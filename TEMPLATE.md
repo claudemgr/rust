@@ -379,6 +379,41 @@ AI should be autonomous by default.
 | Before task completion | Full compliance check | Ensure correctness |
 | When uncertain | Re-read spec first | Never guess needlessly |
 
+## Self-Validation Loop
+
+**AI MUST verify its own work with real tools before reporting a task as done. Do not rely on "the code looks right."**
+
+**This rule applies to EVERY change type covered by this template — library/API logic, GUI/TUI/CLI binaries, single-static-binary build, asset embedding, Docker, CI/CD, configuration, documentation, security — not only one category.** Whatever you touched, you verify.
+
+Getting code correct on the first try is much harder than iterating with feedback. Close the loop every time. All execution goes through the project's containerised targets — never bare host cargo.
+
+| Change type | How to verify |
+|-------------|---------------|
+| Library / API logic | Run the project's test target inside the container; exercise the API directly; compare output against expected |
+| Behavior-preserving refactor | Diff outputs of old vs. new path on representative inputs (don't trust that the diff "looks right") |
+| CLI binary | Run the binary in the container; exercise relevant flags including `--help`/`--version`; check stdout, stderr, and exit code |
+| TUI binary | Run in the container; verify rendering, keyboard input, and screen redraw on resize/exit |
+| GUI binary | Run in the container; verify the rendered window under BOTH X11 AND Wayland forwarding (per the X11/Wayland mandate); confirm input events reach the app |
+| Single static binary requirement | Confirm the artifact is a single self-contained file and that it runs on a clean container with no extra runtime install |
+| Asset embedding | Confirm assets are loaded from the binary itself (not from a host path); test on a container without the source tree mounted |
+| Performance change | Measure before AND after — don't assume parallelism, caching, or "cleaner" code is faster |
+| Bug fix | Reproduce the bug FIRST so you have a failing signal, then verify the fix makes it disappear; add a regression test where feasible |
+| Configuration / settings | Start the binary with the new config; verify defaults; verify validation rejects bad input with a useful error |
+| Docker / container build | Build the image; run the container; smoke-test the binary inside it; for GUI, verify display forwarding still works |
+| CI/CD workflow | Run the workflow on a branch (or equivalent dry-run); verify each job's exit status, not just YAML validity |
+| Logging / error paths | Trigger the error path; verify the log line/structured event was emitted with expected fields |
+| Security-sensitive change (auth, crypto, input validation, plugin/dlopen contracts) | Test both the success path AND attempted bypass paths; never assume a guard works without exercising it |
+| Documentation / README | Render markdown locally; verify links, code samples, and example commands actually work |
+| Type / lint / build correctness | The project's containerised check, clippy, and build targets — green across all |
+
+**Iteration rules:**
+- A failed check is data, not failure — adjust and re-run until green
+- Never report "done" while any verification is still red
+- If a check reveals the change is wrong in a way that can't be patched, revert and re-plan; do not paper over a failing check
+- When verification is genuinely impossible in this environment (no display, no DB, no network): say so explicitly. List what was checked and what could not be, so the user knows where to look
+
+**Reference:** based on published guidance about AI coding agent self-validation (Eivind Kjosbakken, Towards Data Science, 2026) — when an AI agent is given verification tools (output diffing, browser/display, test runners) and allowed to iterate, one-shot success rate, run length, and task complexity all improve substantially.
+
 ## Commit Message File
 
 If changes were made, update `.git/COMMIT_MESS` to reflect the actual current uncommitted changes.
