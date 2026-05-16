@@ -1251,7 +1251,16 @@ Every external action (`uses: owner/action@...`) MUST be pinned to a full commit
 2. **Runtime is still supported** — open the action's `action.yml` at the new SHA and check `runs.using`; if it names a runtime that GitHub has deprecated or scheduled for removal, the action will silently fail after that date. Example: `node20` is removed from GitHub-hosted runners on **2026-09-16** — any action still on `node20` must be updated to a SHA where it has migrated to `node24` — all common `actions/*` and `docker/*` actions have already done so
 3. **No supply-chain change** — skim the diff between the old and new SHA; unexpected new dependencies, changed entrypoints, or network calls added to setup steps are red flags
 
-**Renovate** (`renovate.json`) is the recommended dependency update tool — it updates GitHub Actions SHAs, Docker image digests, and Cargo deps across all providers in a single config. Dependabot (`.github/dependabot.yml`) is acceptable for GitHub-only repos. Neither tool does the runtime verification — that is always a manual check per `cicd_conventions.md`.
+**Renovate** (`renovate.json`) is the only supported dependency update tool — it updates GitHub Actions SHAs, Docker image digests, and Cargo deps across all providers in a single config (see `cicd_conventions.md`). Renovate does not do the runtime verification — that is always a manual check.
+
+### Provider CLIs and Local Runner
+
+**Provider CLIs** (prefer over raw `curl` when installed):
+- `gh` — GitHub (Apache-2.0)
+- `glab` — GitLab (MIT)
+- `tea` — Gitea and Forgejo (MIT, compatible API)
+
+**`act`** (nektos/act, MIT) — run GitHub Actions locally with `act -j {job}` to verify before pushing. Not a CI replacement — always let real CI run.
 
 ## Minimum Public Repo Workflows
 
