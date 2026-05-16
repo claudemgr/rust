@@ -1251,29 +1251,37 @@ Every external action (`uses: owner/action@...`) MUST be pinned to a full commit
 2. **Runtime is still supported** — open the action's `action.yml` at the new SHA and check `runs.using`; if it names a runtime that GitHub has deprecated or scheduled for removal, the action will silently fail after that date. Example: `node20` is removed from GitHub-hosted runners on **2026-09-16** — any action still on `node20` must be updated to a SHA where it has migrated to `node24` — all common `actions/*` and `docker/*` actions have already done so
 3. **No supply-chain change** — skim the diff between the old and new SHA; unexpected new dependencies, changed entrypoints, or network calls added to setup steps are red flags
 
-Dependabot covers `github-actions` ecosystem updates automatically when `.github/dependabot.yml` is configured — but it only updates the SHA, not the runtime verification. The runtime check is always manual.
+**Renovate** (`renovate.json`) is the recommended dependency update tool — it updates GitHub Actions SHAs, Docker image digests, and Cargo deps across all providers in a single config. Dependabot (`.github/dependabot.yml`) is acceptable for GitHub-only repos. Neither tool does the runtime verification — that is always a manual check per `cicd_conventions.md`.
 
 ## Minimum Public Repo Workflows
 
-All three workflows are required on every public repo regardless of language:
+Every project ships workflow files for all five CI/CD providers. Same gates, different syntax — no vendor lock-in.
 
-- `.github/workflows/build.yml` — build, test, coverage, and repo validation
-- `.github/workflows/release.yml` — tagged/manual release build and publish
-- `.github/workflows/security.yml` — secret scanning, dependency/security checks, and workflow policy checks
+| Provider | Workflow location | Syntax |
+|----------|------------------|--------|
+| GitHub | `.github/workflows/build.yml` / `release.yml` / `security.yml` | GitHub Actions |
+| GitLab | `.gitlab-ci.yml` | GitLab CI (stages: build, test, security, release) |
+| Gitea | `.gitea/workflows/build.yml` / `release.yml` / `security.yml` | GitHub Actions (act runner) |
+| Forgejo | `.forgejo/workflows/build.yml` / `release.yml` / `security.yml` | GitHub Actions (act runner) |
+| Jenkins | `Jenkinsfile` | Declarative Pipeline |
 
-**`security.yml` job conditionality:**
-- `secret-scan` (truffleHog) — always runs; `fetch-depth: 0` required for full history scan
-- `workflow-policy` — always runs; checks all `uses:` lines are pinned to a 40-char SHA and blocks `pull_request_target`
-- `vuln-scan` (cargo audit) — runs only when `Cargo.lock` is present in the repo
-- `image-scan` (Trivy) — runs only when a Dockerfile is present; must run after the image is built
+**`security` job conditionality (applies to all providers):**
+- Secret scan (truffleHog) — always runs; full git history required
+- Workflow policy (SHA/digest pinning check) — always runs
+- `vuln-scan` (cargo audit) — conditional on `Cargo.lock` present
+- `image-scan` (Trivy) — conditional on Dockerfile present; runs after image build
 
-**Workflow job ordering (`needs:`):** GitHub Actions runs all jobs in parallel by default. Use `needs:` to enforce ordering:
-- `build.yml`: `lint` and `test` run in parallel → `build` needs: test (never produce artifacts from untested code) → `upload-artifacts` needs: build
-- `release.yml`: `build` → `release` (needs: build); release job re-runs its own build inline, never relies on artifacts from a prior workflow run
-- `security.yml`: all jobs run in parallel — no `needs:` between them
-- Cross-workflow ordering uses branch protection (both `build.yml` and `security.yml` must pass before merge); never use `workflow_run` to chain workflows
+**GitHub Actions job ordering (`needs:`):**
+- `build.yml`: `lint` and `test` run in parallel → `build` needs: test → `upload-artifacts` needs: build
+- `release.yml`: `build` → `release` (needs: build); release job always re-runs its own build inline
+- `security.yml`: all jobs parallel — no `needs:` between them
+- Cross-workflow ordering via branch protection; never `workflow_run`
 
-Equivalent Gitea/Forgejo/GitLab/Jenkins pipelines must enforce the same gates — not a weaker subset.
+**GitLab CI**: security jobs run in the `security` stage (parallel by default). Release stage triggered by `$CI_COMMIT_TAG`.
+
+**Jenkins**: `Security` stage uses `parallel {}`. `Release` stage uses `when { tag 'v*' }`.
+
+CI MUST fail on all providers when tests, coverage gates, secret scans, dependency checks, or release validation fail. Never accept a weaker gate on one provider than another.
 
 ## Suggested CI Steps
 
