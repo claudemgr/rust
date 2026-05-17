@@ -633,7 +633,7 @@ This list is not exhaustive; treat it as the starting point. When introducing a 
 
 ## Cargo Commands
 
-**All cargo invocations execute inside the project Docker container — never on the host.** The table below shows the *logical* command; the **actual** invocation is wrapped (e.g., `docker compose run --rm dev <cmd>` or `docker run --rm -v "$PWD":/work -w /work <image> <cmd>`). See "Docker Rule" below.
+**All cargo invocations execute inside the project Docker container — never on the host.** The table below shows the *logical* command; the **actual** invocation is wrapped (e.g., `docker compose run --rm dev <cmd>` or `docker run --rm -it --name "{project_name}-XXXX" -v "$PWD":/work -w /work <image> <cmd>`). See "Docker Rule" below.
 
 | Logical Command | Purpose |
 |-----------------|---------|
@@ -809,7 +809,8 @@ GUI and display-aware test runs use the `gui` compose service (or equivalent `do
 ```bash
 xhost +SI:localuser:$(id -un)        # grant access to current user only; revoke when done
 
-docker run --rm \
+docker run --rm -it \
+  --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
   -e DISPLAY="$DISPLAY" \
   -e XAUTHORITY=/tmp/.docker.xauth \
   -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
@@ -824,7 +825,8 @@ xhost -SI:localuser:$(id -un)        # revoke after the session
 **Wayland forwarding (host running a Wayland compositor):**
 
 ```bash
-docker run --rm \
+docker run --rm -it \
+  --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
   -e WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
   -e XDG_RUNTIME_DIR=/tmp/xdg \
   -e QT_QPA_PLATFORM=wayland \
@@ -1176,19 +1178,19 @@ mkdir -p dist
 docker build -t "$PROJECT_IMAGE" -f docker/Dockerfile .
 
 # Run gates inside the image
-docker run --rm -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo fmt --all --check
-docker run --rm -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo clippy --workspace --all-targets --all-features -- -D warnings
-docker run --rm -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo test --workspace --all-features
-docker run --rm -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo doc --workspace --no-deps
+docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo fmt --all --check
+docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo clippy --workspace --all-targets --all-features -- -D warnings
+docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo test --workspace --all-features
+docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo doc --workspace --no-deps
 
 # License + advisory enforcement (PART 11 → "License Compliance")
-docker run --rm -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
+docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
   cargo deny check licenses advisories bans sources
 
 # Attribution-drift check: regenerate the GENERATED region and compare to committed.
 # The `>` redirection runs on the host shell, capturing the container's stdout
 # into a host-side file (the cwd is bind-mounted at /work, so this is intentional).
-docker run --rm -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
+docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
   cargo about generate about.hbs > LICENSE.generated.md
 sed -n '/<!-- GENERATED:/,$p' LICENSE.md > LICENSE.committed-generated.md
 diff LICENSE.committed-generated.md LICENSE.generated.md
@@ -1198,7 +1200,9 @@ diff LICENSE.committed-generated.md LICENSE.generated.md
 # is renamed to {project_name}-{platform}-{arch}{.ext} with -musl / vendor / ABI
 # tokens stripped (see PART 2 → "Binary Model").
 for TARGET in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
-  docker run --rm -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
+  docker run --rm -it \
+    --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+    -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
     cargo build --release --target "$TARGET"
 
   # Map triple → artifact name: x86_64-unknown-linux-musl → linux-x86_64
@@ -1215,14 +1219,14 @@ for TARGET in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
   #   Linux musl     → ldd  (expect "not a dynamic executable" / "statically linked")
   #   Apple darwin   → otool -L (expect only Apple-provided frameworks)
   #   Windows MSVC   → dumpbin /dependents (expect no MSVC runtime DLLs)
-  docker run --rm -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
+  docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
     sh -c "ldd target/$TARGET/release/{project_name} 2>&1 | grep -qE 'not a dynamic executable|statically linked'"
 done
 
 # Generate the SBOM (CycloneDX) — published alongside the release artifacts.
 # `cargo cyclonedx --format json` writes `bom.json` next to Cargo.toml; rename
 # into dist/ for inclusion in the release.
-docker run --rm -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
+docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
   cargo cyclonedx --format json
 cp bom.json "dist/{project_name}-bom.json"
 ```
