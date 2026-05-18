@@ -173,7 +173,7 @@ This project's source code is **exclusively Rust**.
 - All application code, library code, build automation, and test code in this repository is written in Rust
 - No C, C++, Objective-C, Swift, Go, Python, JavaScript, TypeScript, or shell-script source files contribute to the produced binary
 - `build.rs`, `xtask/`, and any task automation are written in Rust — not Make, not Bash, not Python
-- Small `docker/entrypoint.sh` and `docker/` shell helpers are tolerated because they orchestrate the container, not the application; they MUST NOT contain application logic
+- Small `docker/rootfs/usr/local/bin/entrypoint.sh` and `docker/` shell helpers are tolerated because they orchestrate the container, not the application; they MUST NOT contain application logic
 - Third-party crates that internally vendor C code (e.g., compression, crypto, SQLite, GUI) are allowed only when (a) no pure-Rust equivalent is viable, (b) the C code is statically linked into the final binary, (c) it does NOT require a system C lib at runtime (no `*-sys`-style dynamic linkage to system-installed `.so`/`.dylib`/`.dll`), and (d) the dependency is documented in `IDEA.md` and `LICENSE.md`. The Pure-Rust Library Stack in PART 5 pre-grants this exception for `ring` only — small, audited, ubiquitous, and effectively unavoidable for crypto performance — which still requires LICENSE.md attribution but does not need a per-project IDEA.md write-up. Larger vendored-C dependencies like `rusqlite` with `bundled` remain a per-project IDEA.md exception.
 - **Prefer pure-Rust crates whenever a viable one exists.** Pure-Rust crates are what make the single-static-binary rule and cross-platform GUI (Windows / macOS / Linux / BSD) achievable in practice — every `*-sys` crate dragged in becomes a portability and build-system tax. See PART 5 → "Pure-Rust Library Stack" for the recommended crate-by-capability list.
 - Never introduce a build that requires a system C/C++ toolchain on the user's machine — the project Docker image is the only required build environment
@@ -251,6 +251,9 @@ The single binary contains **everything the app needs to function**. The user is
 | **deny.toml** | `cargo-deny` license / advisory / bans / sources policy (PART 11 → "License Compliance") | Policy or allow/deny set changes |
 | **about.toml** | `cargo-about` configuration (allowlist of accepted licenses for attribution generation) | Accepted-licenses set changes |
 | **about.hbs** | `cargo-about` Handlebars template controlling the format of the generated `LICENSE.md` GENERATED region | Output-format changes |
+| **Makefile** | Build, test, run targets for local development. Convenience wrappers around the Docker-wrapped commands. **Never called from CI workflow `run:` steps** (PART 10 → "CI/CD Rules") | Local-dev targets change |
+| **.dockerignore** | Build-context exclusions; Rust-specific entries: `target/`. See `dockerfile_conventions.md` → ".dockerignore" for the full standard entry set (version control, `.env`, build artifacts, `volumes/`, OS files, markdown/LICENSE). `docker/`, `src/`, `Cargo.toml`, `Cargo.lock`, `build.rs`, `release.txt` are NEVER excluded. | Build-context surface changes |
+| **renovate.json** | Single Renovate config covering Cargo deps, GitHub Actions SHAs, and Docker digests across all five providers. Dependabot forbidden (PART 9 → "Dependency Governance") | Update-policy changes |
 
 ## Mandatory Compliance Schedule
 
@@ -281,7 +284,7 @@ Getting code correct on the first try is much harder than iterating with feedbac
 | Performance change | Measure before AND after — don't assume parallelism, caching, or "cleaner" code is faster |
 | Bug fix | Reproduce the bug FIRST so you have a failing signal, then verify the fix makes it disappear; add a regression test where feasible |
 | Configuration / settings | Start the binary with the new config; verify defaults; verify validation rejects bad input with a useful error |
-| Docker / container build | Build the image; run the container; smoke-test the binary inside it; for GUI, verify display forwarding still works |
+| Docker / container build | Build and verify each image variant as appropriate to the change: `:build` (toolchain) when `docker/Dockerfile.build` changes, `:devel` (debug binary) for logic changes, `:latest` (release binary) for release verification. Run the container; smoke-test the binary inside it; for GUI, verify display forwarding still works. |
 | CI/CD workflow | Run the workflow on a branch (or equivalent dry-run); verify each job's exit status, not just YAML validity |
 | Logging / error paths | Trigger the error path; verify the log line/structured event was emitted with expected fields |
 | Security-sensitive change (auth, crypto, input validation, plugin/dlopen contracts) | Test both the success path AND attempted bypass paths; never assume a guard works without exercising it |
@@ -730,7 +733,7 @@ src/
     ├── tui/
     └── cli/
 assets/                 # BUILD-TIME ONLY: source tree embedded into the binary at compile time
-docker/                 # REQUIRED: Dockerfile, compose.yaml, entrypoint.sh, README.md
+docker/                 # REQUIRED: Dockerfile, docker-compose.yml, rootfs/usr/local/bin/entrypoint.sh, README.md
 packaging/              # installer/manifests/bundle metadata
 scripts/                # optional helper scripts that wrap Docker invocations (host-side wrappers); MUST NOT contain application logic
 xtask/                  # Rust-based build/release automation crate (executed inside Docker)
@@ -773,16 +776,18 @@ Place Docker assets under `docker/`:
 
 ```text
 docker/
-├── Dockerfile              # production runtime image — two-stage (builder + minimal Alpine/Debian); tagged :latest
-├── Dockerfile.build        # toolchain image — rust:alpine + pinned toolchain + all build/test/lint/scan tools; built monthly; tagged :build   (project-specific)
-├── Dockerfile.dev          # devel image — same as release but binary runs in debug mode; tagged :devel   (project-specific)
-├── rootfs/                 # build-time filesystem overlay copied into image at /   (project-specific)
-├── compose.yaml            # services: dev (build/test/run), gui (X11/Wayland forwarding), runtime
-├── entrypoint.sh           # sets non-root UID/GID, prepares cache/target dirs
-└── README.md               # how to build the image, run tests, run GUI with display forwarding
+├── Dockerfile                              # production runtime image — two-stage (builder + minimal Alpine/Debian); tagged :latest
+├── Dockerfile.build                        # toolchain image — rust:alpine + pinned toolchain + all build/test/lint/scan tools; built monthly; tagged :build   (project-specific)
+├── Dockerfile.dev                          # devel image — same as release but binary runs in debug mode; tagged :devel   (project-specific)
+├── rootfs/                                 # build-time filesystem overlay copied into image at /   (project-specific)
+│   └── usr/local/bin/entrypoint.sh         # sets non-root UID/GID, prepares cache/target dirs; called by tini → entrypoint.sh → app
+├── docker-compose.yml                      # production/human runtime — image: ghcr.io/{org}/{name}:latest
+├── docker-compose.dev.yml                  # human development — image: ghcr.io/{org}/{name}:devel
+├── docker-compose.test.yml                 # automated testing (AI-usable) — builds from Dockerfile, ephemeral tmpfs, named bridge net
+└── README.md                               # how to build the image, run tests, run GUI with display forwarding
 ```
 
-A top-level `compose.yaml` symlink or shim is allowed for ergonomics, but the source of truth lives under `docker/`.
+All three compose files live under `docker/` (per `dockerfile_conventions.md` → "Docker Compose / File locations"). A top-level `docker-compose.yml` symlink or shim is allowed for ergonomics, but the source of truth lives under `docker/`. AI MUST only run `docker-compose.test.yml`; `docker-compose.yml` and `docker-compose.dev.yml` are human-only.
 
 ### Mandatory Image Properties
 
@@ -795,7 +800,66 @@ These properties apply to `docker/Dockerfile.build` — the toolchain image buil
 - `target/` and the cargo registry/cache mounted as named volumes for build speed
 - The image SHOULD be free of system C dev libraries unless a specific dependency requires one. Per the Rust-Only Application rule, the default GUI dependency set (`x11rb` or `x11-dl`, `wayland-client` with `dlopen`, pure-Rust font / Vulkan / GL loaders) does not need `libX11` / `libwayland-client` / `libfontconfig` / `libfreetype` / `libGL` headers at build time. Add such packages to the image **only** when IDEA.md documents a specific `*-sys` exception per PART 0 → "Rust-Only Application", and the addition is the minimum needed by that crate
 
+**Required pre-installed tools in `docker/Dockerfile.build`** (CI workflow steps assume they exist in the image — never install in workflow `run:` steps):
+
+- `rustup component add rustfmt clippy`
+- `cargo install cargo-audit` — Rust vulnerability scanner (PART 10 → `security.yml` `vuln-scan`)
+- `cargo install cargo-cyclonedx` — SBOM generator (PART 5 → "Release Artifacts")
+- `cargo install cargo-about` — third-party license attribution generator (PART 11 → "License Compliance")
+- `cargo install cargo-deny` — license / advisory / bans / sources enforcement
+- `cargo install cargo-tarpaulin` (or `cargo-llvm-cov`) — coverage gate (PART 8 → "Coverage Gate")
+
 CI/CD workflows pull this image via the `ensure-build-image` pre-flight job — they never install tools inline. See `cicd_conventions.md` for the full workflow pattern.
+
+### OCI Annotations (No LABEL Policy)
+
+All image metadata is applied as **OCI annotations at build time** — never as `LABEL` blocks in any Dockerfile. Labels attach to per-platform image layers; multiarch manifest indexes do not inherit labels, so they appear missing on multiarch pulls. Annotations attach to the manifest index and are visible across all platforms.
+
+- No `LABEL` blocks in `docker/Dockerfile`, `docker/Dockerfile.build`, or `docker/Dockerfile.dev`
+- GitHub Actions: use `docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf  # v6.0.0` with an `annotations:` input listing the required OCI keys
+- `docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1.0` MUST set `annotations: ${{ steps.meta.outputs.annotations }}` AND `labels: ""` to suppress label output
+
+See `dockerfile_conventions.md` → "OCI Annotations" for the full required annotation set (`org.opencontainers.image.{title,description,url,source,documentation,vendor,authors,vcs-type,version,revision,created,licenses,...}`).
+
+### Container Runtime Rules
+
+Every production image MUST satisfy:
+
+- **Startup chain `tini → entrypoint.sh → app`** — `ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]`. Never override `ENTRYPOINT` or `CMD` to bypass `tini` or the entrypoint shim. All startup customization goes in `docker/rootfs/usr/local/bin/entrypoint.sh`, which MUST end with `exec "$@"` to preserve PID 1 signal handling.
+- **`STOPSIGNAL SIGTERM`** (or `SIGRTMIN+3` for s6-based images) for graceful shutdown
+- **`HEALTHCHECK`** — every production image declares a `HEALTHCHECK` that exits non-zero when the binary is unhealthy
+- **Non-root `USER`** — containers MUST NOT run as root. Create a non-root user/group in the Dockerfile and switch to it via `USER` before `ENTRYPOINT`. `entrypoint.sh` may remap UID/GID at runtime to match host ownership of mounted volumes. Exceptions (privileged port binding, device access, etc.) MUST be documented in `IDEA.md`.
+
+### Mandatory `docker run` Naming Convention
+
+Every `docker run` invocation in this project (CI, scripts, docs, examples) MUST use:
+
+```bash
+docker run --rm -it \
+  --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+  ...
+```
+
+- `--rm` — self-remove on exit (no orphaned containers)
+- `-it` — interactive-capable for log streaming and signal handling
+- `--name "${PROJECT_NAME}-XXXX"` — traceable name; `XXXX` is the 8-char lowercase-alphanumeric random suffix produced by `tr -dc 'a-z0-9' </dev/urandom | head -c8` (Makefile form: `$$(tr -dc 'a-z0-9' </dev/urandom | head -c8)`)
+
+There is no opt-out. Unnamed or persistent build/test containers are a spec violation.
+
+### Portability Rule
+
+No hardcoded org, project name, official site, or registry value may appear in any Dockerfile, workflow, or Makefile. Use build-time variables:
+
+| Context | Reference |
+|---------|-----------|
+| Dockerfile | `ARG PROJECT_ORG` / `ARG PROJECT_NAME` (passed via `--build-arg`) |
+| GitHub Actions | `${{ github.repository_owner }}` / `${{ github.event.repository.name }}` / `${{ github.event.repository.html_url }}` |
+| GitLab CI | `$CI_REGISTRY_IMAGE`, `$CI_PROJECT_NAMESPACE`, `$CI_PROJECT_NAME` |
+| Gitea / Forgejo | provider-supplied equivalents to the GitHub variables |
+| Jenkinsfile | `${env.JOB_NAME}`, `${env.GIT_URL}` (parse org/name) |
+| Makefile | `PROJECT_ORG ?= $(shell git remote get-url origin \| ...)` |
+
+This rule ensures every workflow, Dockerfile, and Makefile keeps working after a fork without editing values.
 
 ### Build-Time vs Runtime Linkage of Display Libraries
 
@@ -994,6 +1058,23 @@ All gates execute inside the project Docker container (PART 5 → "Docker Rule")
 | GUI smoke (X11) | `cargo run -- --ui gui` against an X11 socket | see PART 5 → "X11 and Wayland Forwarding" |
 | GUI smoke (Wayland) | `cargo run -- --ui gui` against a Wayland socket | see PART 5 → "X11 and Wayland Forwarding" |
 
+## Coverage Gate
+
+`build.yml` MUST enforce a minimum test coverage threshold. The threshold is declared in `IDEA.md ## Business logic` (free-form prose — e.g., "minimum test coverage: 75%"). If `IDEA.md` does not specify a value, the **default is 60%**.
+
+- Use `cargo tarpaulin` (preferred for Linux musl) or `cargo llvm-cov` (works on more targets) — both pre-installed in `docker/Dockerfile.build`
+- CI MUST fail when coverage drops below the threshold; a passing build with uncovered code is a silent regression
+- Coverage is computed against `cargo test --workspace --all-features` output, run inside the toolchain image
+
+```bash
+# Example (Docker-wrapped) — fails if total coverage < threshold
+THRESHOLD="${COVERAGE_MIN:-60}"
+docker run --rm -it \
+  --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+  -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
+  cargo tarpaulin --workspace --all-features --fail-under "$THRESHOLD"
+```
+
 ## Testing Rules
 
 - Core business logic must have unit tests
@@ -1055,7 +1136,10 @@ Plugin downloads are an additional case and apply only when IDEA.md defines a ha
 
 - Keep dependencies minimal
 - Remove unused crates promptly
-- Public repos should automate dependency updates for Cargo, GitHub Actions, and Docker if used
+- **Renovate is the only supported dependency-update tool** — covers Cargo deps, GitHub Actions SHAs, and Docker image digests from a single `renovate.json` at the repo root. Works on GitHub, GitLab, Gitea, Forgejo, and Bitbucket.
+- **Dependabot is forbidden** — GitHub-only, duplicates Renovate's work on GitHub, and cannot serve the other four providers. Never enable both.
+- Public repos MUST ship `renovate.json` so Cargo / Actions / Docker updates land as PRs automatically; Renovate uses `pinDigests: true` to keep all `uses:` lines pinned to immutable SHAs
+- Renovate only updates the SHA; the **runtime-still-supported** verification (e.g., node24 vs deprecated runtimes) remains a manual check on every SHA bump (PART 10 → "Third-party Action Pinning")
 - Security advisories are blockers until triaged
 
 ## Telemetry Rule
@@ -1077,6 +1161,12 @@ No hidden telemetry. Any analytics, crash reporting, or update pings must be doc
 | Version precedence | `release.txt` wins when present |
 | Site precedence | `site.txt` wins when present |
 | Verifiable outputs | Releases publish checksums and an SBOM (always); provenance/attestation when the platform supports it |
+| No Makefile in CI | Workflow `run:` steps invoke explicit commands with all environment variables inlined — never `make {target}`. The Makefile is for local developer convenience only. CI MUST NOT depend on Makefile targets that could drift silently. |
+| Portability | No hardcoded org, project name, official site, or registry value anywhere in workflows. Use `${{ github.repository_owner }}` / `${{ github.event.repository.name }}` (and provider equivalents). Workflows must keep working after a fork without editing values. |
+| Renovate only | `renovate.json` at repo root is the only supported dependency-update tool — it covers GitHub Actions SHAs, Docker image digests, Cargo deps, and works across all five providers from a single config. Dependabot is **forbidden** (GitHub-only; duplicates Renovate on GitHub; cannot serve the other four providers). |
+| `act` pre-commit validation | Before committing any change to `.github/workflows/*.yml`, run `act --list -W {file}` on each changed file. Fix all errors before committing. The `validate-workflows.sh` PreToolUse hook enforces this automatically. |
+| Concurrency groups | Every push/PR workflow declares `concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }`. Release workflows use `cancel-in-progress: false` so a release in flight is never cancelled by a follow-up push. |
+| Artifact retention | Every `actions/upload-artifact` step sets `retention-days: 7` (or shorter) — no infinite retention of build outputs. |
 
 ## Workflow Permissions
 
@@ -1148,11 +1238,24 @@ Every project ships workflow files for all five CI/CD providers. Same gates, dif
 
 | Provider | Workflow location | Syntax |
 |----------|------------------|--------|
-| GitHub | `.github/workflows/build.yml` / `release.yml` / `security.yml` | GitHub Actions |
-| GitLab | `.gitlab-ci.yml` | GitLab CI (stages: build, test, security, release) |
-| Gitea | `.gitea/workflows/build.yml` / `release.yml` / `security.yml` | GitHub Actions (act runner) |
-| Forgejo | `.forgejo/workflows/build.yml` / `release.yml` / `security.yml` | GitHub Actions (act runner) |
-| Jenkins | `Jenkinsfile` | Declarative Pipeline |
+| GitHub | `.github/workflows/build.yml` / `release.yml` / `security.yml` / `build-toolchain.yml` | GitHub Actions |
+| GitLab | `.gitlab-ci.yml` (stages: build, test, security, release, toolchain) | GitLab CI |
+| Gitea | `.gitea/workflows/build.yml` / `release.yml` / `security.yml` / `build-toolchain.yml` | GitHub Actions (act runner) |
+| Forgejo | `.forgejo/workflows/build.yml` / `release.yml` / `security.yml` / `build-toolchain.yml` | GitHub Actions (act runner) |
+| Jenkins | `Jenkinsfile` (parallel stages: Build / Test / Security / Release; separate `Jenkinsfile.toolchain` for the monthly image build) | Declarative Pipeline |
+
+**Workflow purposes:**
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `build.yml` | push + pull_request | `cargo fmt --check`, `cargo clippy`, `cargo test`, coverage gate, `cargo build --release` on supported targets |
+| `release.yml` | tag push (`v*`) + workflow_dispatch | Build statically linked artifacts for the supported target matrix, sign, upload to GitHub Releases, publish SBOM and checksums |
+| `security.yml` | push + pull_request + weekly schedule | truffleHog secret scan + workflow-policy SHA pinning check + conditional `vuln-scan` (cargo audit) + conditional `image-scan` (Trivy) |
+| `build-toolchain.yml` | monthly schedule (`cron: '0 4 1 * *'`) + workflow_dispatch | Build `docker/Dockerfile.build` and push as `ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:build`; every other workflow pulls this image via `ensure-build-image` and never installs tools inline. Provider equivalents: GitLab pipeline triggered by `schedules`; Gitea/Forgejo equivalent workflow file; Jenkins `Jenkinsfile.toolchain` declarative pipeline. |
+
+In addition to the workflows, every repository ships:
+
+- `renovate.json` — single dependency-update config covering GitHub Actions SHAs, Docker digests, Cargo deps; works on all five providers (see PART 9 → "Dependency Governance")
 
 **`security` job conditionality (applies to all providers):**
 - Secret scan (truffleHog) — always runs; full git history required
@@ -1172,9 +1275,115 @@ Every project ships workflow files for all five CI/CD providers. Same gates, dif
 
 CI MUST fail on all providers when tests, coverage gates, secret scans, dependency checks, or release validation fail. Never accept a weaker gate on one provider than another.
 
+### `security.yml` Example (GitHub / Gitea / Forgejo)
+
+truffleHog is the mandatory secret scanner — **never** `gitleaks` (requires a commercial license for org repos). Trivy is the mandatory image scanner. Both pin to full commit SHAs.
+
+```yaml
+name: Security
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1'   # weekly Monday 06:00 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0   # required: truffleHog needs full history
+
+      - name: TruffleHog secret scan
+        uses: trufflesecurity/trufflehog@b634fb72d9901a4f942e5b8e4ef5f7ec59c97e7c  # v3.88.2
+        with:
+          base: ${{ github.event.before }}   # NEVER use default_branch — it resolves to HEAD post-push and skips the scan
+          head: ${{ github.sha }}
+          extra_args: --only-verified
+
+  workflow-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - name: Verify all third-party actions are pinned to a 40-char SHA
+        run: |
+          set -euo pipefail
+          bad=$(grep -RhnE '^\s*uses:\s*[^@]+@(v?[0-9]|main|master)' .github/ .gitea/ .forgejo/ 2>/dev/null || true)
+          if [[ -n "$bad" ]]; then
+            echo "::error::Unpinned actions found (must be 40-char SHAs):"
+            echo "$bad"
+            exit 1
+          fi
+
+  vuln-scan:
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('Cargo.lock') != '' }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - name: cargo audit (inside :build image)
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:build"
+          docker run --rm -i \
+            --name "${{ github.event.repository.name }}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+            -v "$PWD":/work -w /work "$IMAGE" cargo audit
+
+  image-scan:
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('docker/Dockerfile') != '' }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
+      - name: Build local image for scanning
+        run: |
+          docker build -f docker/Dockerfile -t scan-target:ci .
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@76071ef0d7ec797419534a183b498b4d6366cf37  # v0.70.0
+        with:
+          image-ref: scan-target:ci
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+```
+
+**Per-provider notes:**
+
+- GitLab: `secret-scan` runs as a docker job using `image: trufflesecurity/trufflehog:latest` with `GIT_DEPTH: 0`; `image-scan` uses `image: aquasecurity/trivy:0.70.0`.
+- Jenkins: `Security` stage uses `parallel {}`; truffleHog and Trivy each run via `docker.image(...).inside { ... }`.
+- All providers: same gates, same severities, same exit conditions — no weaker subset on any provider.
+
 ## Suggested CI Steps
 
 CI runs every cargo step inside the project's Docker toolchain image (`docker/Dockerfile.build`). CI MUST NOT install a Rust toolchain on the runner and call cargo directly — it pulls the build image (built monthly via `build-toolchain.yml`) using the `ensure-build-image` pre-flight job and executes all commands inside it.
+
+### Required Concurrency and Retention Headers
+
+Every push/PR workflow (`build.yml`, `security.yml`) MUST declare:
+
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+```
+
+Release workflows (`release.yml`) and the toolchain workflow (`build-toolchain.yml`) MUST use `cancel-in-progress: false` so a release or image build already in flight is not killed by a follow-up push.
+
+Every `actions/upload-artifact` step MUST set a finite `retention-days`:
+
+```yaml
+- uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+  with:
+    name: {project_name}-${{ matrix.target }}
+    path: dist/
+    retention-days: 7   # release-job artifacts may use up to 30; build-job CI artifacts use 7
+```
 
 ```bash
 # Prepare output directory for release artifacts (binaries, checksums, SBOM)
@@ -1332,7 +1541,7 @@ License compliance is enforced by tooling and gated in CI; it is not left to man
 | `cargo-about` | Generate the third-party attribution section of `LICENSE.md` from `Cargo.lock` | `about.toml` (accepted-licenses config) **and** `about.hbs` (Handlebars output template), both at project root |
 | `cargo-cyclonedx` | Generate the SBOM (CycloneDX format) referenced in PART 5 → "Release Artifacts" and PART 10 → "Release Integrity" | (CLI flags; no separate config file) |
 
-All three tools run inside the project Docker image. The image MUST have them pre-installed (added to the same `cargo install` step that pins `rustfmt` / `clippy` parity).
+All three tools run inside the project Docker image. The image MUST have them pre-installed in `docker/Dockerfile.build` — `rustup component add rustfmt clippy` plus the required `cargo install` steps (`cargo-audit`, `cargo-cyclonedx`, `cargo-about`, `cargo-deny`, `cargo-tarpaulin` or `cargo-llvm-cov`) run during image build. The tools live in the image, never in CI workflow `run:` steps.
 
 ### License Allowlist (default)
 
@@ -1453,7 +1662,8 @@ Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI fai
 - [ ] `CLAUDE.md` / `.claude/CLAUDE.md` are short loaders, not duplicate specs
 - [ ] `release.txt` exists if the project is using explicit release versioning
 - [ ] `site.txt` exists only if there is a real official site URL
-- [ ] `docker/Dockerfile`, `docker/Dockerfile.build`, `docker/compose.yaml`, and `docker/entrypoint.sh` exist; `Dockerfile.build` builds the toolchain image; `Dockerfile` is the runtime image
+- [ ] `docker/Dockerfile` (always, when project ships a container), `docker/Dockerfile.build` (project-specific — when a CI toolchain image is used), `docker/Dockerfile.dev` (project-specific — when a debug-mode image is shipped), `docker/docker-compose.yml`, `docker/docker-compose.dev.yml`, `docker/docker-compose.test.yml`, and `docker/rootfs/usr/local/bin/entrypoint.sh` exist as needed; `Dockerfile.build` builds the toolchain image; `Dockerfile` is the runtime image
+- [ ] `.dockerignore` exists at project root with Rust-specific entries (`target/`, plus the standard exclusions from `dockerfile_conventions.md` → ".dockerignore")
 - [ ] `docker/Dockerfile.build` has pinned Rust toolchain, rustfmt, clippy, and all musl/cross targets pre-installed
 - [ ] If IDEA.md documents a `*-sys` exception requiring system dev libs at build time, only the minimum set needed by that crate is added to the image — by default the image carries no GUI-stack C dev libs (PART 0 → "Rust-Only Application")
 - [ ] X11 forwarding sample command is documented and works against a real Xorg/XWayland session
