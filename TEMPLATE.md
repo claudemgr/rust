@@ -773,8 +773,9 @@ Place Docker assets under `docker/`:
 
 ```text
 docker/
-├── Dockerfile              # builds the dev/build/test image with the pinned Rust toolchain
-├── Dockerfile.runtime      # optional: minimal runtime image for produced binaries
+├── Dockerfile              # two-stage runtime image (builder stage + minimal Alpine/Debian runtime)
+├── Dockerfile.build        # toolchain image — rust:alpine + pinned toolchain + all build/test/lint/scan tools; built monthly
+├── Dockerfile.dev          # development variant — same base as Dockerfile.build + hot-reload/extra debug setup
 ├── compose.yaml            # services: dev (build/test/run), gui (X11/Wayland forwarding), runtime
 ├── entrypoint.sh           # sets non-root UID/GID, prepares cache/target dirs
 └── README.md               # how to build the image, run tests, run GUI with display forwarding
@@ -784,12 +785,16 @@ A top-level `compose.yaml` symlink or shim is allowed for ergonomics, but the so
 
 ### Mandatory Image Properties
 
+These properties apply to `docker/Dockerfile.build` — the toolchain image built monthly and pulled by all CI/CD workflows:
+
 - Pinned Rust toolchain version matching `rust-toolchain.toml` / `Cargo.toml` MSRV policy
 - `rustfmt` and `clippy` components included
 - All release targets the project builds for are pre-installed via `rustup` (musl Linux + MSVC `+crt-static` Windows from `.cargo/config.toml`, plus Apple `*-darwin` targets which need no rustflags and so do not appear in `.cargo/config.toml`)
 - A non-root user matching the host UID/GID by default (so files written into mounted volumes are not root-owned)
 - `target/` and the cargo registry/cache mounted as named volumes for build speed
 - The image SHOULD be free of system C dev libraries unless a specific dependency requires one. Per the Rust-Only Application rule, the default GUI dependency set (`x11rb` or `x11-dl`, `wayland-client` with `dlopen`, pure-Rust font / Vulkan / GL loaders) does not need `libX11` / `libwayland-client` / `libfontconfig` / `libfreetype` / `libGL` headers at build time. Add such packages to the image **only** when IDEA.md documents a specific `*-sys` exception per PART 0 → "Rust-Only Application", and the addition is the minimum needed by that crate
+
+CI/CD workflows pull this image via the `ensure-build-image` pre-flight job — they never install tools inline. See `cicd_conventions.md` for the full workflow pattern.
 
 ### Build-Time vs Runtime Linkage of Display Libraries
 
@@ -1168,14 +1173,14 @@ CI MUST fail on all providers when tests, coverage gates, secret scans, dependen
 
 ## Suggested CI Steps
 
-CI runs every cargo step inside the project's Docker image. CI MUST NOT install a Rust toolchain on the runner and call cargo directly — it builds the project image (or pulls a cached one) and executes commands inside it.
+CI runs every cargo step inside the project's Docker toolchain image (`docker/Dockerfile.build`). CI MUST NOT install a Rust toolchain on the runner and call cargo directly — it pulls the build image (built monthly via `build-toolchain.yml`) using the `ensure-build-image` pre-flight job and executes all commands inside it.
 
 ```bash
 # Prepare output directory for release artifacts (binaries, checksums, SBOM)
 mkdir -p dist
 
-# Build (or pull) the dev/build/test image
-docker build -t "$PROJECT_IMAGE" -f docker/Dockerfile .
+# Build image is pulled (or built) by the ensure-build-image job — see cicd_conventions.md
+# Reference it as: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:build
 
 # Run gates inside the image
 docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo fmt --all --check
@@ -1447,8 +1452,8 @@ Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI fai
 - [ ] `CLAUDE.md` / `.claude/CLAUDE.md` are short loaders, not duplicate specs
 - [ ] `release.txt` exists if the project is using explicit release versioning
 - [ ] `site.txt` exists only if there is a real official site URL
-- [ ] `docker/Dockerfile`, `docker/compose.yaml`, and `docker/entrypoint.sh` exist and build a working dev/test image
-- [ ] Image has pinned Rust toolchain, rustfmt, clippy, and all musl/cross targets pre-installed
+- [ ] `docker/Dockerfile`, `docker/Dockerfile.build`, `docker/compose.yaml`, and `docker/entrypoint.sh` exist; `Dockerfile.build` builds the toolchain image; `Dockerfile` is the runtime image
+- [ ] `docker/Dockerfile.build` has pinned Rust toolchain, rustfmt, clippy, and all musl/cross targets pre-installed
 - [ ] If IDEA.md documents a `*-sys` exception requiring system dev libs at build time, only the minimum set needed by that crate is added to the image — by default the image carries no GUI-stack C dev libs (PART 0 → "Rust-Only Application")
 - [ ] X11 forwarding sample command is documented and works against a real Xorg/XWayland session
 - [ ] Wayland forwarding sample command is documented and works against a real Wayland compositor
