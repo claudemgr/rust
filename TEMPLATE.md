@@ -793,6 +793,7 @@ All three compose files live under `docker/` (per `dockerfile_conventions.md` �
 
 These properties apply to `docker/Dockerfile.build` — the toolchain image built monthly and pulled by all CI/CD workflows:
 
+- Base image: `rust:alpine` (the official Rust toolchain image) — never a generic Alpine or Debian base without the toolchain pre-loaded
 - Pinned Rust toolchain version matching `rust-toolchain.toml` / `Cargo.toml` MSRV policy
 - `rustfmt` and `clippy` components included
 - All release targets the project builds for are pre-installed via `rustup` (musl Linux + MSVC `+crt-static` Windows from `.cargo/config.toml`, plus Apple `*-darwin` targets which need no rustflags and so do not appear in `.cargo/config.toml`)
@@ -1361,6 +1362,59 @@ jobs:
 
 CI runs every cargo step inside the project's Docker toolchain image (`docker/Dockerfile.build`). CI MUST NOT install a Rust toolchain on the runner and call cargo directly — it pulls the build image (built monthly via `build-toolchain.yml`) using the `ensure-build-image` pre-flight job and executes all commands inside it.
 
+### `ensure-build-image` Job (Required in Every Workflow)
+
+`ensure-build-image` is **pull-only and fails fast** — it never builds the image inline. If the image is missing, the job exits immediately with actionable error messages. The correct response to a missing image is to trigger `build-toolchain.yml` via `workflow_dispatch`.
+
+**Bootstrap order** — when adding `docker/Dockerfile.build` to a project for the first time:
+1. Commit only `docker/Dockerfile.build` (no `ci.yml` or `release.yml` yet)
+2. Trigger `build-toolchain.yml` via `workflow_dispatch` and verify the image appears in the registry
+3. Only then commit `ci.yml` and `release.yml`
+
+`Dockerfile.build` base is always the official language toolchain image (`rust:alpine` for Rust projects) — never a generic Alpine or Debian base without the toolchain pre-loaded.
+
+```yaml
+jobs:
+  ensure-build-image:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+    outputs:
+      image: ${{ steps.pull.outputs.image }}
+    steps:
+      - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: pull
+        name: Pull build image (fail fast if missing)
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:build"
+          if ! docker pull "$IMAGE"; then
+            echo "::error::Build image $IMAGE not found."
+            echo "::error::Trigger the 'Build Toolchain Image' workflow (workflow_dispatch) to create it."
+            echo "::error::Never commit ci.yml or release.yml before the build image exists in the registry."
+            exit 1
+          fi
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: ensure-build-image
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.ensure-build-image.outputs.image }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - run: cargo build --release
+      # ... rest of build steps
+```
+
+Every downstream job that uses the build image must follow this pattern:
+- `needs: ensure-build-image`
+- `container: image: ${{ needs.ensure-build-image.outputs.image }}`
+
 ### Required Concurrency and Retention Headers
 
 Every push/PR workflow (`ci.yml`) MUST declare:
@@ -1387,7 +1441,7 @@ Every `actions/upload-artifact` step MUST set a finite `retention-days`:
 # Prepare output directory for release artifacts (binaries, checksums, SBOM)
 mkdir -p dist
 
-# Build image is pulled (or built) by the ensure-build-image job — see cicd_conventions.md
+# Build image is pulled by the ensure-build-image job (pull-only; fails fast if missing) — see cicd_conventions.md
 # Reference it as: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:build
 
 # Run gates inside the image
@@ -1662,7 +1716,9 @@ Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI fai
 - [ ] `site.txt` exists only if there is a real official site URL
 - [ ] `docker/Dockerfile` (always, when project ships a container), `docker/Dockerfile.build` (project-specific — when a CI toolchain image is used), `docker/Dockerfile.dev` (project-specific — when a debug-mode image is shipped), `docker/docker-compose.yml`, `docker/docker-compose.dev.yml`, `docker/docker-compose.test.yml`, and `docker/rootfs/usr/local/bin/entrypoint.sh` exist as needed; `Dockerfile.build` builds the toolchain image; `Dockerfile` is the runtime image
 - [ ] `.dockerignore` exists at project root with Rust-specific entries (`target/`, plus the standard exclusions from `dockerfile_conventions.md` → ".dockerignore")
+- [ ] `docker/Dockerfile.build` base is `rust:alpine` (the official Rust toolchain image) — never a generic Alpine or Debian base without the toolchain pre-loaded
 - [ ] `docker/Dockerfile.build` has pinned Rust toolchain, rustfmt, clippy, and all musl/cross targets pre-installed
+- [ ] Bootstrap order was followed: `docker/Dockerfile.build` committed first → `build-toolchain.yml` triggered via `workflow_dispatch` → image verified in registry → then `ci.yml`/`release.yml` committed
 - [ ] If IDEA.md documents a `*-sys` exception requiring system dev libs at build time, only the minimum set needed by that crate is added to the image — by default the image carries no GUI-stack C dev libs (PART 0 → "Rust-Only Application")
 - [ ] X11 forwarding sample command is documented and works against a real Xorg/XWayland session
 - [ ] Wayland forwarding sample command is documented and works against a real Wayland compositor
