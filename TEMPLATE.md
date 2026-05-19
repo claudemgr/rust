@@ -803,7 +803,7 @@ These properties apply to `docker/Dockerfile.build` — the toolchain image buil
 **Required pre-installed tools in `docker/Dockerfile.build`** (CI workflow steps assume they exist in the image — never install in workflow `run:` steps):
 
 - `rustup component add rustfmt clippy`
-- `cargo install cargo-audit` — Rust vulnerability scanner (PART 10 → `security.yml` `vuln-scan`)
+- `cargo install cargo-audit` — Rust vulnerability scanner (PART 10 → `ci.yml` `vuln-scan`)
 - `cargo install cargo-cyclonedx` — SBOM generator (PART 5 → "Release Artifacts")
 - `cargo install cargo-about` — third-party license attribution generator (PART 11 → "License Compliance")
 - `cargo install cargo-deny` — license / advisory / bans / sources enforcement
@@ -1060,7 +1060,7 @@ All gates execute inside the project Docker container (PART 5 → "Docker Rule")
 
 ## Coverage Gate
 
-`build.yml` MUST enforce a minimum test coverage threshold. The threshold is declared in `IDEA.md ## Business logic` (free-form prose — e.g., "minimum test coverage: 75%"). If `IDEA.md` does not specify a value, the **default is 60%**.
+`ci.yml` MUST enforce a minimum test coverage threshold. The threshold is declared in `IDEA.md ## Business logic` (free-form prose — e.g., "minimum test coverage: 75%"). If `IDEA.md` does not specify a value, the **default is 60%**.
 
 - Use `cargo tarpaulin` (preferred for Linux musl) or `cargo llvm-cov` (works on more targets) — both pre-installed in `docker/Dockerfile.build`
 - CI MUST fail when coverage drops below the threshold; a passing build with uncovered code is a silent regression
@@ -1238,19 +1238,18 @@ Every project ships workflow files for all five CI/CD providers. Same gates, dif
 
 | Provider | Workflow location | Syntax |
 |----------|------------------|--------|
-| GitHub | `.github/workflows/build.yml` / `release.yml` / `security.yml` / `build-toolchain.yml` | GitHub Actions |
+| GitHub | `.github/workflows/ci.yml` / `release.yml` / `build-toolchain.yml` | GitHub Actions |
 | GitLab | `.gitlab-ci.yml` (stages: build, test, security, release, toolchain) | GitLab CI |
-| Gitea | `.gitea/workflows/build.yml` / `release.yml` / `security.yml` / `build-toolchain.yml` | GitHub Actions (act runner) |
-| Forgejo | `.forgejo/workflows/build.yml` / `release.yml` / `security.yml` / `build-toolchain.yml` | GitHub Actions (act runner) |
+| Gitea | `.gitea/workflows/ci.yml` / `release.yml` / `build-toolchain.yml` | GitHub Actions (act runner) |
+| Forgejo | `.forgejo/workflows/ci.yml` / `release.yml` / `build-toolchain.yml` | GitHub Actions (act runner) |
 | Jenkins | `Jenkinsfile` (parallel stages: Build / Test / Security / Release; separate `Jenkinsfile.toolchain` for the monthly image build) | Declarative Pipeline |
 
 **Workflow purposes:**
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `build.yml` | push + pull_request | `cargo fmt --check`, `cargo clippy`, `cargo test`, coverage gate, `cargo build --release` on supported targets |
+| `ci.yml` | push + pull_request + weekly schedule (security jobs only on schedule) | `cargo fmt --check`, `cargo clippy`, `cargo test`, coverage gate, `cargo build --release`, truffleHog secret scan, workflow-policy SHA check, `cargo audit`, Trivy image scan |
 | `release.yml` | tag push (`v*`) + workflow_dispatch | Build statically linked artifacts for the supported target matrix, sign, upload to GitHub Releases, publish SBOM and checksums |
-| `security.yml` | push + pull_request + weekly schedule | truffleHog secret scan + workflow-policy SHA pinning check + conditional `vuln-scan` (cargo audit) + conditional `image-scan` (Trivy) |
 | `build-toolchain.yml` | monthly schedule (`cron: '0 4 1 * *'`) + workflow_dispatch | Build `docker/Dockerfile.build` and push as `ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:build`; every other workflow pulls this image via `ensure-build-image` and never installs tools inline. Provider equivalents: GitLab pipeline triggered by `schedules`; Gitea/Forgejo equivalent workflow file; Jenkins `Jenkinsfile.toolchain` declarative pipeline. |
 
 In addition to the workflows, every repository ships:
@@ -1264,9 +1263,8 @@ In addition to the workflows, every repository ships:
 - `image-scan` (Trivy) — conditional on Dockerfile present; runs after image build
 
 **GitHub Actions job ordering (`needs:`):**
-- `build.yml`: `lint` and `test` run in parallel → `build` needs: test → `upload-artifacts` needs: build
+- `ci.yml`: `lint` and `test` run in parallel → `build` needs: test → `upload-artifacts` needs: build; security jobs (`secret-scan`, `workflow-policy`, `vuln-scan`, `image-scan`) all need: `ensure-build-image` and run in parallel with each other
 - `release.yml`: `build` → `release` (needs: build); release job always re-runs its own build inline
-- `security.yml`: all jobs parallel — no `needs:` between them
 - Cross-workflow ordering via branch protection; never `workflow_run`
 
 **GitLab CI**: security jobs run in the `security` stage (parallel by default). Release stage triggered by `$CI_COMMIT_TAG`.
@@ -1275,12 +1273,12 @@ In addition to the workflows, every repository ships:
 
 CI MUST fail on all providers when tests, coverage gates, secret scans, dependency checks, or release validation fail. Never accept a weaker gate on one provider than another.
 
-### `security.yml` Example (GitHub / Gitea / Forgejo)
+### Security Jobs in `ci.yml` Example (GitHub / Gitea / Forgejo)
 
-truffleHog is the mandatory secret scanner — **never** `gitleaks` (requires a commercial license for org repos). Trivy is the mandatory image scanner. Both pin to full commit SHAs.
+truffleHog is the mandatory secret scanner — **never** `gitleaks` (requires a commercial license for org repos). Trivy is the mandatory image scanner. Both pin to full commit SHAs. These jobs live in `ci.yml` under a `needs: ensure-build-image` dependency and also run on the weekly schedule trigger.
 
 ```yaml
-name: Security
+name: CI
 
 on:
   push:
@@ -1365,7 +1363,7 @@ CI runs every cargo step inside the project's Docker toolchain image (`docker/Do
 
 ### Required Concurrency and Retention Headers
 
-Every push/PR workflow (`build.yml`, `security.yml`) MUST declare:
+Every push/PR workflow (`ci.yml`) MUST declare:
 
 ```yaml
 concurrency:
