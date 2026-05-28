@@ -990,8 +990,8 @@ fn main() {
 ```rust
 pub const VERSION: &str = option_env!("APP_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"));
 pub const OFFICIAL_SITE: &str = option_env!("APP_OFFICIAL_SITE").unwrap_or("");
-pub const COMMIT_ID: &str = option_env!("APP_COMMIT_ID").unwrap_or("unknown");
-pub const BUILD_DATE: &str = option_env!("APP_BUILD_DATE").unwrap_or("unknown");
+pub const COMMIT_ID: &str = option_env!("APP_COMMIT_ID").unwrap_or("N/A");
+pub const BUILD_DATE: &str = option_env!("APP_BUILD_DATE").unwrap_or("N/A");
 ```
 
 ---
