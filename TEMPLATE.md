@@ -1320,7 +1320,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
       - name: Verify all third-party actions are pinned to a 40-char SHA
         run: |
-          set -euo pipefail
+          set -eo pipefail
           bad=$(grep -RhnE '^\s*uses:\s*[^@]+@(v?[0-9]|main|master)' .github/ .gitea/ .forgejo/ 2>/dev/null || true)
           if [[ -n "$bad" ]]; then
             echo "::error::Unpinned actions found (must be 40-char SHAs):"
