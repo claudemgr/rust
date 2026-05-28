@@ -1237,6 +1237,8 @@ Every external action (`uses: owner/action@...`) MUST be pinned to a full commit
 
 Every project ships workflow files for all five CI/CD providers. Same gates, different syntax — no vendor lock-in.
 
+**Workflow files are created last.** Never scaffold or commit a workflow file before all code is complete, `make test` passes, and the lint gate is clean. Pushing a workflow file with incomplete code triggers an immediate CI failure and wastes build minutes.
+
 | Provider | Workflow location | Syntax |
 |----------|------------------|--------|
 | GitHub | `.github/workflows/ci.yml` / `release.yml` / `build-toolchain.yml` | GitHub Actions |
