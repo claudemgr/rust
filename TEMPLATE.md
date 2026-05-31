@@ -1093,6 +1093,12 @@ docker run --rm -it \
 - Panic/backtrace behavior must be intentional and documented
 - GUI/TUI debug tooling must not leak into normal production UX by default
 
+## Directory Naming
+
+**Plural** — all directories use plural names (`handlers/`, `models/`, `routes/`, `utils/`). Rust module directories follow the same rule — `src/handlers/mod.rs` not `src/handler/mod.rs`. Tooling dirs are also plural (`scripts/`, `tests/`, `completions/`).
+
+---
+
 ## Performance Rules
 
 - Optimize based on measured behavior, not guesses
