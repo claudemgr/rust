@@ -777,7 +777,7 @@ Place Docker assets under `docker/`:
 ```text
 docker/
 ├── Dockerfile                              # production runtime image — two-stage (builder + minimal Alpine/Debian); tagged :latest
-├── Dockerfile.build                        # toolchain image — rust:alpine + pinned toolchain + all build/test/lint/scan tools; built monthly; tagged :build   (project-specific)
+├── Dockerfile.build                        # toolchain image — casjaysdev/rust:latest + pinned toolchain + all build/test/lint/scan tools; built monthly; tagged :build   (project-specific)
 ├── Dockerfile.dev                          # devel image — same as release but binary runs in debug mode; tagged :devel   (project-specific)
 ├── rootfs/                                 # build-time filesystem overlay copied into image at /   (project-specific)
 │   └── usr/local/bin/entrypoint.sh         # sets non-root UID/GID, prepares cache/target dirs; called by tini → entrypoint.sh → app
@@ -793,7 +793,7 @@ All three compose files live under `docker/` (per `dockerfile_conventions.md` �
 
 These properties apply to `docker/Dockerfile.build` — the toolchain image built monthly and pulled by all CI/CD workflows:
 
-- Base image: `rust:alpine` (the official Rust toolchain image) — never a generic Alpine or Debian base without the toolchain pre-loaded
+- Base image: `casjaysdev/rust:latest` — never a generic Alpine or Debian base without the toolchain pre-loaded
 - Pinned Rust toolchain version matching `rust-toolchain.toml` / `Cargo.toml` MSRV policy
 - `rustfmt` and `clippy` components included
 - All release targets the project builds for are pre-installed via `rustup` (musl Linux + MSVC `+crt-static` Windows from `.cargo/config.toml`, plus Apple `*-darwin` targets which need no rustflags and so do not appear in `.cargo/config.toml`)
@@ -1382,7 +1382,7 @@ CI runs every cargo step inside the project's Docker toolchain image (`docker/Do
 2. Trigger `build-toolchain.yml` via `workflow_dispatch` and verify the image appears in the registry
 3. Only then commit `ci.yml` and `release.yml`
 
-`Dockerfile.build` base is always the official language toolchain image (`rust:alpine` for Rust projects) — never a generic Alpine or Debian base without the toolchain pre-loaded.
+`Dockerfile.build` uses `casjaysdev/rust:latest` as the base (the maintained Rust toolchain image) — never a generic Alpine or Debian base without the toolchain pre-loaded.
 
 ```yaml
 jobs:
@@ -1727,7 +1727,7 @@ Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI fai
 - [ ] `site.txt` exists only if there is a real official site URL
 - [ ] `docker/Dockerfile` (always, when project ships a container), `docker/Dockerfile.build` (project-specific — when a CI toolchain image is used), `docker/Dockerfile.dev` (project-specific — when a debug-mode image is shipped), `docker/docker-compose.yml`, `docker/docker-compose.dev.yml`, `docker/docker-compose.test.yml`, and `docker/rootfs/usr/local/bin/entrypoint.sh` exist as needed; `Dockerfile.build` builds the toolchain image; `Dockerfile` is the runtime image
 - [ ] `.dockerignore` exists at project root with Rust-specific entries (`target/`, plus the standard exclusions from `dockerfile_conventions.md` → ".dockerignore")
-- [ ] `docker/Dockerfile.build` base is `rust:alpine` (the official Rust toolchain image) — never a generic Alpine or Debian base without the toolchain pre-loaded
+- [ ] `docker/Dockerfile.build` base is `casjaysdev/rust:latest` — the standard maintained Rust toolchain image. `Dockerfile.build` is only needed for custom toolchain requirements beyond what `casjaysdev/rust:latest` provides
 - [ ] `docker/Dockerfile.build` has pinned Rust toolchain, rustfmt, clippy, and all musl/cross targets pre-installed
 - [ ] Bootstrap order was followed: `docker/Dockerfile.build` committed first → `build-toolchain.yml` triggered via `workflow_dispatch` → image verified in registry → then `ci.yml`/`release.yml` committed
 - [ ] If IDEA.md documents a `*-sys` exception requiring system dev libs at build time, only the minimum set needed by that crate is added to the image — by default the image carries no GUI-stack C dev libs (PART 0 → "Rust-Only Application")
