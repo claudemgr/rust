@@ -763,7 +763,7 @@ The `assets/` directory in the repo holds source files (fonts, icons, default th
 - No companion files (no `.so`, `.dylib`, `.dll`, no asset bundles, no font directories) ship next to the binary
 - Include SHA-256 checksums for every published artifact, named `{artifact}.sha256`
 - Include release notes that describe actual changes
-- Include an SBOM (always — generated via `cargo-cyclonedx`; see PART 10 → "Suggested CI Steps" for the invocation, PART 11 → "Required Tooling" for the tool pin). Include provenance/attestation when the release platform supports it
+- Include an SBOM (always — generated via `cargo-cyclonedx`; see PART 10 → "Suggested CI Steps" for the invocation, PART 11 → "Required Tooling" for the tool pin). Include provenance/attestation via `actions/attest-build-provenance` when the release platform supports it; always set `provenance: false` on `docker/build-push-action` steps
 - If GUI packaging exists (MSI, DMG, AppImage, deb, rpm, etc.), the package wraps the same single static binary plus desktop integration metadata; package metadata lives in `packaging/`
 
 ## Docker Rule
@@ -818,7 +818,7 @@ All image metadata is applied as **OCI annotations at build time** — never as 
 
 - No `LABEL` blocks in `docker/Dockerfile`, `docker/Dockerfile.build`, or `docker/Dockerfile.dev`
 - GitHub Actions: use `docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf  # v6.0.0` with an `annotations:` input listing the required OCI keys
-- `docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1.0` MUST set `annotations: ${{ steps.meta.outputs.annotations }}` AND `labels: ""` to suppress label output
+- `docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1.0` MUST set `annotations: ${{ steps.meta.outputs.annotations }}`, `labels: ""` to suppress label output, AND `provenance: false` to prevent a spurious `unknown/unknown` platform entry in the manifest list (use `actions/attest-build-provenance` for release binary attestation instead)
 
 See `dockerfile_conventions.md` → "OCI Annotations" for the full required annotation set (`org.opencontainers.image.{title,description,url,source,documentation,vendor,authors,vcs-type,version,revision,created,licenses,...}`).
 
