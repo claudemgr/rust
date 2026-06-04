@@ -584,7 +584,7 @@ Prefer platform-standard user directories:
 | Rust edition | Use the current stable Rust edition declared in `Cargo.toml` |
 | Toolchain channel | Stable by default; toolchain version pinned in `rust-toolchain.toml` |
 | Targets | Static targets pre-installed in the Docker image: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, Windows MSVC targets with `+crt-static`, Apple Silicon + x86_64 macOS. BSD targets (`x86_64-unknown-{freebsd,netbsd,openbsd}` and aarch64 equivalents) are opt-in — added to the image only when IDEA.md declares them in scope (PART 0 → "Single Static Binary") |
-| Formatting | `rustfmt` is required |
+| Formatting | `rustfmt` is required; default `max_width = 100` — do not override without a `rustfmt.toml` |
 | Linting | `clippy` is required |
 | Testing | `cargo test` is required |
 | Docs | `cargo doc --no-deps` is required for public APIs/libraries inside the app workspace |
