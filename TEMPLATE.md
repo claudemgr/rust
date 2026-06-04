@@ -798,7 +798,7 @@ These properties apply to `docker/Dockerfile.build` — the toolchain image buil
 - `rustfmt` and `clippy` components included
 - All release targets the project builds for are pre-installed via `rustup` (musl Linux + MSVC `+crt-static` Windows from `.cargo/config.toml`, plus Apple `*-darwin` targets which need no rustflags and so do not appear in `.cargo/config.toml`)
 - A non-root user matching the host UID/GID by default (so files written into mounted volumes are not root-owned)
-- `target/` and the cargo registry/cache mounted as named volumes for build speed
+- `target/` and the cargo registry/cache bind-mounted from host dirs (`CARGO_CACHE`, `RUSTUP_CACHE`, `SCCACHE_CACHE`) for build speed, with named volumes as fallback
 - The image SHOULD be free of system C dev libraries unless a specific dependency requires one. Per the Rust-Only Application rule, the default GUI dependency set (`x11rb` or `x11-dl`, `wayland-client` with `dlopen`, pure-Rust font / Vulkan / GL loaders) does not need `libX11` / `libwayland-client` / `libfontconfig` / `libfreetype` / `libGL` headers at build time. Add such packages to the image **only** when IDEA.md documents a specific `*-sys` exception per PART 0 → "Rust-Only Application", and the addition is the minimum needed by that crate
 
 **Required pre-installed tools in `docker/Dockerfile.build`** (CI workflow steps assume they exist in the image — never install in workflow `run:` steps):
