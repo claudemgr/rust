@@ -1020,6 +1020,20 @@ All machine-dependent settings MUST be detected at runtime on the target machine
 - CLI override wins over env; env wins over config; config wins over defaults
 - Secrets must not be stored in world-readable files
 
+## Standard CLI Flags
+
+### Universal Flags (ALL Binaries)
+
+| Flag | Short | Values | Description |
+|------|-------|--------|-------------|
+| `--help` | `-h` | — | Show help and exit 0 |
+| `--version` | `-v` | — | Show version and exit 0 |
+| `--debug` | — | — | Enable debug output |
+| `--color` | — | `auto` (default) / `yes` / `no` | Color output — `auto`: TTY detect; `yes`: force on; `no`: force off and remove emojis |
+
+- `--color auto` and `--color=auto` (space and `=` forms) must both work — `clap` handles this natively; no extra parsing needed.
+- **No escalation** — `--help` and `--version` must never be gated behind privilege checks; never call `nix::unistd::getuid()` or any capability check before help/version output.
+
 ## Output Rules
 
 - Respect `NO_COLOR`
