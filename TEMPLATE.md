@@ -284,7 +284,7 @@ Getting code correct on the first try is much harder than iterating with feedbac
 | Performance change | Measure before AND after — don't assume parallelism, caching, or "cleaner" code is faster |
 | Bug fix | Reproduce the bug FIRST so you have a failing signal, then verify the fix makes it disappear; add a regression test where feasible |
 | Configuration / settings | Start the binary with the new config; verify defaults; verify validation rejects bad input with a useful error |
-| Docker / container build | Build and verify each image variant as appropriate to the change: `:build` (toolchain) when `docker/Dockerfile.build` changes, `:devel` (debug binary) for logic changes, `:latest` (release binary) for release verification. Run the container; smoke-test the binary inside it; for GUI, verify display forwarding still works. |
+| Docker / container build | Build and verify each image variant as appropriate to the change: `:devel` (debug binary) for logic changes, `:latest` (release binary) for release verification. Run the container; smoke-test the binary inside it; for GUI, verify display forwarding still works. |
 | CI/CD workflow | Run the workflow on a branch (or equivalent dry-run); verify each job's exit status, not just YAML validity |
 | Logging / error paths | Trigger the error path; verify the log line/structured event was emitted with expected fields |
 | Security-sensitive change (auth, crypto, input validation, plugin/dlopen contracts) | Test both the success path AND attempted bypass paths; never assume a guard works without exercising it |
@@ -788,27 +788,44 @@ docker/
 
 All three compose files live under `docker/` (per `dockerfile_conventions.md` → "Docker Compose / File locations"). A top-level `docker-compose.yml` symlink or shim is allowed for ergonomics, but the source of truth lives under `docker/`. AI MUST only run `docker-compose.test.yml`; `docker-compose.yml` and `docker-compose.dev.yml` are human-only.
 
-### Standard Toolchain Image
+### Toolchain Image
 
-**Most Rust projects use `casjaysdev/rust:latest` directly** — it includes stable + nightly toolchains, clippy, rustfmt, cargo-audit, cargo-nextest, cargo-zigbuild, 30 cross-compile targets, and sccache out of the box. CI workflows reference it directly as `image: casjaysdev/rust:latest`; no `docker/Dockerfile.build` or `build-toolchain.yml` is needed.
+**All Rust projects use `casjaysdev/rust:latest` — never create `docker/Dockerfile.build` or `build-toolchain.yml` for Rust.** The maintained image includes everything any Rust project needs:
 
-Only create `docker/Dockerfile.build` when the project genuinely needs tools not present in `casjaysdev/rust:latest`. When it is created:
+- Latest stable toolchain + nightly (minimal profile with miri and rust-src)
+- Components: `rustfmt`, `clippy`, `rust-src`, `rust-analyzer`, `llvm-tools-preview`
+- `cargo-binstall` for fast tool installation without source compilation
+- C/C++ toolchain: `build-base`, `musl-dev`, `clang`, `lld`, `llvm`, `cmake`, `gdb`
+- Cross-compile linker: `mingw-w64-gcc` (Windows GNU), `zig` (cargo-zigbuild), `binaryen` (WASM optimisation)
+- Cross-compile targets: musl Linux (x86_64, aarch64, i686, armv7, riscv64), glibc Linux (x86_64, aarch64, i686, armv7, arm, riscv64, ppc64le, s390x), Windows GNU (x86_64, i686, aarch64), macOS (x86_64, aarch64), FreeBSD, WebAssembly (wasm32-unknown-unknown, wasip1, wasip2, emscripten), embedded ARM/RISC-V, Android (aarch64)
+- `cargo-audit`, `cargo-deny`, `cargo-tarpaulin`, `cargo-llvm-cov`, `grcov` — security and coverage
+- `cargo-nextest`, `cargo-make`, `just` — testing and task runners
+- `cargo-zigbuild`, `cross`, `cargo-ndk` — cross-compilation runners
+- `sccache` — compiler cache
+- `cargo-release`, `cargo-dist`, `cargo-deb` — release tooling
+- `cargo-edit`, `cargo-watch`, `cargo-outdated`, `cargo-update`, `cargo-expand` — development workflow
+- `cargo-semver-checks`, `cargo-msrv`, `cargo-machete`, `cargo-udeps` — API and dependency analysis
+- `cargo-fuzz`, `cargo-mutants`, `cargo-careful` — testing depth
+- `wasm-pack`, `wasm-tools`, `wasm-bindgen-cli`, `trunk` — WebAssembly toolchain
+- `cargo-bloat`, `cargo-asm`, `cargo-binutils`, `hyperfine`, `flamegraph`, `samply` — performance and binary analysis
+- `cbindgen` — C header generation from Rust
+- `mdbook`, `mdbook-toc`, `cargo-public-api`, `cargo-spellcheck` — documentation
+- `typos-cli`, `taplo-cli`, `dprint`, `cargo-sort` — code quality
+- `sqlx-cli`, `sea-orm-cli` — database tooling
+- `tokei` — code statistics
+- `cargo-geiger` — unsafe code audit
+- `cargo-chef` — layer caching for Docker builds
+- `cargo-criterion`, `cargo-hack`, `cargo-minimal-versions` — testing and compatibility
+- `probe-rs` — embedded debugging
+- `bacon` — background cargo runner
 
-- Base image: `casjaysdev/rust:latest` — never a generic Alpine or Debian base without the toolchain pre-loaded
-- Pinned Rust toolchain version matching `rust-toolchain.toml` / `Cargo.toml` MSRV policy
-- `rustfmt` and `clippy` components included
-- All release targets the project builds for are pre-installed via `rustup` (musl Linux + MSVC `+crt-static` Windows from `.cargo/config.toml`, plus Apple `*-darwin` targets which need no rustflags and so do not appear in `.cargo/config.toml`)
-- A non-root user matching the host UID/GID by default (so files written into mounted volumes are not root-owned)
-- `target/` and the cargo registry/cache bind-mounted from host dirs (`CARGO_CACHE`, `RUSTUP_CACHE`, `SCCACHE_CACHE`) for build speed, with named volumes as fallback
-- The image SHOULD be free of system C dev libraries unless a specific dependency requires one. Per the Rust-Only Application rule, the default GUI dependency set (`x11rb` or `x11-dl`, `wayland-client` with `dlopen`, pure-Rust font / Vulkan / GL loaders) does not need `libX11` / `libwayland-client` / `libfontconfig` / `libfreetype` / `libGL` headers at build time. Add such packages to the image **only** when IDEA.md documents a specific `*-sys` exception per PART 0 → "Rust-Only Application", and the addition is the minimum needed by that crate
-
-When a `docker/Dockerfile.build` exists, CI/CD workflows pull it via the `ensure-build-image` pre-flight job and never install tools inline. See `cicd_conventions.md` for the full workflow pattern.
+CI workflows reference this image directly: `container: image: casjaysdev/rust:latest`. No `cargo install`, no `rustup` in CI, no `ensure-build-image` job, no `build-toolchain.yml`.
 
 ### OCI Annotations (No LABEL Policy)
 
 All image metadata is applied as **OCI annotations at build time** — never as `LABEL` blocks in any Dockerfile. Labels attach to per-platform image layers; multiarch manifest indexes do not inherit labels, so they appear missing on multiarch pulls. Annotations attach to the manifest index and are visible across all platforms.
 
-- No `LABEL` blocks in `docker/Dockerfile`, `docker/Dockerfile.build`, or `docker/Dockerfile.dev`
+- No `LABEL` blocks in `docker/Dockerfile` or `docker/Dockerfile.dev`
 - GitHub Actions: use `docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf  # v6.0.0` with an `annotations:` input listing the required OCI keys
 - `docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1.0` MUST set `annotations: ${{ steps.meta.outputs.annotations }}`, `labels: ""` to suppress label output, AND `provenance: false` to prevent a spurious `unknown/unknown` platform entry in the manifest list (use `actions/attest-build-provenance` for release binary attestation instead)
 
@@ -856,7 +873,7 @@ This rule ensures every workflow, Dockerfile, and Makefile keeps working after a
 
 ### Build-Time vs Runtime Linkage of Display Libraries
 
-By default the image carries no GUI-stack C dev libraries (per Mandatory Image Properties). Whether the image ships them or not, the produced release binary MUST NOT have a **link-time** dependency on them. Display-related C libraries reach the binary only via runtime `dlopen`, on demand, when a real GUI session is started.
+By default `casjaysdev/rust:latest` carries no GUI-stack C dev libraries at link time. Whether the image ships them or not, the produced release binary MUST NOT have a **link-time** dependency on them. Display-related C libraries reach the binary only via runtime `dlopen`, on demand, when a real GUI session is started.
 
 - **X11**: prefer the pure-Rust `x11rb` crate (no `libX11` involvement at any stage). `x11-dl` is **also acceptable** — it uses runtime `dlopen` and contributes no link-time C dep. Do **not** use `x11`, `xlib-sys`, or any other crate that resolves libX11 symbols at link time.
 - **Wayland**: use `wayland-client` / `wayland-rs` with the `dlopen` feature enabled (or an equivalent runtime-loading mode). The binary then opens `libwayland-client.so` lazily at runtime if Wayland is detected, but contains no link-time dependency on it.
@@ -1070,7 +1087,7 @@ All gates execute inside the project Docker container (PART 5 → "Docker Rule")
 
 `ci.yml` MUST enforce a minimum test coverage threshold. The threshold is declared in `IDEA.md ## Business logic` (free-form prose — e.g., "minimum test coverage: 75%"). If `IDEA.md` does not specify a value, the **default is 60%**.
 
-- Use `cargo tarpaulin` (preferred for Linux musl) or `cargo llvm-cov` (works on more targets) — both pre-installed in `docker/Dockerfile.build`
+- Use `cargo tarpaulin` (preferred for Linux musl) or `cargo llvm-cov` (works on more targets) — both pre-installed in `casjaysdev/rust:latest`
 - CI MUST fail when coverage drops below the threshold; a passing build with uncovered code is a silent regression
 - Coverage is computed against `cargo test --workspace --all-features` output, run inside the toolchain image
 
@@ -1258,16 +1275,17 @@ Every project ships workflow files for all five CI/CD providers. Same gates, dif
 
 **Workflow creation order — not all workflows carry the same risk:**
 1. **Security-only workflows** (secret scan, SHA/digest policy, dependency audit) — no build dependency; safe to add anytime
-2. **`build-toolchain.yml`** (`:build` image) — **only if the project has `docker/Dockerfile.build`**; add once it builds successfully locally. Skip entirely for projects using `casjaysdev/rust:latest` directly — they have no toolchain image to publish
-3. **`ci.yml` and `release.yml`** — add **last**, only after all code is complete, `make test` passes, and the lint gate is clean; these trigger a full build on push and will fail immediately if the code is not ready
+2. **`ci.yml` and `release.yml`** — add **last**, only after all code is complete, `make test` passes, and the lint gate is clean; these trigger a full build on push and will fail immediately if the code is not ready
+
+Rust projects never have `build-toolchain.yml` — `casjaysdev/rust:latest` is maintained externally and needs no per-project rebuild workflow.
 
 | Provider | Workflow location | Syntax |
 |----------|------------------|--------|
-| GitHub | `.github/workflows/ci.yml` / `release.yml` / `build-toolchain.yml` | GitHub Actions |
-| GitLab | `.gitlab-ci.yml` (stages: build, test, security, release, toolchain) | GitLab CI |
-| Gitea | `.gitea/workflows/ci.yml` / `release.yml` / `build-toolchain.yml` | GitHub Actions (act runner) |
-| Forgejo | `.forgejo/workflows/ci.yml` / `release.yml` / `build-toolchain.yml` | GitHub Actions (act runner) |
-| Jenkins | `Jenkinsfile` (parallel stages: Build / Test / Security / Release; separate `Jenkinsfile.toolchain` for the monthly image build) | Declarative Pipeline |
+| GitHub | `.github/workflows/ci.yml` / `release.yml` | GitHub Actions |
+| GitLab | `.gitlab-ci.yml` (stages: build, test, security, release) | GitLab CI |
+| Gitea | `.gitea/workflows/ci.yml` / `release.yml` | GitHub Actions (act runner) |
+| Forgejo | `.forgejo/workflows/ci.yml` / `release.yml` | GitHub Actions (act runner) |
+| Jenkins | `Jenkinsfile` (parallel stages: Build / Test / Security / Release) | Declarative Pipeline |
 
 **Workflow purposes:**
 
@@ -1275,7 +1293,6 @@ Every project ships workflow files for all five CI/CD providers. Same gates, dif
 |----------|---------|---------|
 | `ci.yml` | push + pull_request + weekly schedule (security jobs only on schedule) | `cargo fmt --check`, `cargo clippy`, `cargo test`, coverage gate, `cargo build --release`, truffleHog secret scan, workflow-policy SHA check, `cargo audit`, Trivy image scan |
 | `release.yml` | tag push (`v*`) + workflow_dispatch | Build statically linked artifacts for the supported target matrix, sign, upload to GitHub Releases, publish SBOM and checksums |
-| `build-toolchain.yml` *(only if `docker/Dockerfile.build` exists)* | monthly schedule (`cron: '0 4 1 * *'`) + workflow_dispatch | Build `docker/Dockerfile.build` and push as `ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:build`; every other workflow pulls this image via `ensure-build-image` and never installs tools inline. Omit entirely for projects that use `casjaysdev/rust:latest` directly. Provider equivalents: GitLab pipeline triggered by `schedules`; Gitea/Forgejo equivalent workflow file; Jenkins `Jenkinsfile.toolchain` declarative pipeline. |
 
 In addition to the workflows, every repository ships:
 
@@ -1288,7 +1305,7 @@ In addition to the workflows, every repository ships:
 - `image-scan` (Trivy) — conditional on Dockerfile present; runs after image build
 
 **GitHub Actions job ordering (`needs:`):**
-- `ci.yml`: `lint` and `test` run in parallel → `build` needs: test → `upload-artifacts` needs: build; security jobs (`secret-scan`, `workflow-policy`, `vuln-scan`, `image-scan`) all need: `ensure-build-image` and run in parallel with each other
+- `ci.yml`: `lint` and `test` run in parallel → `build` needs: test → `upload-artifacts` needs: build; security jobs (`secret-scan`, `workflow-policy`, `vuln-scan`, `image-scan`) run in parallel with each other
 - `release.yml`: `build` → `release` (needs: build); release job always re-runs its own build inline
 - Cross-workflow ordering via branch protection; never `workflow_run`
 
@@ -1300,7 +1317,7 @@ CI MUST fail on all providers when tests, coverage gates, secret scans, dependen
 
 ### Security Jobs in `ci.yml` Example (GitHub / Gitea / Forgejo)
 
-truffleHog is the mandatory secret scanner — **never** `gitleaks` (requires a commercial license for org repos). Trivy is the mandatory image scanner. Both pin to full commit SHAs. These jobs live in `ci.yml` under a `needs: ensure-build-image` dependency and also run on the weekly schedule trigger.
+truffleHog is the mandatory secret scanner — **never** `gitleaks` (requires a commercial license for org repos). Trivy is the mandatory image scanner. Both pin to full commit SHAs. These jobs live in `ci.yml` and also run on the weekly schedule trigger.
 
 ```yaml
 name: CI
@@ -1384,62 +1401,20 @@ jobs:
 
 ## Suggested CI Steps
 
-**Standard projects (no `docker/Dockerfile.build`):** CI references `casjaysdev/rust:latest` directly as the container image — no `ensure-build-image` pre-flight, no `build-toolchain.yml`. Never install a Rust toolchain on the runner or run `cargo install` inline.
+All Rust CI jobs run inside `casjaysdev/rust:latest`. Never `cargo install` or `rustup` in a workflow `run:` step — every tool is already in the image. No `ensure-build-image` pre-flight, no `build-toolchain.yml`.
 
-**Projects with a custom `docker/Dockerfile.build`:** CI pulls it via the `ensure-build-image` pre-flight job (built monthly via `build-toolchain.yml`) and executes all commands inside it.
-
-### `ensure-build-image` Job (Required in Every Workflow)
-
-`ensure-build-image` is **pull-only and fails fast** — it never builds the image inline. If the image is missing, the job exits immediately with actionable error messages. The correct response to a missing image is to trigger `build-toolchain.yml` via `workflow_dispatch`.
-
-**Bootstrap order** — when adding `docker/Dockerfile.build` to a project for the first time:
-1. Commit only `docker/Dockerfile.build` (no `ci.yml` or `release.yml` yet)
-2. Trigger `build-toolchain.yml` via `workflow_dispatch` and verify the image appears in the registry
-3. Only then commit `ci.yml` and `release.yml`
-
-`Dockerfile.build` uses `casjaysdev/rust:latest` as the base (the maintained Rust toolchain image) — never a generic Alpine or Debian base without the toolchain pre-loaded.
+Canonical job pattern for `ci.yml` / `release.yml`:
 
 ```yaml
 jobs:
-  ensure-build-image:
-    runs-on: ubuntu-latest
-    permissions:
-      packages: read
-    outputs:
-      image: ${{ steps.pull.outputs.image }}
-    steps:
-      - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - id: pull
-        name: Pull build image (fail fast if missing)
-        run: |
-          IMAGE="ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:build"
-          if ! docker pull "$IMAGE"; then
-            echo "::error::Build image $IMAGE not found."
-            echo "::error::Trigger the 'Build Toolchain Image' workflow (workflow_dispatch) to create it."
-            echo "::error::Never commit ci.yml or release.yml before the build image exists in the registry."
-            exit 1
-          fi
-          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
-
   build:
-    needs: ensure-build-image
     runs-on: ubuntu-latest
     container:
-      image: ${{ needs.ensure-build-image.outputs.image }}
+      image: casjaysdev/rust:latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-      - run: cargo build --release
-      # ... rest of build steps
+      - run: make build
 ```
-
-Every downstream job that uses the build image must follow this pattern:
-- `needs: ensure-build-image`
-- `container: image: ${{ needs.ensure-build-image.outputs.image }}`
 
 ### Required Concurrency and Retention Headers
 
@@ -1451,7 +1426,7 @@ concurrency:
   cancel-in-progress: true
 ```
 
-Release workflows (`release.yml`) and the toolchain workflow (`build-toolchain.yml`) MUST use `cancel-in-progress: false` so a release or image build already in flight is not killed by a follow-up push.
+Release workflows (`release.yml`) MUST use `cancel-in-progress: false` so a release build already in flight is not killed by a follow-up push.
 
 Every `actions/upload-artifact` step MUST set a finite `retention-days`:
 
@@ -1467,10 +1442,7 @@ Every `actions/upload-artifact` step MUST set a finite `retention-days`:
 # Prepare output directory for release artifacts (binaries, checksums, SBOM)
 mkdir -p dist
 
-# Build image is pulled by the ensure-build-image job (pull-only; fails fast if missing) — see cicd_conventions.md
-# Reference it as: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:build
-
-# Run gates inside the image
+# Run gates inside the image (casjaysdev/rust:latest — all tools pre-installed)
 docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo fmt --all --check
 docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo clippy --workspace --all-targets --all-features -- -D warnings
 docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo test --workspace --all-features
@@ -1692,7 +1664,7 @@ License compliance is enforced by tooling and gated in CI; it is not left to man
 | `cargo-about` | Generate the third-party attribution section of `LICENSE.md` from `Cargo.lock` | `about.toml` (accepted-licenses config) **and** `about.hbs` (Handlebars output template), both at project root |
 | `cargo-cyclonedx` | Generate the SBOM (CycloneDX format) referenced in PART 5 → "Release Artifacts" and PART 10 → "Release Integrity" | (CLI flags; no separate config file) |
 
-All three tools run inside the project Docker image. The image MUST have them pre-installed in `docker/Dockerfile.build` — `rustup component add rustfmt clippy` plus the required `cargo install` steps (`cargo-audit`, `cargo-cyclonedx`, `cargo-about`, `cargo-deny`, `cargo-tarpaulin` or `cargo-llvm-cov`) run during image build. The tools live in the image, never in CI workflow `run:` steps.
+All three tools run inside `casjaysdev/rust:latest` — `rustfmt`, `clippy`, `cargo-audit`, `cargo-deny`, `cargo-tarpaulin`, and `cargo-llvm-cov` are pre-installed. Never install them in CI workflow `run:` steps.
 
 ### License Allowlist (default)
 
@@ -1737,7 +1709,7 @@ Every workspace member's `Cargo.toml` MUST include:
 ```toml
 [package]
 edition      = "2024"       # current stable Rust edition declared in Cargo.toml (PART 5 → "Toolchain Rules")
-rust-version = "1.XX"       # MSRV pin matching rust-toolchain.toml (PART 5 → "Mandatory Image Properties")
+rust-version = "1.XX"       # MSRV pin matching rust-toolchain.toml (PART 5 → "Toolchain Image")
 license      = "MIT"        # or the SPDX expression for the IDEA.md-declared license
 authors      = ["…"]
 repository   = "…"
@@ -1813,11 +1785,10 @@ Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI fai
 - [ ] `CLAUDE.md` / `.claude/CLAUDE.md` are short loaders, not duplicate specs
 - [ ] `release.txt` exists if the project is using explicit release versioning
 - [ ] `site.txt` exists only if there is a real official site URL
-- [ ] `docker/Dockerfile` (always, when project ships a container), `docker/Dockerfile.build` (project-specific — when a CI toolchain image is used), `docker/Dockerfile.dev` (project-specific — when a debug-mode image is shipped), `docker/docker-compose.yml`, `docker/docker-compose.dev.yml`, `docker/docker-compose.test.yml`, and `docker/rootfs/usr/local/bin/entrypoint.sh` exist as needed; `Dockerfile.build` builds the toolchain image; `Dockerfile` is the runtime image
+- [ ] `docker/Dockerfile` (always, when project ships a container), `docker/Dockerfile.dev` (project-specific — when a debug-mode image is shipped), `docker/docker-compose.yml`, `docker/docker-compose.dev.yml`, `docker/docker-compose.test.yml`, and `docker/rootfs/usr/local/bin/entrypoint.sh` exist as needed; `Dockerfile` is the runtime image
 - [ ] `.dockerignore` exists at project root with Rust-specific entries (`target/`, plus the standard exclusions from `dockerfile_conventions.md` → ".dockerignore")
-- [ ] `docker/Dockerfile.build` base is `casjaysdev/rust:latest` — the standard maintained Rust toolchain image. `Dockerfile.build` is only needed for custom toolchain requirements beyond what `casjaysdev/rust:latest` provides
-- [ ] `docker/Dockerfile.build` has pinned Rust toolchain, rustfmt, clippy, and all musl/cross targets pre-installed
-- [ ] Bootstrap order was followed: `docker/Dockerfile.build` committed first → `build-toolchain.yml` triggered via `workflow_dispatch` → image verified in registry → then `ci.yml`/`release.yml` committed
+- [ ] `docker/Dockerfile.build` does not exist — Rust projects always use `casjaysdev/rust:latest` directly; no custom toolchain image is ever needed
+- [ ] `ci.yml` and `release.yml` use `container: image: casjaysdev/rust:latest` — no `ensure-build-image` pre-flight, no `build-toolchain.yml`
 - [ ] If IDEA.md documents a `*-sys` exception requiring system dev libs at build time, only the minimum set needed by that crate is added to the image — by default the image carries no GUI-stack C dev libs (PART 0 → "Rust-Only Application")
 - [ ] X11 forwarding sample command is documented and works against a real Xorg/XWayland session
 - [ ] Wayland forwarding sample command is documented and works against a real Wayland compositor
