@@ -777,7 +777,6 @@ Place Docker assets under `docker/`:
 ```text
 docker/
 ├── Dockerfile                              # production runtime image — two-stage (builder + minimal Alpine/Debian); tagged :latest
-├── Dockerfile.build                        # toolchain image — casjaysdev/rust:latest + pinned toolchain + all build/test/lint/scan tools; built monthly; tagged :build   (project-specific)
 ├── Dockerfile.dev                          # devel image — same as release but binary runs in debug mode; tagged :devel   (project-specific)
 ├── rootfs/                                 # build-time filesystem overlay copied into image at /   (project-specific)
 │   └── usr/local/bin/entrypoint.sh         # sets non-root UID/GID, prepares cache/target dirs; called by tini → entrypoint.sh → app
@@ -789,9 +788,11 @@ docker/
 
 All three compose files live under `docker/` (per `dockerfile_conventions.md` → "Docker Compose / File locations"). A top-level `docker-compose.yml` symlink or shim is allowed for ergonomics, but the source of truth lives under `docker/`. AI MUST only run `docker-compose.test.yml`; `docker-compose.yml` and `docker-compose.dev.yml` are human-only.
 
-### Mandatory Image Properties
+### Standard Toolchain Image
 
-These properties apply to `docker/Dockerfile.build` — the toolchain image built monthly and pulled by all CI/CD workflows:
+**Most Rust projects use `casjaysdev/rust:latest` directly** — it includes stable + nightly toolchains, clippy, rustfmt, cargo-audit, cargo-nextest, cargo-zigbuild, 30 cross-compile targets, and sccache out of the box. CI workflows reference it directly as `image: casjaysdev/rust:latest`; no `docker/Dockerfile.build` or `build-toolchain.yml` is needed.
+
+Only create `docker/Dockerfile.build` when the project genuinely needs tools not present in `casjaysdev/rust:latest`. When it is created:
 
 - Base image: `casjaysdev/rust:latest` — never a generic Alpine or Debian base without the toolchain pre-loaded
 - Pinned Rust toolchain version matching `rust-toolchain.toml` / `Cargo.toml` MSRV policy
@@ -801,16 +802,7 @@ These properties apply to `docker/Dockerfile.build` — the toolchain image buil
 - `target/` and the cargo registry/cache bind-mounted from host dirs (`CARGO_CACHE`, `RUSTUP_CACHE`, `SCCACHE_CACHE`) for build speed, with named volumes as fallback
 - The image SHOULD be free of system C dev libraries unless a specific dependency requires one. Per the Rust-Only Application rule, the default GUI dependency set (`x11rb` or `x11-dl`, `wayland-client` with `dlopen`, pure-Rust font / Vulkan / GL loaders) does not need `libX11` / `libwayland-client` / `libfontconfig` / `libfreetype` / `libGL` headers at build time. Add such packages to the image **only** when IDEA.md documents a specific `*-sys` exception per PART 0 → "Rust-Only Application", and the addition is the minimum needed by that crate
 
-**Required pre-installed tools in `docker/Dockerfile.build`** (CI workflow steps assume they exist in the image — never install in workflow `run:` steps):
-
-- `rustup component add rustfmt clippy`
-- `cargo install cargo-audit` — Rust vulnerability scanner (PART 10 → `ci.yml` `vuln-scan`)
-- `cargo install cargo-cyclonedx` — SBOM generator (PART 5 → "Release Artifacts")
-- `cargo install cargo-about` — third-party license attribution generator (PART 11 → "License Compliance")
-- `cargo install cargo-deny` — license / advisory / bans / sources enforcement
-- `cargo install cargo-tarpaulin` (or `cargo-llvm-cov`) — coverage gate (PART 8 → "Coverage Gate")
-
-CI/CD workflows pull this image via the `ensure-build-image` pre-flight job — they never install tools inline. See `cicd_conventions.md` for the full workflow pattern.
+When a `docker/Dockerfile.build` exists, CI/CD workflows pull it via the `ensure-build-image` pre-flight job and never install tools inline. See `cicd_conventions.md` for the full workflow pattern.
 
 ### OCI Annotations (No LABEL Policy)
 
@@ -1266,7 +1258,7 @@ Every project ships workflow files for all five CI/CD providers. Same gates, dif
 
 **Workflow creation order — not all workflows carry the same risk:**
 1. **Security-only workflows** (secret scan, SHA/digest policy, dependency audit) — no build dependency; safe to add anytime
-2. **`build-toolchain.yml`** (`:build` image) — add once `docker/Dockerfile.build` builds successfully locally; required by all subsequent workflows
+2. **`build-toolchain.yml`** (`:build` image) — **only if the project has `docker/Dockerfile.build`**; add once it builds successfully locally. Skip entirely for projects using `casjaysdev/rust:latest` directly — they have no toolchain image to publish
 3. **`ci.yml` and `release.yml`** — add **last**, only after all code is complete, `make test` passes, and the lint gate is clean; these trigger a full build on push and will fail immediately if the code is not ready
 
 | Provider | Workflow location | Syntax |
@@ -1283,7 +1275,7 @@ Every project ships workflow files for all five CI/CD providers. Same gates, dif
 |----------|---------|---------|
 | `ci.yml` | push + pull_request + weekly schedule (security jobs only on schedule) | `cargo fmt --check`, `cargo clippy`, `cargo test`, coverage gate, `cargo build --release`, truffleHog secret scan, workflow-policy SHA check, `cargo audit`, Trivy image scan |
 | `release.yml` | tag push (`v*`) + workflow_dispatch | Build statically linked artifacts for the supported target matrix, sign, upload to GitHub Releases, publish SBOM and checksums |
-| `build-toolchain.yml` | monthly schedule (`cron: '0 4 1 * *'`) + workflow_dispatch | Build `docker/Dockerfile.build` and push as `ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:build`; every other workflow pulls this image via `ensure-build-image` and never installs tools inline. Provider equivalents: GitLab pipeline triggered by `schedules`; Gitea/Forgejo equivalent workflow file; Jenkins `Jenkinsfile.toolchain` declarative pipeline. |
+| `build-toolchain.yml` *(only if `docker/Dockerfile.build` exists)* | monthly schedule (`cron: '0 4 1 * *'`) + workflow_dispatch | Build `docker/Dockerfile.build` and push as `ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:build`; every other workflow pulls this image via `ensure-build-image` and never installs tools inline. Omit entirely for projects that use `casjaysdev/rust:latest` directly. Provider equivalents: GitLab pipeline triggered by `schedules`; Gitea/Forgejo equivalent workflow file; Jenkins `Jenkinsfile.toolchain` declarative pipeline. |
 
 In addition to the workflows, every repository ships:
 
@@ -1392,7 +1384,9 @@ jobs:
 
 ## Suggested CI Steps
 
-CI runs every cargo step inside the project's Docker toolchain image (`docker/Dockerfile.build`). CI MUST NOT install a Rust toolchain on the runner and call cargo directly — it pulls the build image (built monthly via `build-toolchain.yml`) using the `ensure-build-image` pre-flight job and executes all commands inside it.
+**Standard projects (no `docker/Dockerfile.build`):** CI references `casjaysdev/rust:latest` directly as the container image — no `ensure-build-image` pre-flight, no `build-toolchain.yml`. Never install a Rust toolchain on the runner or run `cargo install` inline.
+
+**Projects with a custom `docker/Dockerfile.build`:** CI pulls it via the `ensure-build-image` pre-flight job (built monthly via `build-toolchain.yml`) and executes all commands inside it.
 
 ### `ensure-build-image` Job (Required in Every Workflow)
 
