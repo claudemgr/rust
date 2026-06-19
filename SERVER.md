@@ -43342,7 +43342,7 @@ verify_all_endpoints_tested
 # 1. Build in Docker (always use Docker for builds)
 mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
 BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
-docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $(pwd):/app -w /app \
+docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD:/app -w /app \
   casjaysdev/rust:latest cargo build --release --target x86_64-unknown-linux-musl
 cp target/x86_64-unknown-linux-musl/release/{project_name} "$BUILD_DIR/"
 
@@ -43436,7 +43436,7 @@ mkdir -p "$CARGO_HOME" "$CARGO_TARGET"
 # Common docker run for Rust builds
 RUST_DOCKER="docker run --rm -it \
   --name \"${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)\" \
-  -v $(pwd):/app \
+  -v $PWD:/app \
   -v $CARGO_HOME:/usr/local/cargo \
   -v $CARGO_TARGET:/app/target \
   -w /app \
@@ -43688,7 +43688,7 @@ mkdir -p "$CARGO_HOME" "$CARGO_TARGET"
 # Common docker run for Rust builds
 RUST_DOCKER="docker run --rm -it \
   --name \"${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)\" \
-  -v $(pwd):/app \
+  -v $PWD:/app \
   -v $CARGO_HOME:/usr/local/cargo \
   -v $CARGO_TARGET:/app/target \
   -w /app \
@@ -44239,7 +44239,7 @@ mkdir -p "$CARGO_HOME" "$CARGO_TARGET"
 # Build (with caching)
 docker run --rm -it \
   --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
-  -v $(pwd):/app \
+  -v $PWD:/app \
   -v $CARGO_HOME:/usr/local/cargo \
   -v $CARGO_TARGET:/app/target \
   -w /app \
@@ -44248,7 +44248,7 @@ mkdir -p binaries
 cp target/x86_64-unknown-linux-musl/release/{project_name} binaries/
 
 # Test in Docker (quick) - install tools first
-docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $(pwd)/binaries:/app alpine:latest sh -c "
+docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD/binaries:/app alpine:latest sh -c "
   apk add --no-cache curl bash file jq >/dev/null
   /app/{project_name} --help
 "
@@ -44278,7 +44278,7 @@ mkdir -p $TEST_DIR/{config,data,logs}
 # Build to binaries/ (with caching)
 docker run --rm -it \
   --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
-  -v $(pwd):/app \
+  -v $PWD:/app \
   -v $CARGO_HOME:/usr/local/cargo \
   -v $CARGO_TARGET:/app/target \
   -w /app \
@@ -44287,7 +44287,7 @@ mkdir -p binaries
 cp target/x86_64-unknown-linux-musl/release/{project_name} binaries/
 
 # Quick test in Docker (install tools first)
-docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $(pwd)/binaries:/app alpine:latest sh -c "
+docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD/binaries:/app alpine:latest sh -c "
   apk add --no-cache curl bash file jq >/dev/null
   /app/{project_name} --help
   /app/{project_name} --version
@@ -44296,7 +44296,7 @@ docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | he
 # Full test with config/data in Docker
 docker run --rm -it \
   --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
-  -v $(pwd)/binaries:/app \
+  -v $PWD/binaries:/app \
   -v $TEST_DIR:/test \
   alpine:latest /app/{project_name} \
     --config /test/config \
@@ -44318,7 +44318,7 @@ TEST_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
 mkdir -p $TEST_DIR/{config,data,logs}
 
 # Build
-docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $(pwd):/app -w /app \
+docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD:/app -w /app \
   casjaysdev/rust:latest cargo build --release --target x86_64-unknown-linux-musl
 mkdir -p binaries
 cp target/x86_64-unknown-linux-musl/release/{project_name} binaries/
