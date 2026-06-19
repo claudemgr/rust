@@ -39521,8 +39521,8 @@ jobs:
       - name: Enforce coverage threshold
         run: |
           THRESHOLD=60
-          cargo llvm-cov --lcov --output-path coverage.lcov
-          PCT=$(lcov --summary coverage.lcov 2>&1 | awk '/lines/ {gsub("%","",$2); print int($2)}')
+          cargo llvm-cov --lcov --output-path /tmp/coverage.lcov
+          PCT=$(lcov --summary /tmp/coverage.lcov 2>&1 | awk '/lines/ {gsub("%","",$2); print int($2)}')
           if [ "$PCT" -lt "$THRESHOLD" ]; then
             echo "::error::coverage $PCT% < threshold $THRESHOLD%"
             exit 1
@@ -43152,7 +43152,7 @@ test:
 
     - name: Run tests with coverage
       run: |
-        cargo llvm-cov nextest --workspace --lcov --output-path coverage.lcov
+        cargo llvm-cov nextest --workspace --lcov --output-path /tmp/coverage.lcov
 
     - name: Check coverage is >= 80%
       run: |
