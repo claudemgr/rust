@@ -1395,7 +1395,7 @@ jobs:
 
 **Per-provider notes:**
 
-- GitLab: `secret-scan` runs as a docker job using `image: trufflesecurity/trufflehog:latest` with `GIT_DEPTH: 0`; `image-scan` uses `image: aquasecurity/trivy:0.70.0`.
+- GitLab: `secret-scan` runs as a docker job using `image: trufflesecurity/trufflehog:latest` with `GIT_DEPTH: 0`; `image-scan` uses `image: aquasec/trivy:0.70.0`.
 - Jenkins: `Security` stage uses `parallel {}`; truffleHog and Trivy each run via `docker.image(...).inside { ... }`.
 - All providers: same gates, same severities, same exit conditions — no weaker subset on any provider.
 
