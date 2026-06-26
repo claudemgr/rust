@@ -3287,6 +3287,8 @@ pub struct Config {
 | **SQL injection** | Use parameterized queries only |
 | **XSS prevention** | Escape all output in templates |
 | **CSRF protection** | All forms must have CSRF tokens |
+| **`#[allow(...)]` suppressions** | Every `#[allow(...)]` attribute MUST have an explanatory comment on the line immediately above it — never a bare suppression without context |
+| **`unwrap()` / `expect()`** | `unwrap()` is forbidden everywhere outside `#[cfg(test)]` blocks, `tests/`, and `examples/`. Use `?` for fallible calls. In non-critical init paths, `expect("invariant: <reason>")` with a documented invariant message is acceptable. `expect()` in production hot paths is forbidden. |
 
 **Comment Style:**
 
@@ -6796,7 +6798,7 @@ pub enum PathError {
 
 // Valid path segment: lowercase alphanumeric, hyphens, underscores
 static VALID_PATH_SEGMENT: once_cell::sync::Lazy<regex::Regex> =
-    once_cell::sync::Lazy::new(|| regex::Regex::new(r"^[a-z0-9_-]+$").unwrap());
+    once_cell::sync::Lazy::new(|| regex::Regex::new(r"^[a-z0-9_-]+$").expect("invariant: valid regex pattern"));
 
 // normalize_path cleans a path for safe use
 // - Strips leading/trailing slashes
@@ -10917,12 +10919,12 @@ impl ConfigManager {
         };
         let mod_time = meta.modified().ok();
         {
-            let last = self.last_file_mod_time.read().unwrap();
+            let last = self.last_file_mod_time.read().expect("invariant: lock not poisoned");
             if *last == mod_time {
                 return;
             }
         }
-        *self.last_file_mod_time.write().unwrap() = mod_time;
+        *self.last_file_mod_time.write().expect("invariant: lock not poisoned") = mod_time;
 
         let new_config = match load_config_from_file(&self.config_path) {
             Ok(c) => c,
@@ -10952,8 +10954,8 @@ impl ConfigManager {
 
         // Flag restart-required settings
         if !needs_restart.is_empty() {
-            *self.pending_restart.write().unwrap() = true;
-            *self.restart_settings.write().unwrap() = needs_restart.clone();
+            *self.pending_restart.write().expect("invariant: lock not poisoned") = true;
+            *self.restart_settings.write().expect("invariant: lock not poisoned") = needs_restart.clone();
             tracing::warn!("Restart required for: {:?}", needs_restart);
         }
     }
@@ -11498,16 +11500,16 @@ async fn build_health_response(state: &AppState) -> HealthResponse {
 // ConfigManager helper methods
 impl ConfigManager {
     pub fn pending_restart(&self) -> bool {
-        *self.pending_restart.read().unwrap()
+        *self.pending_restart.read().expect("invariant: lock not poisoned")
     }
 
     pub fn restart_settings(&self) -> Vec<String> {
-        self.restart_settings.read().unwrap().clone()
+        self.restart_settings.read().expect("invariant: lock not poisoned").clone()
     }
 
     pub fn clear_pending_restart(&self) {
-        *self.pending_restart.write().unwrap() = false;
-        self.restart_settings.write().unwrap().clear();
+        *self.pending_restart.write().expect("invariant: lock not poisoned") = false;
+        self.restart_settings.write().expect("invariant: lock not poisoned").clear();
     }
 }
 ```
@@ -12300,7 +12302,7 @@ pub async fn request_id_middleware(mut req: Request, next: Next) -> Response {
     let mut response = next.run(req).await;
     response.headers_mut().insert(
         "X-Request-ID",
-        HeaderValue::from_str(&request_id).unwrap(),
+        HeaderValue::from_str(&request_id).expect("invariant: request_id is valid ASCII"),
     );
     response
 }
@@ -12710,19 +12712,19 @@ pub fn set_cache_headers(
     use axum::http::header::CACHE_CONTROL;
 
     if is_authenticated {
-        headers.insert(CACHE_CONTROL, "private, no-store".parse().unwrap());
+        headers.insert(CACHE_CONTROL, "private, no-store".parse().expect("invariant: valid cache-control header value"));
         return;
     }
 
     match content_type {
         "static" => {
-            headers.insert(CACHE_CONTROL, "public, max-age=31536000, immutable".parse().unwrap());
+            headers.insert(CACHE_CONTROL, "public, max-age=31536000, immutable".parse().expect("invariant: valid cache-control header value"));
         }
         "api" => {
-            headers.insert(CACHE_CONTROL, "public, max-age=60".parse().unwrap());
+            headers.insert(CACHE_CONTROL, "public, max-age=60".parse().expect("invariant: valid cache-control header value"));
         }
         "html" => {
-            headers.insert(CACHE_CONTROL, "no-store".parse().unwrap());
+            headers.insert(CACHE_CONTROL, "no-store".parse().expect("invariant: valid cache-control header value"));
         }
         _ => {}
     }
@@ -15705,7 +15707,7 @@ pub fn validate_tracking(cfg: &TrackingConfig) -> anyhow::Result<()> {
 
     match cfg.tracking_type.as_str() {
         "google" => {
-            let re = regex::Regex::new(r"^(UA-\d+-\d+|G-[A-Z0-9]+)$").unwrap();
+            let re = regex::Regex::new(r"^(UA-\d+-\d+|G-[A-Z0-9]+)$").expect("invariant: valid regex pattern");
             if !re.is_match(&cfg.id) {
                 return Err(anyhow::anyhow!("invalid Google Analytics ID format"));
             }
@@ -20742,7 +20744,7 @@ Enable only for `/api/` routes. Never enable for HTML page routes.
 use tower_http::cors::{CorsLayer, Any};
 
 let cors = CorsLayer::new()
-    .allow_origin(cfg.server.allowed_origins.iter().map(|o| o.parse().unwrap()).collect::<Vec<_>>())
+    .allow_origin(cfg.server.allowed_origins.iter().filter_map(|o| o.parse().ok()).collect::<Vec<_>>())
     .allow_methods([
         axum::http::Method::GET,
         axum::http::Method::POST,
@@ -23709,10 +23711,10 @@ fn normalize_path(path: &str) -> String {
     use regex::Regex;
 
     static UUID_REGEX: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}").unwrap()
+        Regex::new(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}").expect("invariant: valid regex pattern")
     });
     static NUMERIC_ID_REGEX: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r"/\d+(?:/|$)").unwrap()
+        Regex::new(r"/\d+(?:/|$)").expect("invariant: valid regex pattern")
     });
 
     let path = UUID_REGEX.replace_all(path, ":id");
@@ -25019,8 +25021,8 @@ pub async fn do_update(release: &Release) -> Result<()> {
 
     // Replace binary (platform-specific)
     replace_binary(
-        current_path.to_str().unwrap(),
-        tmp_path.to_str().unwrap(),
+        current_path.to_str().expect("invariant: path is valid UTF-8"),
+        tmp_path.to_str().expect("invariant: path is valid UTF-8"),
     )?;
 
     Ok(())
@@ -26082,7 +26084,8 @@ fn service_main(_arguments: Vec<std::ffi::OsString>) {
         }
     };
 
-    let status_handle = service_control_handler::register("{project_name}", event_handler).unwrap();
+    let status_handle = service_control_handler::register("{project_name}", event_handler)
+        .expect("invariant: service control handler registration succeeds at startup");
 
     status_handle.set_service_status(ServiceStatus {
         service_type: ServiceType::OWN_PROCESS,
@@ -26092,7 +26095,7 @@ fn service_main(_arguments: Vec<std::ffi::OsString>) {
         checkpoint: 0,
         wait_hint: std::time::Duration::default(),
         process_id: None,
-    }).unwrap();
+    }).expect("invariant: set_service_status succeeds immediately after registration");
 }
 ```
 
@@ -26310,9 +26313,9 @@ BINDIR := binaries
 RELDIR := releases
 
 # Rust cache directories (persistent across builds)
-# RUST_CACHE maps host registry cache; RUST_BUILD maps to target cache inside the image
-RUST_CACHE  ?= $(HOME)/.cargo/registry
-RUST_BUILD  ?= $(HOME)/.cargo/git
+# CARGO_CACHE mounts .cargo; RUSTUP_CACHE mounts .rustup; SCCACHE_CACHE mounts sccache dir
+CARGO_CACHE   ?= $(HOME)/.cargo
+RUSTUP_CACHE  ?= $(HOME)/.rustup
 
 # Build targets
 PLATFORMS ?= linux/amd64,linux/arm64
@@ -26322,8 +26325,9 @@ REGISTRY ?= ghcr.io/$(PROJECTORG)/$(PROJECTNAME)
 RUST_DOCKER := docker run --rm -it \
 	--name $(PROJECTNAME)-$$(tr -dc 'a-z0-9' </dev/urandom | head -c8) \
 	-v $(PWD):/app \
-	-v $(RUST_CACHE):/usr/local/cargo/registry \
-	-v $(RUST_BUILD):/usr/local/cargo/git \
+	-v $(CARGO_CACHE):/usr/local/share/cargo \
+	-v $(RUSTUP_CACHE):/usr/local/share/rustup \
+	-v $(SCCACHE_CACHE):/root/.cache/sccache \
 	-w /app \
 	casjaysdev/rust:latest
 
@@ -26333,7 +26337,7 @@ RUST_DOCKER := docker run --rm -it \
 # BUILD - Build all platforms + local binary (via Docker with cached modules)
 # =============================================================================
 build: clean
-	@mkdir -p $(BINDIR) $(RUST_CACHE) $(RUST_BUILD)
+	@mkdir -p $(BINDIR) $(CARGO_CACHE) $(RUSTUP_CACHE) $(SCCACHE_CACHE)
 	@echo "Building version $(VERSION)..."
 
 	# Download crates
@@ -26375,7 +26379,7 @@ build: clean
 # LOCAL - Build local binaries only (fast development builds)
 # =============================================================================
 local: clean
-	@mkdir -p $(BINDIR) $(RUST_CACHE) $(RUST_BUILD)
+	@mkdir -p $(BINDIR) $(CARGO_CACHE) $(RUSTUP_CACHE) $(SCCACHE_CACHE)
 	@echo "Building local binaries version $(VERSION)..."
 
 	# Fetch crates
@@ -26535,10 +26539,11 @@ pub const OFFICIAL_SITE: &str = option_env!("APP_OFFICIAL_SITE").unwrap_or("");
 
 All Docker builds use persistent Rust crate caching to avoid re-downloading dependencies:
 
-| Cache | Local Path | Container Path |
-|-------|-----------|----------------|
-| Cargo registry | `~/.cargo/registry` | `/usr/local/cargo/registry` |
-| Cargo git | `~/.cargo/git` (`RUST_CACHE`/`RUST_BUILD`) | `/usr/local/cargo/registry`, `/usr/local/cargo/git` |
+| Cache | Local Path (`?=` default) | Container Path |
+|-------|--------------------------|----------------|
+| Cargo (`CARGO_CACHE`) | `~/.cargo` | `/usr/local/share/cargo` |
+| Rustup (`RUSTUP_CACHE`) | `~/.rustup` | `/usr/local/share/rustup` |
+| sccache (`SCCACHE_CACHE`) | `~/.cache/sccache` | `/root/.cache/sccache` |
 
 **Benefits:**
 - First build downloads crates once
@@ -27942,7 +27947,7 @@ networks:
 | Aspect | Local Development | CI/CD Workflows |
 |--------|-------------------|-----------------|
 | **Rust installation** | Docker `casjaysdev/rust:latest` | Docker `casjaysdev/rust:latest` |
-| **Caching** | Host cache dirs (`RUST_CACHE`/`RUST_BUILD`) bind-mounted into container | CI-native cache mounted into `casjaysdev/rust:latest` |
+| **Caching** | Host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`) bind-mounted into container | CI-native cache mounted into `casjaysdev/rust:latest` |
 | **Build command** | `make dev`, `make local`, `make build` | Direct `cargo build --release` with explicit flags |
 | **Testing** | Docker/Incus containers | `casjaysdev/rust:latest` job container or explicit `docker run` |
 | **Makefile** | ALWAYS use Makefile targets | NEVER use Makefile (explicit commands) |
@@ -29863,7 +29868,7 @@ pipeline {
         PROJECTORG = '{project_org}'
         BINDIR = 'binaries'
         RELDIR = 'releases'
-        // Rust registry cache bind-mounted from host: RUST_CACHE (registry) and RUST_TARGET (target cache)
+        // Rust cache bind-mounted from host: CARGO_CACHE (.cargo), RUSTUP_CACHE (.rustup), SCCACHE_CACHE (sccache)
 
         // =========================================================================
         // GIT PROVIDER CONFIGURATION
@@ -29938,7 +29943,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -29954,7 +29959,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -29971,7 +29976,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -29987,7 +29992,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -30004,7 +30009,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -30020,7 +30025,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -30037,7 +30042,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -30053,7 +30058,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -30078,7 +30083,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -30094,7 +30099,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -30110,7 +30115,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -30126,7 +30131,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -30142,7 +30147,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -30158,7 +30163,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -30174,7 +30179,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -30190,7 +30195,7 @@ pipeline {
                             docker run --rm -it \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                                 -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
@@ -30209,7 +30214,7 @@ pipeline {
                     docker run --rm -it \
                         --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                         -v ${WORKSPACE}:/app \
-                        -v ${RUST_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
+                        -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
                         -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
                         -w /app \
                         casjaysdev/rust:latest \
@@ -33813,7 +33818,7 @@ impl Client {
         if !self.token.is_empty() {
             req.headers_mut().insert(
                 header::AUTHORIZATION,
-                format!("Bearer {}", self.token).parse().unwrap(),
+                format!("Bearer {}", self.token).parse().expect("invariant: Bearer token is valid ASCII"),
             );
         }
         req
@@ -33924,7 +33929,7 @@ use icu_locid::Locale;
 use icu_decimal::FixedDecimalFormatter;
 
 pub fn format_number(n: f64, lang: &str) -> String {
-    let locale: Locale = lang.parse().unwrap_or_else(|_| "en".parse().unwrap());
+    let locale: Locale = lang.parse().unwrap_or_else(|_| "en".parse().expect("invariant: \"en\" is a valid locale"));
     let formatter = FixedDecimalFormatter::try_new(&locale.into(), Default::default())
         .unwrap_or_default();
     formatter.format_to_string(&n.into())
@@ -33950,8 +33955,8 @@ pub fn format_number(n: f64, lang: &str) -> String {
 use icu_plurals::{PluralRules, PluralCategory, PluralOperands};
 
 pub fn pluralize(key: &str, count: i64, lang: &str) -> String {
-    let locale: Locale = lang.parse().unwrap_or_else(|_| "en".parse().unwrap());
-    let rules = PluralRules::try_new_cardinal(&locale.into()).unwrap();
+    let locale: Locale = lang.parse().unwrap_or_else(|_| "en".parse().expect("invariant: \"en\" is a valid locale"));
+    let rules = PluralRules::try_new_cardinal(&locale.into()).expect("invariant: locale is valid after parse");
     // Select plural form based on count and language rules
     let category = rules.category_for(PluralOperands::from(count));
     let form = match category {
@@ -34796,15 +34801,17 @@ impl TorService {
             return reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
                 .build()
-                .unwrap();
+                .expect("invariant: default HTTP client config is always valid");
         }
 
         // Route through Tor network
         reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(60))  // Tor is slower
-            .proxy(reqwest::Proxy::all(self.dialer.as_ref().unwrap().socks5_addr()).unwrap())
+            .timeout(std::time::Duration::from_secs(60))
+            .proxy(reqwest::Proxy::all(
+                self.dialer.as_ref().expect("invariant: dialer set before client build").socks5_addr()
+            ).expect("invariant: valid SOCKS5 proxy URL"))
             .build()
-            .unwrap()
+            .expect("invariant: Tor client config is always valid")
     }
 
     // close shuts down the Tor process
@@ -35131,7 +35138,7 @@ impl TorManager {
         // Start Tor - new keys will be generated by control.add_onion
         self.start_locked(&mut svc).await?;
 
-        Ok(svc.as_ref().unwrap().onion_address())
+        Ok(svc.as_ref().expect("invariant: svc populated by start_locked").onion_address())
     }
 
     // apply_keys stops Tor, replaces keys, and restarts
@@ -35153,7 +35160,7 @@ impl TorManager {
         // Start Tor with new keys
         self.start_locked(&mut svc).await?;
 
-        Ok(svc.as_ref().unwrap().onion_address())
+        Ok(svc.as_ref().expect("invariant: svc populated by start_locked").onion_address())
     }
 
     // close shuts down the Tor process
@@ -35184,7 +35191,7 @@ impl TorManager {
         reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
-            .unwrap()
+            .expect("invariant: default HTTP client config is always valid")
     }
 }
 ```
@@ -36578,7 +36585,7 @@ pub async fn watch_window_size(
     callback: impl Fn(u16, u16) + Send + 'static,
 ) {
     use tokio::signal::unix::{signal, SignalKind};
-    let mut sig = signal(SignalKind::window_change()).unwrap();
+    let mut sig = signal(SignalKind::window_change()).expect("invariant: signal handler registration succeeds at startup");
 
     loop {
         tokio::select! {
@@ -37835,7 +37842,7 @@ impl APIClient {
             http_client: Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
                 .build()
-                .unwrap(),
+                .expect("invariant: default HTTP client config is always valid"),
             user_agent: get_user_agent(),
             token: token.to_string(),
         }
@@ -38842,9 +38849,9 @@ maintainer_email: jane@example.com
 
 **Rust Cache (Host Bind-Mounts):**
 ```bash
-# Rust cache bind-mounted from host: RUST_CACHE (registry) and RUST_BUILD (build cache)
-# Defaults: RUST_CACHE=$HOME/.cargo/registry  RUST_BUILD=$HOME/.cargo/target
-# Mount in Docker: -v $RUST_CACHE:/usr/local/cargo/registry -v $RUST_BUILD:/usr/local/cargo/target
+# Rust cache bind-mounted from host: CARGO_CACHE (.cargo), RUSTUP_CACHE (.rustup), SCCACHE_CACHE (sccache)
+# Defaults: CARGO_CACHE=$HOME/.cargo  RUSTUP_CACHE=$HOME/.rustup  SCCACHE_CACHE=$HOME/.cache/sccache
+# Mount in Docker: -v $CARGO_CACHE:/usr/local/share/cargo -v $RUSTUP_CACHE:/usr/local/share/rustup -v $SCCACHE_CACHE:/root/.cache/sccache
 ```
 
 **Temp Directory Workflow:**
