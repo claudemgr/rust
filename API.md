@@ -28071,7 +28071,7 @@ jobs:
       image: casjaysdev/rust:latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - run: cargo build --release
+      - run: make build
 
   vuln-check:
     runs-on: ubuntu-latest
@@ -29579,7 +29579,7 @@ test:
   <<: *rust-build
   stage: test
   script:
-    - cargo test --verbose
+    - make test
   rules:
     - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+/
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
@@ -31197,10 +31197,23 @@ verify_all_endpoints_tested
 ### Testing Workflow
 
 ```bash
-# 1. Build in Docker (always use Docker for builds)
+# 1. Build — if Makefile exists (preferred)
+make build    # release build for all platforms → binaries/
+
+# 1. Build — if no Makefile (manual equivalent)
+CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
+mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE"
 mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
 BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
-docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD:/app -w /app \
+docker run --rm -it \
+  --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+  -v $PWD:/app \
+  -v $CARGO_CACHE:/usr/local/share/cargo \
+  -v $RUSTUP_CACHE:/usr/local/share/rustup \
+  -v $SCCACHE_CACHE:/root/.cache/sccache \
+  -w /app \
   casjaysdev/rust:latest cargo build --release
 
 # 2. Test (prefer Incus, fallback to Docker)
@@ -31246,7 +31259,7 @@ fi
 | `tests/incus.sh` | Beta testing with Incus | `debian:latest` | Full integration + systemd tests |
 
 **docker.sh and incus.sh MUST:**
-1. Host cache dirs (`CARGO_CACHE`/`CARGO_TARGET`) provide persistent Rust cache across builds
+1. Host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`) provide persistent Rust cache across builds
 2. Build all binaries using Docker (casjaysdev/rust:latest) in temp directory:
    - Server (`./src`)
    - Client (`./src/client`) if exists
@@ -31282,30 +31295,34 @@ mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
 BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
 trap "rm -rf $BUILD_DIR" EXIT
 
-# Rust cache directories (same as Makefile)
-# Rust cache bind-mounted from host: CARGO_CACHE (registry) and CARGO_TARGET (build cache)
-CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo/registry}"
-CARGO_TARGET="${CARGO_TARGET:-$HOME/.cargo/target}"
-mkdir -p "$CARGO_CACHE" "$CARGO_TARGET"
-
-# Common docker run for Rust builds
-RUST_DOCKER="docker run --rm -it \
+# Build — use Makefile if present (it already handles caching and flags correctly)
+if [ -f Makefile ]; then
+    echo "Building with Makefile..."
+    make build
+    cp binaries/${PROJECT_NAME}-linux-$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/aarch64/') "$BUILD_DIR/${PROJECT_NAME}" 2>/dev/null || \
+        cp binaries/${PROJECT_NAME} "$BUILD_DIR/${PROJECT_NAME}" 2>/dev/null || true
+else
+    # No Makefile — build directly with Docker using correct cache vars
+    CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+    RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+    SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
+    mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE"
+    RUST_DOCKER="docker run --rm -it \
   --name \"${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)\" \
   -v $PWD:/app \
-  -v $CARGO_CACHE:/usr/local/cargo/registry \
-  -v $CARGO_TARGET:/app/target \
+  -v $CARGO_CACHE:/usr/local/share/cargo \
+  -v $RUSTUP_CACHE:/usr/local/share/rustup \
+  -v $SCCACHE_CACHE:/root/.cache/sccache \
   -w /app \
   casjaysdev/rust:latest"
-
-echo "Building server binary in Docker..."
-$RUST_DOCKER cargo build --release
-cp target/release/${PROJECT_NAME} "$BUILD_DIR/${PROJECT_NAME}"
-
-# Build client if exists
-if [ -d "src/client" ]; then
-    echo "Building client in Docker..."
-    $RUST_DOCKER cargo build --release --bin ${PROJECT_NAME}-cli
-    cp target/release/${PROJECT_NAME}-cli "$BUILD_DIR/${PROJECT_NAME}-cli"
+    echo "Building server binary in Docker..."
+    $RUST_DOCKER cargo build --release
+    cp target/release/${PROJECT_NAME} "$BUILD_DIR/${PROJECT_NAME}"
+    if [ -d "src/client" ]; then
+        echo "Building client in Docker..."
+        $RUST_DOCKER cargo build --release --bin ${PROJECT_NAME}-cli
+        cp target/release/${PROJECT_NAME}-cli "$BUILD_DIR/${PROJECT_NAME}-cli"
+    fi
 fi
 
 
@@ -31460,30 +31477,34 @@ mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
 BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
 trap "rm -rf $BUILD_DIR; incus delete $CONTAINER_NAME --force 2>/dev/null || true" EXIT
 
-# Rust cache directories (same as Makefile)
-# Rust cache bind-mounted from host: CARGO_CACHE (registry) and CARGO_TARGET (build cache)
-CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo/registry}"
-CARGO_TARGET="${CARGO_TARGET:-$HOME/.cargo/target}"
-mkdir -p "$CARGO_CACHE" "$CARGO_TARGET"
-
-# Common docker run for Rust builds
-RUST_DOCKER="docker run --rm -it \
+# Build — use Makefile if present (it already handles caching and flags correctly)
+if [ -f Makefile ]; then
+    echo "Building with Makefile..."
+    make build
+    cp binaries/${PROJECT_NAME}-linux-$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/aarch64/') "$BUILD_DIR/${PROJECT_NAME}" 2>/dev/null || \
+        cp binaries/${PROJECT_NAME} "$BUILD_DIR/${PROJECT_NAME}" 2>/dev/null || true
+else
+    # No Makefile — build directly with Docker using correct cache vars
+    CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+    RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+    SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
+    mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE"
+    RUST_DOCKER="docker run --rm -it \
   --name \"${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)\" \
   -v $PWD:/app \
-  -v $CARGO_CACHE:/usr/local/cargo/registry \
-  -v $CARGO_TARGET:/app/target \
+  -v $CARGO_CACHE:/usr/local/share/cargo \
+  -v $RUSTUP_CACHE:/usr/local/share/rustup \
+  -v $SCCACHE_CACHE:/root/.cache/sccache \
   -w /app \
   casjaysdev/rust:latest"
-
-echo "Building server binary in Docker..."
-$RUST_DOCKER cargo build --release
-cp target/release/${PROJECT_NAME} "$BUILD_DIR/${PROJECT_NAME}"
-
-# Build client if exists
-if [ -d "src/client" ]; then
-    echo "Building client in Docker..."
-    $RUST_DOCKER cargo build --release --bin ${PROJECT_NAME}-cli
-    cp target/release/${PROJECT_NAME}-cli "$BUILD_DIR/${PROJECT_NAME}-cli"
+    echo "Building server binary in Docker..."
+    $RUST_DOCKER cargo build --release
+    cp target/release/${PROJECT_NAME} "$BUILD_DIR/${PROJECT_NAME}"
+    if [ -d "src/client" ]; then
+        echo "Building client in Docker..."
+        $RUST_DOCKER cargo build --release --bin ${PROJECT_NAME}-cli
+        cp target/release/${PROJECT_NAME}-cli "$BUILD_DIR/${PROJECT_NAME}-cli"
+    fi
 fi
 
 
@@ -31656,8 +31677,8 @@ fi
 |------|-------------|
 | **Location** | `tests/run_tests.sh`, `tests/docker.sh`, `tests/incus.sh` |
 | **Permissions** | Executable (`chmod +x tests/*.sh`) |
-| **Build method** | ALWAYS use Docker (casjaysdev/rust:latest) with host cache dirs (`CARGO_CACHE`/`CARGO_TARGET`) |
-| **Rust cache** | Host cache dirs bind-mounted: `CARGO_CACHE` → registry cache, `CARGO_TARGET` → build cache |
+| **Build method** | Use `make build` if Makefile exists; otherwise Docker (`casjaysdev/rust:latest`) with host cache dirs |
+| **Rust cache** | `CARGO_CACHE` (`~/.cargo`) → `/usr/local/share/cargo`; `RUSTUP_CACHE` (`~/.rustup`) → `/usr/local/share/rustup`; `SCCACHE_CACHE` (`~/.cache/sccache`) → `/root/.cache/sccache` |
 | **Build location** | ALWAYS use temp directory |
 | **Build all components** | Build server, client (if `src/client/` exists) |
 | **Test container tools** | Docker alpine MUST install: `apk add --no-cache curl bash file jq` |
@@ -31774,18 +31795,25 @@ PROJECT_PATH="/root/Projects/github/apimgr/{project_name}"  # Example 1
 # PROJECT_PATH="~/myproject"                               # Example 3
 # PROJECT_PATH="/workspace/dev/myproject"                  # Example 4
 
-# Rust cache directories (same as Makefile - speeds up builds significantly)
-# Rust cache bind-mounted from host: CARGO_CACHE (registry) and CARGO_TARGET (build cache)
-CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo/registry}"
-CARGO_TARGET="${CARGO_TARGET:-$HOME/.cargo/target}"
-mkdir -p "$CARGO_CACHE" "$CARGO_TARGET"
+# If a Makefile exists (preferred for all project work)
+make build    # → release build for all platforms
+make test     # → cargo fmt --check + cargo test inside Docker
+make release  # → optimized cross-platform release binaries
+make clean    # → remove build artifacts
 
-# Common docker run for Rust commands
+# If no Makefile exists yet — set up correct cache vars and run directly
+CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
+mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE"
+
+# Common docker run for Rust commands (what the Makefile does internally)
 RUST_DOCKER="docker run --rm -it \
   --name \"${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)\" \
   -v $PROJECT_PATH:/app \
-  -v $CARGO_CACHE:/usr/local/cargo/registry \
-  -v $CARGO_TARGET:/app/target \
+  -v $CARGO_CACHE:/usr/local/share/cargo \
+  -v $RUSTUP_CACHE:/usr/local/share/rustup \
+  -v $SCCACHE_CACHE:/root/.cache/sccache \
   -w /app"
 
 # Build (outputs to target/release/ then copy to binaries/)
@@ -31813,29 +31841,35 @@ $RUST_DOCKER casjaysdev/rust:latest cargo clippy -- -D warnings
 docker run --rm -it \
   --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
   -v $PROJECT_PATH:/app \
-  -v ${CARGO_CACHE:-$HOME/.cargo/registry}:/usr/local/cargo/registry \
-  -v ${CARGO_TARGET:-$HOME/.cargo/target}:/app/target \
+  -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+  -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+  -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
   -w /app \
   casjaysdev/rust:latest sh
 ```
 
 ## Build and Test
 
-**Build outputs to `target/release/` (copied to `binaries/`), test by running in container. Host cache dirs (`CARGO_CACHE`/`CARGO_TARGET`) keep builds fast.**
+**Build outputs to `target/release/` (copied to `binaries/`), test by running in container. Host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`) keep builds fast.**
 
 ```bash
-# Rust cache directories (same as Makefile)
-# Rust cache bind-mounted from host: CARGO_CACHE (registry) and CARGO_TARGET (build cache)
-CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo/registry}"
-CARGO_TARGET="${CARGO_TARGET:-$HOME/.cargo/target}"
-mkdir -p "$CARGO_CACHE" "$CARGO_TARGET"
+# If a Makefile exists (preferred for all project work)
+make build    # release build → binaries/
+make test     # cargo fmt --check + cargo test
+
+# If no Makefile exists yet (manual equivalent)
+CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
+mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE"
 
 # Build (with caching)
 docker run --rm -it \
   --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
   -v $PWD:/app \
-  -v $CARGO_CACHE:/usr/local/cargo/registry \
-  -v $CARGO_TARGET:/app/target \
+  -v $CARGO_CACHE:/usr/local/share/cargo \
+  -v $RUSTUP_CACHE:/usr/local/share/rustup \
+  -v $SCCACHE_CACHE:/root/.cache/sccache \
   -w /app \
   casjaysdev/rust:latest cargo build --release
 cp target/release/{project_name} binaries/{project_name}
@@ -31857,26 +31891,30 @@ incus delete test-{project_name} --force
 ### Testing with Config/Data
 
 ```bash
-# Rust cache directories (same as Makefile)
-# Rust cache bind-mounted from host: CARGO_CACHE (registry) and CARGO_TARGET (build cache)
-CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo/registry}"
-CARGO_TARGET="${CARGO_TARGET:-$HOME/.cargo/target}"
-mkdir -p "$CARGO_CACHE" "$CARGO_TARGET"
-
 # Create prefixed temp dir for test data
 mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
 TEST_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
 mkdir -p $TEST_DIR/{config,data,logs}
 
-# Build to binaries/ (with caching)
-docker run --rm -it \
-  --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
-  -v $PWD:/app \
-  -v $CARGO_CACHE:/usr/local/cargo/registry \
-  -v $CARGO_TARGET:/app/target \
-  -w /app \
-  casjaysdev/rust:latest cargo build --release
-cp target/release/{project_name} binaries/{project_name}
+# Build — use Makefile if present (preferred)
+if [ -f Makefile ]; then
+    make build
+else
+    # No Makefile — build directly with Docker using correct cache vars
+    CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+    RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+    SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
+    mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE"
+    docker run --rm -it \
+      --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+      -v $PWD:/app \
+      -v $CARGO_CACHE:/usr/local/share/cargo \
+      -v $RUSTUP_CACHE:/usr/local/share/rustup \
+      -v $SCCACHE_CACHE:/root/.cache/sccache \
+      -w /app \
+      casjaysdev/rust:latest cargo build --release
+    cp target/release/{project_name} binaries/{project_name}
+fi
 
 # Quick test in Docker (install tools first)
 docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD/binaries:/app alpine:latest sh -c "
@@ -31909,10 +31947,24 @@ mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
 TEST_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
 mkdir -p $TEST_DIR/{config,data,logs}
 
-# Build
-docker run --rm -it --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD:/app -w /app \
-  casjaysdev/rust:latest cargo build --release
-cp target/release/{project_name} binaries/{project_name}
+# Build — use Makefile if present (preferred)
+if [ -f Makefile ]; then
+    make build
+else
+    CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+    RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+    SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
+    mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE"
+    docker run --rm -it \
+      --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+      -v $PWD:/app \
+      -v $CARGO_CACHE:/usr/local/share/cargo \
+      -v $RUSTUP_CACHE:/usr/local/share/rustup \
+      -v $SCCACHE_CACHE:/root/.cache/sccache \
+      -w /app \
+      casjaysdev/rust:latest cargo build --release
+    cp target/release/{project_name} binaries/{project_name}
+fi
 
 # Launch Incus container (use latest Debian stable)
 incus launch images:debian/trixie test-{project_name}
