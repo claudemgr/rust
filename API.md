@@ -28071,7 +28071,7 @@ jobs:
       image: casjaysdev/rust:latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - run: make build
+      - run: cargo build --release
 
   vuln-check:
     runs-on: ubuntu-latest
