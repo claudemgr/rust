@@ -385,7 +385,7 @@ permission rules, business invariants. The HOW lives in AI.md PARTS 0-36; PART 3
 ```bash
 # After make dev, debug in Docker with tools
 BUILD_DIR=$(ls -td ${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-*/ 2>/dev/null | head -1)
-docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$BUILD_DIR:/app" alpine:latest sh -c "
+docker run --rm -v "$BUILD_DIR:/app" alpine:latest sh -c "
   apk add --no-cache curl bash file jq  # Required debug tools
   /app/{project_name} --help
   /app/{project_name} --version
@@ -37298,6 +37298,7 @@ BINDIR := binaries
 RELDIR := releases
 
 # Cargo cache bind-mounted from host
+# CARGO_CACHE and SCCACHE_CACHE are safe to share across concurrent builds (cargo + sccache use file locking)
 CARGO_CACHE   ?= $(HOME)/.cargo
 RUSTUP_CACHE  ?= $(HOME)/.rustup
 SCCACHE_CACHE ?= $(HOME)/.cache/sccache
@@ -37306,10 +37307,14 @@ CARGO_TARGET   ?= $(HOME)/.cache/cargo-target
 # Build targets
 PLATFORMS ?= linux/amd64,linux/arm64
 
+# Resource limits — overrideable; prevents any single container from starving concurrent agent builds
+DOCKER_MEM  ?= 4g
+DOCKER_CPUS ?= 2
+
 # Docker - Set REGISTRY based on your platform (ghcr.io, registry.gitlab.com, git.example.com)
 REGISTRY ?= ghcr.io/$(PROJECTORG)/$(PROJECTNAME)
 RUST_DOCKER := docker run --rm \
-	--name $(PROJECTNAME)-$$(tr -dc 'a-z0-9' </dev/urandom | head -c8) \
+	--memory=$(DOCKER_MEM) --cpus=$(DOCKER_CPUS) \
 	-v $(PWD):/app \
 	-v $(CARGO_CACHE):/usr/local/share/cargo \
 	-v $(RUSTUP_CACHE):/usr/local/share/rustup \
