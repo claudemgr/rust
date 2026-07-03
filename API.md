@@ -2007,7 +2007,7 @@ Instructions for how this agent should behave...
 |-------------|-------------|---------|
 | `{project_name}` | Project name (lowercase, no spaces/hyphens) | `jokes`, `echoip`, `pastebin` |
 | `{project_org}` | Organization/owner name (lowercase) | `sneak`, `acme`, `mycompany` |
-| `{projectversion}` | Current version (semver format) | `1.0.0`, `2.3.1` |
+| `{project_version}` | Current version (semver format) | `1.0.0`, `2.3.1` |
 | `{PROJECT_NAME}` | Uppercase project name (for constants, env vars) | `JOKES`, `ECHOIP` |
 | `{official_site}` | Official project website | `https://jokes.example.com` |
 | `{fqdn}` | Fully qualified domain name | `api.example.com` |
@@ -9881,7 +9881,7 @@ NO_COLOR=1 {project_name} --status | grep -E '✅|❌|⚠️|🚀'
 
 ```bash
 $ {project_name} --help
-{project_name} {projectversion} - {project description}
+{project_name} {project_version} - {project description}
 
 Usage:
   {project_name} [flags]
@@ -17259,7 +17259,7 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 ### --version Output
 
 ```
-{project_name} {projectversion}
+{project_name} {project_version}
 Built: {build_date}
 Rust: {rust_version}
 OS/Arch: {target}
@@ -19607,7 +19607,7 @@ format_url(host, 8443, true);
 **Example (Production with SSL + Tor on 443):**
 ```
 ╭───────────────────────────────────────────────────────────╮
-│  🚀 {PROJECT_NAME} · 📦 {projectversion}                   │
+│  🚀 {PROJECT_NAME} · 📦 {project_version}                  │
 ├───────────────────────────────────────────────────────────┤
 │  🔒 Running in mode: production                           │
 ├───────────────────────────────────────────────────────────┤
@@ -19622,7 +19622,7 @@ format_url(host, 8443, true);
 **Example (Full Banner with Tor + I2P + SMTP):**
 ```
 ╭───────────────────────────────────────────────────────────╮
-│  🚀 {PROJECT_NAME} · 📦 {projectversion}                   │
+│  🚀 {PROJECT_NAME} · 📦 {project_version}                  │
 ├───────────────────────────────────────────────────────────┤
 │  🔒 Running in mode: {app_mode}                           │
 ├───────────────────────────────────────────────────────────┤
@@ -19641,7 +19641,7 @@ format_url(host, 8443, true);
 **Example (Production on port 8080):**
 ```
 ╭───────────────────────────────────────────────────────────╮
-│  🚀 {PROJECT_NAME} · 📦 {projectversion}                   │
+│  🚀 {PROJECT_NAME} · 📦 {project_version}                  │
 ├───────────────────────────────────────────────────────────┤
 │  🔒 Running in mode: production                           │
 ├───────────────────────────────────────────────────────────┤
@@ -19655,7 +19655,7 @@ format_url(host, 8443, true);
 **Example (Development on port 8080):**
 ```
 ╭───────────────────────────────────────────────────────────╮
-│  🚀 {PROJECT_NAME} · 📦 {projectversion}                   │
+│  🚀 {PROJECT_NAME} · 📦 {project_version}                  │
 ├───────────────────────────────────────────────────────────┤
 │  🔧 Running in mode: development                          │
 ├───────────────────────────────────────────────────────────┤
@@ -19669,7 +19669,7 @@ format_url(host, 8443, true);
 **Example (Development IPv6 on port 8080):**
 ```
 ╭───────────────────────────────────────────────────────────╮
-│  🚀 {PROJECT_NAME} · 📦 {projectversion}                   │
+│  🚀 {PROJECT_NAME} · 📦 {project_version}                  │
 ├───────────────────────────────────────────────────────────┤
 │  🔧 Running in mode: development                          │
 ├───────────────────────────────────────────────────────────┤
@@ -19683,7 +19683,7 @@ format_url(host, 8443, true);
 **Example (Production on port 80):**
 ```
 ╭───────────────────────────────────────────────────────────╮
-│  🚀 {PROJECT_NAME} · 📦 {projectversion}                   │
+│  🚀 {PROJECT_NAME} · 📦 {project_version}                  │
 ├───────────────────────────────────────────────────────────┤
 │  🔒 Running in mode: production                           │
 ├───────────────────────────────────────────────────────────┤
@@ -19697,7 +19697,7 @@ format_url(host, 8443, true);
 **Example (Production with debugging enabled):**
 ```
 ╭───────────────────────────────────────────────────────────╮
-│  🚀 {PROJECT_NAME} · 📦 {projectversion}                   │
+│  🚀 {PROJECT_NAME} · 📦 {project_version}                  │
 ├───────────────────────────────────────────────────────────┤
 │  🔒 Running in mode: {app_mode} [debugging]               │
 ├───────────────────────────────────────────────────────────┤
@@ -19711,7 +19711,7 @@ format_url(host, 8443, true);
 **Example (First Run - Setup Required):**
 ```
 ╭───────────────────────────────────────────────────────────╮
-│  🚀 {PROJECT_NAME} · 📦 {projectversion}                   │
+│  🚀 {PROJECT_NAME} · 📦 {project_version}                  │
 ├───────────────────────────────────────────────────────────┤
 │  🔧 Running in mode: {app_mode}                           │
 ├───────────────────────────────────────────────────────────┤
@@ -19733,7 +19733,7 @@ format_url(host, 8443, true);
 
 **60-79 cols (Compact - no ASCII art, icons + text):**
 ```
-🚀 {PROJECT_NAME} v{projectversion}
+🚀 {PROJECT_NAME} v{project_version}
 🔒 Mode: {app_mode}
 🌐 {proto}://{fqdn}
 📡 Listening: {proto}://{address}:{port}
@@ -19742,7 +19742,7 @@ format_url(host, 8443, true);
 
 **60-79 cols (Compact - First Run):**
 ```
-🚀 {PROJECT_NAME} v{projectversion}
+🚀 {PROJECT_NAME} v{project_version}
 🔧 Mode: {app_mode}
 🌐 {proto}://{address}:{port}
 📡 Listening: {proto}://{address}:{port}
@@ -19751,14 +19751,14 @@ format_url(host, 8443, true);
 
 **40-59 cols (Minimal - abbreviated, no icons):**
 ```
-{PROJECT_NAME} {projectversion}
+{PROJECT_NAME} {project_version}
 {app_mode}
 {fqdn}:{port}
 ```
 
 **40-59 cols (Minimal - First Run):**
 ```
-{PROJECT_NAME} {projectversion}
+{PROJECT_NAME} {project_version}
 {app_mode}
 {address}:{port}
 ```
@@ -19775,7 +19775,7 @@ format_url(host, 8443, true);
 
 **NO_COLOR / TERM=dumb (Plain text - no emojis, no box drawing, no colors):**
 ```
-{PROJECT_NAME} v{projectversion}
+{PROJECT_NAME} v{project_version}
 Mode: {app_mode}
 URL: {proto}://{fqdn}
 Listening: {proto}://{address}:{port}
@@ -19784,7 +19784,7 @@ Started: {startup_datetime}
 
 **NO_COLOR / TERM=dumb (Plain - First Run):**
 ```
-{PROJECT_NAME} v{projectversion}
+{PROJECT_NAME} v{project_version}
 Mode: {app_mode}
 URL: {proto}://{address}:{port}
 Listening: {proto}://{address}:{port}
@@ -25727,7 +25727,7 @@ Examples:
   {project_name} --update branch beta
 
 Current:
-  Version:  {projectversion}
+  Version:  {project_version}
   Branch:   stable
   Latest:   {latest_version} (if different)
 ```
@@ -33941,7 +33941,7 @@ pub struct LocaleFS;
   },
 
   "cli": {
-    "description": "{project_name} {projectversion} - {project_description}",
+    "description": "{project_name} {project_version} - {project_description}",
     "usage": "Uso:",
     "information": "Información:",
     "shell_integration": "Integración de shell:",
@@ -33983,7 +33983,7 @@ pub struct LocaleFS;
   },
 
   "version": {
-    "name_version": "{project_name} {projectversion}",
+    "name_version": "{project_name} {project_version}",
     "built": "Compilado: {build_date}",
     "rust": "Rust: {rust_version}",
     "os_arch": "SO/Arq: {target_os}/{target_arch}"
@@ -38113,7 +38113,7 @@ fn print_init(shell: &str, binary_name: &str) {
 
 ```bash
 $ {project_name}-cli --help
-{project_name}-cli {projectversion} - CLI for {project_name}
+{project_name}-cli {project_version} - CLI for {project_name}
 
 Usage:
   {project_name}-cli [args] [flags]
@@ -38147,7 +38147,7 @@ Run '{project_name}-cli <command> help' for detailed help on any command.
 ```bash
 $ mypaste --help
 # Shows actual binary name
-mypaste {projectversion} - client for {project_name} API
+mypaste {project_version} - client for {project_name} API
 
 Usage:
   # Shows actual binary name
@@ -38161,18 +38161,18 @@ Usage:
 
 ```bash
 $ {project_name}-cli --version
-{project_name}-cli {projectversion} ({commit_sha}) built {build_date}
+{project_name}-cli {project_version} ({commit_sha}) built {build_date}
 
 # If renamed:
 $ mypaste --version
 # Shows actual name
-mypaste {projectversion} ({commit_sha}) built {build_date}
+mypaste {project_version} ({commit_sha}) built {build_date}
 ```
 
 Same format as server:
 ```bash
 $ pastebin --version
-pastebin {projectversion} ({commit_sha}) built {build_date}
+pastebin {project_version} ({commit_sha}) built {build_date}
 ```
 
 ## Commands
@@ -39012,10 +39012,10 @@ When server is reachable, `--version` can show extended info:
 
 ```bash
 $ {project_name}-cli --version
-{project_name}-cli {projectversion} ({commit_sha}) built {build_date}
+{project_name}-cli {project_version} ({commit_sha}) built {build_date}
 
 Server: https://{project_name}.example.com
-Server Version: {projectversion} (compatible)
+Server Version: {project_version} (compatible)
 
 Build Info:
   Rust: {rust_version}
@@ -40379,7 +40379,7 @@ make docker
 - [ ] `{smtp_port}` - SMTP server port
 - [ ] `{startup_datetime}` - Server start timestamp
 - [ ] `{PROJECT_NAME}` - Project name (uppercase for display)
-- [ ] `{projectversion}` - Current version
+- [ ] `{project_version}` - Current version
 
 ### Client TUI/GUI Dynamic Sizing
 
