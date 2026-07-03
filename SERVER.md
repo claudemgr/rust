@@ -9135,11 +9135,11 @@ Before proceeding, confirm you understand:
 
 ## Debug Flag (`--debug` / `DEBUG=true`)
 
-**Enables ALL debug features regardless of mode. Use sparingly in production.**
+**Enables ALL debug diagnostics regardless of mode. Debug mode affects verbosity and diagnostics ONLY — it NEVER disables authentication or security checks, in any mode, including production. Use sparingly in production.**
 
 | Setting | Behavior |
 |---------|----------|
-| **Admin authentication** | **BYPASSED** (for manual dev only - NOT for automated tests) |
+| **Admin authentication** | **NEVER bypassed** — all auth and security checks remain fully enforced |
 | Debug endpoints | **Enabled** (`/debug/*`) |
 | tokio-console | **Enabled** (`/debug/tokio-console`) |
 | Metrics endpoints | **Enabled** (`/debug/metrics`) |
@@ -11992,7 +11992,7 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
     ip_address  TEXT NOT NULL,
     user_agent  TEXT,
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-    expires_at  INTEGER NOT NULL,              -- Unix timestamp (default: 30 days)
+    expires_at  INTEGER NOT NULL,              -- Unix timestamp (default: 24 hours, per session.timeout)
     last_active INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
 
@@ -13795,7 +13795,7 @@ See **PART 12: SERVER CONFIGURATION** for full Valkey/Redis setup.
 
 | Content Type | TTL | Reason |
 |--------------|-----|--------|
-| Session tokens | 7 days | User convenience vs security |
+| Session tokens | 24 hours | Matches `session.timeout` default |
 | API tokens | No expiry | Explicit revocation only |
 | Rate limit counters | 1 minute | Rolling window |
 | User profile | 5 minutes | Balance freshness and load |
@@ -15774,14 +15774,11 @@ llms.txt tells AI agents (Claude, GPT, etc.) what the application does, what API
 
 ## API
 Base URL: {app_url}/api/{api_version}
-Authentication: Bearer token (obtain via /api/{api_version}/auth/token)
+Authentication: Bearer token (API tokens are created in the server admin panel)
 Rate limit: {rate_limit} requests/minute
 
 ## Endpoints
-- GET /health - Health check (no auth)
-- GET /server/info - Server information (no auth)
-- POST /auth/token - Obtain API token
-- GET /users/me - Current user profile
+- GET /server/healthz - Health check (no auth)
 - ... (auto-generated from route definitions)
 
 ## Capabilities
@@ -15818,7 +15815,8 @@ web:
 | Authenticated API (`/api/**` + auth) | Yes | Note auth requirement |
 | Admin routes (`/server/{admin_path}/**`) | No | Not for external agents |
 | Internal routes (`/internal/**`) | No | Server-to-server only |
-| Health/metrics (`/healthz`, `/metrics`) | Yes | Useful for monitoring agents |
+| Health (`/server/healthz`) | Yes | Useful for monitoring agents |
+| Metrics (`/metrics`) | No | Operator-only diagnostics; not for AI agents |
 
 **Well-Known Support Matrix Update:**
 
@@ -16087,7 +16085,7 @@ When using `format: custom`, these variables are available:
 server:
   logs:
     # Global log level: debug, info, warn, error
-    level: warn
+    level: info
 
     # All log types share these options:
     #   filename: name of log file
@@ -30281,8 +30279,8 @@ Admin Panel Header:
 | `mfa.enabled` | Toggle | Off | No | Require MFA for admins |
 | `mfa.methods` | Checkbox group | TOTP | No | Allowed MFA methods |
 | `password.min_length` | Number | `8` | No | Minimum password length |
-| `password.require_uppercase` | Toggle | On | No | Require uppercase |
-| `password.require_number` | Toggle | On | No | Require number |
+| `password.require_uppercase` | Toggle | Off | No | Require uppercase |
+| `password.require_number` | Toggle | Off | No | Require number |
 | `password.require_special` | Toggle | Off | No | Require special char |
 | `auth.oidc.enabled` | Toggle | Off | No | Enable OIDC login support |
 | `auth.oidc.providers` | Provider table | (empty) | No | Add/edit/remove/test OIDC providers |
@@ -33652,8 +33650,6 @@ server:
 | `tokio_tasks_active` | Gauge | - | Current number of spawned async tasks |
 | `tokio_mem_alloc_bytes` | Gauge | - | Bytes allocated and in use (heap) |
 | `tokio_mem_sys_bytes` | Gauge | - | Total bytes obtained from system |
-| `tokio_gc_runs_total` | Counter | - | Total allocator GC cycles |
-| `tokio_gc_pause_total_seconds` | Counter | - | Total time spent in allocator pauses |
 
 ### Cluster Metrics (if using PART 10 clustering)
 
@@ -33795,10 +33791,6 @@ server:
 # HELP {project_name}_tokio_mem_alloc_bytes Bytes allocated and in use
 # TYPE {project_name}_tokio_mem_alloc_bytes gauge
 {project_name}_tokio_mem_alloc_bytes 2.4576e+07
-
-# HELP {project_name}_tokio_gc_runs_total Total number of allocator GC cycles
-# TYPE {project_name}_tokio_gc_runs_total counter
-{project_name}_tokio_gc_runs_total 1523
 
 # HELP {project_name}_cluster_nodes_total Total nodes in cluster
 # TYPE {project_name}_cluster_nodes_total gauge
@@ -42154,9 +42146,6 @@ pipeline {
                                 -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
                                 -w /app \
-                                -e CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc \
-                                -e GOOS=darwin \
-                                -e GOARCH=amd64 \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target x86_64-apple-darwin --bin {project_name}-cli
                         '''
@@ -51327,7 +51316,7 @@ tui:
 
 # Logging
 logging:
-  level: warn                      # debug, info, warn, error (match server default)
+  level: info                      # debug, info, warn, error (match server default)
   file: ""                         # Log file path (empty = {log_dir}/cli.log)
   max_size: 10MB                   # Max log file size (match server default)
   max_files: 5                     # Max log files to keep (match server default)

@@ -4296,7 +4296,7 @@ sqlx::query(&format!("SELECT * FROM users WHERE email = '{}'", email))
 
 | Endpoint Type | Default Limit | Default Window | Response |
 |---------------|---------------|----------------|----------|
-| **Login attempts** | 5 | 15 minutes | 429 + lockout |
+| **Failed auth attempts (invalid token)** | 5 | 15 minutes | 429 + lockout |
 | **API (authenticated)** | Configurable | 1 minute | 429 + Retry-After header |
 | **API (unauthenticated)** | Configurable | 1 minute | 429 + Retry-After header |
 | **File upload** | 10 | 1 hour | 429 |
@@ -4360,13 +4360,13 @@ Content-Type: application/json
 }
 ```
 
-**Never reveal to users:**
-- Whether a username/email exists (use "If account exists, email sent")
+**Never reveal to clients:**
+- Whether a resource or token exists (identical response for "not found" vs "no access")
 - Database structure, table names, or query details
 - Internal IP addresses, hostnames, or ports
 - Stack traces or file paths
 - Dependency versions or internal service names
-- Specific reason for auth failures (user not found vs wrong password)
+- Specific reason for auth failures (unknown token vs revoked token vs expired token)
 
 ### Security vs Usability Balance
 
@@ -5469,7 +5469,7 @@ For MIT/ISC/BSD licenses, a summary table is sufficient. Full text only needed f
 | Library | Version | License | Copyright |
 |---------|---------|---------|-----------|
 | axum | {version} | MIT | 2021-present Axum Contributors |
-| modernc.org/sqlite | {version} | BSD-3-Clause | 2017 The Sqlite Authors |
+| sqlx | {version} | MIT OR Apache-2.0 | 2019-present LaunchBadge LLC |
 | libsql | {version} | MIT | 2023-2024 Turso Authors |
 
 Full license texts available at: https://spdx.org/licenses/
@@ -5516,7 +5516,7 @@ This software includes the following third-party libraries:
 | axum | {version} | MIT | 2021-present Axum Contributors |
 | libsql | {version} | MIT | 2023-2024 Turso Authors |
 | redis | {version} | BSD-2-Clause | 2012-2024 The redis-rs Authors |
-| sqlx | {version} | MIT | 2019-2024 The sqlx Authors |
+| sqlx | {version} | MIT OR Apache-2.0 | 2019-present LaunchBadge LLC |
 | argon2 | {version} | MIT/Apache-2.0 | 2021 The RustCrypto Project |
 | ratatui | {version} | MIT | 2023-2024 Ratatui Contributors |
 
@@ -5530,9 +5530,9 @@ Full license texts: https://spdx.org/licenses/
 For BSD-3-Clause, include the third clause since it has specific restrictions:
 
 ```markdown
-### modernc.org/sqlite {version} (BSD-3-Clause)
+### subtle {version} (BSD-3-Clause)
 
-Copyright (c) 2017 The Sqlite Authors. All rights reserved.
+Copyright (c) 2016-2024 Isis Agora Lovecruft, Henry de Valence. All rights reserved.
 
 Neither the name of the copyright holder nor the names of its contributors
 may be used to endorse or promote products derived from this software
@@ -7909,7 +7909,7 @@ ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]
    #[cfg(not(target_os = "windows"))]
    // Unix: bind privileged port while still root, then drop privileges
    if is_elevated() && port < 1024 {
-       let listener = std::net::TcpListener::bind(format!(":{}", port))?;
+       let listener = std::net::TcpListener::bind(("0.0.0.0", port))?;
        // Store listener, drop privileges later
    }
    ```
@@ -8485,7 +8485,7 @@ Before proceeding, confirm you understand:
 |---------|----------|
 | Logging | `info` level, minimal output |
 | Debug endpoints | **Disabled** (`/debug/*` returns 404) |
-| pprof endpoints | **Disabled** |
+| tokio-console | **Disabled** |
 | Error messages | Generic (no stack traces) |
 | Panic recovery | Graceful (logs error, returns 500) |
 | Template caching | Enabled |
@@ -8503,7 +8503,7 @@ Before proceeding, confirm you understand:
 |---------|----------|
 | Logging | `debug` level, verbose |
 | Debug endpoints | **Disabled** (use `--debug` to enable) |
-| pprof endpoints | **Disabled** (use `--debug` to enable) |
+| tokio-console | **Disabled** (use `--debug` to enable) |
 | Error messages | Detailed (stack traces in logs) |
 | Panic recovery | Verbose (full stack in response) |
 | Template caching | Disabled (hot reload) |
@@ -8515,14 +8515,13 @@ Before proceeding, confirm you understand:
 
 ## Debug Flag (`--debug` / `DEBUG=true`)
 
-**Enables ALL debug features regardless of mode. Use sparingly in production.**
+**Enables ALL debug diagnostics regardless of mode. Debug mode affects verbosity and diagnostics ONLY — it NEVER disables authentication or security checks, in any mode, including production builds. Use sparingly in production.**
 
 | Setting | Behavior |
 |---------|----------|
-| **Operator token (`server.token`) auth** | **BYPASSED** (for manual dev only - NOT for automated tests) |
+| **Operator token (`server.token`) auth** | **NEVER bypassed** — all auth and security checks remain fully enforced |
 | Debug endpoints | **Enabled** (`/debug/*`) |
-| pprof endpoints | **Enabled** (`/debug/pprof/*`) |
-| expvar endpoints | **Enabled** (`/debug/vars`) |
+| Runtime variables endpoint | **Enabled** (`/debug/vars`) |
 | Request/response logging | Full (headers, body, timing) |
 | Database query logging | Enabled (queries, timing, rows) |
 | Cache operation logging | Enabled (hits, misses, evictions) |
@@ -8548,27 +8547,11 @@ Before proceeding, confirm you understand:
 
 **Debug endpoints are ONLY available when `--debug` flag or `DEBUG=true` is set. Otherwise returns 404.**
 
-### pprof Endpoints
-
-| Endpoint | Purpose |
-|----------|---------|
-| `/debug/pprof/` | Index page with all profiles |
-| `/debug/pprof/heap` | Heap memory profile |
-| `/debug/pprof/goroutine` | Async task stack traces |
-| `/debug/pprof/allocs` | Memory allocation profile |
-| `/debug/pprof/block` | Blocking profile |
-| `/debug/pprof/mutex` | Mutex contention profile |
-| `/debug/pprof/threadcreate` | Thread creation profile |
-| `/debug/pprof/cmdline` | Command line arguments |
-| `/debug/pprof/profile` | CPU profile (30s default) |
-| `/debug/pprof/symbol` | Symbol lookup |
-| `/debug/pprof/trace` | Execution trace |
-
 ### Debug API Endpoints
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/debug/vars` | GET | Runtime variables (expvar) |
+| `/debug/vars` | GET | Runtime variables (JSON) |
 | `/debug/config` | GET | Current configuration (sanitized) |
 | `/debug/routes` | GET | All registered routes |
 | `/debug/cache` | GET | Cache statistics |
@@ -8598,7 +8581,7 @@ pub fn register_debug_routes(router: Router<AppState>, config: &Config) -> Route
         .route("/scheduler", get(handle_debug_scheduler))
         .route("/memory", get(handle_debug_memory))
         .route("/tasks", get(handle_debug_tasks))
-        // expvar equivalent
+        // Runtime variables endpoint
         .route("/vars", get(handle_debug_vars))
     )
 }
@@ -8778,7 +8761,7 @@ pub async fn debug_middleware(
 }
 ```
 
-### expvar Registration
+### Runtime Metrics Registration
 
 ```rust
 // src/server/metrics.rs
@@ -8815,10 +8798,10 @@ impl Metrics {
 }
 ```
 
-### Using pprof (Commands)
+### Profiling (Commands)
 
 ```bash
-# CPU profile (30 seconds)
+# CPU profile (flamegraph)
 cargo install cargo-flamegraph
 cargo flamegraph --bin {internal_name}
 
@@ -8829,9 +8812,6 @@ heaptrack ./{internal_name}
 cargo install tokio-console
 TOKIO_CONSOLE_BIND=127.0.0.1:6669 ./{internal_name}
 tokio-console http://127.0.0.1:6669
-
-# Execution trace (download and view)
-curl -q -LSsf -o trace.out http://localhost:64580/debug/pprof/trace?seconds=5
 
 # WebUI for profiles — use cargo-flamegraph output
 cargo flamegraph -o flamegraph.svg --bin {internal_name}
@@ -8846,8 +8826,8 @@ server:
 
   # Debug-specific settings (only apply in development mode)
   debug:
-    # Enable pprof endpoints
-    pprof: true
+    # Enable tokio-console task monitoring
+    tokio_console: true
 
     # Log all SQL queries
     log_queries: true
@@ -8858,12 +8838,6 @@ server:
     # Log request/response bodies (up to max_body_log_size)
     log_bodies: false
     max_body_log_size: 10KB
-
-    # Block profiling rate (0 = disabled)
-    block_profile_rate: 1
-
-    # Mutex profiling fraction (0 = disabled)
-    mutex_profile_fraction: 1
 
     # Enable runtime/debug endpoints
     runtime_endpoints: true
@@ -11107,7 +11081,7 @@ CREATE INDEX IF NOT EXISTS idx_config_key_prefix ON config(key);
 -- Rate Limiting (sliding window counters)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS rate_limits (
-    key         TEXT PRIMARY KEY,              -- "ip:1.2.3.4:login" or "key:abc12345:global" (prefix, not hash)
+    key         TEXT PRIMARY KEY,              -- "ip:1.2.3.4:auth" or "key:abc12345:global" (prefix, not hash)
     count       INTEGER NOT NULL DEFAULT 1,
     window_start INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     updated_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
@@ -12630,7 +12604,6 @@ See **PART 12: SERVER CONFIGURATION** for full Valkey/Redis setup.
 
 | Content Type | TTL | Reason |
 |--------------|-----|--------|
-| Session tokens | 7 days | User convenience vs security |
 | API tokens | No expiry | Explicit revocation only |
 | Rate limit counters | 1 minute | Rolling window |
 | User profile | 5 minutes | Balance freshness and load |
@@ -13246,11 +13219,11 @@ fn is_serialization_error(err: &anyhow::Error) -> bool {
 | **CORS rejection context — request Origin, computed allow-list, which resolution-order tier produced the list, why credentials path mismatched** | CORS middleware | Same — explains why a fetch was blocked |
 | **Validation failure detail — which field, which rule, what the input looked like (sensitive fields redacted)** | Input validators | Beyond the canonical `details` block — full constraint info |
 | Rate-limit details — current count, window, threshold, time to reset | Rate limiter | Operator running load tests against their own dev instance |
-| Specific 4xx error reason — "user not found" vs "wrong password" (auth flows only when in debug) | Auth handlers | Lets devs reproduce a flaky login locally |
+| Specific 4xx error reason — "unknown token" vs "revoked token" (auth flows only when in debug) | Auth handlers | Lets devs reproduce a flaky auth failure locally |
 | SQL query (parameterized, parameters redacted) and EXPLAIN output | DB layer | Performance / bug hunting |
 | Cache hit/miss/eviction patterns | Cache layer | Tuning |
 | Internal IP / hostname of upstream services in error messages | Network layer | Diagnosing routing issues |
-| Async task dump, pprof profiles, expvar | `/api/{api_version}/debug/*` (PART 6) | Already debug-gated; reaffirmed |
+| Async task dump, profiling data, runtime variables | `/api/{api_version}/debug/*` (PART 6) | Already debug-gated; reaffirmed |
 | Config file path reminder (after first install) | Startup banner | Helps the operator find and edit `server.yml` |
 
 **Debug mode response shape:**
@@ -14003,14 +13976,12 @@ llms.txt tells AI agents (Claude, GPT, etc.) what the application does, what API
 
 ## API
 Base URL: {app_url}/api/{api_version}
-Authentication: Bearer token (obtain via /api/{api_version}/auth/token)
+Authentication: Bearer token (operator token from server.yml, or resource owner token issued once at resource creation)
 Rate limit: {rate_limit} requests/minute
 
 ## Endpoints
-- GET /health - Health check (no auth)
-- GET /info - Server information (no auth)
-- POST /auth/token - Obtain API token
-- GET /users/me - Current user profile
+- GET /server/healthz - Health check (no auth)
+- GET /server/version - Version info (no auth)
 - ... (auto-generated from route definitions)
 
 ## Capabilities
@@ -14045,7 +14016,8 @@ web:
 |------------|----------|--------|
 | Public API (`/api/**`) | Yes | AI agents can use these |
 | Authenticated API (`/api/**` + auth) | Yes | Note auth requirement |
-| Health/metrics (`/healthz`, `/metrics`) | Yes | Useful for monitoring agents |
+| Health (`/server/healthz`) | Yes | Useful for monitoring agents |
+| Metrics (`/metrics`) | No | Operator-only diagnostics; not for AI agents |
 
 **Well-Known Support Matrix Update:**
 
@@ -14197,7 +14169,7 @@ web:
 | `server.log` | Application events | `text` | `text`, `json` |
 | `error.log` | Error messages | `text` | `text`, `json` |
 | `app.log` (or `{project_name}.log`) | General application events (info/warn) | `logfmt` | `logfmt`, `json` |
-| `auth.log` | Authentication events (login, logout, token issue/revoke, MFA, failures) | `syslog` | `syslog` (RFC 3164), `json` |
+| `auth.log` | Authentication events (token issue/revoke, auth failures) | `syslog` | `syslog` (RFC 3164), `json` |
 | `audit.log` | Security events | `json` | `json` only (must be machine-parseable) |
 | `security.log` | Security/auth events | `fail2ban` | `fail2ban`, `syslog`, `cef`, `json`, `text` |
 | `debug.log` | Debug (dev mode) | `text` | `text`, `json` |
@@ -14319,7 +14291,7 @@ When using `format: custom`, these variables are available:
 server:
   logs:
     # Global log level: debug, info, warn, error
-    level: warn
+    level: info
 
     # All log types share these options:
     #   filename: name of log file
@@ -14525,8 +14497,8 @@ server:
 
 | Severity | Use For | Examples |
 |----------|---------|----------|
-| `info` | Successful normal operations | Login, config save, backup complete |
-| `warn` | Failed attempts, recoverable issues | Failed login, rate limit hit |
+| `info` | Successful normal operations | Successful token auth, config save, backup complete |
+| `warn` | Failed attempts, recoverable issues | Failed token auth, rate limit hit |
 | `error` | Failures requiring attention | Backup failed, scheduler error |
 | `critical` | Security incidents, server failures | Brute force detected, maintenance mode |
 
@@ -19640,13 +19612,11 @@ Startup (for configured FQDN)
 
 ## Frontend Route Structure
 
-Routes are registered with `axum::Router`. Public routes use no auth middleware; authenticated routes are wrapped with the session/auth layer.
+Routes are registered with `axum::Router`. Public routes use no auth middleware; authenticated routes are wrapped with the bearer-token auth layer (operator token or resource owner token — no sessions, no user accounts).
 
 ```rust
 // Public frontend routes (no auth required)
 router.route("/", get(home_handler))
-router.route("/login", get(login_page_handler).post(login_submit_handler))
-router.route("/register", get(register_page_handler).post(register_submit_handler))
 router.route("/search", get(search_handler))
 
 // Authenticated frontend routes
@@ -20708,7 +20678,7 @@ static/
 | 201 | Created | Successful POST that creates a resource |
 | 204 | No Content | Successful DELETE, or PUT with no body |
 | 301 | Moved Permanently | Canonical redirect (URL normalize, old → new URL) |
-| 302 | Found | Temporary redirect (post-login, post-form) |
+| 302 | Found | Temporary redirect (post-form) |
 | 304 | Not Modified | Conditional GET cache hit |
 | 400 | Bad Request | Malformed request, validation failure |
 | 401 | Unauthorized | Not authenticated |
@@ -20936,16 +20906,11 @@ template/
       sidebar.html.tera
   page/
     home.html.tera
-    login.html.tera
-    register.html.tera
     dashboard.html.tera
     settings.html.tera
     search.html.tera
     error.html.tera
     offline.html.tera
-  email/
-    welcome.html.tera
-    reset-password.html.tera
 ```
 
 
@@ -21670,7 +21635,7 @@ Displays server information, software version, and operator contact.
 | `source_url` | `String` | Source code URL |
 | `license` | `String` | SPDX license identifier |
 | `uptime` | `String` | Human-readable uptime |
-| `go_version` | `String` | Rust version (from `rustc --version`) |
+| `rust_version` | `String` | Rust version (from `rustc --version`) |
 | `build_date` | `String` | ISO 8601 build timestamp |
 
 ### /server/privacy
@@ -21797,36 +21762,42 @@ privacy:
 
 pages:
   about:
-    enabled: true
-    source_url: ""
-    license: "MIT"
+    # Additional content for about page (markdown supported)
+    content: ""
   privacy:
-    enabled: true
-    last_updated: ""
+    # Privacy policy content (markdown supported)
+    # If empty, uses default template
+    content: ""
   contact:
+    # Enable contact form
     enabled: true
-    form_enabled: false
+    # Captcha type: recaptcha, hcaptcha, simple (built-in)
+    captcha: simple
+    # Success message after form submission
+    success_message: "Thank you for your message. We'll respond soon."
   help:
-    enabled: true
-    faqs: []
+    # Help page content (markdown supported)
+    # Project-specific - must be defined per application
+    content: ""
   terms:
-    enabled: true
-    last_updated: ""
+    # Terms of service content (markdown supported)
+    # If empty, uses default template
+    content: ""
 ```
 
 ---
 
 ## Pages Configuration
 
-| Page | Config key | Default |
-|---|---|---|
-| `/server/about` | `pages.about.enabled` | `true` |
-| `/server/privacy` | `pages.privacy.enabled` | `true` |
-| `/server/contact` | `pages.contact.enabled` | `true` |
-| `/server/help` | `pages.help.enabled` | `true` |
-| `/server/terms` | `pages.terms.enabled` | `true` |
+| Page | Config keys |
+|---|---|
+| `/server/about` | `pages.about.content` (Markdown) |
+| `/server/privacy` | `pages.privacy.content` (Markdown) |
+| `/server/contact` | `pages.contact.enabled`, `pages.contact.captcha`, `pages.contact.success_message` |
+| `/server/help` | `pages.help.content` (Markdown) |
+| `/server/terms` | `pages.terms.content` (Markdown) |
 
-When a page is disabled (`enabled: false`), the route returns 404.
+When the contact form is disabled (`pages.contact.enabled: false`), the contact form endpoint returns 404; the other pages are always available.
 
 ---
 
@@ -21840,7 +21811,7 @@ When a page is disabled (`enabled: false`), the route returns 404.
 | `GET` | `/server/contact` | None | Contact page |
 | `GET` | `/server/help` | None | Help and FAQ page |
 | `GET` | `/server/terms` | None | Terms of service page |
-| `GET` | `/server/health` | None | Health check (JSON) |
+| `GET` | `/server/healthz` | None | Health check (JSON) |
 | `GET` | `/server/version` | None | Version info (JSON) |
 
 ---
@@ -22896,7 +22867,7 @@ GeoIP databases are NEVER embedded - they are downloaded on first run and update
 | **Never sole gate** | Country / ASN / city signals can raise risk score, trigger MFA, lower rate-limit thresholds, or feed audit logs — they MUST NOT be the only thing standing between an attacker and a resource. |
 | **Always after rate limit + auth** | Country check runs alongside or after rate limiting and authentication, never replacing them. A blocked-country request still consumes rate-limit budget and is still logged with its identity. |
 | **VPN / proxy / Tor caveat** | Country data is trivially bypassed via VPN, residential proxy, or Tor. Treat any blocking decision based on country as advisory, not authoritative. |
-| **GeoIP-only auth is forbidden** | "Allow if country = US" is not authentication. Login, API keys, session cookies, and tokens are still required regardless of source country. |
+| **GeoIP-only auth is forbidden** | "Allow if country = US" is not authentication. API keys and bearer tokens are still required regardless of source country. |
 | **Failure mode** | If GeoIP database is missing, stale, or lookup fails, the request MUST be processed by the rest of the pipeline normally (fail-open for GeoIP, fail-closed for real auth). Never block a request because GeoIP lookup errored. |
 
 ## Configuration
@@ -23137,7 +23108,7 @@ server:
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
 | `{project_name}_auth_attempts_total` | Counter | `method`, `status` | Auth attempts |
-| `{project_name}_auth_sessions_active` | Gauge | - | Active sessions |
+| `{project_name}_api_tokens_active` | Gauge | - | Active API tokens |
 
 ### Optional: Extended Metrics
 
@@ -23253,8 +23224,15 @@ server:
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `rate_limit_hits_total` | Counter | `endpoint_class` | Rate limit triggers |
-| `rate_limit_blocked_total` | Counter | `endpoint_class` | Requests blocked by rate limit |
+| `ratelimit_requests_total` | Counter | `limit`, `status` | Total rate-limited requests |
+| `ratelimit_blocked_total` | Counter | `limit` | Requests blocked by rate limiter |
+
+**Rate limiting label values:**
+
+| Label | Values | Notes |
+|-------|--------|-------|
+| `limit` | `global`, `per_ip`, `per_user`, `per_endpoint` | Rate limit type |
+| `status` | `allowed`, `limited` | Request outcome |
 
 **Cardinality note:** Never use `ip` as a metric label — unbounded cardinality is a memory-DoS vector. Log per-IP details to structured logs instead; metrics answer "how many?" while logs answer "which IPs?"
 
@@ -23277,8 +23255,6 @@ server:
 | `rust_async_tasks` | Gauge | - | Current number of async tasks |
 | `rust_mem_alloc_bytes` | Gauge | - | Bytes allocated and in use (heap) |
 | `rust_mem_sys_bytes` | Gauge | - | Total bytes obtained from system |
-| `rust_gc_runs_total` | Counter | - | Total garbage collection runs |
-| `rust_gc_pause_total_seconds` | Counter | - | Total time spent in GC pauses |
 
 ### Tor Metrics (if using PART 31 Tor)
 
@@ -23288,20 +23264,6 @@ server:
 | `tor_running` | Gauge | - | 1 if Tor process is running, 0 otherwise |
 | `tor_circuit_established` | Gauge | - | 1 if circuit established, 0 otherwise |
 | `tor_requests_total` | Counter | - | Total requests via Tor hidden service |
-
-### Rate Limiting Metrics (if rate limiting enabled)
-
-| Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `ratelimit_requests_total` | Counter | `limit`, `status` | Total rate-limited requests |
-| `ratelimit_blocked_total` | Counter | `limit` | Requests blocked by rate limiter |
-
-**Rate limiting label values:**
-
-| Label | Values | Notes |
-|-------|--------|-------|
-| `limit` | `global`, `per_ip`, `per_user`, `per_endpoint` | Rate limit type |
-| `status` | `allowed`, `limited` | Request outcome |
 
 ## Metrics Output Example
 
@@ -23354,23 +23316,23 @@ server:
 
 # HELP {project_name}_cache_hits_total Total number of cache hits
 # TYPE {project_name}_cache_hits_total counter
-{project_name}_cache_hits_total{cache="sessions"} 8234
-{project_name}_cache_hits_total{cache="users"} 1523
+{project_name}_cache_hits_total{cache="tokens"} 8234
+{project_name}_cache_hits_total{cache="resources"} 1523
 
 # HELP {project_name}_cache_misses_total Total number of cache misses
 # TYPE {project_name}_cache_misses_total counter
-{project_name}_cache_misses_total{cache="sessions"} 156
-{project_name}_cache_misses_total{cache="users"} 42
+{project_name}_cache_misses_total{cache="tokens"} 156
+{project_name}_cache_misses_total{cache="resources"} 42
 
 # HELP {project_name}_auth_attempts_total Total authentication attempts
 # TYPE {project_name}_auth_attempts_total counter
-{project_name}_auth_attempts_total{method="password",status="success"} 523
-{project_name}_auth_attempts_total{method="password",status="failed"} 12
+{project_name}_auth_attempts_total{method="operator_token",status="success"} 523
+{project_name}_auth_attempts_total{method="operator_token",status="failed"} 12
 {project_name}_auth_attempts_total{method="api_token",status="success"} 8923
 
-# HELP {project_name}_auth_sessions_active Number of active sessions
-# TYPE {project_name}_auth_sessions_active gauge
-{project_name}_auth_sessions_active 42
+# HELP {project_name}_api_tokens_active Number of active API tokens
+# TYPE {project_name}_api_tokens_active gauge
+{project_name}_api_tokens_active 42
 
 # HELP {project_name}_scheduler_tasks_total Total number of scheduled tasks executed
 # TYPE {project_name}_scheduler_tasks_total counter
@@ -23410,10 +23372,6 @@ server:
 # HELP {project_name}_rust_mem_alloc_bytes Bytes allocated and in use
 # TYPE {project_name}_rust_mem_alloc_bytes gauge
 {project_name}_rust_mem_alloc_bytes 2.4576e+07
-
-# HELP {project_name}_rust_gc_runs_total Total number of GC runs
-# TYPE {project_name}_rust_gc_runs_total counter
-{project_name}_rust_gc_runs_total 1523
 
 # HELP {project_name}_tor_enabled 1 if Tor is enabled
 # TYPE {project_name}_tor_enabled gauge
@@ -23459,10 +23417,6 @@ pub static SCHEDULER_TASKS_RUNNING: OnceLock<GaugeVec> = OnceLock::new();
 pub static SCHEDULER_LAST_RUN: OnceLock<GaugeVec> = OnceLock::new();
 
 pub static AUTH_ATTEMPTS: OnceLock<CounterVec> = OnceLock::new();
-pub static AUTH_SESSIONS_ACTIVE: OnceLock<Gauge> = OnceLock::new();
-
-pub static USERS_TOTAL: OnceLock<Gauge> = OnceLock::new();
-pub static USERS_ACTIVE: OnceLock<Gauge> = OnceLock::new();
 pub static API_TOKENS_ACTIVE: OnceLock<Gauge> = OnceLock::new();
 
 pub static APP_INFO: OnceLock<GaugeVec> = OnceLock::new();
@@ -23629,27 +23583,6 @@ pub fn register_metrics(registry: &Registry) -> anyhow::Result<()> {
     )?;
     registry.register(Box::new(auth_attempts.clone()))?;
     AUTH_ATTEMPTS.set(auth_attempts).ok();
-
-    let auth_sessions = Gauge::new(
-        "{project_name}_auth_sessions_active",
-        "Number of active sessions",
-    )?;
-    registry.register(Box::new(auth_sessions.clone()))?;
-    AUTH_SESSIONS_ACTIVE.set(auth_sessions).ok();
-
-    let users_total = Gauge::new(
-        "{project_name}_users_total",
-        "Total number of registered users",
-    )?;
-    registry.register(Box::new(users_total.clone()))?;
-    USERS_TOTAL.set(users_total).ok();
-
-    let users_active = Gauge::new(
-        "{project_name}_users_active",
-        "Number of users active in last 24 hours",
-    )?;
-    registry.register(Box::new(users_active.clone()))?;
-    USERS_ACTIVE.set(users_active).ok();
 
     let api_tokens = Gauge::new(
         "{project_name}_api_tokens_active",
@@ -24119,8 +24052,8 @@ pub fn start_uptime_updater() {
 
 # HELP {project_name}_cache_hits_total Total number of cache hits
 # TYPE {project_name}_cache_hits_total counter
-{project_name}_cache_hits_total{cache="sessions"} 8234
-{project_name}_cache_hits_total{cache="users"} 1523
+{project_name}_cache_hits_total{cache="tokens"} 8234
+{project_name}_cache_hits_total{cache="resources"} 1523
 
 # HELP {project_name}_app_info Application information
 # TYPE {project_name}_app_info gauge
@@ -27330,7 +27263,7 @@ exec $APP_BIN $FLAGS "$@"
 |----------|---------|-------------|
 | `TZ` | `America/New_York` | Timezone for app and scheduler |
 | `MODE` | `development` | `production` (strict) or `development` (relaxed) |
-| `DEBUG` | `false` | Enable ALL debug features (pprof, expvar, detailed logging) |
+| `DEBUG` | `false` | Enable ALL debug features (debug endpoints, detailed logging) |
 | `ADDRESS` | `0.0.0.0` | Listen address |
 | `PORT` | `80` | Listen port (update docker-compose ports: to match) |
 
@@ -33390,7 +33323,6 @@ pub struct LocaleFS;
     "invalid_email": "Correo electrónico inválido",
     "too_short": "Debe tener al menos {min} caracteres",
     "too_long": "No puede exceder {max} caracteres",
-    "passwords_dont_match": "Las contraseñas no coinciden",
     "invalid_format": "Formato inválido",
     "already_exists": "Ya existe",
     "not_found": "No encontrado",
@@ -33418,11 +33350,6 @@ pub struct LocaleFS;
       "zero": "Sin resultados",
       "one": "{count} resultado",
       "other": "{count} resultados"
-    },
-    "users": {
-      "zero": "Sin usuarios",
-      "one": "{count} usuario",
-      "other": "{count} usuarios"
     },
     "days": {
       "one": "{count} día",
@@ -33544,57 +33471,6 @@ pub struct LocaleFS;
       "query": "Consultas disponibles para obtener datos",
       "mutation": "Mutaciones disponibles para modificar datos",
       "subscription": "Suscripciones para datos en tiempo real"
-    }
-  },
-
-  "users": {
-    "registration": {
-      "title": "Registrarse",
-      "username": "Nombre de usuario",
-      "email": "Correo electrónico",
-      "password": "Contraseña",
-      "confirm_password": "Confirmar contraseña",
-      "register_button": "Registrarse",
-      "already_have_account": "¿Ya tiene una cuenta? Inicie sesión"
-    },
-    "profile": {
-      "title": "Perfil",
-      "name": "Nombre",
-      "avatar": "Avatar",
-      "bio": "Biografía",
-      "security": "Seguridad",
-      "sessions": "Sesiones",
-      "login_history": "Historial de inicio de sesión",
-      "api_usage": "Uso de API"
-    },
-    "tokens": {
-      "title": "Tokens de API",
-      "create_new": "Crear nuevo token",
-      "name": "Nombre",
-      "scopes": "Alcances",
-      "scope_read": "Lectura",
-      "scope_write": "Escritura",
-      "expiry": "Expiración",
-      "revoke": "Revocar",
-      "last_used": "Última vez: hace {duration}"
-    },
-    "moderation": {
-      "title": "Moderación de usuarios",
-      "delete_user": "Eliminar usuario",
-      "impersonate": "Suplantar",
-      "disable_user": "Deshabilitar usuario",
-      "enable_user": "Habilitar usuario",
-      "revoke_sessions": "Revocar sesiones",
-      "profile_tab": "Perfil",
-      "security_tab": "Seguridad",
-      "activity_tab": "Actividad",
-      "actions_tab": "Acciones"
-    },
-    "roles": {
-      "title": "Gestión de roles",
-      "public": "Público",
-      "private": "Privado",
-      "disabled": "Deshabilitado"
     }
   },
 
@@ -37224,7 +37100,7 @@ tui:
 
 # Logging
 logging:
-  level: warn                      # debug, info, warn, error (match server default)
+  level: info                      # debug, info, warn, error (match server default)
   file: ""                         # Log file path (empty = {log_dir}/cli.log)
   max_size: 10MB                   # Max log file size (match server default)
   max_files: 5                     # Max log files to keep (match server default)
@@ -39088,7 +38964,7 @@ make docker # Build Docker image
 - [ ] Development mode: Verbose logging, debug endpoints
 - [ ] Mode detection: env var, CLI flag, config file
 - [ ] Debug endpoints disabled in production
-- [ ] `/debug/pprof/` only in development mode
+- [ ] `/debug/*` endpoints only in development mode
 
 ### Phase 2: Binary Core (PARTS 7-9)
 
