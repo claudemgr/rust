@@ -3336,6 +3336,13 @@ db.execute(query, &[&id]).await?;
 
 **Rule: ALL comments go on lines ABOVE the code, NEVER inline. This prevents confusion and improves readability.**
 
+**Comment validity by language:**
+- **JSON has NO comment syntax** — never place comments in `.json` files or JSON examples; JSON must always parse valid
+- **CSS comments are `/* */` only** — `//` and `#` are invalid CSS and break the stylesheet; CSS must always parse valid
+- **JavaScript comments are `//` or `/* */`** — never `#`; JS must always parse valid
+
+**Exception:** GitHub Actions SHA-pin version annotations stay inline — `uses: owner/action@{40-char-sha}  # vX.Y.Z` — Renovate reads and rewrites the same-line comment when bumping pins; never move it above the `uses:` line.
+
 ### Formatting and Indentation
 
 **ALL code, responses, and files MUST be properly formatted.**
@@ -6781,10 +6788,8 @@ Before proceeding, confirm you understand:
 
 **WRONG:**
 ```yaml
-# Enable feature
-enabled: true
-# Server port
-port: 8080
+enabled: true  # Enable feature
+port: 8080     # Server port
 ```
 
 **CORRECT:**
@@ -6797,6 +6802,8 @@ port: 8080
 ```
 
 **Reason:** Inline comments create confusion, make YAML harder to parse visually, and can cause issues with some YAML parsers. Comments above are clear and unambiguous.
+
+**Exception:** GitHub Actions SHA-pin version annotations stay inline — `uses: owner/action@{40-char-sha}  # vX.Y.Z` — Renovate reads and rewrites the same-line comment when bumping pins; never move it above the `uses:` line.
 
 **This applies to:**
 - `server.yml` configuration
@@ -19591,7 +19598,7 @@ format_url(host, 8443, true);
 - HTTPS adds overhead without additional security benefit
 - Only use HTTPS on overlays when HTTPS-only mode is required (port 443)
 
-**Footer timestamp format:** `%B %-d, %Y at %H:%M:%S` → `December 4, 2025 at 13:05:13`
+**Footer timestamp format:** `%B %-d, %Y at %H:%M:%S %Z` → `December 4, 2025 at 13:05:13 EST` — anything user-facing MUST use this format; use `%Y-%m-%dT%H:%M:%S%:z` (RFC 3339) only where machine-readability matters (API responses, logs, health endpoints)
 
 **"Last update" MUST use build date, NEVER hardcoded.** Use `{build_datetime}` template variable which comes from `BUILD_DATE` at compile time. This ensures the footer always shows when the binary was built, not a static date in the source code.
 
@@ -21748,6 +21755,13 @@ pub fn validate_footer_html(html: &str) -> Result<String> {
   {% if footer_custom_html %}
     {{ footer_custom_html | safe }}
   {% else %}
+    {% if tor_enabled and tor_running %}
+      <p class="footer-onion">
+        <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
+        <code class="onion-address">{{ onion_address }}</code>
+        <button type="button" class="copy-btn" data-copy="{{ onion_address }}" aria-label="Copy onion address">📋</button>
+      </p>
+    {% endif %}
     <p class="footer-links">
       <a href="/server/about">About</a>
       <span aria-hidden="true">•</span>
@@ -21760,17 +21774,19 @@ pub fn validate_footer_html(html: &str) -> Result<String> {
     {% if footer_text %}
       <p class="footer-text">{{ footer_text }}</p>
     {% endif %}
-    {% if tor_enabled and tor_running %}
-      <p><a href="/server/help#tor-access">Tor Support</a></p>
-    {% endif %}
     <p class="footer-meta">
-      <span>{{ app_name }}</span>
-      <span aria-hidden="true">·</span>
+      <a href="{PLATFORM_REPO_URL}" target="_blank">Made with</a> ❤️
+      <span aria-hidden="true">•</span>
       <span>{{ app_version }}</span>
+    </p>
+    <p class="footer-build">
+      <a href="/server/healthz">Last update: {{ build_datetime }}</a>
     </p>
   {% endif %}
 </footer>
 ```
+
+**No `<br />` spacers between rows** — rows are consecutive `<p>` elements; vertical rhythm comes from CSS (`footer p { margin: 0.25rem 0; }`), kept tight. Row order is fixed: onion address (Tor only) → page links → branding → last update. A disabled feature drops its row entirely without leaving a gap.
 
 ---
 
