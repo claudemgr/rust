@@ -16966,7 +16966,7 @@ pub struct StatsInfo {
           <div class="code-block">
             <code class="code-content">abc123xyz456abcdef789xyz456abcdef789xyz456abcdef789xyz.onion</code>
             <button class="copy-btn" data-copy="abc123xyz456abcdef789xyz456abcdef789xyz456abcdef789xyz.onion">
-              <span class="copy-icon">📋</span><span class="copy-text">Copy</span>
+              <span class="copy-icon">📋</span><span class="copy-text" aria-live="polite">Copy</span>
             </button>
           </div>
         </li>
@@ -21759,7 +21759,7 @@ pub fn validate_footer_html(html: &str) -> Result<String> {
       <p class="footer-onion">
         <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
         <code class="onion-address">{{ onion_address }}</code>
-        <button type="button" class="copy-btn" data-copy="{{ onion_address }}" aria-label="Copy onion address">📋</button>
+        <button type="button" class="copy-btn" data-copy="{{ onion_address }}" aria-live="polite" aria-label="Copy onion address">📋</button>
       </p>
     {% endif %}
     <p class="footer-links">
@@ -22032,12 +22032,14 @@ General help and FAQ page. Includes a Tor access section when Tor is configured 
     <code class="code-content">{{ tor_address }}</code>
     <button type="button" class="copy-btn" data-copy="{{ tor_address }}" aria-label="Copy to clipboard">
       <span class="copy-icon">📋</span>
-      <span class="copy-text">Copy</span>
+      <span class="copy-text" aria-live="polite">Copy</span>
     </button>
   </div>
 </section>
 {% endif %}
 ```
+
+**Copy feedback is mandatory:** every copy button MUST show a visible "Copied!" confirmation on success — checkmark icon plus the translated label (i18n key `copied`, rendered server-side into `data-copied-label`), `.copied` class for the success colors (CSS custom properties only), reverting after 2 seconds. The `aria-live="polite"` region announces the change to screen readers. Icon-only buttons (e.g. the footer 📋) swap their own content and carry `aria-live="polite"` on the button itself.
 
 ### /server/terms
 
