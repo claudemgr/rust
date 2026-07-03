@@ -386,7 +386,8 @@ permission rules, business invariants. The HOW lives in AI.md PARTS 0-33; PART 3
 # After make dev, debug in Docker with tools
 BUILD_DIR=$(ls -td ${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-*/ 2>/dev/null | head -1)
 docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$BUILD_DIR:/app" alpine:latest sh -c "
-  apk add --no-cache curl bash file jq  # Required debug tools
+  # Required debug tools
+  apk add --no-cache curl bash file jq
   /app/{project_name} --help
   /app/{project_name} --version
   # Interactive debugging...
@@ -427,7 +428,8 @@ docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -
 **Local Development Workflow:**
 ```bash
 # 1. Active development
-make dev                # Quick build to temp dir
+# Quick build to temp dir
+make dev
 
 # 2. Debug in Docker (with tools)
 BUILD_DIR=$(ls -td ${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-*/ 2>/dev/null | head -1)
@@ -440,14 +442,18 @@ docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -
 make test
 
 # 4. Integration tests
-./tests/run_tests.sh    # Auto-detects incus/docker
+# Auto-detects incus/docker
+./tests/run_tests.sh
 
 # 5. Production test (before release)
-make local               # Build with version info
-./tests/incus.sh        # Full systemd testing (PREFERRED)
+# Build with version info
+make local
+# Full systemd testing (PREFERRED)
+./tests/incus.sh
 
 # 6. Full release build
-make build              # All 8 platforms
+# All 8 platforms
+make build
 ```
 
 **See PART 25: MAKEFILE and PART 28: TESTING & DEVELOPMENT for complete details.**
@@ -540,8 +546,10 @@ let workers = num_cpus::get().max(2);
 // Cache size scales to available memory (use ~10% for cache)
 let avail_mem = get_available_memory();
 let cache_size = (avail_mem / 10)
-    .max(64 * 1024 * 1024)   // Minimum 64MB cache
-    .min(1024 * 1024 * 1024); // Maximum 1GB cache
+    // Minimum 64MB cache
+    .max(64 * 1024 * 1024)
+    // Maximum 1GB cache
+    .min(1024 * 1024 * 1024);
 ```
 
 ## JSON File Rules
@@ -644,10 +652,14 @@ jobs:
   release:
     needs: build
     permissions:
-      contents: write      # create GitHub release + upload assets
-      packages: write      # push to ghcr.io
-      id-token: write      # OIDC token for cosign signing
-      attestations: write  # GitHub artifact attestations (SBOM, provenance)
+      # create GitHub release + upload assets
+      contents: write
+      # push to ghcr.io
+      packages: write
+      # OIDC token for cosign signing
+      id-token: write
+      # GitHub artifact attestations (SBOM, provenance)
+      attestations: write
     ...
 ```
 
@@ -759,7 +771,8 @@ The `release` job already has `contents: write` to push assets — this covers t
 ```yaml
 - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
   with:
-    fetch-depth: 0   # required: full history needed to inspect and push tags
+    # required: full history needed to inspect and push tags
+    fetch-depth: 0
 
 - name: Ensure release tag
   run: |
@@ -2125,7 +2138,8 @@ This distinction exists for clarity. When referring to OS-level resources that b
 server:
   healthz:
     root:
-      enabled: false   # When true, mount /healthz to the SAME handler as /server/healthz
+      # When true, mount /healthz to the SAME handler as /server/healthz
+      enabled: false
 ```
 
 - Default is `false`
@@ -2235,8 +2249,10 @@ server:
 
 Use `grep` to find the PART you need:
 ```bash
-grep -n "^# PART" rust/API.md    # List all PARTs with line numbers
-grep -n "keyword" rust/API.md    # Find specific content
+# List all PARTs with line numbers
+grep -n "^# PART" rust/API.md
+# Find specific content
+grep -n "keyword" rust/API.md
 ```
 
 **Step 3: Read the specific PART completely**
@@ -4187,14 +4203,20 @@ When working on this project, the following roles are assumed based on the task:
 
 ```bash
 # CORRECT - Use Makefile targets
-make dev                    # Quick build to {tempdir}/{project_org}/{internal_name}-XXXXXX/
-make local                   # Build with version info to binaries/
-make build                  # Full cross-platform build to binaries/
-make test                   # Run unit tests
+# Quick build to {tempdir}/{project_org}/{internal_name}-XXXXXX/
+make dev
+# Build with version info to binaries/
+make local
+# Full cross-platform build to binaries/
+make build
+# Run unit tests
+make test
 
 # CORRECT - Integration tests
-./tests/run_tests.sh        # Auto-detects incus/docker
-./tests/incus.sh            # Full OS test with systemd (PREFERRED)
+# Auto-detects incus/docker
+./tests/run_tests.sh
+# Full OS test with systemd (PREFERRED)
+./tests/incus.sh
 
 # WRONG - Never run cargo directly on local machine
 cargo build --release -o binary/{project_name} ./src
@@ -5743,8 +5765,10 @@ PROJECTORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+(
 
 # Method 2: Infer from current directory path (fallback if no git remote)
 # Works with any path structure: ~/Documents/myproject, ~/myproject, etc.
-PROJECTNAME=$(basename "$PWD")                    # myproject
-PROJECTORG=$(basename "$(dirname "$PWD")")        # Documents (or parent dir name)
+# myproject
+PROJECTNAME=$(basename "$PWD")
+# Documents (or parent dir name)
+PROJECTORG=$(basename "$(dirname "$PWD")")
 
 # Method 3: Combined approach (git first, fallback to path)
 PROJECTNAME=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)(\.git)?$|\1|' || basename "$PWD")
@@ -6369,8 +6393,10 @@ edition = "2021"
 // Maps user-friendly config values to actual driver names
 fn normalize_driver(driver: &str) -> &str {
     match driver.to_lowercase().as_str() {
-        "sqlite" | "sqlite2" | "sqlite3" => "sqlite",  // All map to sqlx sqlite
-        "libsql" | "turso" => "libsql",                 // Turso/libSQL remote database
+        // All map to sqlx sqlite
+        "sqlite" | "sqlite2" | "sqlite3" => "sqlite",
+        // Turso/libSQL remote database
+        "libsql" | "turso" => "libsql",
         _ => driver,
     }
 }
@@ -6416,7 +6442,8 @@ sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"] }
 ```yaml
 server:
   database:
-    driver: libsql  # or "turso" (alias)
+    # or "turso" (alias)
+    driver: libsql
 
     # Option 1: URL with embedded token
     url: libsql://your-db-name.turso.io?authToken=${TURSO_AUTH_TOKEN}
@@ -6728,8 +6755,10 @@ Before proceeding, confirm you understand:
 **Docker volume mounts map host paths to container paths:**
 ```yaml
 volumes:
-  - './volumes/config:/config:z'   # Host ./volumes/config → Container /config
-  - './volumes/data:/data:z'       # Host ./volumes/data → Container /data
+  # Host ./volumes/config → Container /config
+  - './volumes/config:/config:z'
+  # Host ./volumes/data → Container /data
+  - './volumes/data:/data:z'
 ```
 
 ---
@@ -6752,8 +6781,10 @@ Before proceeding, confirm you understand:
 
 **WRONG:**
 ```yaml
-enabled: true  # Enable feature
-port: 8080     # Server port
+# Enable feature
+enabled: true
+# Server port
+port: 8080
 ```
 
 **CORRECT:**
@@ -6856,7 +6887,8 @@ pub fn validate_path(p: &str) -> Result<(), PathError> {
     // Check each segment
     for seg in p.trim_matches('/').split('/') {
         if seg.is_empty() {
-            continue; // Skip empty (from //)
+            // Skip empty (from //)
+            continue;
         }
         validate_path_segment(seg)?;
     }
@@ -7332,14 +7364,19 @@ server:
     # Self-healing settings
     self_healing:
       enabled: true
-      retry_interval: 30s            # Seconds between retry attempts
-      max_attempts: 0                # 0 = unlimited (keep trying forever)
+      # Seconds between retry attempts
+      retry_interval: 30s
+      # 0 = unlimited (keep trying forever)
+      max_attempts: 0
 
     # Auto-cleanup thresholds
     cleanup:
-      disk_threshold: 90             # Start cleanup when disk > 90% full
-      log_retention_days: 7          # Delete logs older than 7 days during cleanup
-      backup_keep_count: 5           # Keep last 5 backups during cleanup
+      # Start cleanup when disk > 90% full
+      disk_threshold: 90
+      # Delete logs older than 7 days during cleanup
+      log_retention_days: 7
+      # Keep last 5 backups during cleanup
+      backup_keep_count: 5
 
     # Notifications
     notify:
@@ -7365,8 +7402,10 @@ server:
 ```yaml
 server:
   database:
-    driver: sqlite           # or "libsql" for remote Turso/libsql
-    url: "{data_dir}/db/{internal_name}.db"  # auto-created for sqlite
+    # or "libsql" for remote Turso/libsql
+    driver: sqlite
+    # auto-created for sqlite
+    url: "{data_dir}/db/{internal_name}.db"
     # For remote libsql:
     # driver: libsql
     # url: libsql://your-db-name.turso.io?authToken=${TURSO_AUTH_TOKEN}
@@ -7790,7 +7829,8 @@ ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]
            // Check sudo -n (non-interactive) to see if user has sudo access
            if Command::new("sudo").args(["-n", "true"]).output()
                .map(|o| o.status.success()).unwrap_or(false) {
-               return true; // Has passwordless sudo
+               // Has passwordless sudo
+               return true;
            }
 
            // Check if user is in sudo/wheel/admin group
@@ -7869,7 +7909,8 @@ ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]
    ```rust
    pub fn handle_escalation(action: &str) -> anyhow::Result<()> {
        if is_elevated() {
-           return Ok(()); // Already elevated
+           // Already elevated
+           return Ok(());
        }
 
        if !can_escalate() {
@@ -8059,7 +8100,8 @@ fn needs_escalation_for_service() -> bool {
 // Port binding: check if privileged
 fn needs_escalation_for_port(port: u16) -> bool {
     if port >= 1024 {
-        return false; // Unprivileged port
+        // Unprivileged port
+        return false;
     }
     // Windows: no concept of privileged ports (any user can bind any port)
     #[cfg(target_os = "windows")]
@@ -8074,8 +8116,10 @@ fn needs_escalation_for_update() -> anyhow::Result<bool> {
     let binary_path = std::env::current_exe()?;
     // Try to open for writing
     match std::fs::OpenOptions::new().write(true).open(&binary_path) {
-        Ok(_) => Ok(false), // Can write - no escalation
-        Err(_) => Ok(true), // Cannot write - need escalation
+        // Can write - no escalation
+        Ok(_) => Ok(false),
+        // Cannot write - need escalation
+        Err(_) => Ok(true),
     }
 }
 
@@ -8110,7 +8154,8 @@ fn can_restore() -> (bool, &'static str) {
     }
     // Service user: requires operator password (prompted)
     if is_service_user() {
-        return (false, "need-creds"); // Caller must prompt for creds
+        // Caller must prompt for creds
+        return (false, "need-creds");
     }
     // Random user: denied
     (false, "denied")
@@ -8122,7 +8167,8 @@ fn can_change_mode() -> (bool, &'static str) {
         return (true, "elevated");
     }
     if is_service_user() {
-        return (false, "need-creds"); // Caller must prompt for creds
+        // Caller must prompt for creds
+        return (false, "need-creds");
     }
     (false, "denied")
 }
@@ -8351,15 +8397,20 @@ server:
     #   /etc/letsencrypt/live/{fqdn}/ → system manages (certbot)
     #   {config_dir}/ssl/letsencrypt/{fqdn}/ → app manages (auto-renew)
     #   {config_dir}/ssl/local/{fqdn}/ → user manages (no auto-renew)
-    cert: ""   # Manual cert path (optional)
-    key: ""    # Manual key path (optional)
-    min_version: "TLS1.2"  # TLS1.2, TLS1.3
+    # Manual cert path (optional)
+    cert: ""
+    # Manual key path (optional)
+    key: ""
+    # TLS1.2, TLS1.3
+    min_version: "TLS1.2"
 
     letsencrypt:
       enabled: false
       email: admin@{fqdn}
-      challenge: http-01  # http-01, tls-alpn-01, dns-01
-      staging: false      # Use staging server for testing
+      # http-01, tls-alpn-01, dns-01
+      challenge: http-01
+      # Use staging server for testing
+      staging: false
 
   # Scheduler - manages all background tasks
   scheduler:
@@ -8427,7 +8478,8 @@ server:
   rate_limit:
     enabled: true
     # Project-specific default (define in IDEA.md based on expected usage)
-    requests: 0  # 0 = use project default
+    # 0 = use project default
+    requests: 0
     window: 60
 
   # Database
@@ -8824,7 +8876,8 @@ cargo flamegraph -o flamegraph.svg --bin {internal_name}
 ```yaml
 server:
   # Application mode
-  mode: development  # Enables all debug features
+  # Enables all debug features
+  mode: development
 
   # Debug-specific settings (only apply in development mode)
   debug:
@@ -8851,7 +8904,8 @@ server:
 // src/mode/mod.rs
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
-static CURRENT_MODE: AtomicU8 = AtomicU8::new(0); // 0 = Production
+// 0 = Production
+static CURRENT_MODE: AtomicU8 = AtomicU8::new(0);
 static DEBUG_ENABLED: AtomicBool = AtomicBool::new(false);
 
 const PRODUCTION: u8 = 0;
@@ -9295,7 +9349,8 @@ TERM=dumb {project_name} --status
 TERM=dumb {project_name}-cli list
 
 # Should produce plain text output with no escape codes
-TERM=dumb {project_name} --status | cat -v   # No ^[ sequences
+# No ^[ sequences
+TERM=dumb {project_name} --status | cat -v
 ```
 
 ### Platform-Specific Display Detection
@@ -9572,7 +9627,8 @@ use crate::common::terminal::{get_terminal_size, SizeMode};
 pub struct BannerConfig {
     pub app_name: String,
     pub version: String,
-    pub app_mode: String,   // production/development
+    // production/development
+    pub app_mode: String,
     pub debug: bool,
     pub urls: Vec<String>,
 }
@@ -9736,7 +9792,8 @@ fn emoji_enabled() -> bool {
 **Config override:** To keep emojis enabled even when NO_COLOR is set:
 ```yaml
 output:
-  emoji: true  # Force emojis on (overrides NO_COLOR for emojis only)
+  # Force emojis on (overrides NO_COLOR for emojis only)
+  emoji: true
 ```
 
 **Note:** For disabling ALL ANSI escapes (not just colors), use `TERM=dumb`. See PART 7 "TERM=dumb Handling".
@@ -9756,8 +9813,10 @@ NO_COLOR=1 {project_name} --status --color=yes
 {project_name} --status --color=no
 
 # Verify no escape codes or emojis in output
-NO_COLOR=1 {project_name} --status | cat -v   # No ^[ sequences
-NO_COLOR=1 {project_name} --status | grep -E '✅|❌|⚠️|🚀'  # Should find nothing
+# No ^[ sequences
+NO_COLOR=1 {project_name} --status | cat -v
+# Should find nothing
+NO_COLOR=1 {project_name} --status | grep -E '✅|❌|⚠️|🚀'
 ```
 
 **THESE SERVER COMMANDS CANNOT BE CHANGED. This is the complete command set.**
@@ -9765,29 +9824,50 @@ NO_COLOR=1 {project_name} --status | grep -E '✅|❌|⚠️|🚀'  # Should fin
 ## Server Binary Commands
 
 ```bash
---help                       # Show help (can be run by anyone)
---version                    # Show version (can be run by anyone)
---shell completions [SHELL]  # Print shell completions (auto-detect if SHELL omitted)
---shell init [SHELL]         # Print shell init for eval (auto-detect if SHELL omitted)
---mode {production|development}  # Set application mode
---config {config_dir}         # Set config directory
---data {data_dir}             # Set data directory
---cache {cache_dir}           # Set cache directory
---log {log_dir}               # Set log directory
---backup {backup_dir}         # Set backup directory
---pid {pid_file}              # Set PID file path
---address {listen}           # Set listen address
---port {port}                # Set the port
---baseurl {path}             # Set URL path prefix (default: /)
---status                     # Show status and health (exit 0=healthy, 1=unhealthy)
+# Show help (can be run by anyone)
+--help
+# Show version (can be run by anyone)
+--version
+# Print shell completions (auto-detect if SHELL omitted)
+--shell completions [SHELL]
+# Print shell init for eval (auto-detect if SHELL omitted)
+--shell init [SHELL]
+# Set application mode
+--mode {production|development}
+# Set config directory
+--config {config_dir}
+# Set data directory
+--data {data_dir}
+# Set cache directory
+--cache {cache_dir}
+# Set log directory
+--log {log_dir}
+# Set backup directory
+--backup {backup_dir}
+# Set PID file path
+--pid {pid_file}
+# Set listen address
+--address {listen}
+# Set the port
+--port {port}
+# Set URL path prefix (default: /)
+--baseurl {path}
+# Show status and health (exit 0=healthy, 1=unhealthy)
+--status
 --service {start,restart,stop,reload,--install,--uninstall,--disable,--help}
---daemon                     # Daemonize (detach from terminal)
---debug                      # Enable debug mode (verbose logging, debug endpoints)
---color {auto|yes|no}        # Color output (default: auto, respects NO_COLOR)
---lang {code}                # Language for output (default: auto, from LANG env)
+# Daemonize (detach from terminal)
+--daemon
+# Enable debug mode (verbose logging, debug endpoints)
+--debug
+# Color output (default: auto, respects NO_COLOR)
+--color {auto|yes|no}
+# Language for output (default: auto, from LANG env)
+--lang {code}
 --maintenance {backup,restore,update,mode,setup,pgp,--help} [optional-file-or-setting-or-action]
---update [check|yes|branch {stable|beta|daily}|--help]  # Check/perform updates
---shell {completions,init,--help} [SHELL]  # Shell integration
+# Check/perform updates
+--update [check|yes|branch {stable|beta|daily}|--help]
+# Shell integration
+--shell {completions,init,--help} [SHELL]
 ```
 
 ### Server --help Output
@@ -10328,9 +10408,12 @@ PHASE 5: Server startup (actual server start)
 fn is_container() -> bool {
     // File-based detection
     let container_files = [
-        "/.dockerenv",           // Docker
-        "/run/.containerenv",    // Podman
-        "/dev/lxc",              // LXC/LXD/Incus
+        // Docker
+        "/.dockerenv",
+        // Podman
+        "/run/.containerenv",
+        // LXC/LXD/Incus
+        "/dev/lxc",
     ];
     for f in &container_files {
         if std::path::Path::new(f).exists() {
@@ -10340,10 +10423,12 @@ fn is_container() -> bool {
 
     // Environment variable detection
     if std::env::var("container").is_ok() {
-        return true;  // Generic (systemd-nspawn, lxc, etc.)
+        // Generic (systemd-nspawn, lxc, etc.)
+        return true;
     }
     if std::env::var("KUBERNETES_SERVICE_HOST").is_ok() {
-        return true;  // Kubernetes
+        // Kubernetes
+        return true;
     }
 
     // Check parent process name for container init systems
@@ -11000,15 +11085,19 @@ database:
   # Primary: remote libsql/Turso database
   primary:
     driver: libsql
-    url: ${DATABASE_URL}  # libsql://your-db.turso.io?authToken=${TURSO_AUTH_TOKEN}
+    # libsql://your-db.turso.io?authToken=${TURSO_AUTH_TOKEN}
+    url: ${DATABASE_URL}
 
   # Local SQLite cache for fast reads and offline resilience
   cache:
     enabled: true
     path: ${DATA_DIR}/db/cache.db
-    sync_interval: 30s     # Sync from remote
-    offline_mode: true     # Continue working if remote unavailable
-    max_age: 1h            # Max cache age before forcing remote
+    # Sync from remote
+    sync_interval: 30s
+    # Continue working if remote unavailable
+    offline_mode: true
+    # Max cache age before forcing remote
+    max_age: 1h
 ```
 
 When enabled:
@@ -11050,16 +11139,21 @@ async fn open_database(cfg: &Config) -> anyhow::Result<Database> {
 
 -- Config key-value storage (mirrors YAML structure as flat keys)
 CREATE TABLE IF NOT EXISTS config (
-    key         TEXT PRIMARY KEY,              -- Dot notation: "server.port", "ssl.enabled"
-    value       TEXT NOT NULL,                 -- JSON-encoded value (string, number, bool, array)
-    type        TEXT NOT NULL DEFAULT 'string', -- string, number, bool, array, object
+    -- Dot notation: "server.port", "ssl.enabled"
+    key         TEXT PRIMARY KEY,
+    -- JSON-encoded value (string, number, bool, array)
+    value       TEXT NOT NULL,
+    -- string, number, bool, array, object
+    type        TEXT NOT NULL DEFAULT 'string',
     updated_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
 
 -- Config metadata for change detection
 CREATE TABLE IF NOT EXISTS config_meta (
-    id          INTEGER PRIMARY KEY CHECK (id = 1),  -- Single row
-    version     INTEGER NOT NULL DEFAULT 1,          -- Incremented on any change
+    -- Single row
+    id          INTEGER PRIMARY KEY CHECK (id = 1),
+    -- Incremented on any change
+    version     INTEGER NOT NULL DEFAULT 1,
     updated_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
 
@@ -11083,7 +11177,8 @@ CREATE INDEX IF NOT EXISTS idx_config_key_prefix ON config(key);
 -- Rate Limiting (sliding window counters)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS rate_limits (
-    key         TEXT PRIMARY KEY,              -- "ip:1.2.3.4:auth" or "key:abc12345:global" (prefix, not hash)
+    -- "ip:1.2.3.4:auth" or "key:abc12345:global" (prefix, not hash)
+    key         TEXT PRIMARY KEY,
     count       INTEGER NOT NULL DEFAULT 1,
     window_start INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     updated_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
@@ -11100,14 +11195,21 @@ CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start);
 CREATE TABLE IF NOT EXISTS audit_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp   INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-    level       TEXT NOT NULL DEFAULT 'info',  -- info, warning, error, security
-    category    TEXT NOT NULL,                 -- config, api, system, security
-    action      TEXT NOT NULL,                 -- config_change, rate_limit_hit, etc.
-    actor_ip    TEXT,                          -- originating IP address
-    target_type TEXT,                          -- config, endpoint, etc.
+    -- info, warning, error, security
+    level       TEXT NOT NULL DEFAULT 'info',
+    -- config, api, system, security
+    category    TEXT NOT NULL,
+    -- config_change, rate_limit_hit, etc.
+    action      TEXT NOT NULL,
+    -- originating IP address
+    actor_ip    TEXT,
+    -- config, endpoint, etc.
+    target_type TEXT,
     target_id   TEXT,
-    details     TEXT,                          -- JSON with additional context
-    success     INTEGER NOT NULL DEFAULT 1     -- 1=success, 0=failure
+    -- JSON with additional context
+    details     TEXT,
+    -- 1=success, 0=failure
+    success     INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp);
@@ -11119,14 +11221,21 @@ CREATE INDEX IF NOT EXISTS idx_audit_target ON audit_log(target_type, target_id)
 -- Scheduler (background task tracking)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS scheduler_tasks (
-    id          TEXT PRIMARY KEY,              -- Task name: "backup_daily", "backup_hourly", "geoip_update", "cleanup"
-    name        TEXT NOT NULL,                 -- Human-readable: "Daily Backup", "Hourly Incremental"
+    -- Task name: "backup_daily", "backup_hourly", "geoip_update", "cleanup"
+    id          TEXT PRIMARY KEY,
+    -- Human-readable: "Daily Backup", "Hourly Incremental"
+    name        TEXT NOT NULL,
     enabled     INTEGER NOT NULL DEFAULT 1,
-    schedule    TEXT NOT NULL,                 -- Cron expression: "0 2 * * *"
-    last_run    INTEGER,                       -- Unix timestamp
-    next_run    INTEGER,                       -- Unix timestamp
-    last_status TEXT,                          -- success, failed, running, skipped
-    last_error  TEXT,                          -- Error message if failed
+    -- Cron expression: "0 2 * * *"
+    schedule    TEXT NOT NULL,
+    -- Unix timestamp
+    last_run    INTEGER,
+    -- Unix timestamp
+    next_run    INTEGER,
+    -- success, failed, running, skipped
+    last_status TEXT,
+    -- Error message if failed
+    last_error  TEXT,
     run_count   INTEGER NOT NULL DEFAULT 0,
     fail_count  INTEGER NOT NULL DEFAULT 0
 );
@@ -11136,7 +11245,8 @@ CREATE TABLE IF NOT EXISTS scheduler_history (
     task_id     TEXT NOT NULL,
     started_at  INTEGER NOT NULL,
     finished_at INTEGER,
-    status      TEXT NOT NULL,                 -- running, success, failed
+    -- running, success, failed
+    status      TEXT NOT NULL,
     error       TEXT,
     duration_ms INTEGER
 );
@@ -11157,12 +11267,16 @@ CREATE INDEX IF NOT EXISTS idx_scheduler_history_started ON scheduler_history(st
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS backups (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    filename    TEXT NOT NULL UNIQUE,          -- "backup-2025-01-15-103045.tar.gz"
-    filepath    TEXT NOT NULL,                 -- Full path
+    -- "backup-2025-01-15-103045.tar.gz"
+    filename    TEXT NOT NULL UNIQUE,
+    -- Full path
+    filepath    TEXT NOT NULL,
     size_bytes  INTEGER NOT NULL,
-    type        TEXT NOT NULL DEFAULT 'auto',  -- auto, manual, pre_update
+    -- auto, manual, pre_update
+    type        TEXT NOT NULL DEFAULT 'auto',
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-    checksum    TEXT,                          -- SHA256
+    -- SHA256
+    checksum    TEXT,
     notes       TEXT
 );
 
@@ -11175,15 +11289,22 @@ CREATE INDEX IF NOT EXISTS idx_backups_created ON backups(created_at);
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS api_tokens (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    token_hash    TEXT NOT NULL UNIQUE,            -- SHA-256 of raw token; NEVER store plaintext
-    token_prefix  TEXT NOT NULL,                   -- First 12 chars for log identification (tok_xxxxxxxx)
-    resource_type TEXT NOT NULL,                   -- Project-defined type: "paste", "upload", "link", etc.
-    resource_id   TEXT NOT NULL,                   -- ID of the resource this token owns
+    -- SHA-256 of raw token; NEVER store plaintext
+    token_hash    TEXT NOT NULL UNIQUE,
+    -- First 12 chars for log identification (tok_xxxxxxxx)
+    token_prefix  TEXT NOT NULL,
+    -- Project-defined type: "paste", "upload", "link", etc.
+    resource_type TEXT NOT NULL,
+    -- ID of the resource this token owns
+    resource_id   TEXT NOT NULL,
     created_at    INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-    expires_at    INTEGER,                         -- NULL = never expires
+    -- NULL = never expires
+    expires_at    INTEGER,
     last_used_at  INTEGER,
-    revoked_at    INTEGER,                         -- NULL = active
-    revoked_reason TEXT                            -- e.g., "tos_violation", "operator_action"
+    -- NULL = active
+    revoked_at    INTEGER,
+    -- e.g., "tos_violation", "operator_action"
+    revoked_reason TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_api_tokens_hash     ON api_tokens(token_hash);
@@ -11201,13 +11322,17 @@ INSERT INTO config (key, value, type) VALUES
     ('server.port', '8080', 'number'),
     ('server.address', '"0.0.0.0"', 'string'),
     ('ssl.enabled', 'true', 'bool'),
-    ('ssl.cert', '""', 'string'),                    -- Empty = auto-detect
-    ('ssl.key', '""', 'string'),                     -- Empty = auto-detect
+    -- Empty = auto-detect
+    ('ssl.cert', '""', 'string'),
+    -- Empty = auto-detect
+    ('ssl.key', '""', 'string'),
     ('ssl.min_version', '"TLS1.2"', 'string'),
     ('cors.allowed_origins', '["https://example.com","https://api.example.com"]', 'array'),
-    ('ratelimit.requests_per_minute', '0', 'number'),  -- 0 = use project default from IDEA.md
+    -- 0 = use project default from IDEA.md
+    ('ratelimit.requests_per_minute', '0', 'number'),
     ('branding.site_name', '"My App"', 'string'),
-    ('server.token', '"tok_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"', 'string');  -- auto-generated if blank
+    -- auto-generated if blank
+    ('server.token', '"tok_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"', 'string');
 ```
 
 ### API Token Model
@@ -11234,7 +11359,8 @@ Declared in `server.yml` under `server.token`. Auto-generated and written back t
 
 ```yaml
 server:
-  token: tok_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # auto-generated if blank
+  # auto-generated if blank
+  token: tok_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 **Not stored in `api_tokens` DB table.** Validated by SHA-256-hashing the inbound token and comparing against `SHA-256(server.token)` with constant-time comparison. The hash is cached in memory at startup — never written to the DB.
@@ -11277,8 +11403,10 @@ The server generates the token, stores `SHA-256(token)` in `api_tokens` with `re
 
 **Operator revocation:**
 ```
-{project_name} token revoke <prefix>   # revoke a specific resource token
-{project_name} token list              # list active tokens (prefix + resource)
+# revoke a specific resource token
+{project_name} token revoke <prefix>
+# list active tokens (prefix + resource)
+{project_name} token list
 ```
 Token revocation is operator-only via CLI: `{project_name} token revoke <prefix>`
 
@@ -11492,14 +11620,18 @@ impl ConfigManager {
 
 **Health Check Responses:**
 
+Normal operation:
 ```json
-// Normal operation
 {"status": "ok"}
+```
 
-// Restart required (service running but config changed)
+Restart required (service running but config changed):
+```json
 {"status": "restart_required", "pending_restart": true, "restart_reason": ["ssl.enabled", "server.port"]}
+```
 
-// Shutting down
+Shutting down:
+```json
 {"status": "shutting_down"}
 ```
 
@@ -11738,10 +11870,14 @@ services:
       - --pid=/run/{internal_name}.pid
       - --port=8080
     volumes:
-      - config:/config:ro          # Config (read-only)
-      - data:/data                 # Data (read-write)
-      - logs:/logs                 # Logs (read-write)
-      - /var/run:/run:z            # PID file
+      # Config (read-only)
+      - config:/config:ro
+      # Data (read-write)
+      - data:/data
+      # Logs (read-write)
+      - logs:/logs
+      # PID file
+      - /var/run:/run:z
     ports:
       - "8080:8080"
 ```
@@ -12808,7 +12944,8 @@ const SCHEMA_UPDATES: &[&str] = &[
 // is_column_exists_error checks if error is "column already exists"
 fn is_column_exists_error(err: &sqlx::Error) -> bool {
     let msg = err.to_string();
-    msg.contains("duplicate column") // SQLite and libsql
+    // SQLite and libsql
+    msg.contains("duplicate column")
 }
 ```
 
@@ -12839,12 +12976,14 @@ impl Paste {
         if !self.slug.is_empty() {
             &self.slug
         } else {
-            &self.name  // Fallback to old column
+            // Fallback to old column
+            &self.name
         }
     }
 
     pub fn set_slug(&mut self, slug: String) {
-        self.name = slug.clone();  // Keep old column in sync
+        // Keep old column in sync
+        self.name = slug.clone();
         self.slug = slug;
     }
 }
@@ -12885,18 +13024,24 @@ match sqlx::query("ALTER TABLE pastes ADD COLUMN slug TEXT DEFAULT ''")
 ```yaml
 server:
   database:
-    driver: sqlite           # or "libsql" for Turso remote
-    url: "{data_dir}/db/{internal_name}.db"  # auto-created; omit for default
+    # or "libsql" for Turso remote
+    driver: sqlite
+    # auto-created; omit for default
+    url: "{data_dir}/db/{internal_name}.db"
     # For Turso remote:
     # driver: libsql
     # url: libsql://your-db-name.turso.io?authToken=${TURSO_AUTH_TOKEN}
 
     # Connection pool settings (libsql/remote only; SQLite uses single writer)
     pool:
-      max_open: 5         # SQLite: 1 writer + readers; libsql: adjust as needed
-      max_idle: 2         # Max idle connections
-      max_lifetime: 5m    # Max connection lifetime
-      max_idle_time: 1m   # Max idle time before close
+      # SQLite: 1 writer + readers; libsql: adjust as needed
+      max_open: 5
+      # Max idle connections
+      max_idle: 2
+      # Max connection lifetime
+      max_lifetime: 5m
+      # Max idle time before close
+      max_idle_time: 1m
 ```
 
 ### Pool Sizing Guidelines
@@ -13051,7 +13196,8 @@ pub async fn transfer_funds(pool: &sqlx::SqlitePool, from: i64, to: i64, amount:
 pub struct User {
     pub id: i64,
     pub name: String,
-    pub version: i64,  // Optimistic lock version
+    // Optimistic lock version
+    pub version: i64,
 }
 
 pub async fn update_user(pool: &sqlx::SqlitePool, user: &mut User) -> anyhow::Result<()> {
@@ -13470,14 +13616,18 @@ web:
     accelerometer: "()"
     ambient-light-sensor: "()"
     battery: "()"
-    camera: "()"            # mapping/video-chat/voice projects: set to "(self)"
-    display-capture: "()"   # screen-share projects: set to "(self)"
-    geolocation: "()"       # location-aware projects: set to "(self)"
+    # mapping/video-chat/voice projects: set to "(self)"
+    camera: "()"
+    # screen-share projects: set to "(self)"
+    display-capture: "()"
+    # location-aware projects: set to "(self)"
+    geolocation: "()"
     gyroscope: "()"
     hid: "()"
     idle-detection: "()"
     magnetometer: "()"
-    microphone: "()"        # voice/video projects: set to "(self)"
+    # voice/video projects: set to "(self)"
+    microphone: "()"
     midi: "()"
     screen-wake-lock: "()"
     serial: "()"
@@ -13498,7 +13648,8 @@ web:
     fullscreen: "(self)"
     payment: "(self)"
     picture-in-picture: "(self)"
-    publickey-credentials-get: "(self)"   # WebAuthn / Passkeys
+    # WebAuthn / Passkeys
+    publickey-credentials-get: "(self)"
     storage-access: "(self)"
     web-share: "(self)"
 ```
@@ -13514,18 +13665,24 @@ web:
 ```yaml
 web:
   hsts:
-    enabled: true                      # default true. Set false only for HTTP-only deployments.
-    max_age_seconds: 63072000          # default 2 years (preload-list eligible).
-    include_subdomains: true           # default true.
-    preload: true                      # default true. See HSTS preload caveat above.
+    # default true. Set false only for HTTP-only deployments.
+    enabled: true
+    # default 2 years (preload-list eligible).
+    max_age_seconds: 63072000
+    # default true.
+    include_subdomains: true
+    # default true. See HSTS preload caveat above.
+    preload: true
 
   permissions_policy:
     # Per-feature config — see "Permissions-Policy Configuration" below.
 
   reports:
     # Public reports endpoints (PART 14 → "Public Reports Scope").
-    rate_limit_per_minute: 60          # max reports/min/IP across all report types
-    rate_limit_per_ip_burst: 10        # short-burst allowance
+    # max reports/min/IP across all report types
+    rate_limit_per_minute: 60
+    # short-burst allowance
+    rate_limit_per_ip_burst: 10
 
   csrf:
     # See "CSRF Protection" below for full schema.
@@ -13538,25 +13695,38 @@ web:
 
   headers:
     # Modern / privacy / cross-origin headers — see subsections below.
-    coop: "unsafe-none"                # Cross-Origin-Opener-Policy
-    coep: "unsafe-none"                # Cross-Origin-Embedder-Policy
-    corp: "cross-origin"               # Cross-Origin-Resource-Policy
-    origin_agent_cluster: true         # emit "Origin-Agent-Cluster: ?1"
-    cross_domain_policies: "none"      # X-Permitted-Cross-Domain-Policies
-    dns_prefetch_control: ""           # "" = omit (browser default); "off" = privacy-strict
-    honor_sec_gpc: true                # treat Sec-GPC: 1 as opt-out signal
-    honor_dnt: false                   # DNT is dead in modern browsers — off by default
-    sec_fetch_validation: true         # reject cross-site state-changers (CSRF defense layer)
-    server_timing_in_debug_only: true  # never emit Server-Timing in production
+    # Cross-Origin-Opener-Policy
+    coop: "unsafe-none"
+    # Cross-Origin-Embedder-Policy
+    coep: "unsafe-none"
+    # Cross-Origin-Resource-Policy
+    corp: "cross-origin"
+    # emit "Origin-Agent-Cluster: ?1"
+    origin_agent_cluster: true
+    # X-Permitted-Cross-Domain-Policies
+    cross_domain_policies: "none"
+    # "" = omit (browser default); "off" = privacy-strict
+    dns_prefetch_control: ""
+    # treat Sec-GPC: 1 as opt-out signal
+    honor_sec_gpc: true
+    # DNT is dead in modern browsers — off by default
+    honor_dnt: false
+    # reject cross-site state-changers (CSRF defense layer)
+    sec_fetch_validation: true
+    # never emit Server-Timing in production
+    server_timing_in_debug_only: true
     clear_site_data:
       on_token_revocation: true
       on_consent_withdrawal: true
-      execution_contexts: false        # set true to also reload SPA tabs on token revocation
+      # set true to also reload SPA tabs on token revocation
+      execution_contexts: false
     nel:
       enabled: true
-      max_age_seconds: 2592000         # 30 days
+      # 30 days
+      max_age_seconds: 2592000
       include_subdomains: true
-      sample_rate: 1.0                 # 0.0..1.0 — sample failures to control volume
+      # 0.0..1.0 — sample failures to control volume
+      sample_rate: 1.0
 ```
 
 ## Cross-Origin Isolation Headers
@@ -13710,23 +13880,34 @@ report-uri /api/{api_version}/server/reports/csp
 ```yaml
 web:
   csp:
-    enabled: true                     # default: true
-    mode: enforce                     # enforce | report-only
+    # default: true
+    enabled: true
+    # enforce | report-only
+    mode: enforce
     # Per-directive append — these strings are added to the default value.
     # Operator never has to redefine the whole policy.
-    script_src_extra: ""              # e.g. "https://js.stripe.com https://www.google.com/recaptcha/"
-    style_src_extra: ""               # e.g. "https://fonts.googleapis.com"
-    img_src_extra: ""                 # rarely needed — default already covers https:
-    font_src_extra: ""                # rarely needed — default already covers https:
-    connect_src_extra: ""             # e.g. "https://api.stripe.com wss://realtime.example.com"
-    frame_src_extra: ""               # e.g. "https://www.youtube.com https://player.vimeo.com https://js.stripe.com"
-    form_action_extra: ""             # e.g. "https://accounts.google.com" for OAuth submit
+    # e.g. "https://js.stripe.com https://www.google.com/recaptcha/"
+    script_src_extra: ""
+    # e.g. "https://fonts.googleapis.com"
+    style_src_extra: ""
+    # rarely needed — default already covers https:
+    img_src_extra: ""
+    # rarely needed — default already covers https:
+    font_src_extra: ""
+    # e.g. "https://api.stripe.com wss://realtime.example.com"
+    connect_src_extra: ""
+    # e.g. "https://www.youtube.com https://player.vimeo.com https://js.stripe.com"
+    frame_src_extra: ""
+    # e.g. "https://accounts.google.com" for OAuth submit
+    form_action_extra: ""
     # Override-style: REPLACE the directive instead of appending. Use sparingly.
     script_src_override: ""
     # ... (mirror for every directive)
     # Reporting
-    reports_enabled: true             # POST violations to /api/{api_version}/server/reports/csp
-    reports_sample_rate: 1.0          # 0.0 .. 1.0 — sample to control volume on busy sites
+    # POST violations to /api/{api_version}/server/reports/csp
+    reports_enabled: true
+    # 0.0 .. 1.0 — sample to control volume on busy sites
+    reports_sample_rate: 1.0
 ```
 
 **Auto-detection:** `connect-src`, `frame-ancestors`, and `form-action` automatically pick up DOMAIN env entries and reverse-proxy-detected hosts (same resolution order as CORS — see PART 16). Operator does NOT have to list their own domain in `connect_src_extra`.
@@ -13790,10 +13971,14 @@ The middleware substitutes `{request_nonce}` per response and adds the same nonc
 ```rust
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TargetType {
-    Unknown,       // Unknown/invalid target
-    Public,        // Public routes (/, /api/{api_version}/, project-specific like /jokes, /weather, /ip)
-    ServerPages,   // Server pages - about, help, contact, privacy (/server/*, /api/{api_version}/server/*)
-    Server,        // Server administration routes (/api/{api_version}/server/*)
+    // Unknown/invalid target
+    Unknown,
+    // Public routes (/, /api/{api_version}/, project-specific like /jokes, /weather, /ip)
+    Public,
+    // Server pages - about, help, contact, privacy (/server/*, /api/{api_version}/server/*)
+    ServerPages,
+    // Server administration routes (/api/{api_version}/server/*)
+    Server,
 }
 ```
 
@@ -13806,7 +13991,8 @@ pub fn extract_context_from_path(path: &str) -> Result<Context, anyhow::Error> {
     // /api/{api_version}/server/* → Server info / operator-token-protected endpoints
     // /api/{api_version}/{resource}/* → Public routes (project-specific: jokes, weather, ip, etc.)
 
-    let api_base = format!("{}/", api_base_path()); // e.g., "/api/{api_version}/"
+    // e.g., "/api/{api_version}/"
+    let api_base = format!("{}/", api_base_path());
     let parts: Vec<&str> = path
         .strip_prefix(&api_base)
         .unwrap_or(path)
@@ -13945,21 +14131,30 @@ Expires: {expiry_date}
 ```yaml
 web:
   security:
-    report_url: "https://github.com/{project_org}/{project_name}/security/advisories/new"    # Primary contact — GitHub private vulnerability reporting
-    contact: "security@{fqdn}"    # Secondary/CC contact email — never the primary reporting channel
-    expires: "{1year}"            # Auto-calculated 1 year from generation
+    # Primary contact — GitHub private vulnerability reporting
+    report_url: "https://github.com/{project_org}/{project_name}/security/advisories/new"
+    # Secondary/CC contact email — never the primary reporting channel
+    contact: "security@{fqdn}"
+    # Auto-calculated 1 year from generation
+    expires: "{1year}"
   well_known:
-    unsupported_behavior: 404     # Unknown entries never redirect
+    # Unknown entries never redirect
+    unsupported_behavior: 404
     webfinger:
-      enabled: false              # Enable only if project publishes acct: identities/federation
+      # Enable only if project publishes acct: identities/federation
+      enabled: false
     openid_configuration:
-      enabled: false              # Enable only if project is an OIDC provider
+      # Enable only if project is an OIDC provider
+      enabled: false
     assetlinks:
-      enabled: false              # Enable only for Android App Links/native association
+      # Enable only for Android App Links/native association
+      enabled: false
     apple_app_site_association:
-      enabled: false              # Enable only for Apple Universal Links/WebCredentials
+      # Enable only for Apple Universal Links/WebCredentials
+      enabled: false
     mta_sts:
-      enabled: false              # Enable only if this host owns inbound mail policy
+      # Enable only if this host owns inbound mail policy
+      enabled: false
 ```
 
 **Fields:**
@@ -14004,10 +14199,14 @@ Security: {security_contact}
 ```yaml
 web:
   llms:
-    enabled: true                    # Serve llms.txt (default: true)
-    include_endpoints: true          # Auto-generate endpoint list from routes
-    include_schemas: false           # Include request/response schemas (verbose)
-    custom_sections: []              # Additional custom sections
+    # Serve llms.txt (default: true)
+    enabled: true
+    # Auto-generate endpoint list from routes
+    include_endpoints: true
+    # Include request/response schemas (verbose)
+    include_schemas: false
+    # Additional custom sections
+    custom_sections: []
 ```
 
 **Auto-Generation Rules:**
@@ -14523,17 +14722,24 @@ server:
       # Basic options (same as other logs)
       enabled: true
       filename: audit.log
-      format: json           # json only - must be machine-parseable
-      rotate: daily          # daily, weekly, monthly, NMB, or combined
-      keep: none             # none, N, Nd, Nw, Nm
+      # json only - must be machine-parseable
+      format: json
+      # daily, weekly, monthly, NMB, or combined
+      rotate: daily
+      # none, N, Nd, Nw, Nm
+      keep: none
       compress: false
 
       # What to log (event categories)
       events:
-        configuration: true   # Config changes
-        security: true        # Rate limit violations and security events
-        backup: true          # Backup/restore
-        server: true          # Server events (start, stop, maintenance)
+        # Config changes
+        configuration: true
+        # Rate limit violations and security events
+        security: true
+        # Backup/restore
+        backup: true
+        # Server events (start, stop, maintenance)
+        server: true
 
       # Sensitive data handling
       include_user_agent: true
@@ -14955,7 +15161,8 @@ server:
     abuse_detection:
       # Request flood: too many requests from same IP
       request_flood:
-        multiplier: 10       # 10x rate limit triggers flood detection
+        # 10x rate limit triggers flood detection
+        multiplier: 10
         block_duration: 1h
 
       # Auto-actions (all enabled by default)
@@ -15127,7 +15334,8 @@ pub fn is_allowlisted<B>(req: &Request<B>) -> bool {
 fn validate_config(cfg: &mut Config) {
     // Example: port must be 1-65535
     if cfg.server.port < 1 || cfg.server.port > 65535 {
-        let random_port = get_random_available_port(); // 64000-64999 range
+        // 64000-64999 range
+        let random_port = get_random_available_port();
         tracing::warn!("invalid port {}, using random port {}", cfg.server.port, random_port);
         cfg.server.port = random_port;
     }
@@ -15151,7 +15359,8 @@ fn validate_config(cfg: &mut Config) {
 
 ```yaml
 server:
-  baseurl: /              # Default: serve from root (auto-detects from reverse proxy)
+  # Default: serve from root (auto-detects from reverse proxy)
+  baseurl: /
   # baseurl: /myproject   # Serve from /myproject/*
   # baseurl: /api/v2      # Serve from /api/v2/*
 ```
@@ -15272,9 +15481,12 @@ server:
 server:
   trusted_proxies:
     additional:
-      - 203.0.113.10           # specific edge node
-      - 198.51.100.0/24        # CDN PoP block
-      - lb.internal.example    # DNS name, resolved every 5min
+      # specific edge node
+      - 203.0.113.10
+      # CDN PoP block
+      - 198.51.100.0/24
+      # DNS name, resolved every 5min
+      - lb.internal.example
 ```
 
 **On a public-facing direct deployment (no proxy in front)** leave `additional: []`. The X-Forwarded headers from random internet peers are then dropped, falling back to `r.Host` and `r.RemoteAddr` for URL construction — exactly the behavior we want.
@@ -15288,15 +15500,19 @@ server:
   rate_limit:
     enabled: true
     read:
-      requests: 120    # per minute per IP
+      # per minute per IP
+      requests: 120
       window: 60
     write:
-      requests: 10     # per minute per IP
+      # per minute per IP
+      requests: 10
       window: 60
     health:
-      requests: 120    # per minute per IP (health/status endpoints)
+      # per minute per IP (health/status endpoints)
+      requests: 120
       window: 60
-    global_burst: 240  # per minute per IP (absolute ceiling across all endpoint types)
+    # per minute per IP (absolute ceiling across all endpoint types)
+    global_burst: 240
 ```
 
 | Endpoint class | Default limit | Window | Notes |
@@ -15336,10 +15552,14 @@ server:
     admin:
       email: "admin@{fqdn}"
       webhooks:
-        telegram: ""        # https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT}
-        discord: ""         # https://discord.com/api/webhooks/{ID}/{TOKEN}
-        slack: ""           # https://hooks.slack.com/services/{T}/{B}/{X}
-        generic: ""         # any URL — POSTed JSON {role,event,subject,body,severity,timestamp}
+        # https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT}
+        telegram: ""
+        # https://discord.com/api/webhooks/{ID}/{TOKEN}
+        discord: ""
+        # https://hooks.slack.com/services/{T}/{B}/{X}
+        slack: ""
+        # any URL — POSTed JSON {role,event,subject,body,severity,timestamp}
+        generic: ""
 
     # ---- Security (vulnerability reports) ----
     # Recipient for incoming security reports. Public — surfaced in
@@ -15353,7 +15573,8 @@ server:
     # set to "" it falls back to server.contact.admin.email
     # (and server.contact.admin.webhooks).
     security:
-      email: "security@{fqdn}"   # RFC 2142 standard role mailbox
+      # RFC 2142 standard role mailbox
+      email: "security@{fqdn}"
       webhooks:
         telegram: ""
         discord: ""
@@ -15366,7 +15587,8 @@ server:
     # exposes one.
     # If empty: falls back to server.contact.admin.email.
     general:
-      email: ""             # default: server.contact.admin.email
+      # default: server.contact.admin.email
+      email: ""
       webhooks:
         telegram: ""
         discord: ""
@@ -15496,7 +15718,8 @@ server:
   tracking:
     type: google
     id: "G-XXXXXXXXXX"
-    url: ""  # Not used
+    # Not used
+    url: ""
 ```
 
 **Matomo (Self-hosted):**
@@ -15504,7 +15727,8 @@ server:
 server:
   tracking:
     type: matomo
-    id: "1"  # Site ID
+    # Site ID
+    id: "1"
     url: "https://analytics.example.com"
 ```
 
@@ -15541,7 +15765,8 @@ server:
   tracking:
     type: fathom
     id: "ABCDEFGH"
-    url: ""  # Uses cdn.usefathom.com
+    # Uses cdn.usefathom.com
+    url: ""
 ```
 
 **Fathom Lite (Self-hosted):**
@@ -15550,7 +15775,8 @@ server:
   tracking:
     type: fathom
     id: "ABCDEFGH"
-    url: "https://analytics.example.com"  # Your Fathom Lite instance
+    # Your Fathom Lite instance
+    url: "https://analytics.example.com"
 ```
 
 **Plausible Analytics (Cloud):**
@@ -15558,8 +15784,10 @@ server:
 server:
   tracking:
     type: plausible
-    id: "example.com"  # Your domain
-    url: ""  # Uses plausible.io
+    # Your domain
+    id: "example.com"
+    # Uses plausible.io
+    url: ""
 ```
 
 **Plausible Analytics (Self-hosted):**
@@ -15567,8 +15795,10 @@ server:
 server:
   tracking:
     type: plausible
-    id: "example.com"  # Your domain
-    url: "https://analytics.example.com"  # Your Plausible instance
+    # Your domain
+    id: "example.com"
+    # Your Plausible instance
+    url: "https://analytics.example.com"
 ```
 
 **Umami:**
@@ -15576,7 +15806,8 @@ server:
 server:
   tracking:
     type: umami
-    id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Website UUID
+    # Website UUID
+    id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
     url: "https://analytics.example.com"
 ```
 
@@ -15585,8 +15816,10 @@ server:
 server:
   tracking:
     type: simple
-    id: ""  # Not needed, uses domain automatically
-    url: ""  # Not used
+    # Not needed, uses domain automatically
+    id: ""
+    # Not used
+    url: ""
 ```
 
 **Cloudflare Web Analytics:**
@@ -15595,7 +15828,8 @@ server:
   tracking:
     type: cloudflare
     id: "your-beacon-token"
-    url: ""  # Not used
+    # Not used
+    url: ""
 ```
 
 ### Tracking Script Generation
@@ -15753,7 +15987,8 @@ Type selected: matomo, piwik, owa, umami
 // validate_tracking validates tracking configuration
 pub fn validate_tracking(cfg: &TrackingConfig) -> anyhow::Result<()> {
     if cfg.tracking_type.is_empty() || cfg.tracking_type == "none" {
-        return Ok(()); // Disabled is valid
+        // Disabled is valid
+        return Ok(());
     }
 
     match cfg.tracking_type.as_str() {
@@ -15840,7 +16075,8 @@ server:
       sold: false
 
       # Where is user data stored?
-      stored_on_server: true  # All data on this server (not third-party cloud)
+      # All data on this server (not third-party cloud)
+      stored_on_server: true
 
       # When data MAY be shared with third parties
       sharing:
@@ -15905,17 +16141,20 @@ server:
     cookies:
       # Essential cookies - ALWAYS enabled, cannot be disabled
       essential:
-        enabled: true  # Always true, not configurable
+        # Always true, not configurable
+        enabled: true
         description: "Required for the site to function. Includes security tokens (CSRF) and site preferences. These cookies are strictly necessary and cannot be disabled."
 
       # Preference cookies (theme, language, UI settings)
       preferences:
-        enabled: true  # Default on, user can disable via Decline
+        # Default on, user can disable via Decline
+        enabled: true
         description: "Remember your settings such as theme (dark/light), language, and UI preferences. Disabling will reset to defaults on each visit."
 
       # Analytics cookies (only active if server.tracking configured)
       analytics:
-        enabled: true  # Default on, user can disable via Decline
+        # Default on, user can disable via Decline
+        enabled: true
         description: "Help us understand how visitors use our site to improve the experience."
         # Dynamic suffix based on data.sold
         description_suffix_not_sold: "Analytics data is anonymized and never sold."
@@ -16025,16 +16264,21 @@ pub struct PrivacyConfig {
 // DataPolicy controls data handling and CCPA compliance
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DataPolicy {
-    pub sold: bool,              // Default: false (MIT users can enable)
-    pub stored_on_server: bool,  // Always true
+    // Default: false (MIT users can enable)
+    pub sold: bool,
+    // Always true
+    pub stored_on_server: bool,
     pub sharing: Vec<SharingCondition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SharingCondition {
-    pub condition: String, // analytics, email, user_initiated
-    pub when: String,      // Description of when sharing occurs
-    pub data: String,      // What data is shared
+    // analytics, email, user_initiated
+    pub condition: String,
+    // Description of when sharing occurs
+    pub when: String,
+    // What data is shared
+    pub data: String,
 }
 
 // ConsentConfig for cookie consent banner
@@ -16042,11 +16286,14 @@ pub struct SharingCondition {
 pub struct ConsentConfig {
     pub show_until_acknowledged: bool,
     pub default_enabled: bool,
-    pub message: String,          // Used when data.sold = false
-    pub message_if_sold: String,  // Used when data.sold = true
+    // Used when data.sold = false
+    pub message: String,
+    // Used when data.sold = true
+    pub message_if_sold: String,
     pub policy: PolicyLink,
     pub buttons: ConsentButtons,
-    pub position: String,         // top or bottom
+    // top or bottom
+    pub position: String,
 }
 
 // CookieCategories with dynamic description suffixes
@@ -16075,8 +16322,10 @@ pub struct AnalyticsCookie {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrivacyContent {
     pub data_collection: String,
-    pub data_usage: String,         // Used when data.sold = false
-    pub data_usage_if_sold: String, // Used when data.sold = true
+    // Used when data.sold = false
+    pub data_usage: String,
+    // Used when data.sold = true
+    pub data_usage_if_sold: String,
     pub data_security: String,
 }
 
@@ -16126,18 +16375,24 @@ pub fn privacy_data(cookies: &CookieJar, cfg: &AppConfig) -> PrivacyTemplateData
         .unwrap_or(false);
 
     PrivacyTemplateData {
-        privacy: privacy.clone(),   // Full config for template access (.privacy.*)
-        tracking: tracking.clone(), // For analytics type name
-        ccpa_opted_out,             // From cookie check
+        // Full config for template access (.privacy.*)
+        privacy: privacy.clone(),
+        // For analytics type name
+        tracking: tracking.clone(),
+        // From cookie check
+        ccpa_opted_out,
     }
 }
 
 // PrivacyTemplateData for template rendering
 // Templates access config via .privacy.* and .tracking.*
 pub struct PrivacyTemplateData {
-    pub privacy: PrivacyConfig,    // Access via .privacy.data.sold, .privacy.get_consent_message(), etc.
-    pub tracking: TrackingConfig,  // Access via .tracking.tracking_type, .tracking.type_name
-    pub ccpa_opted_out: bool,      // From ccpa_opt_out cookie
+    // Access via .privacy.data.sold, .privacy.get_consent_message(), etc.
+    pub privacy: PrivacyConfig,
+    // Access via .tracking.tracking_type, .tracking.type_name
+    pub tracking: TrackingConfig,
+    // From ccpa_opt_out cookie
+    pub ccpa_opted_out: bool,
 }
 ```
 
@@ -16167,10 +16422,14 @@ pub struct PrivacyTemplateData {
 // ConsentState stores user's cookie preferences
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConsentState {
-    pub essential: bool,    // Always true
-    pub preferences: bool,  // User choice
-    pub analytics: bool,    // User choice
-    pub timestamp: i64,     // When consent given
+    // Always true
+    pub essential: bool,
+    // User choice
+    pub preferences: bool,
+    // User choice
+    pub analytics: bool,
+    // When consent given
+    pub timestamp: i64,
 }
 
 // Stored in localStorage as JSON:
@@ -16325,7 +16584,8 @@ rediss://...  # Redis with TLS
 server:
   cache:
     type: valkey
-    url: ${CACHE_URL}  # valkey://user:pass@valkey.example.com:6379/0
+    # valkey://user:pass@valkey.example.com:6379/0
+    url: ${CACHE_URL}
     prefix: "{project_name}:"
 ```
 
@@ -16429,21 +16689,29 @@ pub struct HealthResponse {
     pub project: ProjectInfo,
 
     // 2. Overall status
-    pub status: String,                                    // "healthy", "unhealthy", "degraded"
+    // "healthy", "unhealthy", "degraded"
+    pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub pending_restart: Option<bool>,                     // true if restart needed
+    // true if restart needed
+    pub pending_restart: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub restart_reason: Option<Vec<String>>,               // settings that changed
+    // settings that changed
+    pub restart_reason: Option<Vec<String>>,
 
     // 3. Version & build info (PART 7: binary requirements)
-    pub version: String,                                   // SemVer "1.0.0"
-    pub rust_version: String,                              // rustc version from the current build/runtime
+    // SemVer "1.0.0"
+    pub version: String,
+    // rustc version from the current build/runtime
+    pub rust_version: String,
     pub build: BuildInfo,
 
     // 4. Runtime info (PART 6: application modes)
-    pub uptime: String,                                    // human readable "2d 5h 30m"
-    pub mode: String,                                      // "production" or "development"
-    pub timestamp: chrono::DateTime<chrono::Utc>,          // current UTC time
+    // human readable "2d 5h 30m"
+    pub uptime: String,
+    // "production" or "development"
+    pub mode: String,
+    // current UTC time
+    pub timestamp: chrono::DateTime<chrono::Utc>,
 
     // 5. Features - PUBLIC only (PARTS 20, 32)
     pub features: FeaturesInfo,
@@ -16461,16 +16729,21 @@ pub struct HealthResponse {
 // ProjectInfo - from branding config (PART 16)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectInfo {
-    pub name: String,        // branding.title
-    pub tagline: String,     // branding.tagline (short slogan)
-    pub description: String, // branding.description (longer)
+    // branding.title
+    pub name: String,
+    // branding.tagline (short slogan)
+    pub tagline: String,
+    // branding.description (longer)
+    pub description: String,
 }
 
 // BuildInfo - from build-time variables (PART 7)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildInfo {
-    pub commit: String, // git short hash (7 chars)
-    pub date: String,   // ISO 8601 build timestamp
+    // git short hash (7 chars)
+    pub commit: String,
+    // ISO 8601 build timestamp
+    pub date: String,
 }
 
 // FeaturesInfo - PUBLIC features only (no /metrics - PART 20 is internal)
@@ -16482,7 +16755,8 @@ pub struct FeaturesInfo {
     pub tor: TorInfo,
 
     // PART 19: GeoIP
-    pub geoip: bool,  // true = enabled, false = disabled
+    // true = enabled, false = disabled
+    pub geoip: bool,
 
     // APP-SPECIFIC: Add your app's features with enabled/disabled status
 }
@@ -16490,21 +16764,30 @@ pub struct FeaturesInfo {
 // TorInfo - from Tor manager (PART 31)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TorInfo {
-    pub enabled: bool,   // Tor binary found and running
-    pub running: bool,   // Hidden service active
-    pub status: String,  // "healthy", "starting", "error"
-    pub hostname: String, // "abc123...xyz.onion" (56 chars, v3)
+    // Tor binary found and running
+    pub enabled: bool,
+    // Hidden service active
+    pub running: bool,
+    // "healthy", "starting", "error"
+    pub status: String,
+    // "abc123...xyz.onion" (56 chars, v3)
+    pub hostname: String,
 }
 
 // ChecksInfo - component health (ok/error only - no details)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChecksInfo {
-    pub database: String,                        // PART 10: "ok" or "error"
-    pub cache: String,                           // PART 10: "ok" or "error"
-    pub disk: String,                            // Disk space check
-    pub scheduler: String,                       // PART 18: "ok" or "error"
+    // PART 10: "ok" or "error"
+    pub database: String,
+    // PART 10: "ok" or "error"
+    pub cache: String,
+    // Disk space check
+    pub disk: String,
+    // PART 18: "ok" or "error"
+    pub scheduler: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tor: Option<String>,                     // PART 31: "ok" or "error" (if enabled)
+    // PART 31: "ok" or "error" (if enabled)
+    pub tor: Option<String>,
     // APP-SPECIFIC: Add your checks here
     // Example: pub storage: Option<String>,
 }
@@ -16512,9 +16795,12 @@ pub struct ChecksInfo {
 // StatsInfo - public-safe aggregate statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StatsInfo {
-    pub requests_total: i64,    // Total HTTP requests (lifetime)
-    pub requests_24h: i64,      // Requests in last 24 hours
-    pub active_connections: i32, // Current active connections
+    // Total HTTP requests (lifetime)
+    pub requests_total: i64,
+    // Requests in last 24 hours
+    pub requests_24h: i64,
+    // Current active connections
+    pub active_connections: i32,
     // APP-SPECIFIC: Add your stats here
     // Example: pub pastes_total: Option<i64>,
 }
@@ -17666,14 +17952,22 @@ fn is_text_browser(req: &Request) -> bool {
     // Text browsers - INTERACTIVE, NO JavaScript support
     // Format: "browser/" or "browser " (links uses space)
     let text_browsers = [
-        "lynx/",      // Lynx - classic text browser
-        "w3m/",       // w3m - text browser with table support
-        "links ",     // Links - text browser (note: space after)
-        "links/",     // Links alternative format
-        "elinks/",    // ELinks - enhanced links
-        "browsh/",    // Browsh - modern text browser
-        "carbonyl/",  // Carbonyl - Chromium in terminal
-        "netsurf",    // NetSurf - lightweight browser (limited JS)
+        // Lynx - classic text browser
+        "lynx/",
+        // w3m - text browser with table support
+        "w3m/",
+        // Links - text browser (note: space after)
+        "links ",
+        // Links alternative format
+        "links/",
+        // ELinks - enhanced links
+        "elinks/",
+        // Browsh - modern text browser
+        "browsh/",
+        // Carbonyl - Chromium in terminal
+        "carbonyl/",
+        // NetSurf - lightweight browser (limited JS)
+        "netsurf",
     ];
     text_browsers.iter().any(|b| ua.contains(b))
 }
@@ -21243,12 +21537,16 @@ server:
   branding:
     name: "My App"
     tagline: "One sentence describing the app"
-    logo_url: ""             # empty = use embedded default
-    favicon_url: ""          # empty = use embedded default
+    # empty = use embedded default
+    logo_url: ""
+    # empty = use embedded default
+    favicon_url: ""
     primary_color: "#7aa2f7"
     og_image_url: ""
-    footer_text: ""          # plain text or sanitized HTML
-    footer_custom_html: ""   # raw HTML (sanitized server-side)
+    # plain text or sanitized HTML
+    footer_text: ""
+    # raw HTML (sanitized server-side)
+    footer_custom_html: ""
 ```
 
 ---
@@ -21752,7 +22050,8 @@ server:
     footer_text: ""
     footer_custom_html: ""
   tracking:
-    tracking_type: ""        # "plausible" | "umami" | "fathom" | ""
+    # "plausible" | "umami" | "fathom" | ""
+    tracking_type: ""
     tracking_url: ""
     tracking_id: ""
   operator:
@@ -21771,7 +22070,8 @@ privacy:
   content:
     data_collection: ""
     cookie_policy: ""
-  consent_message: ""        # empty = use built-in default
+  # empty = use built-in default
+  consent_message: ""
 
 pages:
   about:
@@ -22602,10 +22902,14 @@ server:
         # Creates: {project_name}_backup_YYYY-MM-DD.tar.gz[.enc] (full)
         #          {project_name}-daily.tar.gz[.enc] (incremental)
         retention:
-          max_backups: 1     # 1-365: daily full backups to keep
-          keep_weekly: 0     # 0-52: Sunday backups (0 = disabled)
-          keep_monthly: 0    # 0-12: 1st of month backups (0 = disabled)
-          keep_yearly: 0     # 0-10: January 1st backups (0 = disabled)
+          # 1-365: daily full backups to keep
+          max_backups: 1
+          # 0-52: Sunday backups (0 = disabled)
+          keep_weekly: 0
+          # 0-12: 1st of month backups (0 = disabled)
+          keep_monthly: 0
+          # 0-10: January 1st backups (0 = disabled)
+          keep_yearly: 0
 
       # Hourly incremental backup (disabled by default)
       backup_hourly:
@@ -24343,10 +24647,12 @@ groups:
 server:
   backup:
     encryption:
-      enabled: true       # true if password was set
+      # true if password was set
+      enabled: true
       # Password is NEVER stored - prompted on-demand
   compliance:
-    enabled: false        # HIPAA, SOC2, etc.
+    # HIPAA, SOC2, etc.
+    enabled: false
     # If true, backup.encryption.enabled MUST be true
 ```
 
@@ -24437,10 +24743,14 @@ Shown on:
 server:
   backup:
     retention:
-      max_backups: 1     # 1-365: daily full backups
-      keep_weekly: 0     # 0-52: Sunday backups (0 = disabled)
-      keep_monthly: 0    # 0-12: 1st of month (0 = disabled)
-      keep_yearly: 0     # 0-10: January 1st (0 = disabled)
+      # 1-365: daily full backups
+      max_backups: 1
+      # 0-52: Sunday backups (0 = disabled)
+      keep_weekly: 0
+      # 0-12: 1st of month (0 = disabled)
+      keep_monthly: 0
+      # 0-10: January 1st (0 = disabled)
+      keep_yearly: 0
 ```
 
 **Default: 2 files total** (yesterday's full + today's incremental)
@@ -24973,7 +25283,8 @@ pub async fn check_for_update(current_version: &str, branch: &str) -> Result<Opt
         .await?;
 
     if resp.status().as_u16() == 404 {
-        return Ok(None); // No updates available
+        // No updates available
+        return Ok(None);
     }
     if !resp.status().is_success() {
         return Err(anyhow!("GitHub API error: {}", resp.status().as_u16()));
@@ -24982,7 +25293,8 @@ pub async fn check_for_update(current_version: &str, branch: &str) -> Result<Opt
     if branch == "stable" {
         let release: Release = resp.json().await?;
         if release.tag_name == current_version {
-            return Ok(None); // Already up to date
+            // Already up to date
+            return Ok(None);
         }
         return Ok(Some(release));
     }
@@ -25126,7 +25438,8 @@ fn restart_windows_service() -> anyhow::Result<()> {
     use std::thread;
     use std::time::Duration;
     // Stop service
-    let _ = Command::new("sc").args(["stop", "{project_name}"]).status(); // Ignore error if not running
+    // Ignore error if not running
+    let _ = Command::new("sc").args(["stop", "{project_name}"]).status();
 
     // Wait for stop
     thread::sleep(Duration::from_secs(2));
@@ -25359,9 +25672,12 @@ Shell integration commands:
 
 Usage:
   # Add to shell profile for persistent completions
-  {project_name} --shell init >> ~/.bashrc      # bash
-  {project_name} --shell init >> ~/.zshrc       # zsh
-  {project_name} --shell init >> ~/.config/fish/config.fish  # fish
+  # bash
+  {project_name} --shell init >> ~/.bashrc
+  # zsh
+  {project_name} --shell init >> ~/.zshrc
+  # fish
+  {project_name} --shell init >> ~/.config/fish/config.fish
 
   # Or eval directly for current session
   eval "$({project_name} --shell init)"
@@ -25496,12 +25812,14 @@ fn find_available_system_id() -> anyhow::Result<u32> {
 
         // Check if UID is available
         if uid_exists(id) {
-            continue; // UID exists, try next
+            // UID exists, try next
+            continue;
         }
 
         // Check if GID is available
         if gid_exists(id) {
-            continue; // GID exists, try next
+            // GID exists, try next
+            continue;
         }
 
         // Both available and not reserved
@@ -25764,7 +26082,8 @@ fn install_windows_service() -> anyhow::Result<()> {
         executable_path: exe_path,
         launch_arguments: vec![],
         dependencies: vec![],
-        account_name: None, // Empty = Virtual Service Account
+        // Empty = Virtual Service Account
+        account_name: None,
         account_password: None,
     };
 
@@ -25864,7 +26183,8 @@ WantedBy=multi-user.target
 
 name="{internal_name}"
 description="{app_name}"
-command="/usr/local/bin/{project_name}"   # actual binary (may differ from {internal_name} after rename)
+# actual binary (may differ from {internal_name} after rename)
+command="/usr/local/bin/{project_name}"
 command_args=""
 command_user="{internal_name}:{internal_name}"
 pidfile="/var/run/{project_org}/{internal_name}.pid"
@@ -26217,9 +26537,11 @@ format_version_tag() {
     # Matches: 0.2.0, 1.2.3, 10.5.2-rc1
     # Does NOT match: dev, beta, daily, 20251218
     if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-        echo "v$tag"        # 0.2.0 → v0.2.0
+        # 0.2.0 → v0.2.0
+        echo "v$tag"
     else
-        echo "$tag"         # dev → dev (no v)
+        # dev → dev (no v)
+        echo "$tag"
     fi
 }
 
@@ -26673,16 +26995,22 @@ docker run --rm \
 **Typical workflow:**
 ```bash
 # Active development
-make dev                # Quick build to temp dir
-make test               # Unit tests
+# Quick build to temp dir
+make dev
+# Unit tests
+make test
 
 # Before commit
-./tests/run_tests.sh    # Integration tests (auto-detects incus/docker)
+# Integration tests (auto-detects incus/docker)
+./tests/run_tests.sh
 
 # Before release
-make local               # Production build locally
-./tests/incus.sh        # Full systemd testing (PREFERRED)
-make build              # Full cross-platform build
+# Production build locally
+make local
+# Full systemd testing (PREFERRED)
+./tests/incus.sh
+# Full cross-platform build
+make build
 ```
 
 ## Directory Rules
@@ -27401,9 +27729,12 @@ networks:
 ```yaml
 x-logging: &default-logging
   options:
-    max-size: '5m'    # Max 5MB per log file
-    max-file: '1'     # Keep only 1 log file
-  driver: json-file   # JSON format for parsing
+    # Max 5MB per log file
+    max-size: '5m'
+    # Keep only 1 log file
+    max-file: '1'
+  # JSON format for parsing
+  driver: json-file
 ```
 
 **Every service MUST use the anchor:**
@@ -27574,7 +27905,8 @@ $TEMP_DIR/
 ```bash
 # Setup (uses OS temp dir: {ostempdir}/{project_org}/{internal_name}-XXXXXX/)
 # Set PROJECT_ROOT to your actual project location
-PROJECT_ROOT="$(git rev-parse --show-toplevel)"  # Use git top-level
+# Use git top-level
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 # Or use absolute path: PROJECT_ROOT="/path/to/your/project"
 mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
 TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
@@ -27800,7 +28132,8 @@ TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/{project_org}/{internal_name}-XXXXXX")
 mkdir -p "$TEMP_DIR/volumes/config" "$TEMP_DIR/volumes/data"
 cp docker/docker-compose.test.yml "$TEMP_DIR/docker-compose.yml"
 cd "$TEMP_DIR" && docker compose up --abort-on-container-exit
-rm -rf "$TEMP_DIR"  # Cleanup after tests
+# Cleanup after tests
+rm -rf "$TEMP_DIR"
 ```
 
 ### Docker Compose with Cache Example
@@ -28201,14 +28534,16 @@ jobs:
             ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
@@ -28224,7 +28559,8 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Download all artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        # v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           path: binaries
           merge-multiple: true
@@ -28253,7 +28589,8 @@ jobs:
             -czf binaries/${{ env.PROJECTNAME }}-${{ env.VERSION }}-source.tar.gz .
 
       - name: Create Release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b  # v3.0.1
+        # v3.0.1
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           files: binaries/*
@@ -28363,14 +28700,16 @@ jobs:
             ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
@@ -28386,7 +28725,8 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Download all artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        # v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           path: binaries
           merge-multiple: true
@@ -28403,7 +28743,8 @@ jobs:
         run: echo "${{ env.VERSION }}" > binaries/version.txt
 
       - name: Create Release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b  # v3.0.1
+        # v3.0.1
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b
         with:
           tag_name: ${{ env.VERSION }}
           files: binaries/*
@@ -28420,7 +28761,8 @@ name: Daily Build
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # 3am UTC daily
+    # 3am UTC daily
+    - cron: '0 3 * * *'
   push:
     branches:
       - main
@@ -28517,14 +28859,16 @@ jobs:
             ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
@@ -28540,7 +28884,8 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Download all artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        # v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           path: binaries
           merge-multiple: true
@@ -28564,7 +28909,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Create Release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b  # v3.0.1
+        # v3.0.1
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b
         with:
           tag_name: daily
           name: "Daily Build ${{ env.VERSION }}"
@@ -28603,7 +28949,8 @@ name: Docker Build
 
 on:
   push:
-    branches: ['**']  # ALL branches
+    # ALL branches
+    branches: ['**']
     tags:
       - 'v*'
       - '*.*.*'
@@ -28629,13 +28976,16 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3  # v4.1.0
+        # v4.1.0
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5  # v4.1.0
+        # v4.1.0
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
 
       - name: Log in to Container Registry
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4.2.0
+        # v4.2.0
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ gitea.actor }}
@@ -28674,7 +29024,8 @@ jobs:
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
       - name: Build and push (standard)
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
+        # v7.2.0
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
         with:
           context: .
           file: docker/Dockerfile
@@ -28882,14 +29233,16 @@ jobs:
             ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
@@ -28905,7 +29258,8 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Download all artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        # v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           path: binaries
           merge-multiple: true
@@ -28934,7 +29288,8 @@ jobs:
             -czf binaries/${{ env.PROJECTNAME }}-${{ env.VERSION }}-source.tar.gz .
 
       - name: Create Release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b  # v3.0.1
+        # v3.0.1
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           files: binaries/*
@@ -29024,14 +29379,16 @@ jobs:
             ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
@@ -29047,7 +29404,8 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Download all artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        # v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           path: binaries
           merge-multiple: true
@@ -29064,7 +29422,8 @@ jobs:
         run: echo "${{ env.VERSION }}" > binaries/version.txt
 
       - name: Create Release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b  # v3.0.1
+        # v3.0.1
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b
         with:
           tag_name: ${{ env.VERSION }}
           files: binaries/*
@@ -29081,7 +29440,8 @@ name: Daily Build
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # 3am UTC daily
+    # 3am UTC daily
+    - cron: '0 3 * * *'
   push:
     branches:
       - main
@@ -29178,14 +29538,16 @@ jobs:
             ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/') != ''
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
@@ -29201,7 +29563,8 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Download all artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        # v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           path: binaries
           merge-multiple: true
@@ -29226,7 +29589,8 @@ jobs:
           git push origin :refs/tags/daily 2>/dev/null || true
 
       - name: Create Release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b  # v3.0.1
+        # v3.0.1
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b
         with:
           tag_name: daily
           name: "Daily Build ${{ env.VERSION }}"
@@ -29244,7 +29608,8 @@ name: Docker Build
 
 on:
   push:
-    branches: ['**']  # ALL branches
+    # ALL branches
+    branches: ['**']
     tags:
       - 'v*'
       - '*.*.*'
@@ -29891,7 +30256,8 @@ pipeline {
 
         // ----- GITHUB (default) -----
         GIT_FQDN = 'github.com'
-        GIT_TOKEN = credentials('github-token')  // Jenkins credentials ID
+        // Jenkins credentials ID
+        GIT_TOKEN = credentials('github-token')
         REGISTRY = "ghcr.io/${PROJECT_ORG}/${PROJECT_NAME}"
 
         // ----- GITEA / FORGEJO (self-hosted) -----
@@ -30795,35 +31161,48 @@ rm -rf "${TMPDIR:-/tmp}/${PROJECT_ORG}/"
 **Frontend Route Testing (ALL routes):**
 ```bash
 # Every frontend route MUST be tested with BOTH:
-curl -q -LSsf -H "Accept: text/html" /route          # Returns HTML
-curl -q -LSsf -H "Accept: text/plain" /route         # Returns plain text
+# Returns HTML
+curl -q -LSsf -H "Accept: text/html" /route
+# Returns plain text
+curl -q -LSsf -H "Accept: text/plain" /route
 
 # Example: Test user profile page
-curl -q -LSsf -H "Accept: text/html" /users/john     # HTML page
-curl -q -LSsf -H "Accept: text/plain" /users/john    # Plain text output
+# HTML page
+curl -q -LSsf -H "Accept: text/html" /users/john
+# Plain text output
+curl -q -LSsf -H "Accept: text/plain" /users/john
 ```
 
 **Backend/API Route Testing (ALL routes):**
 ```bash
 # Every API route MUST be tested with BOTH:
-curl -q -LSsf -H "Accept: application/json" /api/v1/resource    # Returns JSON
-curl -q -LSsf -H "Accept: text/plain" /api/v1/resource          # Returns plain text
+# Returns JSON
+curl -q -LSsf -H "Accept: application/json" /api/v1/resource
+# Returns plain text
+curl -q -LSsf -H "Accept: text/plain" /api/v1/resource
 
 # Example: Test jokes API
-curl -q -LSsf -H "Accept: application/json" /api/v1/jokes/random   # JSON response
-curl -q -LSsf -H "Accept: text/plain" /api/v1/jokes/random         # Plain text response
+# JSON response
+curl -q -LSsf -H "Accept: application/json" /api/v1/jokes/random
+# Plain text response
+curl -q -LSsf -H "Accept: text/plain" /api/v1/jokes/random
 ```
 
 **Backend .txt Endpoint Testing (ALL endpoints):**
 ```bash
 # Every *.txt endpoint MUST be tested:
-curl -q -LSsf /robots.txt                            # Robots file
-curl -q -LSsf /.well-known/security.txt              # Security policy (well-known)
-curl -q -LSsf /api/v1/jokes/random.txt               # API .txt extension
+# Robots file
+curl -q -LSsf /robots.txt
+# Security policy (well-known)
+curl -q -LSsf /.well-known/security.txt
+# API .txt extension
+curl -q -LSsf /api/v1/jokes/random.txt
 
 # ALL API endpoints that support .txt MUST be tested with .txt
-curl -q -LSsf /api/v1/users/john.txt                 # User profile as text
-curl -q -LSsf /api/v1/weather/Chicago.txt            # Weather as text
+# User profile as text
+curl -q -LSsf /api/v1/users/john.txt
+# Weather as text
+curl -q -LSsf /api/v1/weather/Chicago.txt
 ```
 
 **Test Matrix Template:**
@@ -30886,64 +31265,95 @@ done
 **Example: Open data API project MUST test:**
 ```bash
 # API endpoints (no auth required)
-GET    /api/{api_version}/items           # List items (JSON)
-GET    /api/{api_version}/items/{id}      # Get item (JSON)
-GET    /api/{api_version}/items/{id}.txt  # Get item (plain text)
-POST   /api/{api_version}/items           # Create item (JSON, rate-limited)
+# List items (JSON)
+GET    /api/{api_version}/items
+# Get item (JSON)
+GET    /api/{api_version}/items/{id}
+# Get item (plain text)
+GET    /api/{api_version}/items/{id}.txt
+# Create item (JSON, rate-limited)
+POST   /api/{api_version}/items
 
 # Frontend routes (smart detection) - CLI gets formatted text via HTML2TextConverter
-curl -q -LSsf /items                              # CLI → formatted text
-browser /items                                    # Browser → HTML page
-curl -q -LSsf -H "Accept: text/plain" /items/{id} # Formatted text (Accept header)
-curl -q -LSsf -H "Accept: text/html" /items/{id}  # HTML (Accept header)
+# CLI → formatted text
+curl -q -LSsf /items
+# Browser → HTML page
+browser /items
+# Formatted text (Accept header)
+curl -q -LSsf -H "Accept: text/plain" /items/{id}
+# HTML (Accept header)
+curl -q -LSsf -H "Accept: text/html" /items/{id}
 ```
 
 **Example: Jokes API (read-only) MUST test:**
 ```bash
 # API endpoints
-GET /api/{api_version}/jokes/random             # Random joke (JSON)
-GET /api/{api_version}/jokes/random.txt         # Random joke (text)
-GET /api/{api_version}/jokes/programming        # Category filter (JSON)
-GET /api/{api_version}/jokes/search?q=bug       # Search (JSON)
+# Random joke (JSON)
+GET /api/{api_version}/jokes/random
+# Random joke (text)
+GET /api/{api_version}/jokes/random.txt
+# Category filter (JSON)
+GET /api/{api_version}/jokes/programming
+# Search (JSON)
+GET /api/{api_version}/jokes/search?q=bug
 
 # Frontend endpoints (smart detection) - CLI gets formatted text
-curl -q -LSsf /jokes/random                   # CLI → formatted text
-curl -q -LSsf /jokes                          # CLI → formatted text list
-curl -q -LSsf -H "Accept: text/html" /jokes   # Browser → HTML
+# CLI → formatted text
+curl -q -LSsf /jokes/random
+# CLI → formatted text list
+curl -q -LSsf /jokes
+# Browser → HTML
+curl -q -LSsf -H "Accept: text/html" /jokes
 ```
 
 **Example: Weather API (external integration) MUST test:**
 ```bash
 # API endpoints with location params
-GET /api/{api_version}/weather/current/New%20York        # Current weather (JSON)
-GET /api/{api_version}/weather/current/New%20York.txt    # Current weather (text)
-GET /api/{api_version}/weather/forecast/10001            # ZIP code forecast (JSON)
-GET /api/{api_version}/weather/alerts/40.7128,-74.0060   # Lat/long alerts (JSON)
+# Current weather (JSON)
+GET /api/{api_version}/weather/current/New%20York
+# Current weather (text)
+GET /api/{api_version}/weather/current/New%20York.txt
+# ZIP code forecast (JSON)
+GET /api/{api_version}/weather/forecast/10001
+# Lat/long alerts (JSON)
+GET /api/{api_version}/weather/alerts/40.7128,-74.0060
 
 # Test caching behavior
-GET /api/{api_version}/weather/current/Chicago           # First call (cache miss)
-GET /api/{api_version}/weather/current/Chicago           # Second call (cache hit, faster)
+# First call (cache miss)
+GET /api/{api_version}/weather/current/Chicago
+# Second call (cache hit, faster)
+GET /api/{api_version}/weather/current/Chicago
 
 # Frontend (smart detection) - CLI gets formatted text
-curl -q -LSsf /weather/Chicago                # CLI → formatted text
-curl -q -LSsf /weather/forecast/90210         # CLI → formatted text forecast
+# CLI → formatted text
+curl -q -LSsf /weather/Chicago
+# CLI → formatted text forecast
+curl -q -LSsf /weather/forecast/90210
 ```
 
 **Example: Link Shortener (URL mapping) MUST test:**
 ```bash
 # API CRUD for short links
-POST   /api/{api_version}/links -d '{"url":"https://example.com/long/url"}'  # Create
-GET    /api/{api_version}/links/abc123         # Get link details (JSON)
-PUT    /api/{api_version}/links/abc123 -d '{"url":"https://new.com"}'        # Update
-DELETE /api/{api_version}/links/abc123         # Delete
+# Create
+POST   /api/{api_version}/links -d '{"url":"https://example.com/long/url"}'
+# Get link details (JSON)
+GET    /api/{api_version}/links/abc123
+# Update
+PUT    /api/{api_version}/links/abc123 -d '{"url":"https://new.com"}'
+# Delete
+DELETE /api/{api_version}/links/abc123
 
 # Redirect resolution
-GET /abc123                          # Should redirect to destination
-GET /abc123/stats                    # Link statistics (JSON or HTML)
+# Should redirect to destination
+GET /abc123
+# Link statistics (JSON or HTML)
+GET /abc123/stats
 
 # Frontend (smart detection)
-curl -q -LSsf /links                          # User's links list (text)
-curl -q -LSsf /links/abc123                   # Link details (text)
+# User's links list (text)
+curl -q -LSsf /links
+# Link details (text)
+curl -q -LSsf /links/abc123
 ```
 
 ### Rust Unit Test Requirements
@@ -31050,15 +31460,19 @@ test:
 // Function with multiple paths
 fn validate_input(input: &str) -> Result<(), AppError> {
     if input.is_empty() {
-        return Err(AppError::Empty);  // Test this path
+        // Test this path
+        return Err(AppError::Empty);
     }
     if input.len() > 100 {
-        return Err(AppError::TooLong);  // Test this path
+        // Test this path
+        return Err(AppError::TooLong);
     }
     if !is_valid(input) {
-        return Err(AppError::Invalid);  // Test this path
+        // Test this path
+        return Err(AppError::Invalid);
     }
-    Ok(())  // Test this path
+    // Test this path
+    Ok(())
 }
 
 // Tests must cover ALL paths
@@ -31180,8 +31594,10 @@ verify_all_endpoints_tested
 
 **Test Execution Order:**
 ```bash
-1. make test                    # Rust unit tests (fast)
-2. ./tests/run_tests.sh         # Integration tests (slower, full coverage)
+# Rust unit tests (fast)
+1. make test
+# Integration tests (slower, full coverage)
+2. ./tests/run_tests.sh
 ```
 
 ### Integration Testing Strategy
@@ -31212,7 +31628,8 @@ verify_all_endpoints_tested
 
 ```bash
 # 1. Build — if Makefile exists (preferred)
-make build    # release build for all platforms → binaries/
+# release build for all platforms → binaries/
+make build
 
 # 1. Build — if no Makefile (manual equivalent)
 CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
@@ -31560,12 +31977,15 @@ incus exec "$CONTAINER_NAME" -- bash -c "
     ${PROJECT_NAME} --service --install
 
     echo '=== Service Status ==='
-    systemctl status ${PROJECT_NAME} || true  # inside VM — not a host-service mutation
+    # inside VM — not a host-service mutation
+    systemctl status ${PROJECT_NAME} || true
 
     echo '=== Service Start Test ==='
-    systemctl start ${PROJECT_NAME}  # inside VM — not a host-service mutation
+    # inside VM — not a host-service mutation
+    systemctl start ${PROJECT_NAME}
     sleep 2
-    systemctl status ${PROJECT_NAME}  # inside VM — not a host-service mutation
+    # inside VM — not a host-service mutation
+    systemctl status ${PROJECT_NAME}
 
     echo '=== API Endpoint Tests ==='
     # Test JSON response (default)
@@ -31653,7 +32073,8 @@ incus exec "$CONTAINER_NAME" -- bash -c "
     echo '=== Agent Tests (if exists) ==='
 
     echo '=== Service Stop Test ==='
-    systemctl stop ${PROJECT_NAME}  # inside VM — not a host-service mutation
+    # inside VM — not a host-service mutation
+    systemctl stop ${PROJECT_NAME}
 
     echo '=== All tests passed ==='
 "
@@ -31804,16 +32225,21 @@ echo '=== All open API smoke tests passed ==='
 # Set project path to YOUR actual project location (examples shown below)
 # Use git top-level if in a git repo: PROJECT_PATH="$(git rev-parse --show-toplevel)"
 # Or use absolute path to your project directory
-PROJECT_PATH="/root/Projects/github/apimgr/{project_name}"  # Example 1
+# Example 1
+PROJECT_PATH="/root/Projects/github/apimgr/{project_name}"
 # PROJECT_PATH="~/Documents/myproject"                     # Example 2
 # PROJECT_PATH="~/myproject"                               # Example 3
 # PROJECT_PATH="/workspace/dev/myproject"                  # Example 4
 
 # If a Makefile exists (preferred for all project work)
-make build    # → release build for all platforms
-make test     # → cargo fmt --check + cargo test inside Docker
-make release  # → optimized cross-platform release binaries
-make clean    # → remove build artifacts
+# → release build for all platforms
+make build
+# → cargo fmt --check + cargo test inside Docker
+make test
+# → optimized cross-platform release binaries
+make release
+# → remove build artifacts
+make clean
 
 # If no Makefile exists yet — set up correct cache vars and run directly
 CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
@@ -31868,8 +32294,10 @@ docker run --rm \
 
 ```bash
 # If a Makefile exists (preferred for all project work)
-make build    # release build → binaries/
-make test     # cargo fmt --check + cargo test
+# release build → binaries/
+make build
+# cargo fmt --check + cargo test
+make test
 
 # If no Makefile exists yet (manual equivalent)
 CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
@@ -32209,7 +32637,8 @@ site_author: {project_org}
 
 repo_name: {project_org}/{internal_name}
 repo_url: {PLATFORM_REPO_URL}
-edit_uri: edit/main/docs/  # Adjust path format for GitLab/Gitea if needed
+# Adjust path format for GitLab/Gitea if needed
+edit_uri: edit/main/docs/
 
 theme:
   name: material
@@ -32308,7 +32737,8 @@ nav:
     - Configuration: configuration.md
   - Usage:
     - API Reference: api.md
-    - CLI Reference: cli.md         # Remove if project has no CLI surface
+    # Remove if project has no CLI surface
+    - CLI Reference: cli.md
     - Security: security.md
     - Integrations: integrations.md
   - Development:
@@ -32316,7 +32746,8 @@ nav:
 
 extra:
   social:
-    - icon: fontawesome/brands/git-alt  # Or github/gitlab/gitea as appropriate
+    # Or github/gitlab/gitea as appropriate
+    - icon: fontawesome/brands/git-alt
       link: {PLATFORM_REPO_URL}
   generator: false
 ```
@@ -32331,9 +32762,11 @@ extra:
 version: 2
 
 build:
-  os: ubuntu-24.04          # Use latest Ubuntu LTS
+  # Use latest Ubuntu LTS
+  os: ubuntu-24.04
   tools:
-    python: "3.12"          # Use latest stable Python
+    # Use latest stable Python
+    python: "3.12"
 
 mkdocs:
   configuration: mkdocs.yml
@@ -32704,8 +33137,10 @@ chmod +x {project_name}-linux-amd64
 
 ```bash
 sudo ./{project_name} --service install
-sudo systemctl start {project_name}   # operator action on target host — not an AI-executed command during development
-sudo systemctl enable {project_name}  # operator action on target host — not an AI-executed command during development
+# operator action on target host — not an AI-executed command during development
+sudo systemctl start {project_name}
+# operator action on target host — not an AI-executed command during development
+sudo systemctl enable {project_name}
 ```
 
 ## Configuration
@@ -33630,7 +34065,8 @@ pub fn translate(lang: &str, key: &str) -> String {
     if let Some(val) = TRANSLATIONS.get("en").and_then(|m| m.get(key)) {
         return val.clone();
     }
-    key.to_string() // last resort: return the key itself
+    // last resort: return the key itself
+    key.to_string()
 }
 ```
 
@@ -33686,9 +34122,8 @@ pub async fn handle_error(
 }
 ```
 
+Response to `GET /api/v1/items/999?lang=es`:
 ```json
-// GET /api/v1/items/999?lang=es
-// Response:
 {
   "ok": false,
   "error": "NOT_FOUND",
@@ -33704,7 +34139,8 @@ pub async fn handle_error(
 pub async fn swagger_handler(
     Extension(lang): Extension<String>,
 ) -> impl IntoResponse {
-    let spec = generate_swagger_spec(&lang); // Translates descriptions
+    // Translates descriptions
+    let spec = generate_swagger_spec(&lang);
     Json(spec)
 }
 ```
@@ -33821,7 +34257,8 @@ impl Client {
             .method(method)
             .uri(format!("{}{}", self.base_url, path))
             .header(header::USER_AGENT, &self.user_agent)
-            .header(header::ACCEPT_LANGUAGE, &self.lang) // from --lang / config / env
+            // from --lang / config / env
+            .header(header::ACCEPT_LANGUAGE, &self.lang)
             .body(body.unwrap_or(Body::empty()))
             .expect("valid request");
         if !self.token.is_empty() {
@@ -34000,7 +34437,8 @@ server:
       - ja
     fallback_language: en
     cookie_name: lang
-    cookie_max_age: 365d  # 1 year
+    # 1 year
+    cookie_max_age: 365d
 ```
 
 ---
@@ -34629,10 +35067,14 @@ use anyhow::anyhow;
 // Server binary fully owns and controls the Tor process lifecycle.
 pub struct TorService {
     tor: bine::Tor,
-    service_id: String,              // .onion address (without .onion suffix)
-    key: Option<Vec<u8>>,            // ED25519 private key for persistent address
-    server_port: u16,                // Server's HTTP port that hidden service forwards to
-    dialer: Option<bine::Dialer>,    // For outbound Tor connections (None if disabled)
+    // .onion address (without .onion suffix)
+    service_id: String,
+    // ED25519 private key for persistent address
+    key: Option<Vec<u8>>,
+    // Server's HTTP port that hidden service forwards to
+    server_port: u16,
+    // For outbound Tor connections (None if disabled)
+    dialer: Option<bine::Dialer>,
 }
 
 // TorConfig holds Tor-related configuration from server config
@@ -34645,29 +35087,40 @@ pub struct TorConfig {
     pub use_network: bool,
 
     // Performance settings
-    pub max_circuits: u32,           // 1-128, default 32
-    pub circuit_timeout: u32,        // 10-300s, default 60
-    pub bootstrap_timeout: u32,      // 30-600s, default 180
+    // 1-128, default 32
+    pub max_circuits: u32,
+    // 10-300s, default 60
+    pub circuit_timeout: u32,
+    // 30-600s, default 180
+    pub bootstrap_timeout: u32,
 
     // Security settings
     pub safe_logging: bool,
-    pub max_streams_per_circuit: u32,      // 10-500, default 100
-    pub close_circuit_on_stream_limit: bool, // default true
+    // 10-500, default 100
+    pub max_streams_per_circuit: u32,
+    // default true
+    pub close_circuit_on_stream_limit: bool,
 
     // Bandwidth settings
-    pub bandwidth_rate: String,        // e.g., "1 MB" per second
-    pub bandwidth_burst: String,       // e.g., "2 MB" per second
-    pub max_monthly_bandwidth: String, // e.g., "100 GB", "unlimited"
+    // e.g., "1 MB" per second
+    pub bandwidth_rate: String,
+    // e.g., "2 MB" per second
+    pub bandwidth_burst: String,
+    // e.g., "100 GB", "unlimited"
+    pub max_monthly_bandwidth: String,
 
     // Hidden service settings
-    pub num_intro_points: u32, // 3-10, default 3
-    pub virtual_port: u16,     // 1-65535, default 80
+    // 3-10, default 3
+    pub num_intro_points: u32,
+    // 1-65535, default 80
+    pub virtual_port: u16,
 }
 
 // default_tor_config returns the default Tor configuration
 pub fn default_tor_config() -> TorConfig {
     TorConfig {
-        binary: String::new(),  // auto-detect
+        // auto-detect
+        binary: String::new(),
         use_network: false,
         max_circuits: 32,
         circuit_timeout: 60,
@@ -34677,7 +35130,8 @@ pub fn default_tor_config() -> TorConfig {
         close_circuit_on_stream_limit: true,
         bandwidth_rate: "1 MB".to_string(),
         bandwidth_burst: "2 MB".to_string(),
-        max_monthly_bandwidth: "100 GB".to_string(), // default 100GB per month
+        // default 100GB per month
+        max_monthly_bandwidth: "100 GB".to_string(),
         num_intro_points: 3,
         virtual_port: 80,
     }
@@ -34924,7 +35378,8 @@ pub fn get_tor_config(cfg: &TorConfig) -> String {
         // Enable SOCKS for outbound - "auto" picks high port at runtime
         "SocksPort auto"
     } else {
-        "SocksPort 0"  // Disabled
+        // Disabled
+        "SocksPort 0"
     };
 
     // SafeLogging
@@ -35020,8 +35475,10 @@ The hidden service is created using bine's `control.add_onion()` method, which s
 
 **Required bine imports:**
 ```rust
-use bine::control;    // add_onion, key handling
-use bine::tor;        // Tor, StartConf
+// add_onion, key handling
+use bine::control;
+// Tor, StartConf
+use bine::tor;
 ```
 
 ### Tor Process Lifecycle
@@ -35315,9 +35772,12 @@ pub async fn ensure_tor_dirs() -> anyhow::Result<()> {
 
     // Tor directories (all under app's dirs, binary owns Tor)
     let dirs = vec![
-        config_dir.join("tor"),                    // torrc location
-        data_dir.join("tor"),                      // Tor data
-        data_dir.join("tor").join("site"),         // Hidden service keys
+        // torrc location
+        config_dir.join("tor"),
+        // Tor data
+        data_dir.join("tor"),
+        // Hidden service keys
+        data_dir.join("tor").join("site"),
     ];
 
     for dir in &dirs {
@@ -35354,7 +35814,8 @@ pub async fn ensure_torrc(path: &std::path::Path, content: &[u8]) -> anyhow::Res
             tokio::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).await
                 .map_err(|e| anyhow!("chmod file: {}", e))?;
         }
-        return Ok(false);  // Not created, already existed
+        // Not created, already existed
+        return Ok(false);
     }
 
     // File doesn't exist - create it
@@ -35369,7 +35830,8 @@ pub async fn ensure_torrc(path: &std::path::Path, content: &[u8]) -> anyhow::Res
             .map_err(|e| anyhow!("chmod file: {}", e))?;
     }
 
-    Ok(true)  // Created new file
+    // Created new file
+    Ok(true)
 }
 
 // update_torrc overwrites torrc with new content (for config changes)
@@ -35590,8 +36052,10 @@ let user_agent = format!("{}-cli/{}", PROJECT_NAME, version);
 
 ```yaml
 update:
-  auto: false                # default false for CLI (interactive prompt unless explicitly opted in). Server default true.
-  check_interval: per_invocation   # CLI is short-lived; checks once per command. No background poll.
+  # default false for CLI (interactive prompt unless explicitly opted in). Server default true.
+  auto: false
+  # CLI is short-lived; checks once per command. No background poll.
+  check_interval: per_invocation
   channel: stable
 ```
 
@@ -35640,16 +36104,19 @@ fn save_if_empty_or_invalid(
 
     // Current is empty - save new value
     if current.is_empty() {
-        return flag_value.to_string();  // Save to config
+        // Save to config
+        return flag_value.to_string();
     }
 
     // Current is invalid - replace with valid flag value
     if !validate(current) {
-        return flag_value.to_string();  // Save to config
+        // Save to config
+        return flag_value.to_string();
     }
 
     // Current is valid - use flag for session only, don't save
-    flag_value.to_string()  // Use but don't persist
+    // Use but don't persist
+    flag_value.to_string()
 }
 ```
 
@@ -35728,25 +36195,36 @@ display:
 
 **Exit-immediately flags (NEVER launch TUI):**
 ```bash
-{project_name}-cli -h                    # Print help, exit
-{project_name}-cli --help                # Print help, exit
-{project_name}-cli -v                    # Print version, exit
-{project_name}-cli --version             # Print version, exit
+# Print help, exit
+{project_name}-cli -h
+# Print help, exit
+{project_name}-cli --help
+# Print version, exit
+{project_name}-cli -v
+# Print version, exit
+{project_name}-cli --version
 ```
 
 **Config flags (still launch TUI):**
 ```bash
-{project_name}-cli                                    # TUI mode
-{project_name}-cli --config dev                       # TUI mode (with dev.yml)
-{project_name}-cli --server https://example.com       # TUI mode (with server)
-{project_name}-cli --token abc123                     # TUI mode (with token)
+# TUI mode
+{project_name}-cli
+# TUI mode (with dev.yml)
+{project_name}-cli --config dev
+# TUI mode (with server)
+{project_name}-cli --server https://example.com
+# TUI mode (with token)
+{project_name}-cli --token abc123
 ```
 
 **Command/args (CLI mode):**
 ```bash
-{project_name}-cli list                               # CLI mode
-{project_name}-cli rust tutorials                     # CLI mode (search)
-{project_name}-cli notes.txt                          # CLI mode (paste file)
+# CLI mode
+{project_name}-cli list
+# CLI mode (search)
+{project_name}-cli rust tutorials
+# CLI mode (paste file)
+{project_name}-cli notes.txt
 ```
 
 ```rust
@@ -35771,15 +36249,18 @@ fn detect_mode(args: &[String]) -> &'static str {
 
     for arg in args.iter().skip(1) {
         if !arg.starts_with('-') {
-            return "cli";  // Command/arg provided
+            // Command/arg provided
+            return "cli";
         }
         let flag = arg.split('=').next().unwrap_or(arg);
         if !config_flags.contains(flag) {
-            return "cli";  // Action flag
+            // Action flag
+            return "cli";
         }
     }
 
-    "tui"  // No args or config-only = TUI
+    // No args or config-only = TUI
+    "tui"
 }
 ```
 
@@ -36287,7 +36768,8 @@ fn is_remote_session() -> bool {
 ```yaml
 # cli.yml - theme section (same format as server.yml)
 theme:
-  mode: auto          # dark (default), light, auto
+  # dark (default), light, auto
+  mode: auto
 ```
 
 ### TUI Styles from Palette
@@ -36381,7 +36863,8 @@ impl Output {
 // GUI window scaling for high-DPI and large displays
 fn calculate_gui_layout(width: u32, height: u32, dpi: f64) -> Layout {
     // Scale based on DPI
-    let scale = dpi / 96.0; // 96 DPI is baseline
+    // 96 DPI is baseline
+    let scale = dpi / 96.0;
 
     // Base sizes (at 96 DPI)
     let base_min_width: u32 = 800;
@@ -36392,7 +36875,8 @@ fn calculate_gui_layout(width: u32, height: u32, dpi: f64) -> Layout {
     let _min_height = (base_min_height as f64 * scale) as u32;
 
     // Determine layout mode
-    if width >= 3840 { // 4K+
+    // 4K+
+    if width >= 3840 {
         Layout {
             mode: "dashboard",
             columns: 4,
@@ -36400,7 +36884,8 @@ fn calculate_gui_layout(width: u32, height: u32, dpi: f64) -> Layout {
             sidebar_w: (300.0 * scale) as u32,
             font_scale: scale,
         }
-    } else if width >= 2560 { // 1440p/QHD
+    // 1440p/QHD
+    } else if width >= 2560 {
         Layout {
             mode: "wide",
             columns: 3,
@@ -36408,7 +36893,8 @@ fn calculate_gui_layout(width: u32, height: u32, dpi: f64) -> Layout {
             sidebar_w: (280.0 * scale) as u32,
             font_scale: scale,
         }
-    } else if width >= 1920 { // 1080p
+    // 1080p
+    } else if width >= 1920 {
         Layout {
             mode: "standard",
             columns: 2,
@@ -36416,7 +36902,8 @@ fn calculate_gui_layout(width: u32, height: u32, dpi: f64) -> Layout {
             sidebar_w: (250.0 * scale) as u32,
             font_scale: scale,
         }
-    } else if width >= 1280 { // 720p
+    // 720p
+    } else if width >= 1280 {
         Layout {
             mode: "compact",
             columns: 1,
@@ -36528,7 +37015,8 @@ pub fn get_layout_config(mode: terminal::SizeMode) -> LayoutConfig {
             max_columns: 12,
             truncate_at: 200,
             use_abbrev: false,
-            vertical_scroll: false, // Full content visible
+            // Full content visible
+            vertical_scroll: false,
             multi_pane: true,
             ..Default::default()
         },
@@ -36539,7 +37027,8 @@ pub fn get_layout_config(mode: terminal::SizeMode) -> LayoutConfig {
             show_sidebar: true,
             sidebar_width: 50,
             max_columns: 20,
-            truncate_at: 0, // No truncation
+            // No truncation
+            truncate_at: 0,
             use_abbrev: false,
             vertical_scroll: false,
             multi_pane: true,
@@ -36655,11 +37144,16 @@ pub async fn watch_window_size(
 
 ```rust
 // Consistent spacing units (TUI)
-pub const SPACE_XS: u16 = 1;  // Micro spacing
-pub const SPACE_S: u16 = 2;   // Small spacing
-pub const SPACE_M: u16 = 4;   // Medium spacing
-pub const SPACE_L: u16 = 6;   // Large spacing
-pub const SPACE_XL: u16 = 8;  // Extra large spacing
+// Micro spacing
+pub const SPACE_XS: u16 = 1;
+// Small spacing
+pub const SPACE_S: u16 = 2;
+// Medium spacing
+pub const SPACE_M: u16 = 4;
+// Large spacing
+pub const SPACE_L: u16 = 6;
+// Extra large spacing
+pub const SPACE_XL: u16 = 8;
 
 // Apply spacing based on terminal size mode
 pub fn get_spacing_for_mode(m: terminal::SizeMode) -> u16 {
@@ -36668,7 +37162,8 @@ pub fn get_spacing_for_mode(m: terminal::SizeMode) -> u16 {
         terminal::SizeMode::Compact => SPACE_S,
         terminal::SizeMode::Standard => SPACE_M,
         terminal::SizeMode::Wide => SPACE_L,
-        _ => SPACE_XL, // Ultrawide, Massive
+        // Ultrawide, Massive
+        _ => SPACE_XL,
     }
 }
 ```
@@ -36741,7 +37236,8 @@ When launched with no arguments in an interactive terminal:
 
 ```bash
 # Launch TUI (no arguments needed)
-{project_name}-cli              # Opens TUI automatically
+# Opens TUI automatically
+{project_name}-cli
 
 # TUI provides:
 # - Interactive menus
@@ -37010,7 +37506,8 @@ pub fn log_file() -> PathBuf {
 // resolve_config_path resolves --config flag to absolute path
 fn resolve_config_path(config_flag: &str) -> anyhow::Result<PathBuf> {
     if config_flag.is_empty() {
-        return Ok(paths::config_file());  // Default: cli.yml
+        // Default: cli.yml
+        return Ok(paths::config_file());
     }
 
     let config_flag = if config_flag.starts_with("~/") {
@@ -37066,9 +37563,12 @@ fn resolve_yaml_extension(path: &Path) -> PathBuf {
 **Example usage:**
 ```bash
 # Use different configs for different environments
-{project_name}-cli --config dev list              # Uses ~/.config/.../dev.yml
-{project_name}-cli --config staging list          # Uses ~/.config/.../staging.yml
-{project_name}-cli --config ~/work/prod.yml list  # Uses absolute path
+# Uses ~/.config/.../dev.yml
+{project_name}-cli --config dev list
+# Uses ~/.config/.../staging.yml
+{project_name}-cli --config staging list
+# Uses absolute path
+{project_name}-cli --config ~/work/prod.yml list
 
 # Config profiles allow different servers/tokens without flags
 # dev.yml:   server: https://dev.example.com, token: dev-token
@@ -37085,47 +37585,71 @@ fn resolve_yaml_extension(path: &Path) -> PathBuf {
 
 # Server connection
 server:
-  primary: ""                      # Server URL (empty = use {official_site} or prompt)
-  api_version: v1                  # API version prefix (default: v1, must match server)
-  timeout: 30s                     # Request timeout (match server default)
-  retry: 3                         # Retry attempts on failure
-  retry_delay: 1s                  # Delay between retries
+  # Server URL (empty = use {official_site} or prompt)
+  primary: ""
+  # API version prefix (default: v1, must match server)
+  api_version: v1
+  # Request timeout (match server default)
+  timeout: 30s
+  # Retry attempts on failure
+  retry: 3
+  # Delay between retries
+  retry_delay: 1s
 
 # Authentication
 auth:
-  token: ""                        # API token (see PART 11)
-  token_file: ""                   # Read token from file instead
+  # API token (see PART 11)
+  token: ""
+  # Read token from file instead
+  token_file: ""
 
 # Output preferences
 output:
-  format: table                    # Default: table, json, yaml, plain, csv
-  color: auto                      # auto, yes, no (match terminal detection)
-  pager: auto                      # auto, always, never (use less/more for long output)
-  quiet: false                     # Suppress non-essential output
-  verbose: false                   # Extra output (same as --verbose)
+  # Default: table, json, yaml, plain, csv
+  format: table
+  # auto, yes, no (match terminal detection)
+  color: auto
+  # auto, always, never (use less/more for long output)
+  pager: auto
+  # Suppress non-essential output
+  quiet: false
+  # Extra output (same as --verbose)
+  verbose: false
 
 # TUI preferences (if TUI supported)
 tui:
-  enabled: true                    # Allow TUI mode (false = CLI-only)
-  theme: dark                      # dark, light, system (match server theme options)
-  mouse: true                      # Enable mouse support
-  unicode: true                    # Use unicode characters (false = ASCII only)
+  # Allow TUI mode (false = CLI-only)
+  enabled: true
+  # dark, light, system (match server theme options)
+  theme: dark
+  # Enable mouse support
+  mouse: true
+  # Use unicode characters (false = ASCII only)
+  unicode: true
 
 # Logging
 logging:
-  level: info                      # debug, info, warn, error (match server default)
-  file: ""                         # Log file path (empty = {log_dir}/cli.log)
-  max_size: 10MB                   # Max log file size (match server default)
-  max_files: 5                     # Max log files to keep (match server default)
+  # debug, info, warn, error (match server default)
+  level: info
+  # Log file path (empty = {log_dir}/cli.log)
+  file: ""
+  # Max log file size (match server default)
+  max_size: 10MB
+  # Max log files to keep (match server default)
+  max_files: 5
 
 # Cache
 cache:
-  enabled: true                    # Enable response caching
-  ttl: 5m                          # Cache TTL (5 minutes)
-  max_size: 100MB                  # Max cache size
+  # Enable response caching
+  enabled: true
+  # Cache TTL (5 minutes)
+  ttl: 5m
+  # Max cache size
+  max_size: 100MB
 
 # Debug
-debug: false                       # Enable debug mode (same as --debug)
+# Enable debug mode (same as --debug)
+debug: false
 
 # Project-specific defaults (flag defaults)
 defaults:
@@ -37189,9 +37713,11 @@ fn save_if_empty(
         return Err(anyhow::anyhow!("invalid value: {}", new_value));
     }
     if current.is_empty() {
-        return Ok(new_value.to_string());  // Save to config
+        // Save to config
+        return Ok(new_value.to_string());
     }
-    Ok(new_value.to_string())  // Use for session, don't save (current preserved)
+    // Use for session, don't save (current preserved)
+    Ok(new_value.to_string())
 }
 ```
 
@@ -37285,19 +37811,27 @@ See PART 5: Boolean Handling for the complete implementation.
 
 **Usage in flags:**
 ```bash
-{project_name}-cli --public                    # Boolean flag (true)
-{project_name}-cli --public=yes                # Explicit truthy
-{project_name}-cli --public=no                 # Explicit falsey
-{project_name}-cli --expire=0                  # Falsey = no expiration
-{project_name}-cli --expire=disabled           # Falsey = no expiration
+# Boolean flag (true)
+{project_name}-cli --public
+# Explicit truthy
+{project_name}-cli --public=yes
+# Explicit falsey
+{project_name}-cli --public=no
+# Falsey = no expiration
+{project_name}-cli --expire=0
+# Falsey = no expiration
+{project_name}-cli --expire=disabled
 ```
 
 **Config file (cli.yml):**
 ```yaml
 server:
-  verify_ssl: yes        # Truthy
-  auto_update: false     # Falsey
-  notifications: enabled # Truthy
+  # Truthy
+  verify_ssl: yes
+  # Falsey
+  auto_update: false
+  # Truthy
+  notifications: enabled
 ```
 
 **ALL boolean inputs MUST use `config::parse_bool()` or `config::is_truthy()` - NEVER Rust's built-in bool parsing.**
@@ -37334,29 +37868,42 @@ server:
 **Search/Query CLI (minimal flags):**
 ```bash
 # Args ARE the search - no flags needed for basic use
-{project_name}-cli rust tutorials             # Search
-{project_name}-cli --limit 10 rust           # With limit
-{project_name}-cli --output json rust        # JSON output
+# Search
+{project_name}-cli rust tutorials
+# With limit
+{project_name}-cli --limit 10 rust
+# JSON output
+{project_name}-cli --output json rust
 ```
 
 **Pastebin/Content CLI:**
 ```bash
 # Smart detection handles input, flags for metadata
-{project_name}-cli notes.txt                          # File (detected), uses defaults
-{project_name}-cli notes.txt --public yes             # Public paste
-{project_name}-cli notes.txt --public no              # Private (requires auth)
-{project_name}-cli notes.txt --public unlisted        # Unlisted (default)
-{project_name}-cli notes.txt --expire 24h             # Expiration
-{project_name}-cli notes.txt --syntax python          # Syntax highlight
-{project_name}-cli notes.txt --author "John"          # Author name
+# File (detected), uses defaults
+{project_name}-cli notes.txt
+# Public paste
+{project_name}-cli notes.txt --public yes
+# Private (requires auth)
+{project_name}-cli notes.txt --public no
+# Unlisted (default)
+{project_name}-cli notes.txt --public unlisted
+# Expiration
+{project_name}-cli notes.txt --expire 24h
+# Syntax highlight
+{project_name}-cli notes.txt --syntax python
+# Author name
+{project_name}-cli notes.txt --author "John"
 ```
 
 **API/Data CLI:**
 ```bash
 # Resource-specific flags
-{project_name}-cli get abc123                         # Get by ID
-{project_name}-cli list --limit 20 --offset 0         # Pagination
-{project_name}-cli delete abc123 --force              # Dangerous ops need confirm
+# Get by ID
+{project_name}-cli get abc123
+# Pagination
+{project_name}-cli list --limit 20 --offset 0
+# Dangerous ops need confirm
+{project_name}-cli delete abc123 --force
 ```
 
 ### Flag Defaults from Config
@@ -37366,12 +37913,18 @@ server:
 ```yaml
 # cli.yml - defaults for flags
 defaults:
-  lang: auto            # --lang default (auto = detect from env, or "en", "es", etc.)
-  public: unlisted      # --public default (yes, no, unlisted)
-  expire: 24h           # --expire default
-  syntax: auto          # --syntax default
-  output: table         # --output default (json, table, plain)
-  limit: 20             # --limit default
+  # --lang default (auto = detect from env, or "en", "es", etc.)
+  lang: auto
+  # --public default (yes, no, unlisted)
+  public: unlisted
+  # --expire default
+  expire: 24h
+  # --syntax default
+  syntax: auto
+  # --output default (json, table, plain)
+  output: table
+  # --limit default
+  limit: 20
 ```
 
 **Precedence (highest to lowest):**
@@ -37405,11 +37958,14 @@ defaults:
 ```bash
 # These are equivalent:
 eval "$({project_name} --shell init)"
-eval "$({project_name} --shell init bash)"      # if $SHELL=/bin/bash
+# if $SHELL=/bin/bash
+eval "$({project_name} --shell init bash)"
 
 # init outputs the eval command, completions outputs the script:
-{project_name} --shell init        # → source <({project_name} --shell completions bash)
-{project_name} --shell completions # → (actual completion script)
+# → source <({project_name} --shell completions bash)
+{project_name} --shell init
+# → (actual completion script)
+{project_name} --shell completions
 ```
 
 **Supported shells:**
@@ -37439,8 +37995,10 @@ eval "$({project_name} --shell init bash)"      # if $SHELL=/bin/bash
 
 # Auto-detect shell (omit SHELL argument)
 {project_name} --shell completions > ~/completions/{project_name}
-{project_name}-cli --shell init                    # auto-detect, print init
-eval "$({project_name} --shell init)"              # auto-detect in eval
+# auto-detect, print init
+{project_name}-cli --shell init
+# auto-detect in eval
+eval "$({project_name} --shell init)"
 
 # Specific shell init
 eval "$({project_name}-cli --shell init bash)"
@@ -37450,8 +38008,10 @@ eval "$({project_name}-cli --shell init bash)"
 **Add to shell rc file:**
 ```bash
 # ~/.bashrc, ~/.zshrc, ~/.config/fish/config.fish, etc.
-eval "$({project_name} --shell init)"        # server (auto-detect)
-eval "$({project_name}-cli --shell init)"    # client (auto-detect)
+# server (auto-detect)
+eval "$({project_name} --shell init)"
+# client (auto-detect)
+eval "$({project_name}-cli --shell init)"
 ```
 
 **Why built-in (not separate files):**
@@ -37475,7 +38035,8 @@ fn handle_shell_command(args: &[String]) {
     let shell = if args.len() > 1 {
         args[1].clone()
     } else {
-        detect_shell()  // auto-detect from $SHELL
+        // auto-detect from $SHELL
+        detect_shell()
     };
 
     let binary_name = std::env::args().next()
@@ -37492,7 +38053,8 @@ fn handle_shell_command(args: &[String]) {
 fn detect_shell() -> String {
     let shell_path = std::env::var("SHELL").unwrap_or_default();
     if shell_path.is_empty() {
-        return "bash".to_string();  // default fallback
+        // default fallback
+        return "bash".to_string();
     }
     std::path::Path::new(&shell_path)
         .file_name()
@@ -37537,7 +38099,8 @@ $ {project_name}-cli --help
 
 Usage:
   {project_name}-cli [args] [flags]
-  {project_name}-cli                    # TUI mode (no args)
+  # TUI mode (no args)
+  {project_name}-cli
 
 Flags:
 -h, --help                             - Show help
@@ -37565,10 +38128,12 @@ Run '{project_name}-cli <command> help' for detailed help on any command.
 **If user renames binary:**
 ```bash
 $ mypaste --help
-mypaste {projectversion} - client for {project_name} API   # Shows actual binary name
+# Shows actual binary name
+mypaste {projectversion} - client for {project_name} API
 
 Usage:
-  mypaste [command] [flags]                     # Shows actual binary name
+  # Shows actual binary name
+  mypaste [command] [flags]
 ...
 ```
 
@@ -37582,7 +38147,8 @@ $ {project_name}-cli --version
 
 # If renamed:
 $ mypaste --version
-mypaste {projectversion} ({commit_sha}) built {build_date}   # Shows actual name
+# Shows actual name
+mypaste {projectversion} ({commit_sha}) built {build_date}
 ```
 
 Same format as server:
@@ -37666,7 +38232,8 @@ The project name is compiled into the binary at build time:
 
 ```rust
 // Set at build time via env! macro or build.rs
-const PROJECT_NAME: &str = env!("PROJECT_NAME");  // set via build.rs or --cfg
+// set via build.rs or --cfg
+const PROJECT_NAME: &str = env!("PROJECT_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // get_user_agent returns the fixed User-Agent regardless of binary name
@@ -37948,18 +38515,25 @@ Each project defines its own commands based on its API.
 **Search/Query Services:**
 ```bash
 # Bare args = search term (no --query flag needed)
-{project_name}-cli rust tutorials         # Search for "rust tutorials"
-{project_name}-cli "exact phrase"          # Quoted = exact match
-{project_name}-cli --limit 5 rust         # Flags before search term OK
+# Search for "rust tutorials"
+{project_name}-cli rust tutorials
+# Quoted = exact match
+{project_name}-cli "exact phrase"
+# Flags before search term OK
+{project_name}-cli --limit 5 rust
 ```
 
 **Content/Paste Services:**
 ```bash
 # Detection order: stdin → file → directory → text
-echo "hello" | {project_name}-cli          # stdin detected → paste stdin
-{project_name}-cli notes.txt               # File exists → paste file content
-{project_name}-cli /path/to/dir            # Directory → error or list
-{project_name}-cli "some text here"        # Not file → paste as text
+# stdin detected → paste stdin
+echo "hello" | {project_name}-cli
+# File exists → paste file content
+{project_name}-cli notes.txt
+# Directory → error or list
+{project_name}-cli /path/to/dir
+# Not file → paste as text
+{project_name}-cli "some text here"
 ```
 
 **Detection Logic:**
@@ -38003,8 +38577,10 @@ fn detect_input(args: &[String]) -> (String, String) {
 
 **Explicit flags still work (override detection):**
 ```bash
-{project_name}-cli --file notes.txt        # Force file mode
-{project_name}-cli --text "notes.txt"      # Force text mode (not file)
+# Force file mode
+{project_name}-cli --file notes.txt
+# Force text mode (not file)
+{project_name}-cli --text "notes.txt"
 ```
 
 ## Build Integration
@@ -38120,7 +38696,8 @@ impl SizeMode {
             terminal::SizeMode::Minimal => 3,
             terminal::SizeMode::Compact => 4,
             terminal::SizeMode::Standard => 6,
-            _ => 10,  // Wide, Ultrawide, Massive
+            // Wide, Ultrawide, Massive
+            _ => 10,
         }
     }
 }
@@ -38254,7 +38831,8 @@ pub static CURRENT_TUI_THEME: &TUITheme = &TUI_THEME_DARK;
 **Theme is set in cli.yml:**
 ```yaml
 tui:
-  theme: dark    # dark (default) or light
+  # dark (default) or light
+  theme: dark
 ```
 
 ### TUI Implementation Guidance
@@ -38341,17 +38919,21 @@ impl Model {
 // Single-key bindings work better on mobile keyboards
 fn key_bindings() -> std::collections::HashMap<&'static str, &'static str> {
     [
-        ("up", "k"),       // vim-style, single key
+        // vim-style, single key
+        ("up", "k"),
         ("down", "j"),
         ("left", "h"),
         ("right", "l"),
         ("select", "enter"),
-        ("back", "escape"), // Also 'b' as alternative
+        // Also 'b' as alternative
+        ("back", "escape"),
         ("quit", "q"),
         ("help", "?"),
         ("search", "/"),
-        ("top", "g"),      // Go to top
-        ("bottom", "G"),   // Go to bottom
+        // Go to top
+        ("top", "g"),
+        // Go to bottom
+        ("bottom", "G"),
     ].iter().cloned().collect()
 }
 ```
@@ -38359,10 +38941,14 @@ fn key_bindings() -> std::collections::HashMap<&'static str, &'static str> {
 **Testing Small Terminals:**
 ```bash
 # Test with different terminal sizes
-resize -s 10 40   # Phone portrait (micro)
-resize -s 16 60   # Phone landscape (minimal)
-resize -s 24 80   # Standard terminal
-resize -s 40 120  # Large monitor
+# Phone portrait (micro)
+resize -s 10 40
+# Phone landscape (minimal)
+resize -s 16 60
+# Standard terminal
+resize -s 24 80
+# Large monitor
+resize -s 40 120
 
 # Or use stty
 stty rows 10 cols 40
@@ -38903,10 +39489,14 @@ cd "$TEMP_DIR" && docker compose up -d
 
 **Makefile Targets:**
 ```bash
-make dev    # Quick build → temp dir (no version info)
-make build  # Full build → binaries/ (with ldflags)
-make test   # Run tests in container
-make docker # Build Docker image
+# Quick build → temp dir (no version info)
+make dev
+# Full build → binaries/ (with ldflags)
+make build
+# Run tests in container
+make test
+# Build Docker image
+make docker
 ```
 
 **Cryptography:**
@@ -40610,7 +41200,8 @@ This distinction exists for clarity. When referring to OS-level resources that b
 server:
   healthz:
     root:
-      enabled: false   # When true, mount /healthz to the SAME handler as /server/healthz
+      # When true, mount /healthz to the SAME handler as /server/healthz
+      enabled: false
 ```
 
 - Default is `false`
@@ -40720,8 +41311,10 @@ server:
 
 Use `grep` to find the PART you need:
 ```bash
-grep -n "^# PART" rust/API.md    # List all PARTs with line numbers
-grep -n "keyword" rust/API.md    # Find specific content
+# List all PARTs with line numbers
+grep -n "^# PART" rust/API.md
+# Find specific content
+grep -n "keyword" rust/API.md
 ```
 
 **Step 3: Read the specific PART completely**

@@ -48,8 +48,10 @@ Example:
 
     project_name:  notes
     project_org:   casjay
-    internal_name: notes        # FROZEN — set once at first-time setup, never edit
-    internal_org:  casjay       # FROZEN — set once at first-time setup, never edit
+    # FROZEN — set once at first-time setup, never edit
+    internal_name: notes
+    # FROZEN — set once at first-time setup, never edit
+    internal_org:  casjay
     app_name:      Notes
     crate_name:    notes
     official_site: https://notes.example.com
@@ -887,7 +889,8 @@ GUI and display-aware test runs use the `gui` compose service (or equivalent `do
 **X11 forwarding (host running Xorg or XWayland):**
 
 ```bash
-xhost +SI:localuser:$(id -un)        # grant access to current user only; revoke when done
+# grant access to current user only; revoke when done
+xhost +SI:localuser:$(id -un)
 
 docker run --rm \
   --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
@@ -899,7 +902,8 @@ docker run --rm \
   -v "$PWD":/work -w /work \
   "$PROJECT_IMAGE" cargo run -- --ui gui
 
-xhost -SI:localuser:$(id -un)        # revoke after the session
+# revoke after the session
+xhost -SI:localuser:$(id -un)
 ```
 
 **Wayland forwarding (host running a Wayland compositor):**
@@ -1225,10 +1229,14 @@ jobs:
   release:
     needs: build
     permissions:
-      contents: write      # create GitHub release + upload assets
-      packages: write      # push to ghcr.io
-      id-token: write      # OIDC token for cosign signing
-      attestations: write  # GitHub artifact attestations (SBOM, provenance)
+      # create GitHub release + upload assets
+      contents: write
+      # push to ghcr.io
+      packages: write
+      # OIDC token for cosign signing
+      id-token: write
+      # GitHub artifact attestations (SBOM, provenance)
+      attestations: write
     ...
 ```
 
@@ -1326,7 +1334,8 @@ on:
   push:
   pull_request:
   schedule:
-    - cron: '0 6 * * 1'   # weekly Monday 06:00 UTC
+    # weekly Monday 06:00 UTC
+    - cron: '0 6 * * 1'
 
 permissions:
   contents: read
@@ -1341,12 +1350,14 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
-          fetch-depth: 0   # required: truffleHog needs full history
+          # required: truffleHog needs full history
+          fetch-depth: 0
 
       - name: TruffleHog secret scan
         uses: trufflesecurity/trufflehog@b634fb72d9901a4f942e5b8e4ef5f7ec59c97e7c  # v3.88.2
         with:
-          base: ${{ github.event.before }}   # NEVER use default_branch — it resolves to HEAD post-push and skips the scan
+          # NEVER use default_branch — it resolves to HEAD post-push and skips the scan
+          base: ${{ github.event.before }}
           head: ${{ github.sha }}
           extra_args: --only-verified
 
@@ -1435,7 +1446,8 @@ Every `actions/upload-artifact` step MUST set a finite `retention-days`:
   with:
     name: {project_name}-${{ matrix.target }}
     path: dist/
-    retention-days: 7   # release-job artifacts may use up to 30; build-job CI artifacts use 7
+    # release-job artifacts may use up to 30; build-job CI artifacts use 7
+    retention-days: 7
 ```
 
 ```bash
@@ -1518,7 +1530,8 @@ The `release` job already has `contents: write` to push assets — this covers t
 ```yaml
 - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
   with:
-    fetch-depth: 0   # required: full history needed to inspect and push tags
+    # required: full history needed to inspect and push tags
+    fetch-depth: 0
 
 - name: Ensure release tag
   run: |
@@ -1708,12 +1721,16 @@ Every workspace member's `Cargo.toml` MUST include:
 
 ```toml
 [package]
-edition      = "2024"       # current stable Rust edition declared in Cargo.toml (PART 5 → "Toolchain Rules")
-rust-version = "1.XX"       # MSRV pin matching rust-toolchain.toml (PART 5 → "Toolchain Image")
-license      = "MIT"        # or the SPDX expression for the IDEA.md-declared license
+# current stable Rust edition declared in Cargo.toml (PART 5 → "Toolchain Rules")
+edition      = "2024"
+# MSRV pin matching rust-toolchain.toml (PART 5 → "Toolchain Image")
+rust-version = "1.XX"
+# or the SPDX expression for the IDEA.md-declared license
+license      = "MIT"
 authors      = ["…"]
 repository   = "…"
-homepage     = "…"          # follows the official-site precedence chain in PART 6 → "Metadata Priority Rules / Official Site": site.txt > IDEA.md `official_site` > documented env override > empty
+# follows the official-site precedence chain in PART 6 → "Metadata Priority Rules / Official Site": site.txt > IDEA.md `official_site` > documented env override > empty
+homepage     = "…"
 description  = "…"
 ```
 
@@ -1921,8 +1938,10 @@ solves. Free-form prose, 1–3 paragraphs.}
 
 project_name:     {project_name}
 project_org:      {project_org}
-internal_name:    {project_name}        # FROZEN — equals project_name on first install, never changes
-internal_org:     {project_org}         # FROZEN — equals project_org on first install, never changes
+# FROZEN — equals project_name on first install, never changes
+internal_name:    {project_name}
+# FROZEN — equals project_org on first install, never changes
+internal_org:     {project_org}
 app_name:         {App Display Name}
 crate_name:       {project_name}
 official_site:    {full URL with scheme, e.g., https://example.com — or empty}

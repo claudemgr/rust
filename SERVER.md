@@ -386,7 +386,8 @@ permission rules, business invariants. The HOW lives in AI.md PARTS 0-36; PART 3
 # After make dev, debug in Docker with tools
 BUILD_DIR=$(ls -td ${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-*/ 2>/dev/null | head -1)
 docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$BUILD_DIR:/app" alpine:latest sh -c "
-  apk add --no-cache curl bash file jq  # Required debug tools
+  # Required debug tools
+  apk add --no-cache curl bash file jq
   /app/{project_name} --help
   /app/{project_name} --version
   # Interactive debugging...
@@ -427,7 +428,8 @@ docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -
 **Local Development Workflow:**
 ```bash
 # 1. Active development
-make dev                # Quick build to temp dir
+# Quick build to temp dir
+make dev
 
 # 2. Debug in Docker (with tools)
 BUILD_DIR=$(ls -td ${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-*/ 2>/dev/null | head -1)
@@ -440,14 +442,18 @@ docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -
 make test
 
 # 4. Integration tests
-./tests/run_tests.sh    # Auto-detects incus/docker
+# Auto-detects incus/docker
+./tests/run_tests.sh
 
 # 5. Production test (before release)
-make local               # Build with version info
-./tests/incus.sh        # Full systemd testing (PREFERRED)
+# Build with version info
+make local
+# Full systemd testing (PREFERRED)
+./tests/incus.sh
 
 # 6. Full release build
-make build              # All 8 platforms
+# All 8 platforms
+make build
 ```
 
 **See PART 26: MAKEFILE and PART 29: TESTING & DEVELOPMENT for complete details.**
@@ -543,8 +549,10 @@ let workers = std::thread::available_parallelism()
 // Cache size scales to available memory (use ~10% for cache)
 let avail_mem = get_available_memory();
 let cache_size = (avail_mem / 10)
-    .max(64 * 1024 * 1024)   // minimum 64 MiB
-    .min(1024 * 1024 * 1024); // maximum 1 GiB
+    // minimum 64 MiB
+    .max(64 * 1024 * 1024)
+    // maximum 1 GiB
+    .min(1024 * 1024 * 1024);
 ```
 
 ## JSON File Rules
@@ -647,10 +655,14 @@ jobs:
   release:
     needs: build
     permissions:
-      contents: write      # create GitHub release + upload assets
-      packages: write      # push to ghcr.io
-      id-token: write      # OIDC token for cosign signing
-      attestations: write  # GitHub artifact attestations (SBOM, provenance)
+      # create GitHub release + upload assets
+      contents: write
+      # push to ghcr.io
+      packages: write
+      # OIDC token for cosign signing
+      id-token: write
+      # GitHub artifact attestations (SBOM, provenance)
+      attestations: write
     ...
 ```
 
@@ -762,7 +774,8 @@ The `release` job already has `contents: write` to push assets — this covers t
 ```yaml
 - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
   with:
-    fetch-depth: 0   # required: full history needed to inspect and push tags
+    # required: full history needed to inspect and push tags
+    fetch-depth: 0
 
 - name: Ensure release tag
   run: |
@@ -2223,7 +2236,8 @@ This distinction exists for clarity. When referring to OS-level resources that b
 server:
   healthz:
     root:
-      enabled: false   # When true, mount /healthz to the SAME handler as /server/healthz
+      # When true, mount /healthz to the SAME handler as /server/healthz
+      enabled: false
 ```
 
 - Default is `false`
@@ -2338,8 +2352,10 @@ server:
 
 Use `grep` to find the PART you need:
 ```bash
-grep -n "^# PART" AI.md    # List all PARTs with line numbers
-grep -n "keyword" AI.md    # Find specific content
+# List all PARTs with line numbers
+grep -n "^# PART" AI.md
+# Find specific content
+grep -n "keyword" AI.md
 ```
 
 **Step 3: Read the specific PART completely**
@@ -3328,14 +3344,17 @@ struct Config {
 
 **Incorrect:**
 ```rust
-let total = price * (1.0 + tax_rate); // Calculate total price - WRONG
+// Calculate total price - WRONG
+let total = price * (1.0 + tax_rate);
 
 let total = price * (1.0 + tax_rate);
 // Calculate total price - WRONG (below)
 
 struct Config {
-    port: u16,  // Server port - WRONG (inline)
-    debug: bool, // Debug mode - WRONG (inline)
+    // Server port - WRONG (inline)
+    port: u16,
+    // Debug mode - WRONG (inline)
+    debug: bool,
 }
 ```
 
@@ -3367,8 +3386,10 @@ registration:
 
 ```yaml
 # WRONG: Inline comments
-enabled: true  # Enable feature
-port: 8080     # Server port
+# Enable feature
+enabled: true
+# Server port
+port: 8080
 
 # CORRECT: Comments above
 # Enable feature
@@ -3380,8 +3401,10 @@ port: 8080
 
 ```rust
 // WRONG: Inline comments
-let port: u16 = 8080;  // Server port
-sqlx::query!("DELETE FROM users WHERE id = $1", id);  // Delete user
+// Server port
+let port: u16 = 8080;
+// Delete user
+sqlx::query!("DELETE FROM users WHERE id = $1", id);
 
 // CORRECT: Comments above
 // Server port
@@ -4334,14 +4357,20 @@ When working on this project, the following roles are assumed based on the task:
 
 ```bash
 # CORRECT - Use Makefile targets
-make dev                    # Quick build to {tempdir}/{project_org}/{internal_name}-XXXXXX/
-make local                   # Build with version info to binaries/
-make build                  # Full cross-platform build to binaries/
-make test                   # Run unit tests
+# Quick build to {tempdir}/{project_org}/{internal_name}-XXXXXX/
+make dev
+# Build with version info to binaries/
+make local
+# Full cross-platform build to binaries/
+make build
+# Run unit tests
+make test
 
 # CORRECT - Integration tests
-./tests/run_tests.sh        # Auto-detects incus/docker
-./tests/incus.sh            # Full OS test with systemd (PREFERRED)
+# Auto-detects incus/docker
+./tests/run_tests.sh
+# Full OS test with systemd (PREFERRED)
+./tests/incus.sh
 
 # WRONG - Never run cargo directly on local machine
 cargo build --release --target x86_64-unknown-linux-musl
@@ -5953,8 +5982,10 @@ PROJECTORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+(
 
 # Method 2: Infer from current directory path (fallback if no git remote)
 # Works with any path structure: ~/Documents/myproject, ~/myproject, etc.
-PROJECTNAME=$(basename "$PWD")                    # myproject
-PROJECTORG=$(basename "$(dirname "$PWD")")        # Documents (or parent dir name)
+# myproject
+PROJECTNAME=$(basename "$PWD")
+# Documents (or parent dir name)
+PROJECTORG=$(basename "$(dirname "$PWD")")
 
 # Method 3: Combined approach (git first, fallback to path)
 PROJECTNAME=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)(\.git)?$|\1|' || basename "$PWD")
@@ -6617,12 +6648,18 @@ edition = "2021"
 // Maps user-friendly config values to actual backend names
 fn normalize_driver(driver: &str) -> &'static str {
     match driver.to_lowercase().as_str() {
-        "sqlite" | "sqlite2" | "sqlite3" => "sqlite",   // All map to sqlx sqlite
-        "libsql" | "turso" => "libsql",                 // Turso/libSQL remote database
-        "postgres" | "pgsql" | "postgresql" => "postgres", // PostgreSQL via sqlx
-        "mysql" | "mariadb" => "mysql",                 // MySQL/MariaDB via sqlx
-        "mssql" | "sqlserver" => "mssql",               // Microsoft SQL Server via tiberius
-        "mongodb" | "mongo" => "mongodb",               // MongoDB native driver
+        // All map to sqlx sqlite
+        "sqlite" | "sqlite2" | "sqlite3" => "sqlite",
+        // Turso/libSQL remote database
+        "libsql" | "turso" => "libsql",
+        // PostgreSQL via sqlx
+        "postgres" | "pgsql" | "postgresql" => "postgres",
+        // MySQL/MariaDB via sqlx
+        "mysql" | "mariadb" => "mysql",
+        // Microsoft SQL Server via tiberius
+        "mssql" | "sqlserver" => "mssql",
+        // MongoDB native driver
+        "mongodb" | "mongo" => "mongodb",
         other => Box::leak(other.to_string().into_boxed_str()),
     }
 }
@@ -6753,46 +6790,69 @@ edition = "2021"
 [dependencies]
 # Database drivers
 sqlx = { version = "*", features = ["sqlite", "postgres", "mysql", "runtime-tokio-rustls", "migrate"] }
-libsql = "*"                          # libSQL/Turso (remote)
-tiberius = "*"                        # MSSQL
-mongodb = "*"                         # MongoDB
+# libSQL/Turso (remote)
+libsql = "*"
+# MSSQL
+tiberius = "*"
+# MongoDB
+mongodb = "*"
 
 # Cache/Cluster
-redis = { version = "*", features = ["tokio-comp"] }   # Valkey/Redis
-async-memcached = "*"                 # Memcache
+# Valkey/Redis
+redis = { version = "*", features = ["tokio-comp"] }
+# Memcache
+async-memcached = "*"
 
 # Core
 serde = { version = "*", features = ["derive"] }
-serde_yaml = "*"                      # YAML config
-serde_json = "*"                      # JSON encode/decode
-uuid = { version = "*", features = ["v4"] }  # UUID generation
-argon2 = "*"                          # Argon2id password hashing
-bcrypt = "*"                          # Verify existing bcrypt passwords
+# YAML config
+serde_yaml = "*"
+# JSON encode/decode
+serde_json = "*"
+# UUID generation
+uuid = { version = "*", features = ["v4"] }
+# Argon2id password hashing
+argon2 = "*"
+# Verify existing bcrypt passwords
+bcrypt = "*"
 
 # Authentication
-totp-rs = "*"                         # TOTP 2FA
-webauthn-rs = "*"                     # Passkeys/WebAuthn
-jsonwebtoken = "*"                    # JWT tokens
-openidconnect = "*"                   # OIDC client
-oauth2 = "*"                          # OAuth2 flows
-ldap3 = "*"                           # LDAP/AD
-tower-sessions = "*"                  # Cookie sessions
+# TOTP 2FA
+totp-rs = "*"
+# Passkeys/WebAuthn
+webauthn-rs = "*"
+# JWT tokens
+jsonwebtoken = "*"
+# OIDC client
+openidconnect = "*"
+# OAuth2 flows
+oauth2 = "*"
+# LDAP/AD
+ldap3 = "*"
+# Cookie sessions
+tower-sessions = "*"
 
 # Network/HTTP
 axum = { version = "*", features = ["ws", "multipart"] }
 tower = "*"
 tower-http = { version = "*", features = ["cors", "trace", "compression-full", "timeout"] }
 tokio = { version = "*", features = ["full"] }
-arti-client = "*"                     # Tor controller
+# Tor controller
+arti-client = "*"
 
 # Templating / Embed
-askama = "*"                          # HTML templates
-rust-embed = "*"                      # Embed static files
+# HTML templates
+askama = "*"
+# Embed static files
+rust-embed = "*"
 
 # Utilities
-tokio-cron-scheduler = "*"            # In-process async job scheduler
-tower_governor = "*"                  # Rate limiting
-validator = { version = "*", features = ["derive"] }  # Input validation
+# In-process async job scheduler
+tokio-cron-scheduler = "*"
+# Rate limiting
+tower_governor = "*"
+# Input validation
+validator = { version = "*", features = ["derive"] }
 
 # Errors
 thiserror = "*"
@@ -7084,8 +7144,10 @@ Before proceeding, confirm you understand:
 **Docker volume mounts map host paths to container paths:**
 ```yaml
 volumes:
-  - './volumes/config:/config:z'   # Host ./volumes/config → Container /config
-  - './volumes/data:/data:z'       # Host ./volumes/data → Container /data
+  # Host ./volumes/config → Container /config
+  - './volumes/config:/config:z'
+  # Host ./volumes/data → Container /data
+  - './volumes/data:/data:z'
 ```
 
 ---
@@ -7108,8 +7170,10 @@ Before proceeding, confirm you understand:
 
 **WRONG:**
 ```yaml
-enabled: true  # Enable feature
-port: 8080     # Server port
+# Enable feature
+enabled: true
+# Server port
+port: 8080
 ```
 
 **CORRECT:**
@@ -7206,7 +7270,8 @@ pub fn validate_path(p: &str) -> Result<(), PathError> {
     // Check each segment
     for seg in p.trim_matches('/').split('/') {
         if seg.is_empty() {
-            continue; // skip empty (from //)
+            // skip empty (from //)
+            continue;
         }
         if seg == "." || seg == ".." {
             return Err(PathError::Traversal);
@@ -8969,15 +9034,20 @@ server:
     #   /etc/letsencrypt/live/{fqdn}/ → system manages (certbot)
     #   {config_dir}/ssl/letsencrypt/{fqdn}/ → app manages (auto-renew)
     #   {config_dir}/ssl/local/{fqdn}/ → user manages (no auto-renew)
-    cert: ""   # Manual cert path (optional)
-    key: ""    # Manual key path (optional)
-    min_version: "TLS1.2"  # TLS1.2, TLS1.3
+    # Manual cert path (optional)
+    cert: ""
+    # Manual key path (optional)
+    key: ""
+    # TLS1.2, TLS1.3
+    min_version: "TLS1.2"
 
     letsencrypt:
       enabled: false
       email: admin@{fqdn}
-      challenge: http-01  # http-01, tls-alpn-01, dns-01
-      staging: false      # Use staging server for testing
+      # http-01, tls-alpn-01, dns-01
+      challenge: http-01
+      # Use staging server for testing
+      staging: false
 
   # Scheduler - manages all background tasks
   scheduler:
@@ -9045,7 +9115,8 @@ server:
   rate_limit:
     enabled: true
     # Project-specific default (define in IDEA.md based on expected usage)
-    requests: 0  # 0 = use project default
+    # 0 = use project default
+    requests: 0
     window: 60
 
   # Database
@@ -9508,7 +9579,8 @@ heaptrack_gui heaptrack.{project_name}.*.gz
 ```yaml
 server:
   # Application mode
-  mode: development  # Enables all debug features
+  # Enables all debug features
+  mode: development
 
   # Debug-specific settings (only apply in development mode)
   debug:
@@ -9974,7 +10046,8 @@ TERM=dumb {project_name}-cli list
 TERM=dumb {project_name}-agent status
 
 # Should produce plain text output with no escape codes
-TERM=dumb {project_name} --status | cat -v   # No ^[ sequences
+# No ^[ sequences
+TERM=dumb {project_name} --status | cat -v
 ```
 
 ### Platform-Specific Display Detection
@@ -10366,7 +10439,8 @@ pub fn emoji_enabled() -> bool {
         if cfg.output.emoji_set && cfg.output.emoji {
             return true;
         }
-    }    // 2. NO_COLOR disables emojis (practical plain output)
+    // 2. NO_COLOR disables emojis (practical plain output)
+    }
     if std::env::var("NO_COLOR").is_ok() {
         return false;
     }
@@ -10393,7 +10467,8 @@ pub fn emoji_enabled() -> bool {
 **Config override:** To keep emojis enabled even when NO_COLOR is set:
 ```yaml
 output:
-  emoji: true  # Force emojis on (overrides NO_COLOR for emojis only)
+  # Force emojis on (overrides NO_COLOR for emojis only)
+  emoji: true
 ```
 
 **Note:** For disabling ALL ANSI escapes (not just colors), use `TERM=dumb`. See PART 7 "TERM=dumb Handling".
@@ -10413,8 +10488,10 @@ NO_COLOR=1 {project_name} --status --color=yes
 {project_name} --status --color=no
 
 # Verify no escape codes or emojis in output
-NO_COLOR=1 {project_name} --status | cat -v   # No ^[ sequences
-NO_COLOR=1 {project_name} --status | grep -E '✅|❌|⚠️|🚀'  # Should find nothing
+# No ^[ sequences
+NO_COLOR=1 {project_name} --status | cat -v
+# Should find nothing
+NO_COLOR=1 {project_name} --status | grep -E '✅|❌|⚠️|🚀'
 ```
 
 **THESE SERVER COMMANDS CANNOT BE CHANGED. This is the complete command set.**
@@ -10422,29 +10499,50 @@ NO_COLOR=1 {project_name} --status | grep -E '✅|❌|⚠️|🚀'  # Should fin
 ## Server Binary Commands
 
 ```bash
---help                       # Show help (can be run by anyone)
---version                    # Show version (can be run by anyone)
---shell completions [SHELL]  # Print shell completions (auto-detect if SHELL omitted)
---shell init [SHELL]         # Print shell init for eval (auto-detect if SHELL omitted)
---mode {production|development}  # Set application mode
---config {config_dir}         # Set config directory
---data {data_dir}             # Set data directory
---cache {cache_dir}           # Set cache directory
---log {log_dir}               # Set log directory
---backup {backup_dir}         # Set backup directory
---pid {pid_file}              # Set PID file path
---address {listen}           # Set listen address
---port {port}                # Set the port
---baseurl {path}             # Set URL path prefix (default: /)
---status                     # Show status and health (exit 0=healthy, 1=unhealthy)
+# Show help (can be run by anyone)
+--help
+# Show version (can be run by anyone)
+--version
+# Print shell completions (auto-detect if SHELL omitted)
+--shell completions [SHELL]
+# Print shell init for eval (auto-detect if SHELL omitted)
+--shell init [SHELL]
+# Set application mode
+--mode {production|development}
+# Set config directory
+--config {config_dir}
+# Set data directory
+--data {data_dir}
+# Set cache directory
+--cache {cache_dir}
+# Set log directory
+--log {log_dir}
+# Set backup directory
+--backup {backup_dir}
+# Set PID file path
+--pid {pid_file}
+# Set listen address
+--address {listen}
+# Set the port
+--port {port}
+# Set URL path prefix (default: /)
+--baseurl {path}
+# Show status and health (exit 0=healthy, 1=unhealthy)
+--status
 --service {start,restart,stop,reload,--install,--uninstall,--disable,--help}
---daemon                     # Daemonize (detach from terminal)
---debug                      # Enable debug mode (verbose logging, debug endpoints)
---color {auto|yes|no}        # Color output (default: auto, respects NO_COLOR)
---lang {code}                # Language for output (default: auto, from LANG env)
+# Daemonize (detach from terminal)
+--daemon
+# Enable debug mode (verbose logging, debug endpoints)
+--debug
+# Color output (default: auto, respects NO_COLOR)
+--color {auto|yes|no}
+# Language for output (default: auto, from LANG env)
+--lang {code}
 --maintenance {backup,restore,update,mode,setup,--help} [optional-file-or-setting]
---update [check|yes|branch {stable|beta|daily}|--help]  # Check/perform updates
---shell {completions,init,--help} [SHELL]  # Shell integration
+# Check/perform updates
+--update [check|yes|branch {stable|beta|daily}|--help]
+# Shell integration
+--shell {completions,init,--help} [SHELL]
 ```
 
 ### Server --help Output
@@ -11021,9 +11119,12 @@ use std::path::Path;
 pub fn is_container() -> bool {
     // File-based detection
     let container_files = [
-        "/.dockerenv",           // Docker
-        "/run/.containerenv",    // Podman
-        "/dev/lxc",              // LXC/LXD/Incus
+        // Docker
+        "/.dockerenv",
+        // Podman
+        "/run/.containerenv",
+        // LXC/LXD/Incus
+        "/dev/lxc",
     ];
     for f in &container_files {
         if Path::new(f).exists() {
@@ -11803,7 +11904,8 @@ MongoDB is available but NOT used for standard schema (config, sessions, admins,
 ```yaml
 # Project-specific MongoDB connection (NOT for standard schema)
 mongodb:
-  url: ${MONGODB_URL}  # mongodb://user:pass@host:27017/dbname
+  # mongodb://user:pass@host:27017/dbname
+  url: ${MONGODB_URL}
   database: myapp
   # Replica set for HA
   replica_set: rs0
@@ -11849,9 +11951,12 @@ database:
   cache:
     enabled: true
     path: ${DATA_DIR}/db/cache.db
-    sync_interval: 30s     # Sync from remote
-    offline_mode: true     # Continue working if remote unavailable
-    max_age: 1h            # Max cache age before forcing remote
+    # Sync from remote
+    sync_interval: 30s
+    # Continue working if remote unavailable
+    offline_mode: true
+    # Max cache age before forcing remote
+    max_age: 1h
 ```
 
 When enabled:
@@ -11876,8 +11981,10 @@ database:
     - name: mariadb-1
       driver: mysql
       url: mysql://user:pass@mariadb1.example.com:3306/myapp
-      priority: 1        # Failover priority (lower = higher priority)
-      read_only: true    # Read replica
+      # Failover priority (lower = higher priority)
+      priority: 1
+      # Read replica
+      read_only: true
 
     - name: mariadb-2
       driver: mysql
@@ -11889,24 +11996,30 @@ database:
       driver: postgres
       url: postgres://user:pass@pg-backup.example.com:5432/myapp
       priority: 3
-      read_only: false   # Can be promoted to primary
+      # Can be promoted to primary
+      read_only: false
 
     - name: mssql-legacy
       driver: mssql
       url: sqlserver://user:pass@mssql.example.com:1433?database=myapp
       priority: 10
-      sync: true         # Sync data to this DB
+      # Sync data to this DB
+      sync: true
 
   # Sync settings
   sync:
-    enabled: true        # Auto-sync between all databases
-    interval: 5s         # Sync check interval
+    # Auto-sync between all databases
+    enabled: true
+    # Sync check interval
+    interval: 5s
 
   # Failover settings
   failover:
     enabled: true
-    health_check: 10s    # Health check interval
-    threshold: 3         # Failed checks before failover
+    # Health check interval
+    health_check: 10s
+    # Failed checks before failover
+    threshold: 3
 ```
 
 **Failover Priority:**
@@ -11953,16 +12066,21 @@ async fn open_database(cfg: &Config) -> Result<Database> {
 
 -- Config key-value storage (mirrors YAML structure as flat keys)
 CREATE TABLE IF NOT EXISTS config (
-    key         TEXT PRIMARY KEY,              -- Dot notation: "server.port", "ssl.enabled"
-    value       TEXT NOT NULL,                 -- JSON-encoded value (string, number, bool, array)
-    type        TEXT NOT NULL DEFAULT 'string', -- string, number, bool, array, object
+    -- Dot notation: "server.port", "ssl.enabled"
+    key         TEXT PRIMARY KEY,
+    -- JSON-encoded value (string, number, bool, array)
+    value       TEXT NOT NULL,
+    -- string, number, bool, array, object
+    type        TEXT NOT NULL DEFAULT 'string',
     updated_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
 
 -- Config metadata for change detection
 CREATE TABLE IF NOT EXISTS config_meta (
-    id          INTEGER PRIMARY KEY CHECK (id = 1),  -- Single row
-    version     INTEGER NOT NULL DEFAULT 1,          -- Incremented on any change
+    -- Single row
+    id          INTEGER PRIMARY KEY CHECK (id = 1),
+    -- Incremented on any change
+    version     INTEGER NOT NULL DEFAULT 1,
     updated_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
 
@@ -11987,12 +12105,15 @@ CREATE INDEX IF NOT EXISTS idx_config_key_prefix ON config(key);
 -- NOTE: admin_id is a logical FK to users.db admins table (cross-DB, not enforced)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS admin_sessions (
-    id          TEXT PRIMARY KEY,              -- Session token (secure random)
-    admin_id    INTEGER NOT NULL,              -- Logical FK to admins.id in users.db
+    -- Session token (secure random)
+    id          TEXT PRIMARY KEY,
+    -- Logical FK to admins.id in users.db
+    admin_id    INTEGER NOT NULL,
     ip_address  TEXT NOT NULL,
     user_agent  TEXT,
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-    expires_at  INTEGER NOT NULL,              -- Unix timestamp (default: 24 hours, per session.timeout)
+    -- Unix timestamp (default: 24 hours, per session.timeout)
+    expires_at  INTEGER NOT NULL,
     last_active INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
 
@@ -12006,7 +12127,8 @@ CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires ON admin_sessions(expires_
 -- Rate Limiting (sliding window counters)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS rate_limits (
-    key         TEXT PRIMARY KEY,              -- "ip:1.2.3.4:login" or "key:abc12345:global" (prefix, not hash)
+    -- "ip:1.2.3.4:login" or "key:abc12345:global" (prefix, not hash)
+    key         TEXT PRIMARY KEY,
     count       INTEGER NOT NULL DEFAULT 1,
     window_start INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     updated_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
@@ -12023,16 +12145,24 @@ CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start);
 CREATE TABLE IF NOT EXISTS audit_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp   INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-    level       TEXT NOT NULL DEFAULT 'info',  -- info, warning, error, security
-    category    TEXT NOT NULL,                 -- auth, config, admin, api, system
-    action      TEXT NOT NULL,                 -- login, logout, config_change, user_create, etc.
-    actor_type  TEXT,                          -- admin, api_key, system, anonymous
-    actor_id    TEXT,                          -- admin ID, API key ID, or null
+    -- info, warning, error, security
+    level       TEXT NOT NULL DEFAULT 'info',
+    -- auth, config, admin, api, system
+    category    TEXT NOT NULL,
+    -- login, logout, config_change, user_create, etc.
+    action      TEXT NOT NULL,
+    -- admin, api_key, system, anonymous
+    actor_type  TEXT,
+    -- admin ID, API key ID, or null
+    actor_id    TEXT,
     actor_ip    TEXT,
-    target_type TEXT,                          -- user, config, api_key, etc.
+    -- user, config, api_key, etc.
+    target_type TEXT,
     target_id   TEXT,
-    details     TEXT,                          -- JSON with additional context
-    success     INTEGER NOT NULL DEFAULT 1     -- 1=success, 0=failure
+    -- JSON with additional context
+    details     TEXT,
+    -- 1=success, 0=failure
+    success     INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp);
@@ -12043,19 +12173,29 @@ CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor_type, actor_id);
 -- Scheduler (background task tracking)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS scheduler_tasks (
-    id          TEXT PRIMARY KEY,              -- Task name: "backup_daily", "backup_hourly", "geoip_update", "cleanup"
-    name        TEXT NOT NULL,                 -- Human-readable: "Daily Backup", "Hourly Incremental"
-    task_type   TEXT NOT NULL DEFAULT 'global', -- global (one node) or local (all nodes)
+    -- Task name: "backup_daily", "backup_hourly", "geoip_update", "cleanup"
+    id          TEXT PRIMARY KEY,
+    -- Human-readable: "Daily Backup", "Hourly Incremental"
+    name        TEXT NOT NULL,
+    -- global (one node) or local (all nodes)
+    task_type   TEXT NOT NULL DEFAULT 'global',
     enabled     INTEGER NOT NULL DEFAULT 1,
-    schedule    TEXT NOT NULL,                 -- Cron expression: "0 2 * * *"
-    last_run    INTEGER,                       -- Unix timestamp
-    next_run    INTEGER,                       -- Unix timestamp
-    last_status TEXT,                          -- success, failed, running, skipped
-    last_error  TEXT,                          -- Error message if failed
+    -- Cron expression: "0 2 * * *"
+    schedule    TEXT NOT NULL,
+    -- Unix timestamp
+    last_run    INTEGER,
+    -- Unix timestamp
+    next_run    INTEGER,
+    -- success, failed, running, skipped
+    last_status TEXT,
+    -- Error message if failed
+    last_error  TEXT,
     run_count   INTEGER NOT NULL DEFAULT 0,
     fail_count  INTEGER NOT NULL DEFAULT 0,
-    locked_by   TEXT,                          -- Node ID holding lock (cluster mode)
-    locked_at   INTEGER                        -- When lock was acquired (cluster mode)
+    -- Node ID holding lock (cluster mode)
+    locked_by   TEXT,
+    -- When lock was acquired (cluster mode)
+    locked_at   INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS scheduler_history (
@@ -12063,7 +12203,8 @@ CREATE TABLE IF NOT EXISTS scheduler_history (
     task_id     TEXT NOT NULL,
     started_at  INTEGER NOT NULL,
     finished_at INTEGER,
-    status      TEXT NOT NULL,                 -- running, success, failed
+    -- running, success, failed
+    status      TEXT NOT NULL,
     error       TEXT,
     duration_ms INTEGER
 );
@@ -12084,12 +12225,16 @@ CREATE INDEX IF NOT EXISTS idx_scheduler_history_started ON scheduler_history(st
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS backups (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    filename    TEXT NOT NULL UNIQUE,          -- "backup-2025-01-15-103045.tar.gz"
-    filepath    TEXT NOT NULL,                 -- Full path
+    -- "backup-2025-01-15-103045.tar.gz"
+    filename    TEXT NOT NULL UNIQUE,
+    -- Full path
+    filepath    TEXT NOT NULL,
     size_bytes  INTEGER NOT NULL,
-    type        TEXT NOT NULL DEFAULT 'auto',  -- auto, manual, pre_update
+    -- auto, manual, pre_update
+    type        TEXT NOT NULL DEFAULT 'auto',
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-    checksum    TEXT,                          -- SHA256
+    -- SHA256
+    checksum    TEXT,
     notes       TEXT
 );
 
@@ -12105,21 +12250,29 @@ CREATE INDEX IF NOT EXISTS idx_backups_created ON backups(created_at);
 CREATE TABLE IF NOT EXISTS admins (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     username    TEXT NOT NULL UNIQUE,
-    password    TEXT NOT NULL,                 -- Argon2id hash
+    -- Argon2id hash
+    password    TEXT NOT NULL,
     email       TEXT,
-    role        TEXT NOT NULL DEFAULT 'admin', -- superadmin, admin, readonly
+    -- superadmin, admin, readonly
+    role        TEXT NOT NULL DEFAULT 'admin',
     enabled     INTEGER NOT NULL DEFAULT 1,
-    api_token_hash TEXT,                       -- SHA-256 hash of API token (prefix: adm_)
+    -- SHA-256 hash of API token (prefix: adm_)
+    api_token_hash TEXT,
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     updated_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     last_login  INTEGER,
     failed_attempts INTEGER NOT NULL DEFAULT 0,
-    locked_until INTEGER,                      -- Account lockout timestamp
+    -- Account lockout timestamp
+    locked_until INTEGER,
     -- OIDC/LDAP sync fields (null for local accounts)
-    source      TEXT NOT NULL DEFAULT 'local', -- local, oidc:{provider}, ldap:{provider}
-    external_id TEXT,                          -- Provider's user ID
-    groups      TEXT,                          -- JSON array of group memberships
-    last_sync   INTEGER                        -- Last OIDC/LDAP sync timestamp
+    -- local, oidc:{provider}, ldap:{provider}
+    source      TEXT NOT NULL DEFAULT 'local',
+    -- Provider's user ID
+    external_id TEXT,
+    -- JSON array of group memberships
+    groups      TEXT,
+    -- Last OIDC/LDAP sync timestamp
+    last_sync   INTEGER
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_admins_username ON admins(username);
@@ -12129,22 +12282,32 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_admins_username ON admins(username);
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS admin_preferences (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    admin_id    INTEGER NOT NULL UNIQUE,          -- FK to admins.id (one row per admin)
+    -- FK to admins.id (one row per admin)
+    admin_id    INTEGER NOT NULL UNIQUE,
 
     -- Appearance Settings
-    theme           TEXT NOT NULL DEFAULT 'dark', -- dark (default), light, auto
-    font_size       TEXT NOT NULL DEFAULT 'medium', -- small, medium, large
-    reduce_motion   INTEGER NOT NULL DEFAULT 0,   -- Minimize animations
+    -- dark (default), light, auto
+    theme           TEXT NOT NULL DEFAULT 'dark',
+    -- small, medium, large
+    font_size       TEXT NOT NULL DEFAULT 'medium',
+    -- Minimize animations
+    reduce_motion   INTEGER NOT NULL DEFAULT 0,
 
     -- Display Settings
-    date_format     TEXT NOT NULL DEFAULT 'YYYY-MM-DD', -- YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY
-    time_format     TEXT NOT NULL DEFAULT '24h',  -- 12h, 24h
+    -- YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY
+    date_format     TEXT NOT NULL DEFAULT 'YYYY-MM-DD',
+    -- 12h, 24h
+    time_format     TEXT NOT NULL DEFAULT '24h',
 
     -- Notification Settings (Email)
-    email_security  INTEGER NOT NULL DEFAULT 1,   -- Security alerts (CANNOT be disabled)
-    email_server    INTEGER NOT NULL DEFAULT 1,   -- Server alerts (SSL, updates, disk space)
-    email_backups   INTEGER NOT NULL DEFAULT 1,   -- Backup notifications
-    email_users     INTEGER NOT NULL DEFAULT 1,   -- User activity (if multi-user)
+    -- Security alerts (CANNOT be disabled)
+    email_security  INTEGER NOT NULL DEFAULT 1,
+    -- Server alerts (SSL, updates, disk space)
+    email_server    INTEGER NOT NULL DEFAULT 1,
+    -- Backup notifications
+    email_backups   INTEGER NOT NULL DEFAULT 1,
+    -- User activity (if multi-user)
+    email_users     INTEGER NOT NULL DEFAULT 1,
 
     -- Timestamps
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
@@ -12163,31 +12326,49 @@ CREATE TABLE IF NOT EXISTS users (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     username    TEXT NOT NULL UNIQUE,
     email       TEXT UNIQUE,
-    password    TEXT NOT NULL,                 -- Argon2id hash
+    -- Argon2id hash
+    password    TEXT NOT NULL,
     display_name TEXT,
-    bio         TEXT,                          -- Short biography (max 500 chars)
-    location    TEXT,                          -- Location (free text)
-    website     TEXT,                          -- Personal website URL
-    avatar_type TEXT NOT NULL DEFAULT 'gravatar', -- gravatar, upload, url
-    avatar_url  TEXT,                          -- URL for upload/url types, null for gravatar
-    visibility  TEXT NOT NULL DEFAULT 'public', -- public, private
-    org_visibility INTEGER NOT NULL DEFAULT 1, -- 1=show basic info in orgs, 0=username only
-    timezone    TEXT,                          -- IANA timezone (e.g., America/New_York)
-    language    TEXT NOT NULL DEFAULT 'en',    -- Preferred language
-    role        TEXT NOT NULL DEFAULT 'user',  -- user, moderator, premium, etc.
+    -- Short biography (max 500 chars)
+    bio         TEXT,
+    -- Location (free text)
+    location    TEXT,
+    -- Personal website URL
+    website     TEXT,
+    -- gravatar, upload, url
+    avatar_type TEXT NOT NULL DEFAULT 'gravatar',
+    -- URL for upload/url types, null for gravatar
+    avatar_url  TEXT,
+    -- public, private
+    visibility  TEXT NOT NULL DEFAULT 'public',
+    -- 1=show basic info in orgs, 0=username only
+    org_visibility INTEGER NOT NULL DEFAULT 1,
+    -- IANA timezone (e.g., America/New_York)
+    timezone    TEXT,
+    -- Preferred language
+    language    TEXT NOT NULL DEFAULT 'en',
+    -- user, moderator, premium, etc.
+    role        TEXT NOT NULL DEFAULT 'user',
     enabled     INTEGER NOT NULL DEFAULT 1,
-    verified    INTEGER NOT NULL DEFAULT 0,    -- Email verified
+    -- Email verified
+    verified    INTEGER NOT NULL DEFAULT 0,
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     updated_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     last_login  INTEGER,
     failed_attempts INTEGER NOT NULL DEFAULT 0,
-    locked_until INTEGER,                      -- Account lockout timestamp
+    -- Account lockout timestamp
+    locked_until INTEGER,
     -- OIDC/LDAP sync fields (null for local accounts)
-    source      TEXT NOT NULL DEFAULT 'local', -- local, oidc:{provider}, ldap:{provider}
-    external_id TEXT,                          -- Provider's user ID
-    groups      TEXT,                          -- JSON array of cached group memberships
-    last_sync   INTEGER,                       -- Last successful OIDC/LDAP sync timestamp
-    metadata    TEXT                           -- JSON for app-specific data
+    -- local, oidc:{provider}, ldap:{provider}
+    source      TEXT NOT NULL DEFAULT 'local',
+    -- Provider's user ID
+    external_id TEXT,
+    -- JSON array of cached group memberships
+    groups      TEXT,
+    -- Last successful OIDC/LDAP sync timestamp
+    last_sync   INTEGER,
+    -- JSON for app-specific data
+    metadata    TEXT
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
@@ -12198,32 +12379,48 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email);
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS user_preferences (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id     INTEGER NOT NULL UNIQUE,          -- FK to users.id (one row per user)
+    -- FK to users.id (one row per user)
+    user_id     INTEGER NOT NULL UNIQUE,
 
     -- Privacy Settings
-    show_email      INTEGER NOT NULL DEFAULT 0,   -- Show email on public profile
-    show_activity   INTEGER NOT NULL DEFAULT 1,   -- Show activity on public profile
-    show_orgs       INTEGER NOT NULL DEFAULT 1,   -- Show org memberships on profile
-    searchable      INTEGER NOT NULL DEFAULT 1,   -- Appear in user search results
+    -- Show email on public profile
+    show_email      INTEGER NOT NULL DEFAULT 0,
+    -- Show activity on public profile
+    show_activity   INTEGER NOT NULL DEFAULT 1,
+    -- Show org memberships on profile
+    show_orgs       INTEGER NOT NULL DEFAULT 1,
+    -- Appear in user search results
+    searchable      INTEGER NOT NULL DEFAULT 1,
 
     -- Notification Settings (Email)
-    email_security  INTEGER NOT NULL DEFAULT 1,   -- Security alerts (CANNOT be disabled)
-    email_mentions  INTEGER NOT NULL DEFAULT 1,   -- Email when mentioned
-    email_updates   INTEGER NOT NULL DEFAULT 1,   -- Product updates and news
-    email_digest    TEXT NOT NULL DEFAULT 'weekly', -- never, daily, weekly
+    -- Security alerts (CANNOT be disabled)
+    email_security  INTEGER NOT NULL DEFAULT 1,
+    -- Email when mentioned
+    email_mentions  INTEGER NOT NULL DEFAULT 1,
+    -- Product updates and news
+    email_updates   INTEGER NOT NULL DEFAULT 1,
+    -- never, daily, weekly
+    email_digest    TEXT NOT NULL DEFAULT 'weekly',
 
     -- Notification Settings (Push)
-    push_enabled    INTEGER NOT NULL DEFAULT 0,   -- Browser push notifications
-    push_mentions   INTEGER NOT NULL DEFAULT 1,   -- Push when mentioned
+    -- Browser push notifications
+    push_enabled    INTEGER NOT NULL DEFAULT 0,
+    -- Push when mentioned
+    push_mentions   INTEGER NOT NULL DEFAULT 1,
 
     -- Appearance Settings
-    theme           TEXT NOT NULL DEFAULT 'dark', -- dark (default), light, auto
-    font_size       TEXT NOT NULL DEFAULT 'medium', -- small, medium, large
-    reduce_motion   INTEGER NOT NULL DEFAULT 0,   -- Minimize animations
+    -- dark (default), light, auto
+    theme           TEXT NOT NULL DEFAULT 'dark',
+    -- small, medium, large
+    font_size       TEXT NOT NULL DEFAULT 'medium',
+    -- Minimize animations
+    reduce_motion   INTEGER NOT NULL DEFAULT 0,
 
     -- Display Settings
-    date_format     TEXT NOT NULL DEFAULT 'YYYY-MM-DD', -- YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY
-    time_format     TEXT NOT NULL DEFAULT '24h',  -- 12h, 24h
+    -- YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY
+    date_format     TEXT NOT NULL DEFAULT 'YYYY-MM-DD',
+    -- 12h, 24h
+    time_format     TEXT NOT NULL DEFAULT '24h',
 
     -- Timestamps
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
@@ -12240,16 +12437,23 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_user_preferences_user ON user_preferences(
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS orgs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    slug        TEXT NOT NULL UNIQUE,             -- URL-safe identifier
-    name        TEXT NOT NULL,                    -- Display name
+    -- URL-safe identifier
+    slug        TEXT NOT NULL UNIQUE,
+    -- Display name
+    name        TEXT NOT NULL,
     description TEXT,
-    avatar_type TEXT NOT NULL DEFAULT 'gravatar', -- gravatar, upload, url
-    avatar_url  TEXT,                             -- URL for upload/url types
-    visibility  TEXT NOT NULL DEFAULT 'public',  -- public, private
-    owner_id    INTEGER NOT NULL,                 -- FK to users.id (creator)
+    -- gravatar, upload, url
+    avatar_type TEXT NOT NULL DEFAULT 'gravatar',
+    -- URL for upload/url types
+    avatar_url  TEXT,
+    -- public, private
+    visibility  TEXT NOT NULL DEFAULT 'public',
+    -- FK to users.id (creator)
+    owner_id    INTEGER NOT NULL,
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     updated_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-    metadata    TEXT                              -- JSON for app-specific data
+    -- JSON for app-specific data
+    metadata    TEXT
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orgs_slug ON orgs(slug);
@@ -12258,9 +12462,12 @@ CREATE INDEX IF NOT EXISTS idx_orgs_owner ON orgs(owner_id);
 -- Organization Members
 CREATE TABLE IF NOT EXISTS org_members (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    org_id      INTEGER NOT NULL,                 -- FK to orgs.id
-    user_id     INTEGER NOT NULL,                 -- FK to users.id
-    role        TEXT NOT NULL DEFAULT 'member',   -- owner, admin, member
+    -- FK to orgs.id
+    org_id      INTEGER NOT NULL,
+    -- FK to users.id
+    user_id     INTEGER NOT NULL,
+    -- owner, admin, member
+    role        TEXT NOT NULL DEFAULT 'member',
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     UNIQUE(org_id, user_id)
 );
@@ -12273,20 +12480,28 @@ CREATE INDEX IF NOT EXISTS idx_org_members_user ON org_members(user_id);
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS org_preferences (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    org_id      INTEGER NOT NULL UNIQUE,          -- FK to orgs.id (one row per org)
+    -- FK to orgs.id (one row per org)
+    org_id      INTEGER NOT NULL UNIQUE,
 
     -- Member Settings
-    default_member_role TEXT NOT NULL DEFAULT 'member', -- Role for new members
-    require_2fa     INTEGER NOT NULL DEFAULT 0,   -- Require 2FA for all members
-    allow_invites   INTEGER NOT NULL DEFAULT 1,   -- Allow admins to invite members
+    -- Role for new members
+    default_member_role TEXT NOT NULL DEFAULT 'member',
+    -- Require 2FA for all members
+    require_2fa     INTEGER NOT NULL DEFAULT 0,
+    -- Allow admins to invite members
+    allow_invites   INTEGER NOT NULL DEFAULT 1,
 
     -- Visibility Settings
-    show_members    INTEGER NOT NULL DEFAULT 1,   -- Show member list publicly
-    show_activity   INTEGER NOT NULL DEFAULT 1,   -- Show org activity publicly
+    -- Show member list publicly
+    show_members    INTEGER NOT NULL DEFAULT 1,
+    -- Show org activity publicly
+    show_activity   INTEGER NOT NULL DEFAULT 1,
 
     -- Notification Settings
-    notify_new_member   INTEGER NOT NULL DEFAULT 1, -- Notify admins of new members
-    notify_member_leave INTEGER NOT NULL DEFAULT 1, -- Notify admins when members leave
+    -- Notify admins of new members
+    notify_new_member   INTEGER NOT NULL DEFAULT 1,
+    -- Notify admins when members leave
+    notify_member_leave INTEGER NOT NULL DEFAULT 1,
 
     -- Timestamps
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
@@ -12306,8 +12521,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_org_preferences_org ON org_preferences(org
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS password_resets (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    token_hash  TEXT NOT NULL UNIQUE,          -- SHA256 of token
-    user_type   TEXT NOT NULL,                 -- admin, user
+    -- SHA256 of token
+    token_hash  TEXT NOT NULL UNIQUE,
+    -- admin, user
+    user_type   TEXT NOT NULL,
     user_id     INTEGER NOT NULL,
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     expires_at  INTEGER NOT NULL,
@@ -12324,10 +12541,13 @@ CREATE INDEX IF NOT EXISTS idx_password_resets_expires ON password_resets(expire
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS email_verifications (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    token_hash  TEXT NOT NULL UNIQUE,          -- SHA256 of token
-    user_type   TEXT NOT NULL,                 -- admin, user
+    -- SHA256 of token
+    token_hash  TEXT NOT NULL UNIQUE,
+    -- admin, user
+    user_type   TEXT NOT NULL,
     user_id     INTEGER NOT NULL,
-    email       TEXT NOT NULL,                 -- Email being verified
+    -- Email being verified
+    email       TEXT NOT NULL,
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     expires_at  INTEGER NOT NULL,
     verified_at INTEGER
@@ -12343,11 +12563,16 @@ CREATE INDEX IF NOT EXISTS idx_email_verifications_expires ON email_verification
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS totp_secrets (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_type   TEXT NOT NULL,                 -- admin (users can be added per-project)
-    user_id     INTEGER NOT NULL UNIQUE,       -- One TOTP per user
-    secret      TEXT NOT NULL,                 -- Encrypted TOTP secret
-    enabled     INTEGER NOT NULL DEFAULT 0,    -- 0=setup pending, 1=active
-    backup_codes TEXT,                         -- JSON array of hashed backup codes
+    -- admin (users can be added per-project)
+    user_type   TEXT NOT NULL,
+    -- One TOTP per user
+    user_id     INTEGER NOT NULL UNIQUE,
+    -- Encrypted TOTP secret
+    secret      TEXT NOT NULL,
+    -- 0=setup pending, 1=active
+    enabled     INTEGER NOT NULL DEFAULT 0,
+    -- JSON array of hashed backup codes
+    backup_codes TEXT,
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     last_used   INTEGER
 );
@@ -12358,12 +12583,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_totp_user ON totp_secrets(user_type, user_
 -- User Sessions (app user login sessions - ONLY if project has user accounts)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS user_sessions (
-    id          TEXT PRIMARY KEY,              -- Session token (secure random)
-    user_id     INTEGER NOT NULL,              -- FK to users.id
+    -- Session token (secure random)
+    id          TEXT PRIMARY KEY,
+    -- FK to users.id
+    user_id     INTEGER NOT NULL,
     ip_address  TEXT NOT NULL,
     user_agent  TEXT,
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-    expires_at  INTEGER NOT NULL,              -- Unix timestamp (default: 7 days)
+    -- Unix timestamp (default: 7 days)
+    expires_at  INTEGER NOT NULL,
     last_active INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
 
@@ -12377,14 +12605,22 @@ CREATE INDEX IF NOT EXISTS idx_user_sessions_expires ON user_sessions(expires_at
 -- Passkeys (WebAuthn/FIDO2 credentials)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS passkeys (
-    id              TEXT PRIMARY KEY,              -- WebAuthn credential ID (base64url)
-    user_type       TEXT NOT NULL,                 -- admin, user
-    user_id         INTEGER NOT NULL,              -- FK to admins or users
-    name            TEXT NOT NULL,                 -- User-friendly name: "MacBook Pro Touch ID"
-    public_key      TEXT NOT NULL,                 -- WebAuthn public key (base64)
-    sign_count      INTEGER NOT NULL DEFAULT 0,    -- Signature counter (replay protection)
-    transports      TEXT,                          -- JSON array: ["usb", "nfc", "ble", "internal"]
-    aaguid          TEXT,                          -- Authenticator AAGUID
+    -- WebAuthn credential ID (base64url)
+    id              TEXT PRIMARY KEY,
+    -- admin, user
+    user_type       TEXT NOT NULL,
+    -- FK to admins or users
+    user_id         INTEGER NOT NULL,
+    -- User-friendly name: "MacBook Pro Touch ID"
+    name            TEXT NOT NULL,
+    -- WebAuthn public key (base64)
+    public_key      TEXT NOT NULL,
+    -- Signature counter (replay protection)
+    sign_count      INTEGER NOT NULL DEFAULT 0,
+    -- JSON array: ["usb", "nfc", "ble", "internal"]
+    transports      TEXT,
+    -- Authenticator AAGUID
+    aaguid          TEXT,
     created_at      INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
     last_used       INTEGER
 );
@@ -12395,13 +12631,19 @@ CREATE INDEX IF NOT EXISTS idx_passkeys_user ON passkeys(user_type, user_id);
 -- Trusted Devices (skip 2FA for remembered devices)
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS trusted_devices (
-    id          TEXT PRIMARY KEY,              -- Device token (secure random)
-    user_type   TEXT NOT NULL,                 -- admin, user
-    user_id     INTEGER NOT NULL,              -- FK to admins or users
-    device_hash TEXT NOT NULL,                 -- SHA256(user_agent + ip partial)
-    name        TEXT,                          -- "Chrome on Windows" (auto-detected)
+    -- Device token (secure random)
+    id          TEXT PRIMARY KEY,
+    -- admin, user
+    user_type   TEXT NOT NULL,
+    -- FK to admins or users
+    user_id     INTEGER NOT NULL,
+    -- SHA256(user_agent + ip partial)
+    device_hash TEXT NOT NULL,
+    -- "Chrome on Windows" (auto-detected)
+    name        TEXT,
     created_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-    expires_at  INTEGER NOT NULL,              -- 30 days from creation
+    -- 30 days from creation
+    expires_at  INTEGER NOT NULL,
     last_used   INTEGER
 );
 
@@ -12420,11 +12662,14 @@ INSERT INTO config (key, value, type) VALUES
     ('server.port', '8080', 'number'),
     ('server.address', '"0.0.0.0"', 'string'),
     ('ssl.enabled', 'true', 'bool'),
-    ('ssl.cert', '""', 'string'),                    -- Empty = auto-detect
-    ('ssl.key', '""', 'string'),                     -- Empty = auto-detect
+    -- Empty = auto-detect
+    ('ssl.cert', '""', 'string'),
+    -- Empty = auto-detect
+    ('ssl.key', '""', 'string'),
     ('ssl.min_version', '"TLS1.2"', 'string'),
     ('cors.allowed_origins', '["https://example.com","https://api.example.com"]', 'array'),
-    ('ratelimit.requests_per_minute', '0', 'number'),  -- 0 = use project default from IDEA.md
+    -- 0 = use project default from IDEA.md
+    ('ratelimit.requests_per_minute', '0', 'number'),
     ('branding.site_name', '"My App"', 'string');
 ```
 
@@ -12684,14 +12929,18 @@ impl ConfigManager {
 
 **Health Check Responses:**
 
+Normal operation:
 ```json
-// Normal operation
 {"status": "ok"}
+```
 
-// Restart required (service running but config changed)
+Restart required (service running but config changed):
+```json
 {"status": "restart_required", "pending_restart": true, "restart_reason": ["ssl.enabled", "server.port"]}
+```
 
-// Shutting down
+Shutting down:
+```json
 {"status": "shutting_down"}
 ```
 
@@ -12928,10 +13177,14 @@ services:
       - --pid=/run/{internal_name}.pid
       - --port=8080
     volumes:
-      - config:/config:ro          # Config (read-only)
-      - data:/data                 # Data (read-write)
-      - logs:/logs                 # Logs (read-write)
-      - /var/run:/run:z            # PID file
+      # Config (read-only)
+      - config:/config:ro
+      # Data (read-write)
+      - data:/data
+      # Logs (read-write)
+      - logs:/logs
+      # PID file
+      - /var/run:/run:z
     ports:
       - "172.17.0.1:8080:8080"
 ```
@@ -14303,10 +14556,14 @@ server:
 
     # Connection pool settings
     pool:
-      max_open: 25        # Max open connections
-      max_idle: 5         # Max idle connections
-      max_lifetime: 5m    # Max connection lifetime
-      max_idle_time: 1m   # Max idle time before close
+      # Max open connections
+      max_open: 25
+      # Max idle connections
+      max_idle: 5
+      # Max connection lifetime
+      max_lifetime: 5m
+      # Max idle time before close
+      max_idle_time: 1m
 ```
 
 ### Pool Sizing Guidelines
@@ -14907,14 +15164,18 @@ web:
     accelerometer: "()"
     ambient-light-sensor: "()"
     battery: "()"
-    camera: "()"            # mapping/video-chat/voice projects: set to "(self)"
-    display-capture: "()"   # screen-share projects: set to "(self)"
-    geolocation: "()"       # location-aware projects: set to "(self)"
+    # mapping/video-chat/voice projects: set to "(self)"
+    camera: "()"
+    # screen-share projects: set to "(self)"
+    display-capture: "()"
+    # location-aware projects: set to "(self)"
+    geolocation: "()"
     gyroscope: "()"
     hid: "()"
     idle-detection: "()"
     magnetometer: "()"
-    microphone: "()"        # voice/video projects: set to "(self)"
+    # voice/video projects: set to "(self)"
+    microphone: "()"
     midi: "()"
     screen-wake-lock: "()"
     serial: "()"
@@ -14935,7 +15196,8 @@ web:
     fullscreen: "(self)"
     payment: "(self)"
     picture-in-picture: "(self)"
-    publickey-credentials-get: "(self)"   # WebAuthn / Passkeys
+    # WebAuthn / Passkeys
+    publickey-credentials-get: "(self)"
     storage-access: "(self)"
     web-share: "(self)"
 ```
@@ -14951,18 +15213,24 @@ web:
 ```yaml
 web:
   hsts:
-    enabled: true                      # default true. Set false only for HTTP-only deployments.
-    max_age_seconds: 63072000          # default 2 years (preload-list eligible).
-    include_subdomains: true           # default true.
-    preload: true                      # default true. See HSTS preload caveat above.
+    # default true. Set false only for HTTP-only deployments.
+    enabled: true
+    # default 2 years (preload-list eligible).
+    max_age_seconds: 63072000
+    # default true.
+    include_subdomains: true
+    # default true. See HSTS preload caveat above.
+    preload: true
 
   permissions_policy:
     # Per-feature config — see "Permissions-Policy Configuration" below.
 
   reports:
     # Public reports endpoints (PART 14 → "Public Reports Scope").
-    rate_limit_per_minute: 60          # max reports/min/IP across all report types
-    rate_limit_per_ip_burst: 10        # short-burst allowance
+    # max reports/min/IP across all report types
+    rate_limit_per_minute: 60
+    # short-burst allowance
+    rate_limit_per_ip_burst: 10
 
   csrf:
     # See "CSRF Protection" below for full schema.
@@ -14975,26 +15243,39 @@ web:
 
   headers:
     # Modern / privacy / cross-origin headers — see subsections below.
-    coop: "unsafe-none"                # Cross-Origin-Opener-Policy
-    coep: "unsafe-none"                # Cross-Origin-Embedder-Policy
-    corp: "cross-origin"               # Cross-Origin-Resource-Policy
-    origin_agent_cluster: true         # emit "Origin-Agent-Cluster: ?1"
-    cross_domain_policies: "none"      # X-Permitted-Cross-Domain-Policies
-    dns_prefetch_control: ""           # "" = omit (browser default); "off" = privacy-strict
-    honor_sec_gpc: true                # treat Sec-GPC: 1 as opt-out signal
-    honor_dnt: false                   # DNT is dead in modern browsers — off by default
-    sec_fetch_validation: true         # reject cross-site state-changers (CSRF defense layer)
-    server_timing_in_debug_only: true  # never emit Server-Timing in production
+    # Cross-Origin-Opener-Policy
+    coop: "unsafe-none"
+    # Cross-Origin-Embedder-Policy
+    coep: "unsafe-none"
+    # Cross-Origin-Resource-Policy
+    corp: "cross-origin"
+    # emit "Origin-Agent-Cluster: ?1"
+    origin_agent_cluster: true
+    # X-Permitted-Cross-Domain-Policies
+    cross_domain_policies: "none"
+    # "" = omit (browser default); "off" = privacy-strict
+    dns_prefetch_control: ""
+    # treat Sec-GPC: 1 as opt-out signal
+    honor_sec_gpc: true
+    # DNT is dead in modern browsers — off by default
+    honor_dnt: false
+    # reject cross-site state-changers (CSRF defense layer)
+    sec_fetch_validation: true
+    # never emit Server-Timing in production
+    server_timing_in_debug_only: true
     clear_site_data:
       on_logout: true
       on_account_delete: true
       on_consent_withdrawal: true
-      execution_contexts: false        # set true to also reload SPA tabs on logout
+      # set true to also reload SPA tabs on logout
+      execution_contexts: false
     nel:
       enabled: true
-      max_age_seconds: 2592000         # 30 days
+      # 30 days
+      max_age_seconds: 2592000
       include_subdomains: true
-      sample_rate: 1.0                 # 0.0..1.0 — sample failures to control volume
+      # 0.0..1.0 — sample failures to control volume
+      sample_rate: 1.0
 ```
 
 ## Cross-Origin Isolation Headers
@@ -15148,23 +15429,34 @@ report-uri /api/{api_version}/server/reports/csp
 ```yaml
 web:
   csp:
-    enabled: true                     # default: true
-    mode: enforce                     # enforce | report-only
+    # default: true
+    enabled: true
+    # enforce | report-only
+    mode: enforce
     # Per-directive append — these strings are added to the default value.
     # Operator never has to redefine the whole policy.
-    script_src_extra: ""              # e.g. "https://js.stripe.com https://www.google.com/recaptcha/"
-    style_src_extra: ""               # e.g. "https://fonts.googleapis.com"
-    img_src_extra: ""                 # rarely needed — default already covers https:
-    font_src_extra: ""                # rarely needed — default already covers https:
-    connect_src_extra: ""             # e.g. "https://api.stripe.com wss://realtime.example.com"
-    frame_src_extra: ""               # e.g. "https://www.youtube.com https://player.vimeo.com https://js.stripe.com"
-    form_action_extra: ""             # e.g. "https://accounts.google.com" for OAuth submit
+    # e.g. "https://js.stripe.com https://www.google.com/recaptcha/"
+    script_src_extra: ""
+    # e.g. "https://fonts.googleapis.com"
+    style_src_extra: ""
+    # rarely needed — default already covers https:
+    img_src_extra: ""
+    # rarely needed — default already covers https:
+    font_src_extra: ""
+    # e.g. "https://api.stripe.com wss://realtime.example.com"
+    connect_src_extra: ""
+    # e.g. "https://www.youtube.com https://player.vimeo.com https://js.stripe.com"
+    frame_src_extra: ""
+    # e.g. "https://accounts.google.com" for OAuth submit
+    form_action_extra: ""
     # Override-style: REPLACE the directive instead of appending. Use sparingly.
     script_src_override: ""
     # ... (mirror for every directive)
     # Reporting
-    reports_enabled: true             # POST violations to /api/{api_version}/server/reports/csp
-    reports_sample_rate: 1.0          # 0.0 .. 1.0 — sample to control volume on busy sites
+    # POST violations to /api/{api_version}/server/reports/csp
+    reports_enabled: true
+    # 0.0 .. 1.0 — sample to control volume on busy sites
+    reports_sample_rate: 1.0
 ```
 
 **Auto-detection:** `connect-src`, `frame-ancestors`, and `form-action` automatically pick up DOMAIN env entries and reverse-proxy-detected hosts (same resolution order as CORS — see PART 16). Operator does NOT have to list their own domain in `connect_src_extra`.
@@ -15741,21 +16033,30 @@ Expires: {expiry_date}
 ```yaml
 web:
   security:
-    report_url: "https://github.com/{project_org}/{project_name}/security/advisories/new"    # Primary contact — GitHub private vulnerability reporting
-    contact: "security@{fqdn}"    # Secondary/CC contact email — never the primary reporting channel
-    expires: "{1year}"            # Auto-calculated 1 year from generation
+    # Primary contact — GitHub private vulnerability reporting
+    report_url: "https://github.com/{project_org}/{project_name}/security/advisories/new"
+    # Secondary/CC contact email — never the primary reporting channel
+    contact: "security@{fqdn}"
+    # Auto-calculated 1 year from generation
+    expires: "{1year}"
   well_known:
-    unsupported_behavior: 404     # Unknown entries never redirect
+    # Unknown entries never redirect
+    unsupported_behavior: 404
     webfinger:
-      enabled: false              # Enable only if project publishes acct: identities/federation
+      # Enable only if project publishes acct: identities/federation
+      enabled: false
     openid_configuration:
-      enabled: false              # Enable only if project is an OIDC provider
+      # Enable only if project is an OIDC provider
+      enabled: false
     assetlinks:
-      enabled: false              # Enable only for Android App Links/native association
+      # Enable only for Android App Links/native association
+      enabled: false
     apple_app_site_association:
-      enabled: false              # Enable only for Apple Universal Links/WebCredentials
+      # Enable only for Apple Universal Links/WebCredentials
+      enabled: false
     mta_sts:
-      enabled: false              # Enable only if this host owns inbound mail policy
+      # Enable only if this host owns inbound mail policy
+      enabled: false
 ```
 
 **Fields:**
@@ -15799,10 +16100,14 @@ Security: {security_contact}
 ```yaml
 web:
   llms:
-    enabled: true                    # Serve llms.txt (default: true)
-    include_endpoints: true          # Auto-generate endpoint list from routes
-    include_schemas: false           # Include request/response schemas (verbose)
-    custom_sections: []              # Additional custom sections
+    # Serve llms.txt (default: true)
+    enabled: true
+    # Auto-generate endpoint list from routes
+    include_endpoints: true
+    # Include request/response schemas (verbose)
+    include_schemas: false
+    # Additional custom sections
+    custom_sections: []
 ```
 
 **Auto-Generation Rules:**
@@ -16461,26 +16766,40 @@ server:
       # Basic options (same as other logs)
       enabled: true
       filename: audit.log
-      format: json           # json only - must be machine-parseable
-      rotate: daily          # daily, weekly, monthly, NMB, or combined
-      keep: none             # none, N, Nd, Nw, Nm
+      # json only - must be machine-parseable
+      format: json
+      # daily, weekly, monthly, NMB, or combined
+      rotate: daily
+      # none, N, Nd, Nw, Nm
+      keep: none
       compress: false
 
       # What to log (event categories)
       events:
-        authentication: true  # Login/logout events
-        configuration: true   # Config changes
-        security: true        # Security events
-        tokens: true          # Token create/revoke
-        users: true           # User management
-        backup: true          # Backup/restore
-        server: true          # Server events (start, stop, maintenance)
-        cluster: true         # Cluster events
-        token_usage: false    # Individual token uses (high volume - disabled by default)
+        # Login/logout events
+        authentication: true
+        # Config changes
+        configuration: true
+        # Security events
+        security: true
+        # Token create/revoke
+        tokens: true
+        # User management
+        users: true
+        # Backup/restore
+        backup: true
+        # Server events (start, stop, maintenance)
+        server: true
+        # Cluster events
+        cluster: true
+        # Individual token uses (high volume - disabled by default)
+        token_usage: false
 
       # Sensitive data handling
-      mask_emails: true       # Show j***n@e***.com instead of full
-      mask_usernames: false   # Show full usernames in logs
+      # Show j***n@e***.com instead of full
+      mask_emails: true
+      # Show full usernames in logs
+      mask_usernames: false
       include_user_agent: true
 ```
 
@@ -17567,7 +17886,8 @@ use tracing::warn;
 pub fn validate_config(cfg: &mut Config) {
     // Port must be 1–65535
     if cfg.server.port == 0 {
-        let random_port = get_random_available_port(); // 64000–64999 range
+        // 64000–64999 range
+        let random_port = get_random_available_port();
         warn!(
             invalid_port = cfg.server.port,
             replacement = random_port,
@@ -17598,7 +17918,8 @@ pub fn validate_config(cfg: &mut Config) {
 
 ```yaml
 server:
-  baseurl: /              # Default: serve from root (auto-detects from reverse proxy)
+  # Default: serve from root (auto-detects from reverse proxy)
+  baseurl: /
   # baseurl: /myproject   # Serve from /myproject/*
   # baseurl: /api/v2      # Serve from /api/v2/*
 ```
@@ -17719,9 +18040,12 @@ server:
 server:
   trusted_proxies:
     additional:
-      - 203.0.113.10           # specific edge node
-      - 198.51.100.0/24        # CDN PoP block
-      - lb.internal.example    # DNS name, resolved every 5min
+      # specific edge node
+      - 203.0.113.10
+      # CDN PoP block
+      - 198.51.100.0/24
+      # DNS name, resolved every 5min
+      - lb.internal.example
 ```
 
 **On a public-facing direct deployment (no proxy in front)** leave `additional: []`. The X-Forwarded headers from random internet peers are then dropped, falling back to the `Host` header and `peer_addr` for URL construction — exactly the behavior we want.
@@ -17734,15 +18058,20 @@ server:
     # Admin sessions (server.db admin_sessions table)
     admin:
       cookie_name: admin_session
-      max_age: 30d                   # Absolute session lifetime
-      idle_timeout: 24h              # Session expires after inactivity
+      # Absolute session lifetime
+      max_age: 30d
+      # Session expires after inactivity
+      idle_timeout: 24h
     # User sessions (users.db user_sessions table) - only if app has users
     user:
       cookie_name: user_session
-      max_age: 7d                    # Absolute session lifetime
-      idle_timeout: 24h              # Session expires after inactivity
+      # Absolute session lifetime
+      max_age: 7d
+      # Session expires after inactivity
+      idle_timeout: 24h
     # Common settings (apply to both)
-    extend_on_activity: true     # Reset idle timeout on each request
+    # Reset idle timeout on each request
+    extend_on_activity: true
     # auto, true, false
     secure: auto
     http_only: true
@@ -17766,26 +18095,33 @@ server:
   rate_limit:
     enabled: true
     read:
-      requests: 120    # per minute per IP
+      # per minute per IP
+      requests: 120
       window: 60
     write:
-      requests: 10     # per minute per IP
+      # per minute per IP
+      requests: 10
       window: 60
     health:
-      requests: 120    # per minute per IP (health/status endpoints)
+      # per minute per IP (health/status endpoints)
+      requests: 120
       window: 60
-    global_burst: 240  # per minute per IP (absolute ceiling across all endpoint types)
+    # per minute per IP (absolute ceiling across all endpoint types)
+    global_burst: 240
     # Auth endpoints — stricter limits, applied independently of the general limits above
     auth:
       login:
         requests: 5
-        window: 900    # 15 minutes
+        # 15 minutes
+        window: 900
       password_reset:
         requests: 3
-        window: 3600   # 1 hour
+        # 1 hour
+        window: 3600
       registration:
         requests: 5
-        window: 3600   # 1 hour
+        # 1 hour
+        window: 3600
 ```
 
 | Endpoint class | Default limit | Window | Notes |
@@ -17828,10 +18164,14 @@ server:
     admin:
       email: "admin@{fqdn}"
       webhooks:
-        telegram: ""        # https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT}
-        discord: ""         # https://discord.com/api/webhooks/{ID}/{TOKEN}
-        slack: ""           # https://hooks.slack.com/services/{T}/{B}/{X}
-        generic: ""         # any URL — POSTed JSON {role,event,subject,body,severity,timestamp}
+        # https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT}
+        telegram: ""
+        # https://discord.com/api/webhooks/{ID}/{TOKEN}
+        discord: ""
+        # https://hooks.slack.com/services/{T}/{B}/{X}
+        slack: ""
+        # any URL — POSTed JSON {role,event,subject,body,severity,timestamp}
+        generic: ""
 
     # ---- Security (vulnerability reports) ----
     # Recipient for incoming security reports. Public — surfaced in
@@ -17845,7 +18185,8 @@ server:
     # set to "" it falls back to server.contact.admin.email
     # (and server.contact.admin.webhooks).
     security:
-      email: "security@{fqdn}"   # RFC 2142 standard role mailbox
+      # RFC 2142 standard role mailbox
+      email: "security@{fqdn}"
       webhooks:
         telegram: ""
         discord: ""
@@ -17858,7 +18199,8 @@ server:
     # exposes one.
     # If empty: falls back to server.contact.admin.email.
     general:
-      email: ""             # default: server.contact.admin.email
+      # default: server.contact.admin.email
+      email: ""
       webhooks:
         telegram: ""
         discord: ""
@@ -17999,7 +18341,8 @@ server:
   tracking:
     type: google
     id: "G-XXXXXXXXXX"
-    url: ""  # Not used
+    # Not used
+    url: ""
 ```
 
 **Matomo (Self-hosted):**
@@ -18007,7 +18350,8 @@ server:
 server:
   tracking:
     type: matomo
-    id: "1"  # Site ID
+    # Site ID
+    id: "1"
     url: "https://analytics.example.com"
 ```
 
@@ -18044,7 +18388,8 @@ server:
   tracking:
     type: fathom
     id: "ABCDEFGH"
-    url: ""  # Uses cdn.usefathom.com
+    # Uses cdn.usefathom.com
+    url: ""
 ```
 
 **Fathom Lite (Self-hosted):**
@@ -18053,7 +18398,8 @@ server:
   tracking:
     type: fathom
     id: "ABCDEFGH"
-    url: "https://analytics.example.com"  # Your Fathom Lite instance
+    # Your Fathom Lite instance
+    url: "https://analytics.example.com"
 ```
 
 **Plausible Analytics (Cloud):**
@@ -18061,8 +18407,10 @@ server:
 server:
   tracking:
     type: plausible
-    id: "example.com"  # Your domain
-    url: ""  # Uses plausible.io
+    # Your domain
+    id: "example.com"
+    # Uses plausible.io
+    url: ""
 ```
 
 **Plausible Analytics (Self-hosted):**
@@ -18070,8 +18418,10 @@ server:
 server:
   tracking:
     type: plausible
-    id: "example.com"  # Your domain
-    url: "https://analytics.example.com"  # Your Plausible instance
+    # Your domain
+    id: "example.com"
+    # Your Plausible instance
+    url: "https://analytics.example.com"
 ```
 
 **Umami:**
@@ -18079,7 +18429,8 @@ server:
 server:
   tracking:
     type: umami
-    id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Website UUID
+    # Website UUID
+    id: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
     url: "https://analytics.example.com"
 ```
 
@@ -18088,8 +18439,10 @@ server:
 server:
   tracking:
     type: simple
-    id: ""  # Not needed, uses domain automatically
-    url: ""  # Not used
+    # Not needed, uses domain automatically
+    id: ""
+    # Not used
+    url: ""
 ```
 
 **Cloudflare Web Analytics:**
@@ -18098,7 +18451,8 @@ server:
   tracking:
     type: cloudflare
     id: "your-beacon-token"
-    url: ""  # Not used
+    # Not used
+    url: ""
 ```
 
 ### Tracking Script Generation
@@ -18415,7 +18769,8 @@ server:
       sold: false
 
       # Where is user data stored?
-      stored_on_server: true  # All data on this server (not third-party cloud)
+      # All data on this server (not third-party cloud)
+      stored_on_server: true
 
       # When data MAY be shared with third parties
       sharing:
@@ -18480,17 +18835,20 @@ server:
     cookies:
       # Essential cookies - ALWAYS enabled, cannot be disabled
       essential:
-        enabled: true  # Always true, not configurable
+        # Always true, not configurable
+        enabled: true
         description: "Required for the site to function. Includes session management, security tokens (CSRF), and authentication. These cookies are strictly necessary and cannot be disabled."
 
       # Preference cookies (theme, language, UI settings)
       preferences:
-        enabled: true  # Default on, user can disable via Decline
+        # Default on, user can disable via Decline
+        enabled: true
         description: "Remember your settings such as theme (dark/light), language, and UI preferences. Disabling will reset to defaults on each visit."
 
       # Analytics cookies (only active if server.tracking configured)
       analytics:
-        enabled: true  # Default on, user can disable via Decline
+        # Default on, user can disable via Decline
+        enabled: true
         description: "Help us understand how visitors use our site to improve the experience."
         # Dynamic suffix based on data.sold
         description_suffix_not_sold: "Analytics data is anonymized and never sold."
@@ -18963,7 +19321,8 @@ rediss://...  # Redis with TLS
 server:
   cache:
     type: valkey
-    url: ${CACHE_URL}  # valkey://user:pass@valkey.example.com:6379/0
+    # valkey://user:pass@valkey.example.com:6379/0
+    url: ${CACHE_URL}
     prefix: "{project_name}:"
 ```
 
@@ -20603,14 +20962,22 @@ fn is_text_browser(req: &Request) -> bool {
     // Text browsers - INTERACTIVE, NO JavaScript support
     // Format: "browser/" or "browser " (links uses space)
     let text_browsers = [
-        "lynx/",     // Lynx - classic text browser
-        "w3m/",      // w3m - text browser with table support
-        "links ",    // Links - text browser (note: space after)
-        "links/",    // Links alternative format
-        "elinks/",   // ELinks - enhanced links
-        "browsh/",   // Browsh - modern text browser
-        "carbonyl/", // Carbonyl - Chromium in terminal
-        "netsurf",   // NetSurf - lightweight browser (limited JS)
+        // Lynx - classic text browser
+        "lynx/",
+        // w3m - text browser with table support
+        "w3m/",
+        // Links - text browser (note: space after)
+        "links ",
+        // Links alternative format
+        "links/",
+        // ELinks - enhanced links
+        "elinks/",
+        // Browsh - modern text browser
+        "browsh/",
+        // Carbonyl - Chromium in terminal
+        "carbonyl/",
+        // NetSurf - lightweight browser (limited JS)
+        "netsurf",
     ];
     text_browsers.iter().any(|&b| ua.contains(b))
 }
@@ -22947,15 +23314,20 @@ fn detect_client_type(headers: &HeaderMap) -> &'static str {
 2. **API Endpoints** (programmatic):
    ```bash
    curl -q -LSsf -X POST /api/{api_version}/server/auth/register -d '{"username":"test","email":"test@example.com"}'
-   curl -q -LSsf -X PATCH /api/{api_version}/users -d '{"email":"new@test.com"}'  # Current user
-   curl -q -LSsf -X PATCH /api/{api_version}/server/{admin_path}/config/users/123 -d '{"email":"new@test.com"}'  # Admin
-   curl -q -LSsf -X DELETE /api/{api_version}/server/{admin_path}/config/users/123  # Admin
+   # Current user
+   curl -q -LSsf -X PATCH /api/{api_version}/users -d '{"email":"new@test.com"}'
+   # Admin
+   curl -q -LSsf -X PATCH /api/{api_version}/server/{admin_path}/config/users/123 -d '{"email":"new@test.com"}'
+   # Admin
+   curl -q -LSsf -X DELETE /api/{api_version}/server/{admin_path}/config/users/123
    ```
 
 3. **Frontend Direct** (CLI/scripting):
    ```bash
-   curl -q -LSsf -X POST /server/auth/register -d 'username=test&email=test@example.com'  # Form-encoded
-   curl -q -LSsf /{username}  # Returns text (auto-detected) - public profile
+   # Form-encoded
+   curl -q -LSsf -X POST /server/auth/register -d 'username=test&email=test@example.com'
+   # Returns text (auto-detected) - public profile
+   curl -q -LSsf /{username}
    ```
 
 **Rule:** CRUD must work for browsers (HTML forms), APIs (JSON), and CLI (text/form-encoded).
@@ -22966,11 +23338,14 @@ fn detect_client_type(headers: &HeaderMap) -> &'static str {
 
 ```bash
 # Easy: Test text output (no HTML parsing needed)
-curl -q -LSsf /users/123                  # Auto-detects CLI, returns text
-curl -q -LSsf -H "Accept: text/plain" /users/123  # Explicitly request text
+# Auto-detects CLI, returns text
+curl -q -LSsf /users/123
+# Explicitly request text
+curl -q -LSsf -H "Accept: text/plain" /users/123
 
 # Hard: Testing HTML requires parsing
-curl -q -LSsf -H "Accept: text/html" /users/123 | grep "<title>"  # Fragile
+# Fragile
+curl -q -LSsf -H "Accept: text/html" /users/123 | grep "<title>"
 ```
 
 **Recommended testing approach:**
@@ -23924,9 +24299,11 @@ Does user need to make a decision or provide input?
 async function saveSettings(data) {
     const result = await api.post('/users/settings', data);
     if (result.ok) {
-        showToast('Settings saved', 'success');  // Non-blocking, auto-dismiss
+        // Non-blocking, auto-dismiss
+        showToast('Settings saved', 'success');
     } else {
-        showToast('Failed to save settings', 'error');  // Non-blocking error
+        // Non-blocking error
+        showToast('Failed to save settings', 'error');
     }
 }
 
@@ -23939,7 +24316,8 @@ function deleteItem(itemId) {
         confirmStyle: 'danger',
         onConfirm: async () => {
             await api.delete(`/items/${itemId}`);
-            showToast('Item deleted', 'success');  // Confirmation after action
+            // Confirmation after action
+            showToast('Item deleted', 'success');
         }
     });
 }
@@ -23952,7 +24330,8 @@ function changePassword() {
         fields: ['current_password', 'new_password', 'confirm_password'],
         onSubmit: async (data) => {
             await api.post('/users/security/password', data);
-            showToast('Password changed', 'success');  // Confirmation after action
+            // Confirmation after action
+            showToast('Password changed', 'success');
         }
     });
 }
@@ -24044,10 +24423,14 @@ function changePassword() {
 **JavaScript Toast API:**
 ```javascript
 // Show toast - returns toast ID for programmatic control
-const toastId = showToast("Settings saved", "success");        // 3s auto-dismiss
-const toastId = showToast("Save failed", "error");             // No auto-dismiss
-const toastId = showToast("Check your input", "warning", 5000); // 5s auto-dismiss
-const toastId = showToast("Tip: Use shortcuts", "info");       // 3s auto-dismiss
+// 3s auto-dismiss
+const toastId = showToast("Settings saved", "success");
+// No auto-dismiss
+const toastId = showToast("Save failed", "error");
+// 5s auto-dismiss
+const toastId = showToast("Check your input", "warning", 5000);
+// 3s auto-dismiss
+const toastId = showToast("Tip: Use shortcuts", "info");
 
 // Dismiss programmatically
 dismissToast(toastId);
@@ -24504,7 +24887,8 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(PRECACHE_ASSETS))
-      .then(() => self.skipWaiting()) // Activate immediately
+      // Activate immediately
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -24517,7 +24901,8 @@ self.addEventListener('activate', event => {
           .filter(key => key.startsWith('{app_name}-cache-') && key !== CACHE_NAME)
           .map(key => caches.delete(key))
       ))
-      .then(() => self.clients.claim()) // Take control immediately
+      // Take control immediately
+      .then(() => self.clients.claim())
   );
 });
 
@@ -24531,7 +24916,8 @@ self.addEventListener('fetch', event => {
 
   // Skip API calls (network-only)
   if (url.pathname.startsWith('/api/')) {
-    return; // Let browser handle normally
+    // Let browser handle normally
+    return;
   }
 
   // Static assets: cache-first
@@ -24652,9 +25038,11 @@ let deferredPrompt;
 
 // Capture the install prompt
 window.addEventListener('beforeinstallprompt', event => {
-  event.preventDefault(); // Don't show automatically
+  // Don't show automatically
+  event.preventDefault();
   deferredPrompt = event;
-  showInstallButton(); // Show custom install UI
+  // Show custom install UI
+  showInstallButton();
 });
 
 // Custom install button handler
@@ -24681,7 +25069,8 @@ window.addEventListener('appinstalled', () => {
 // Check if running as installed PWA
 function isInstalledPWA() {
   return window.matchMedia('(display-mode: standalone)').matches
-    || window.navigator.standalone === true; // iOS
+    // iOS
+    || window.navigator.standalone === true;
 }
 ```
 
@@ -24921,9 +25310,12 @@ async function getCurrentLocation() {
       }),
       error => reject(handleGeolocationError(error)),
       {
-        enableHighAccuracy: true,  // Use GPS if available
-        timeout: 10000,            // 10 second timeout
-        maximumAge: 60000          // Accept cached position up to 1 minute old
+        // Use GPS if available
+        enableHighAccuracy: true,
+        // 10 second timeout
+        timeout: 10000,
+        // Accept cached position up to 1 minute old
+        maximumAge: 60000
       }
     );
   });
@@ -24950,7 +25342,8 @@ function watchLocation(callback, errorCallback) {
     {
       enableHighAccuracy: true,
       timeout: 10000,
-      maximumAge: 0  // Always get fresh position
+      // Always get fresh position
+      maximumAge: 0
     }
   );
 }
@@ -25002,7 +25395,8 @@ async function checkLocationPermission() {
   if (!navigator.permissions) return 'unknown';
 
   const result = await navigator.permissions.query({ name: 'geolocation' });
-  return result.state; // 'granted', 'denied', or 'prompt'
+  // 'granted', 'denied', or 'prompt'
+  return result.state;
 }
 ```
 
@@ -27037,13 +27431,20 @@ server:
   seo:
     verification:
       # Format: { "provider": "verification_code" }
-      google: ""           # Google Search Console
-      bing: ""             # Bing Webmaster Tools
-      yandex: ""           # Yandex Webmaster
-      baidu: ""            # Baidu Webmaster
-      pinterest: ""        # Pinterest verification
-      facebook: ""         # Facebook domain verification
-      custom: []           # Custom meta tags (see below)
+      # Google Search Console
+      google: ""
+      # Bing Webmaster Tools
+      bing: ""
+      # Yandex Webmaster
+      yandex: ""
+      # Baidu Webmaster
+      baidu: ""
+      # Pinterest verification
+      pinterest: ""
+      # Facebook domain verification
+      facebook: ""
+      # Custom meta tags (see below)
+      custom: []
 ```
 
 **Generated Meta Tags:**
@@ -27168,9 +27569,12 @@ server:
 server:
   seo:
     sitemap:
-      enabled: true          # Default: true
-      max_urls: 50000        # Sitemap protocol limit
-      include_images: false  # Include image URLs
+      # Default: true
+      enabled: true
+      # Sitemap protocol limit
+      max_urls: 50000
+      # Include image URLs
+      include_images: false
 ```
 
 **Large Sites (>50,000 URLs):**
@@ -27569,11 +27973,14 @@ pub fn build_cors_layer(cors_config: &str) -> CorsLayer {
 ```yaml
 web:
   csrf:
-    enabled: true                # default: true. Set false ONLY for API-only deployments (no browser forms at all).
-    token_length: 32             # bytes
+    # default: true. Set false ONLY for API-only deployments (no browser forms at all).
+    enabled: true
+    # bytes
+    token_length: 32
     cookie_name: csrf_token
     header_name: X-CSRF-Token
-    secure: auto                 # auto | true | false. "auto" sets Secure when proto is https.
+    # auto | true | false. "auto" sets Secure when proto is https.
+    secure: auto
     # Endpoints exempt from CSRF (operator-declared). Glob patterns supported.
     # Common exemptions: OAuth callbacks, webhook receivers.
     exempt_paths:
@@ -27966,7 +28373,8 @@ When admin edits `custom_html`, show:
 **Dynamic Message Selection:**
 ```rust
 // Template rendering uses get_consent_message() for {message}
-let message = cfg.privacy.get_consent_message(); // Returns appropriate message based on data.sold
+// Returns appropriate message based on data.sold
+let message = cfg.privacy.get_consent_message();
 ```
 
 ```html
@@ -27987,9 +28395,12 @@ let message = cfg.privacy.get_consent_message(); // Returns appropriate message 
 <script>
 // Granular consent state (matches server.privacy.cookies structure)
 const defaultConsent = {
-  essential: true,    // Always true, cannot be disabled
-  preferences: true,  // Default from server.privacy.cookies.preferences.enabled
-  analytics: true,    // Default from server.privacy.cookies.analytics.enabled
+  // Always true, cannot be disabled
+  essential: true,
+  // Default from server.privacy.cookies.preferences.enabled
+  preferences: true,
+  // Default from server.privacy.cookies.analytics.enabled
+  analytics: true,
   timestamp: 0
 };
 
@@ -28046,7 +28457,8 @@ function showCookiePreferences() {
 function savePreferences() {
   // Called from preferences modal
   const consent = {
-    essential: true,  // Always true
+    // Always true
+    essential: true,
     preferences: document.getElementById('pref-preferences').checked,
     analytics: document.getElementById('pref-analytics').checked,
     timestamp: Date.now()
@@ -28276,7 +28688,8 @@ initCCPA();
 // 2. server.tracking is configured
 pub fn check_tracking_allowed(headers: &HeaderMap, cfg: &Config) -> bool {
     let Some(consent) = get_consent_from_headers(headers) else {
-        return false; // No consent or declined
+        // No consent or declined
+        return false;
     };
     if !consent.analytics {
         return false;
@@ -29128,8 +29541,10 @@ use std::collections::HashSet;
 // Admin route hierarchy validation
 fn valid_admin_root_paths() -> HashSet<&'static str> {
     let mut set = HashSet::new();
-    set.insert("");       // Dashboard (/server/{admin_path}/)
-    set.insert("config"); // Server management (has sub-routes)
+    // Dashboard (/server/{admin_path}/)
+    set.insert("");
+    // Server management (has sub-routes)
+    set.insert("config");
     set
 }
 
@@ -29137,7 +29552,8 @@ fn validate_admin_route(path: &str, current_admin_username: &str) -> Result<(), 
     // Extract first segment after /server/{admin_path}/
     let trimmed = path.trim_matches('/');
     if trimmed.is_empty() {
-        return Ok(()); // Root path is OK
+        // Root path is OK
+        return Ok(());
     }
 
     let first_segment = trimmed.split('/').next().unwrap_or("");
@@ -29286,17 +29702,20 @@ async function changeAdminPath(newPath) {
 ```rust
 // Global admin path accessor
 pub fn admin_path(cfg: &Config) -> &str {
-    &cfg.server.admin_path // default: "admin"
+    // default: "admin"
+    &cfg.server.admin_path
 }
 
 // Global API version accessor
 pub fn api_version(cfg: &Config) -> &str {
-    &cfg.server.api_version // default: "v1"
+    // default: "v1"
+    &cfg.server.api_version
 }
 
 // API base path helper
 pub fn api_base_path(cfg: &Config) -> String {
-    format!("/api/{}", api_version(cfg)) // e.g., "/api/{api_version}"
+    // e.g., "/api/{api_version}"
+    format!("/api/{}", api_version(cfg))
 }
 
 // Use in route registration
@@ -30421,7 +30840,8 @@ server:
 
         - name: "level1"
           url: "https://www.iblocklist.com/lists/level1.gz"
-          format: auto  # auto-detect from content/extension (P2P, gzipped)
+          # auto-detect from content/extension (P2P, gzipped)
+          format: auto
           enabled: false
 
         - name: "abuse_ch_urlhaus"
@@ -30573,7 +30993,8 @@ pub async fn blocklist_middleware(
     req: axum::http::Request<axum::body::Body>,
     next: axum::middleware::Next,
 ) -> impl IntoResponse {
-    let ip = extract_client_ip(&req, addr.ip()); // respects X-Forwarded-For / X-Real-IP if trusted proxy
+    // respects X-Forwarded-For / X-Real-IP if trusted proxy
+    let ip = extract_client_ip(&req, addr.ip());
 
     let lookup = state.blocklist.read().await;
     if lookup.contains(ip) {
@@ -30632,8 +31053,8 @@ pub async fn blocklist_middleware(
 
 **API Response Examples:**
 
+Response for `GET /api/{api_version}/server/{admin_path}/config/network/blocklists`:
 ```json
-// GET /api/{api_version}/server/{admin_path}/config/network/blocklists
 {
   "enabled": true,
   "action": "reject",
@@ -30663,8 +31084,10 @@ pub async fn blocklist_middleware(
     }
   ]
 }
+```
 
-// GET /api/{api_version}/server/{admin_path}/config/network/blocklists/check/1.2.3.4
+Response for `GET /api/{api_version}/server/{admin_path}/config/network/blocklists/check/1.2.3.4`:
+```json
 {
   "ip": "1.2.3.4",
   "blocked": true,
@@ -31398,26 +31821,37 @@ Define project-specific data views in IDEA.md.
 ```sql
 -- agents table (supports all scopes)
 CREATE TABLE agents (
-    id TEXT PRIMARY KEY,                    -- UUID
-    name TEXT NOT NULL,                     -- hostname or custom name
+    -- UUID
+    id TEXT PRIMARY KEY,
+    -- hostname or custom name
+    name TEXT NOT NULL,
 
     -- Scope (which owner)
-    scope TEXT NOT NULL,                    -- 'admin', 'user', 'org'
-    owner_id TEXT,                          -- NULL for admin, user_id for user, org_id for org
-    token_prefix TEXT NOT NULL,             -- 'adm_agt_', 'usr_agt_', 'org_agt_'
-    token_hash TEXT NOT NULL,               -- SHA-256 hash of full token
+    -- 'admin', 'user', 'org'
+    scope TEXT NOT NULL,
+    -- NULL for admin, user_id for user, org_id for org
+    owner_id TEXT,
+    -- 'adm_agt_', 'usr_agt_', 'org_agt_'
+    token_prefix TEXT NOT NULL,
+    -- SHA-256 hash of full token
+    token_hash TEXT NOT NULL,
 
     -- System info (from agent)
     hostname TEXT,
-    os TEXT,                                -- linux, windows, darwin
-    arch TEXT,                              -- amd64, arm64
-    version TEXT,                           -- Agent version
+    -- linux, windows, darwin
+    os TEXT,
+    -- amd64, arm64
+    arch TEXT,
+    -- Agent version
+    version TEXT,
 
     -- Tags
-    tags TEXT,                              -- JSON array: ["prod", "web"]
+    -- JSON array: ["prod", "web"]
+    tags TEXT,
 
     -- Connection tracking
-    status TEXT DEFAULT 'pending',          -- pending, online, offline
+    -- pending, online, offline
+    status TEXT DEFAULT 'pending',
     ip_address TEXT,
     connected_at TIMESTAMP,
     last_seen_at TIMESTAMP,
@@ -31426,7 +31860,8 @@ CREATE TABLE agents (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    UNIQUE(scope, owner_id, name)           -- Name unique within scope+owner
+    -- Name unique within scope+owner
+    UNIQUE(scope, owner_id, name)
 );
 
 CREATE INDEX idx_agents_scope_owner ON agents(scope, owner_id);
@@ -32937,10 +33372,14 @@ verify = true
 #          {project_name}-daily.tar.gz[.enc] (incremental)
 
 [server.scheduler.tasks.backup_daily.retention]
-max_backups = 1    # 1-365: daily full backups to keep
-keep_weekly = 0    # 0-52: Sunday backups (0 = disabled)
-keep_monthly = 0   # 0-12: 1st of month backups (0 = disabled)
-keep_yearly = 0    # 0-10: January 1st backups (0 = disabled)
+# 1-365: daily full backups to keep
+max_backups = 1
+# 0-52: Sunday backups (0 = disabled)
+keep_weekly = 0
+# 0-12: 1st of month backups (0 = disabled)
+keep_monthly = 0
+# 0-10: January 1st backups (0 = disabled)
+keep_yearly = 0
 
 [server.scheduler.tasks.backup_hourly]
 # Hourly incremental backup (disabled by default)
@@ -34813,10 +35252,12 @@ groups:
 server:
   backup:
     encryption:
-      enabled: true       # true if password was set
+      # true if password was set
+      enabled: true
       # Password is NEVER stored - prompted on-demand
   compliance:
-    enabled: false        # HIPAA, SOC2, etc.
+    # HIPAA, SOC2, etc.
+    enabled: false
     # If true, backup.encryption.enabled MUST be true
 ```
 
@@ -34921,10 +35362,14 @@ Shown on:
 server:
   backup:
     retention:
-      max_backups: 1     # 1-365: daily full backups
-      keep_weekly: 0     # 0-52: Sunday backups (0 = disabled)
-      keep_monthly: 0    # 0-12: 1st of month (0 = disabled)
-      keep_yearly: 0     # 0-10: January 1st (0 = disabled)
+      # 1-365: daily full backups
+      max_backups: 1
+      # 0-52: Sunday backups (0 = disabled)
+      keep_weekly: 0
+      # 0-12: 1st of month (0 = disabled)
+      keep_monthly: 0
+      # 0-10: January 1st (0 = disabled)
+      keep_yearly: 0
 ```
 
 **Default: 2 files total** (yesterday's full + today's incremental)
@@ -35654,7 +36099,8 @@ pub async fn check_for_update(
     let response = client.execute(req).await?;
 
     if response.status() == StatusCode::NOT_FOUND {
-        return Ok(None); // No updates available
+        // No updates available
+        return Ok(None);
     }
     if response.status() != StatusCode::OK {
         return Err(anyhow::anyhow!("GitHub API error: {}", response.status()));
@@ -35663,7 +36109,8 @@ pub async fn check_for_update(
     if branch == "stable" {
         let release: Release = response.json().await?;
         if release.tag_name == current_version {
-            return Ok(None); // Already up to date
+            // Already up to date
+            return Ok(None);
         }
         return Ok(Some(release));
     }
@@ -36066,9 +36513,12 @@ init [SHELL]                          - Print shell init command for eval
 
 Usage:
   # Add to shell profile for persistent completions
-  {project_name} --shell init >> ~/.bashrc      # bash
-  {project_name} --shell init >> ~/.zshrc       # zsh
-  {project_name} --shell init >> ~/.config/fish/config.fish  # fish
+  # bash
+  {project_name} --shell init >> ~/.bashrc
+  # zsh
+  {project_name} --shell init >> ~/.zshrc
+  # fish
+  {project_name} --shell init >> ~/.config/fish/config.fish
 
   # Or eval directly for current session
   eval "$({project_name} --shell init)"
@@ -36871,7 +37321,8 @@ WantedBy=multi-user.target
 
 name="{internal_name}"
 description="{app_name}"
-command="/usr/local/bin/{project_name}"   # actual binary (may differ from {internal_name} after rename)
+# actual binary (may differ from {internal_name} after rename)
+command="/usr/local/bin/{project_name}"
 command_args=""
 command_user="{internal_name}:{internal_name}"
 pidfile="/var/run/{project_org}/{internal_name}.pid"
@@ -37257,9 +37708,11 @@ format_version_tag() {
     # Matches: 0.2.0, 1.2.3, 10.5.2-rc1
     # Does NOT match: dev, beta, daily, 20251218
     if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-        echo "v$tag"        # 0.2.0 → v0.2.0
+        # 0.2.0 → v0.2.0
+        echo "v$tag"
     else
-        echo "$tag"         # dev → dev (no v)
+        # dev → dev (no v)
+        echo "$tag"
     fi
 }
 
@@ -37787,16 +38240,22 @@ docker run --rm \
 **Typical workflow:**
 ```bash
 # Active development
-make dev                # Quick build to temp dir
-make test               # Unit tests
+# Quick build to temp dir
+make dev
+# Unit tests
+make test
 
 # Before commit
-./tests/run_tests.sh    # Integration tests (auto-detects incus/docker)
+# Integration tests (auto-detects incus/docker)
+./tests/run_tests.sh
 
 # Before release
-make local               # Production build locally
-./tests/incus.sh        # Full systemd testing (PREFERRED)
-make build              # Full cross-platform build
+# Production build locally
+make local
+# Full systemd testing (PREFERRED)
+./tests/incus.sh
+# Full cross-platform build
+make build
 ```
 
 ## Directory Rules
@@ -38497,9 +38956,12 @@ networks:
 ```yaml
 x-logging: &default-logging
   options:
-    max-size: '5m'    # Max 5MB per log file
-    max-file: '1'     # Keep only 1 log file
-  driver: json-file   # JSON format for parsing
+    # Max 5MB per log file
+    max-size: '5m'
+    # Keep only 1 log file
+    max-file: '1'
+  # JSON format for parsing
+  driver: json-file
 ```
 
 **Every service MUST use the anchor:**
@@ -39112,7 +39574,8 @@ $TEMP_DIR/
 ```bash
 # Setup (uses OS temp dir: {ostempdir}/{project_org}/{internal_name}-XXXXXX/)
 # Set PROJECT_ROOT to your actual project location
-PROJECT_ROOT="$(git rev-parse --show-toplevel)"  # Use git top-level
+# Use git top-level
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 # Or use absolute path: PROJECT_ROOT="/path/to/your/project"
 mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
 TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
@@ -39328,7 +39791,8 @@ TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/{project_org}/{internal_name}-XXXXXX")
 mkdir -p "$TEMP_DIR/volumes/config" "$TEMP_DIR/volumes/data"
 cp docker/docker-compose.test.yml "$TEMP_DIR/docker-compose.yml"
 cd "$TEMP_DIR" && docker compose up --abort-on-container-exit
-rm -rf "$TEMP_DIR"  # Cleanup after tests
+# Cleanup after tests
+rm -rf "$TEMP_DIR"
 ```
 
 ### Docker Compose with Database Example
@@ -39626,7 +40090,8 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - run: cargo audit
-      - run: cargo deny check  # Additional jobs (same pattern — no ensure-build-image; container: image: casjaysdev/rust:latest directly):
+      # Additional jobs (same pattern — no ensure-build-image; container: image: casjaysdev/rust:latest directly):
+      - run: cargo deny check
   # secret-scan, workflow-policy, image-scan (needs: build), coverage (needs: test), upload-artifacts (needs: build)
 ```
 
@@ -40009,7 +40474,8 @@ name: Daily Build
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # 3am UTC daily
+    # 3am UTC daily
+    - cron: '0 3 * * *'
   push:
     branches:
       - main
@@ -40218,7 +40684,8 @@ name: Docker Build
 
 on:
   push:
-    branches: ['**']  # ALL branches
+    # ALL branches
+    branches: ['**']
     tags:
       - 'v*'
       - '*.*.*'
@@ -40843,7 +41310,8 @@ name: Daily Build
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # 3am UTC daily
+    # 3am UTC daily
+    - cron: '0 3 * * *'
   push:
     branches:
       - main
@@ -41023,7 +41491,8 @@ name: Docker Build
 
 on:
   push:
-    branches: ['**']  # ALL branches
+    # ALL branches
+    branches: ['**']
     tags:
       - 'v*'
       - '*.*.*'
@@ -41077,7 +41546,8 @@ jobs:
           echo "YYMM=$(date +"%y%m")" >> $GITEA_ENV
           if [[ "${{ gitea.ref }}" == refs/tags/* ]]; then
             VERSION="${GITEA_REF_NAME}"
-            echo "VERSION=${VERSION#v}" >> $GITEA_ENV  # Strip 'v' prefix
+            # Strip 'v' prefix
+            echo "VERSION=${VERSION#v}" >> $GITEA_ENV
             echo "IS_TAG=true" >> $GITEA_ENV
           else
             echo "VERSION=$(git rev-parse --short HEAD)" >> $GITEA_ENV
@@ -41862,7 +42332,8 @@ pipeline {
 
         // ----- GITHUB (default) -----
         GIT_FQDN = 'github.com'
-        GIT_TOKEN = credentials('github-token')  // Jenkins credentials ID
+        // Jenkins credentials ID
+        GIT_TOKEN = credentials('github-token')
         REGISTRY = "ghcr.io/${PROJECT_ORG}/${PROJECT_NAME}"
 
         // ----- GITEA / FORGEJO (self-hosted) -----
@@ -43037,35 +43508,48 @@ rm -rf "${TMPDIR:-/tmp}/${PROJECT_ORG}/"
 **Frontend Route Testing (ALL routes):**
 ```bash
 # Every frontend route MUST be tested with BOTH:
-curl -q -LSsf -H "Accept: text/html" /route          # Returns HTML
-curl -q -LSsf -H "Accept: text/plain" /route         # Returns plain text
+# Returns HTML
+curl -q -LSsf -H "Accept: text/html" /route
+# Returns plain text
+curl -q -LSsf -H "Accept: text/plain" /route
 
 # Example: Test user profile page
-curl -q -LSsf -H "Accept: text/html" /users/john     # HTML page
-curl -q -LSsf -H "Accept: text/plain" /users/john    # Plain text output
+# HTML page
+curl -q -LSsf -H "Accept: text/html" /users/john
+# Plain text output
+curl -q -LSsf -H "Accept: text/plain" /users/john
 ```
 
 **Backend/API Route Testing (ALL routes):**
 ```bash
 # Every API route MUST be tested with BOTH:
-curl -q -LSsf -H "Accept: application/json" /api/v1/resource    # Returns JSON
-curl -q -LSsf -H "Accept: text/plain" /api/v1/resource          # Returns plain text
+# Returns JSON
+curl -q -LSsf -H "Accept: application/json" /api/v1/resource
+# Returns plain text
+curl -q -LSsf -H "Accept: text/plain" /api/v1/resource
 
 # Example: Test jokes API
-curl -q -LSsf -H "Accept: application/json" /api/v1/jokes/random   # JSON response
-curl -q -LSsf -H "Accept: text/plain" /api/v1/jokes/random         # Plain text response
+# JSON response
+curl -q -LSsf -H "Accept: application/json" /api/v1/jokes/random
+# Plain text response
+curl -q -LSsf -H "Accept: text/plain" /api/v1/jokes/random
 ```
 
 **Backend .txt Endpoint Testing (ALL endpoints):**
 ```bash
 # Every *.txt endpoint MUST be tested:
-curl -q -LSsf /robots.txt                            # Robots file
-curl -q -LSsf /.well-known/security.txt              # Security policy (well-known)
-curl -q -LSsf /api/v1/jokes/random.txt               # API .txt extension
+# Robots file
+curl -q -LSsf /robots.txt
+# Security policy (well-known)
+curl -q -LSsf /.well-known/security.txt
+# API .txt extension
+curl -q -LSsf /api/v1/jokes/random.txt
 
 # ALL API endpoints that support .txt MUST be tested with .txt
-curl -q -LSsf /api/v1/users/john.txt                 # User profile as text
-curl -q -LSsf /api/v1/weather/Chicago.txt            # Weather as text
+# User profile as text
+curl -q -LSsf /api/v1/users/john.txt
+# Weather as text
+curl -q -LSsf /api/v1/weather/Chicago.txt
 ```
 
 **Test Matrix Template:**
@@ -43128,73 +43612,109 @@ done
 **Example: User management project MUST test:**
 ```bash
 # API - Current user (authenticated)
-GET    /api/{api_version}/users           # Get current user profile (API JSON)
-PATCH  /api/{api_version}/users           # Update current user profile (API JSON)
+# Get current user profile (API JSON)
+GET    /api/{api_version}/users
+# Update current user profile (API JSON)
+PATCH  /api/{api_version}/users
 
 # API - Public profiles (by username)
-GET    /api/{api_version}/users/{username}     # Read public profile (API JSON)
-GET    /api/{api_version}/users/{username}.txt # Read public profile (API plain text)
+# Read public profile (API JSON)
+GET    /api/{api_version}/users/{username}
+# Read public profile (API plain text)
+GET    /api/{api_version}/users/{username}.txt
 
 # API - Admin managing users (by ID)
-GET    /api/{api_version}/server/{admin_path}/config/users        # List all users (admin)
-GET    /api/{api_version}/server/{admin_path}/config/users/1      # Read specific user (admin)
-PATCH  /api/{api_version}/server/{admin_path}/config/users/1      # Update specific user (admin)
-DELETE /api/{api_version}/server/{admin_path}/config/users/1      # Delete specific user (admin)
+# List all users (admin)
+GET    /api/{api_version}/server/{admin_path}/config/users
+# Read specific user (admin)
+GET    /api/{api_version}/server/{admin_path}/config/users/1
+# Update specific user (admin)
+PATCH  /api/{api_version}/server/{admin_path}/config/users/1
+# Delete specific user (admin)
+DELETE /api/{api_version}/server/{admin_path}/config/users/1
 
 # Frontend routes (smart detection) - CLI gets beautiful formatted text via HTML2TextConverter
-curl -q -LSsf /users                              # CLI → formatted text (current user)
-browser /users                                    # Browser → HTML page (current user)
-curl -q -LSsf /{username}                         # CLI → formatted text (public profile)
-curl -q -LSsf -H "Accept: text/plain" /{username} # Formatted text (Accept header)
-curl -q -LSsf -H "Accept: text/html" /{username}  # HTML (Accept header)
+# CLI → formatted text (current user)
+curl -q -LSsf /users
+# Browser → HTML page (current user)
+browser /users
+# CLI → formatted text (public profile)
+curl -q -LSsf /{username}
+# Formatted text (Accept header)
+curl -q -LSsf -H "Accept: text/plain" /{username}
+# HTML (Accept header)
+curl -q -LSsf -H "Accept: text/html" /{username}
 ```
 
 **Example: Jokes API (read-only) MUST test:**
 ```bash
 # API endpoints
-GET /api/{api_version}/jokes/random             # Random joke (JSON)
-GET /api/{api_version}/jokes/random.txt         # Random joke (text)
-GET /api/{api_version}/jokes/programming        # Category filter (JSON)
-GET /api/{api_version}/jokes/search?q=bug       # Search (JSON)
+# Random joke (JSON)
+GET /api/{api_version}/jokes/random
+# Random joke (text)
+GET /api/{api_version}/jokes/random.txt
+# Category filter (JSON)
+GET /api/{api_version}/jokes/programming
+# Search (JSON)
+GET /api/{api_version}/jokes/search?q=bug
 
 # Frontend endpoints (smart detection) - CLI gets formatted text
-curl -q -LSsf /jokes/random                   # CLI → formatted text
-curl -q -LSsf /jokes                          # CLI → formatted text list
-curl -q -LSsf -H "Accept: text/html" /jokes   # Browser → HTML
+# CLI → formatted text
+curl -q -LSsf /jokes/random
+# CLI → formatted text list
+curl -q -LSsf /jokes
+# Browser → HTML
+curl -q -LSsf -H "Accept: text/html" /jokes
 ```
 
 **Example: Weather API (external integration) MUST test:**
 ```bash
 # API endpoints with location params
-GET /api/{api_version}/weather/current/New%20York        # Current weather (JSON)
-GET /api/{api_version}/weather/current/New%20York.txt    # Current weather (text)
-GET /api/{api_version}/weather/forecast/10001            # ZIP code forecast (JSON)
-GET /api/{api_version}/weather/alerts/40.7128,-74.0060   # Lat/long alerts (JSON)
+# Current weather (JSON)
+GET /api/{api_version}/weather/current/New%20York
+# Current weather (text)
+GET /api/{api_version}/weather/current/New%20York.txt
+# ZIP code forecast (JSON)
+GET /api/{api_version}/weather/forecast/10001
+# Lat/long alerts (JSON)
+GET /api/{api_version}/weather/alerts/40.7128,-74.0060
 
 # Test caching behavior
-GET /api/{api_version}/weather/current/Chicago           # First call (cache miss)
-GET /api/{api_version}/weather/current/Chicago           # Second call (cache hit, faster)
+# First call (cache miss)
+GET /api/{api_version}/weather/current/Chicago
+# Second call (cache hit, faster)
+GET /api/{api_version}/weather/current/Chicago
 
 # Frontend (smart detection) - CLI gets formatted text
-curl -q -LSsf /weather/Chicago                # CLI → formatted text
-curl -q -LSsf /weather/forecast/90210         # CLI → formatted text forecast
+# CLI → formatted text
+curl -q -LSsf /weather/Chicago
+# CLI → formatted text forecast
+curl -q -LSsf /weather/forecast/90210
 ```
 
 **Example: Link Shortener (URL mapping) MUST test:**
 ```bash
 # API CRUD for short links
-POST   /api/{api_version}/links -d '{"url":"https://example.com/long/url"}'  # Create
-GET    /api/{api_version}/links/abc123         # Get link details (JSON)
-PUT    /api/{api_version}/links/abc123 -d '{"url":"https://new.com"}'        # Update
-DELETE /api/{api_version}/links/abc123         # Delete
+# Create
+POST   /api/{api_version}/links -d '{"url":"https://example.com/long/url"}'
+# Get link details (JSON)
+GET    /api/{api_version}/links/abc123
+# Update
+PUT    /api/{api_version}/links/abc123 -d '{"url":"https://new.com"}'
+# Delete
+DELETE /api/{api_version}/links/abc123
 
 # Redirect resolution
-GET /abc123                          # Should redirect to destination
-GET /abc123/stats                    # Link statistics (JSON or HTML)
+# Should redirect to destination
+GET /abc123
+# Link statistics (JSON or HTML)
+GET /abc123/stats
 
 # Frontend (smart detection)
-curl -q -LSsf /links                          # User's links list (text)
-curl -q -LSsf /links/abc123                   # Link details (text)
+# User's links list (text)
+curl -q -LSsf /links
+# Link details (text)
+curl -q -LSsf /links/abc123
 ```
 
 ### Rust Unit Test Requirements
@@ -43441,8 +43961,10 @@ verify_all_endpoints_tested
 
 **Test Execution Order:**
 ```bash
-1. make test                    # Rust unit tests (fast)
-2. ./tests/run_tests.sh         # Integration tests (slower, full coverage)
+# Rust unit tests (fast)
+1. make test
+# Integration tests (slower, full coverage)
+2. ./tests/run_tests.sh
 ```
 
 ### Integration Testing Strategy
@@ -44313,7 +44835,8 @@ pub async fn admin_auth_middleware(
 # Set project path to YOUR actual project location (examples shown below)
 # Use git top-level if in a git repo: PROJECT_PATH="$(git rev-parse --show-toplevel)"
 # Or use absolute path to your project directory
-PROJECT_PATH="/root/Projects/github/apimgr/{project_name}"  # Example 1
+# Example 1
+PROJECT_PATH="/root/Projects/github/apimgr/{project_name}"
 # PROJECT_PATH="~/Documents/myproject"                     # Example 2
 # PROJECT_PATH="~/myproject"                               # Example 3
 # PROJECT_PATH="/workspace/dev/myproject"                  # Example 4
@@ -44702,7 +45225,8 @@ site_author: {project_org}
 
 repo_name: {project_org}/{internal_name}
 repo_url: {PLATFORM_REPO_URL}
-edit_uri: edit/main/docs/  # Adjust path format for GitLab/Gitea if needed
+# Adjust path format for GitLab/Gitea if needed
+edit_uri: edit/main/docs/
 
 theme:
   name: material
@@ -44800,7 +45324,8 @@ nav:
     - Configuration: configuration.md
   - Usage:
     - API Reference: api.md
-    - CLI Reference: cli.md         # Remove if project has no CLI surface
+    # Remove if project has no CLI surface
+    - CLI Reference: cli.md
     - Admin Panel: admin.md
     - Security: security.md
     - Integrations: integrations.md
@@ -44809,7 +45334,8 @@ nav:
 
 extra:
   social:
-    - icon: fontawesome/brands/git-alt  # Or github/gitlab/gitea as appropriate
+    # Or github/gitlab/gitea as appropriate
+    - icon: fontawesome/brands/git-alt
       link: {PLATFORM_REPO_URL}
   generator: false
 ```
@@ -44824,9 +45350,11 @@ extra:
 version: 2
 
 build:
-  os: ubuntu-24.04          # Use latest Ubuntu LTS
+  # Use latest Ubuntu LTS
+  os: ubuntu-24.04
   tools:
-    python: "3.12"          # Use latest stable Python
+    # Use latest stable Python
+    python: "3.12"
 
 mkdocs:
   configuration: mkdocs.yml
@@ -46911,9 +47439,8 @@ async fn handle_error(
 }
 ```
 
+Response to `GET /api/v1/items/999?lang=es`:
 ```json
-// GET /api/v1/items/999?lang=es
-// Response:
 {
   "ok": false,
   "error": "NOT_FOUND",
@@ -46930,7 +47457,8 @@ async fn swagger_handler(
     State(state): State<Arc<AppState>>,
     Extension(lang): Extension<String>,
 ) -> impl IntoResponse {
-    let spec = generate_swagger_spec(&lang); // translates descriptions
+    // translates descriptions
+    let spec = generate_swagger_spec(&lang);
     Json(spec)
 }
 ```
@@ -47231,7 +47759,8 @@ server:
       - ja
     fallback_language: en
     cookie_name: lang
-    cookie_max_age: 365d  # 1 year
+    # 1 year
+    cookie_max_age: 365d
 ```
 
 ---
@@ -49337,8 +49866,10 @@ The CLI never adds URLs that weren't in the autodiscover response — operators 
 
 ```yaml
 update:
-  auto: false                # default false for CLI (interactive prompt unless explicitly opted in). Server / agent default true.
-  check_interval: per_invocation   # CLI is short-lived; checks once per command. No background poll.
+  # default false for CLI (interactive prompt unless explicitly opted in). Server / agent default true.
+  auto: false
+  # CLI is short-lived; checks once per command. No background poll.
+  check_interval: per_invocation
   channel: stable
 ```
 
@@ -49478,17 +50009,22 @@ pub async fn validate_access(
 
 ```bash
 # Default: use token owner's personal context (no --user flag)
-{project_name}-cli list                    # GET /api/{api_version}/users/{resource} (current user)
+# GET /api/{api_version}/users/{resource} (current user)
+{project_name}-cli list
 
 # Explicit user context (view another user's public resources)
-{project_name}-cli --user @alice list      # GET /api/{api_version}/users/alice/{resource}
+# GET /api/{api_version}/users/alice/{resource}
+{project_name}-cli --user @alice list
 
 # Org context (user must have org access)
-{project_name}-cli --user +acme-corp list  # GET /api/{api_version}/orgs/acme-corp/{resource}
+# GET /api/{api_version}/orgs/acme-corp/{resource}
+{project_name}-cli --user +acme-corp list
 
 # Auto-detect: CLI determines if name is user or org
-{project_name}-cli --user alice list       # GET /api/{api_version}/users/alice/{resource} (if user)
-{project_name}-cli --user acme-corp list   # GET /api/{api_version}/orgs/acme-corp/{resource} (if org)
+# GET /api/{api_version}/users/alice/{resource} (if user)
+{project_name}-cli --user alice list
+# GET /api/{api_version}/orgs/acme-corp/{resource} (if org)
+{project_name}-cli --user acme-corp list
 ```
 
 **Note:** `{resource}` is the project-specific resource type (e.g., `repos`, `pastes`, `links`). See IDEA.md for your project's resources.
@@ -49551,23 +50087,34 @@ CLI receives --user flag
 
 ```bash
 # Token: alice (no org access)
-{project_name}-cli list                    # Uses alice's context (only option)
-{project_name}-cli --user alice list       # Same (redundant but valid)
-{project_name}-cli --user acme-corp list   # ERROR: no access to acme-corp
+# Uses alice's context (only option)
+{project_name}-cli list
+# Same (redundant but valid)
+{project_name}-cli --user alice list
+# ERROR: no access to acme-corp
+{project_name}-cli --user acme-corp list
 
 # Token: scoped to acme-corp only (org-specific token)
-{project_name}-cli list                    # Uses acme-corp context (only option)
-{project_name}-cli --user acme-corp list   # Same (redundant but valid)
-{project_name}-cli --user @me list         # ERROR: token not scoped to user
+# Uses acme-corp context (only option)
+{project_name}-cli list
+# Same (redundant but valid)
+{project_name}-cli --user acme-corp list
+# ERROR: token not scoped to user
+{project_name}-cli --user @me list
 
 # Token: alice + acme-corp (user has one org)
-{project_name}-cli list                    # Uses alice's context (default = user)
-{project_name}-cli --user acme-corp list   # Uses acme-corp context
+# Uses alice's context (default = user)
+{project_name}-cli list
+# Uses acme-corp context
+{project_name}-cli --user acme-corp list
 
 # Token: alice + acme-corp + dev-team (user has multiple orgs)
-{project_name}-cli list                    # Uses alice's context (default = user)
-{project_name}-cli --user acme-corp list   # Uses acme-corp context
-{project_name}-cli --user dev-team list    # Uses dev-team context
+# Uses alice's context (default = user)
+{project_name}-cli list
+# Uses acme-corp context
+{project_name}-cli --user acme-corp list
+# Uses dev-team context
+{project_name}-cli --user dev-team list
 ```
 
 **Server-side scope detection:**
@@ -49683,7 +50230,8 @@ pub fn save_if_empty_or_invalid(
 
 ```bash
 # @me always means token owner
-{project_name}-cli --user @me list    # Always personal context
+# Always personal context
+{project_name}-cli --user @me list
 ```
 
 ## Modes
@@ -49739,25 +50287,36 @@ display:
 
 **Exit-immediately flags (NEVER launch TUI):**
 ```bash
-{project_name}-cli -h                    # Print help, exit
-{project_name}-cli --help                # Print help, exit
-{project_name}-cli -v                    # Print version, exit
-{project_name}-cli --version             # Print version, exit
+# Print help, exit
+{project_name}-cli -h
+# Print help, exit
+{project_name}-cli --help
+# Print version, exit
+{project_name}-cli -v
+# Print version, exit
+{project_name}-cli --version
 ```
 
 **Config flags (still launch TUI):**
 ```bash
-{project_name}-cli                                    # TUI mode
-{project_name}-cli --config dev                       # TUI mode (with dev.yml)
-{project_name}-cli --server https://example.com       # TUI mode (with server)
-{project_name}-cli --token abc123                     # TUI mode (with token)
+# TUI mode
+{project_name}-cli
+# TUI mode (with dev.yml)
+{project_name}-cli --config dev
+# TUI mode (with server)
+{project_name}-cli --server https://example.com
+# TUI mode (with token)
+{project_name}-cli --token abc123
 ```
 
 **Command/args (CLI mode):**
 ```bash
-{project_name}-cli list                               # CLI mode
-{project_name}-cli golang tutorials                   # CLI mode (search)
-{project_name}-cli notes.txt                          # CLI mode (paste file)
+# CLI mode
+{project_name}-cli list
+# CLI mode (search)
+{project_name}-cli golang tutorials
+# CLI mode (paste file)
+{project_name}-cli notes.txt
 ```
 
 ```rust
@@ -49784,15 +50343,18 @@ pub fn detect_mode(args: &[String]) -> &'static str {
 
     for arg in &args[1..] {
         if !arg.starts_with('-') {
-            return "cli";  // Command/arg provided
+            // Command/arg provided
+            return "cli";
         }
         let flag = arg.split('=').next().unwrap_or(arg);
         if !config_flags.contains(&flag) {
-            return "cli";  // Action flag
+            // Action flag
+            return "cli";
         }
     }
 
-    "tui"  // No args or config-only = TUI
+    // No args or config-only = TUI
+    "tui"
 }
 ```
 
@@ -50414,7 +50976,8 @@ pub fn is_remote_session() -> bool {
 ```yaml
 # cli.yml - theme section (same format as server.yml)
 theme:
-  mode: auto          # dark (default), light, auto
+  # dark (default), light, auto
+  mode: auto
 ```
 
 ### TUI Styles from Palette
@@ -50915,7 +51478,8 @@ When launched with no arguments in an interactive terminal:
 
 ```bash
 # Launch TUI (no arguments needed)
-{project_name}-cli              # Opens TUI automatically
+# Opens TUI automatically
+{project_name}-cli
 
 # TUI provides:
 # - Interactive menus
@@ -51274,9 +51838,12 @@ fn resolve_yaml_extension(path: &Path) -> PathBuf {
 **Example usage:**
 ```bash
 # Use different configs for different environments
-{project_name}-cli --config dev list              # Uses ~/.config/.../dev.yml
-{project_name}-cli --config staging list          # Uses ~/.config/.../staging.yml
-{project_name}-cli --config ~/work/prod.yml list  # Uses absolute path
+# Uses ~/.config/.../dev.yml
+{project_name}-cli --config dev list
+# Uses ~/.config/.../staging.yml
+{project_name}-cli --config staging list
+# Uses absolute path
+{project_name}-cli --config ~/work/prod.yml list
 
 # Config profiles allow different servers/tokens without flags
 # dev.yml:   server: https://dev.example.com, token: dev-token
@@ -51293,51 +51860,77 @@ fn resolve_yaml_extension(path: &Path) -> PathBuf {
 
 # Server connection
 server:
-  primary: ""                      # Server URL (empty = use {official_site} or prompt)
-  cluster: []                      # Auto-discovered cluster nodes
-  api_version: v1                  # API version prefix (default: v1, must match server)
-  admin_path: admin                # Admin path (default: admin, must match server)
-  timeout: 30s                     # Request timeout (match server default)
-  retry: 3                         # Retry attempts on failure
-  retry_delay: 1s                  # Delay between retries
+  # Server URL (empty = use {official_site} or prompt)
+  primary: ""
+  # Auto-discovered cluster nodes
+  cluster: []
+  # API version prefix (default: v1, must match server)
+  api_version: v1
+  # Admin path (default: admin, must match server)
+  admin_path: admin
+  # Request timeout (match server default)
+  timeout: 30s
+  # Retry attempts on failure
+  retry: 3
+  # Delay between retries
+  retry_delay: 1s
 
 # Authentication (required for multi-user, see PART 34/35)
 auth:
-  token: ""                        # API token (usr_xxx, see PART 11)
-  token_file: ""                   # Read token from file instead
+  # API token (usr_xxx, see PART 11)
+  token: ""
+  # Read token from file instead
+  token_file: ""
   # No default_context - default is ALWAYS token owner (user)
   # Use --user {org} to switch to org context
 
 # Output preferences
 output:
-  format: table                    # Default: table, json, yaml, plain, csv
-  color: auto                      # auto, yes, no (match terminal detection)
-  pager: auto                      # auto, always, never (use less/more for long output)
-  quiet: false                     # Suppress non-essential output
-  verbose: false                   # Extra output (same as --verbose)
+  # Default: table, json, yaml, plain, csv
+  format: table
+  # auto, yes, no (match terminal detection)
+  color: auto
+  # auto, always, never (use less/more for long output)
+  pager: auto
+  # Suppress non-essential output
+  quiet: false
+  # Extra output (same as --verbose)
+  verbose: false
 
 # TUI preferences (if TUI supported)
 tui:
-  enabled: true                    # Allow TUI mode (false = CLI-only)
-  theme: dark                      # dark, light, system (match server theme options)
-  mouse: true                      # Enable mouse support
-  unicode: true                    # Use unicode characters (false = ASCII only)
+  # Allow TUI mode (false = CLI-only)
+  enabled: true
+  # dark, light, system (match server theme options)
+  theme: dark
+  # Enable mouse support
+  mouse: true
+  # Use unicode characters (false = ASCII only)
+  unicode: true
 
 # Logging
 logging:
-  level: info                      # debug, info, warn, error (match server default)
-  file: ""                         # Log file path (empty = {log_dir}/cli.log)
-  max_size: 10MB                   # Max log file size (match server default)
-  max_files: 5                     # Max log files to keep (match server default)
+  # debug, info, warn, error (match server default)
+  level: info
+  # Log file path (empty = {log_dir}/cli.log)
+  file: ""
+  # Max log file size (match server default)
+  max_size: 10MB
+  # Max log files to keep (match server default)
+  max_files: 5
 
 # Cache
 cache:
-  enabled: true                    # Enable response caching
-  ttl: 5m                          # Cache TTL (5 minutes)
-  max_size: 100MB                  # Max cache size
+  # Enable response caching
+  enabled: true
+  # Cache TTL (5 minutes)
+  ttl: 5m
+  # Max cache size
+  max_size: 100MB
 
 # Debug
-debug: false                       # Enable debug mode (same as --debug)
+# Enable debug mode (same as --debug)
+debug: false
 
 # Project-specific defaults (flag defaults)
 defaults:
@@ -51430,9 +52023,11 @@ fn save_if_empty(
         return Err(format!("invalid value: {}", new_value));
     }
     if current.is_empty() {
-        return Ok(new_value.to_string()); // Save to config
+        // Save to config
+        return Ok(new_value.to_string());
     }
-    Ok(new_value.to_string()) // Use for session, don't save (current preserved)
+    // Use for session, don't save (current preserved)
+    Ok(new_value.to_string())
 }
 ```
 
@@ -51527,19 +52122,27 @@ See PART 5: Boolean Handling for the complete implementation.
 
 **Usage in flags:**
 ```bash
-{project_name}-cli --public                    # Boolean flag (true)
-{project_name}-cli --public=yes                # Explicit truthy
-{project_name}-cli --public=no                 # Explicit falsey
-{project_name}-cli --expire=0                  # Falsey = no expiration
-{project_name}-cli --expire=disabled           # Falsey = no expiration
+# Boolean flag (true)
+{project_name}-cli --public
+# Explicit truthy
+{project_name}-cli --public=yes
+# Explicit falsey
+{project_name}-cli --public=no
+# Falsey = no expiration
+{project_name}-cli --expire=0
+# Falsey = no expiration
+{project_name}-cli --expire=disabled
 ```
 
 **Config file (cli.yml):**
 ```yaml
 server:
-  verify_ssl: yes        # Truthy
-  auto_update: false     # Falsey
-  notifications: enabled # Truthy
+  # Truthy
+  verify_ssl: yes
+  # Falsey
+  auto_update: false
+  # Truthy
+  notifications: enabled
 ```
 
 **ALL boolean inputs MUST use `config::parse_bool()` or `config::is_truthy()` - NEVER `str::parse::<bool>()`.**
@@ -51576,29 +52179,42 @@ server:
 **Search/Query CLI (minimal flags):**
 ```bash
 # Args ARE the search - no flags needed for basic use
-{project_name}-cli golang tutorials           # Search
-{project_name}-cli --limit 10 golang          # With limit
-{project_name}-cli --output json golang       # JSON output
+# Search
+{project_name}-cli golang tutorials
+# With limit
+{project_name}-cli --limit 10 golang
+# JSON output
+{project_name}-cli --output json golang
 ```
 
 **Pastebin/Content CLI:**
 ```bash
 # Smart detection handles input, flags for metadata
-{project_name}-cli notes.txt                          # File (detected), uses defaults
-{project_name}-cli notes.txt --public yes             # Public paste
-{project_name}-cli notes.txt --public no              # Private (requires auth)
-{project_name}-cli notes.txt --public unlisted        # Unlisted (default)
-{project_name}-cli notes.txt --expire 24h             # Expiration
-{project_name}-cli notes.txt --syntax python          # Syntax highlight
-{project_name}-cli notes.txt --author "John"          # Author name
+# File (detected), uses defaults
+{project_name}-cli notes.txt
+# Public paste
+{project_name}-cli notes.txt --public yes
+# Private (requires auth)
+{project_name}-cli notes.txt --public no
+# Unlisted (default)
+{project_name}-cli notes.txt --public unlisted
+# Expiration
+{project_name}-cli notes.txt --expire 24h
+# Syntax highlight
+{project_name}-cli notes.txt --syntax python
+# Author name
+{project_name}-cli notes.txt --author "John"
 ```
 
 **API/Data CLI:**
 ```bash
 # Resource-specific flags
-{project_name}-cli get abc123                         # Get by ID
-{project_name}-cli list --limit 20 --offset 0         # Pagination
-{project_name}-cli delete abc123 --force              # Dangerous ops need confirm
+# Get by ID
+{project_name}-cli get abc123
+# Pagination
+{project_name}-cli list --limit 20 --offset 0
+# Dangerous ops need confirm
+{project_name}-cli delete abc123 --force
 ```
 
 ### Flag Defaults from Config
@@ -51608,12 +52224,18 @@ server:
 ```yaml
 # cli.yml - defaults for flags
 defaults:
-  lang: auto            # --lang default (auto = detect from env, or "en", "es", etc.)
-  public: unlisted      # --public default (yes, no, unlisted)
-  expire: 24h           # --expire default
-  syntax: auto          # --syntax default
-  output: table         # --output default (json, table, plain)
-  limit: 20             # --limit default
+  # --lang default (auto = detect from env, or "en", "es", etc.)
+  lang: auto
+  # --public default (yes, no, unlisted)
+  public: unlisted
+  # --expire default
+  expire: 24h
+  # --syntax default
+  syntax: auto
+  # --output default (json, table, plain)
+  output: table
+  # --limit default
+  limit: 20
 ```
 
 **Precedence (highest to lowest):**
@@ -51647,11 +52269,14 @@ defaults:
 ```bash
 # These are equivalent:
 eval "$({project_name} --shell init)"
-eval "$({project_name} --shell init bash)"      # if $SHELL=/bin/bash
+# if $SHELL=/bin/bash
+eval "$({project_name} --shell init bash)"
 
 # init outputs the eval command, completions outputs the script:
-{project_name} --shell init        # → source <({project_name} --shell completions bash)
-{project_name} --shell completions # → (actual completion script)
+# → source <({project_name} --shell completions bash)
+{project_name} --shell init
+# → (actual completion script)
+{project_name} --shell completions
 ```
 
 **Supported shells:**
@@ -51682,8 +52307,10 @@ eval "$({project_name} --shell init bash)"      # if $SHELL=/bin/bash
 
 # Auto-detect shell (omit SHELL argument)
 {project_name} --shell completions > ~/completions/{project_name}
-{project_name}-cli --shell init                    # auto-detect, print init
-eval "$({project_name} --shell init)"              # auto-detect in eval
+# auto-detect, print init
+{project_name}-cli --shell init
+# auto-detect in eval
+eval "$({project_name} --shell init)"
 
 # Specific shell init
 eval "$({project_name}-cli --shell init bash)"
@@ -51694,9 +52321,12 @@ eval "$({project_name}-agent --shell init zsh)"
 **Add to shell rc file:**
 ```bash
 # ~/.bashrc, ~/.zshrc, ~/.config/fish/config.fish, etc.
-eval "$({project_name} --shell init)"        # server (auto-detect)
-eval "$({project_name}-cli --shell init)"    # client (auto-detect)
-eval "$({project_name}-agent --shell init)"  # agent (auto-detect)
+# server (auto-detect)
+eval "$({project_name} --shell init)"
+# client (auto-detect)
+eval "$({project_name}-cli --shell init)"
+# agent (auto-detect)
+eval "$({project_name}-agent --shell init)"
 ```
 
 **Why built-in (not separate files):**
@@ -51794,7 +52424,8 @@ $ {project_name}-cli --help
 
 Usage:
   {project_name}-cli [args] [flags]
-  {project_name}-cli                    # TUI mode (no args)
+  # TUI mode (no args)
+  {project_name}-cli
 
 Options:
 -h, --help                             - Show help
@@ -51827,10 +52458,12 @@ Run '{project_name}-cli <command> help' for detailed help on any command.
 **If user renames binary:**
 ```bash
 $ mypaste --help
-mypaste {projectversion} - client for {project_name} API   # Shows actual binary name
+# Shows actual binary name
+mypaste {projectversion} - client for {project_name} API
 
 Usage:
-  mypaste [command] [flags]                     # Shows actual binary name
+  # Shows actual binary name
+  mypaste [command] [flags]
 ...
 ```
 
@@ -51844,7 +52477,8 @@ $ {project_name}-cli --version
 
 # If renamed:
 $ mypaste --version
-mypaste {projectversion} ({commit_sha}) built {build_date}   # Shows actual name
+# Shows actual name
+mypaste {projectversion} ({commit_sha}) built {build_date}
 ```
 
 Same format as server:
@@ -52254,18 +52888,25 @@ Each project defines its own commands based on its API.
 **Search/Query Services:**
 ```bash
 # Bare args = search term (no --query flag needed)
-{project_name}-cli golang tutorials        # Search for "golang tutorials"
-{project_name}-cli "exact phrase"          # Quoted = exact match
-{project_name}-cli --limit 5 golang        # Flags before search term OK
+# Search for "golang tutorials"
+{project_name}-cli golang tutorials
+# Quoted = exact match
+{project_name}-cli "exact phrase"
+# Flags before search term OK
+{project_name}-cli --limit 5 golang
 ```
 
 **Content/Paste Services:**
 ```bash
 # Detection order: stdin → file → directory → text
-echo "hello" | {project_name}-cli          # stdin detected → paste stdin
-{project_name}-cli notes.txt               # File exists → paste file content
-{project_name}-cli /path/to/dir            # Directory → error or list
-{project_name}-cli "some text here"        # Not file → paste as text
+# stdin detected → paste stdin
+echo "hello" | {project_name}-cli
+# File exists → paste file content
+{project_name}-cli notes.txt
+# Directory → error or list
+{project_name}-cli /path/to/dir
+# Not file → paste as text
+{project_name}-cli "some text here"
 ```
 
 **Detection Logic:**
@@ -52327,8 +52968,10 @@ pub fn detect_input(args: &[String]) -> InputSource {
 
 **Explicit flags still work (override detection):**
 ```bash
-{project_name}-cli --file notes.txt        # Force file mode
-{project_name}-cli --text "notes.txt"      # Force text mode (not file)
+# Force file mode
+{project_name}-cli --file notes.txt
+# Force text mode (not file)
+{project_name}-cli --text "notes.txt"
 ```
 
 ## Build Integration
@@ -52453,7 +53096,8 @@ impl SizeMode {
             SizeMode::Minimal => 3,
             SizeMode::Compact => 4,
             SizeMode::Standard => 6,
-            _ => 10, // Wide, Ultrawide, Massive
+            // Wide, Ultrawide, Massive
+            _ => 10,
         }
     }
 }
@@ -52572,7 +53216,8 @@ pub const TUI_THEME_LIGHT: TuiTheme = TuiTheme {
 **Theme is set in cli.yml:**
 ```yaml
 tui:
-  theme: dark    # dark (default) or light
+  # dark (default) or light
+  theme: dark
 ```
 
 ### TUI Implementation Guidance
@@ -52662,17 +53307,21 @@ use std::collections::HashMap;
 
 pub fn default_key_bindings() -> HashMap<&'static str, &'static str> {
     let mut m = HashMap::new();
-    m.insert("up", "k");      // vim-style, single key
+    // vim-style, single key
+    m.insert("up", "k");
     m.insert("down", "j");
     m.insert("left", "h");
     m.insert("right", "l");
     m.insert("select", "enter");
-    m.insert("back", "escape"); // Also 'b' as alternative
+    // Also 'b' as alternative
+    m.insert("back", "escape");
     m.insert("quit", "q");
     m.insert("help", "?");
     m.insert("search", "/");
-    m.insert("top", "g");       // Go to top
-    m.insert("bottom", "G");    // Go to bottom
+    // Go to top
+    m.insert("top", "g");
+    // Go to bottom
+    m.insert("bottom", "G");
     m
 }
 ```
@@ -52680,10 +53329,14 @@ pub fn default_key_bindings() -> HashMap<&'static str, &'static str> {
 **Testing Small Terminals:**
 ```bash
 # Test with different terminal sizes
-resize -s 10 40   # Phone portrait (micro)
-resize -s 16 60   # Phone landscape (minimal)
-resize -s 24 80   # Standard terminal
-resize -s 40 120  # Large monitor
+# Phone portrait (micro)
+resize -s 10 40
+# Phone landscape (minimal)
+resize -s 16 60
+# Standard terminal
+resize -s 24 80
+# Large monitor
+resize -s 40 120
 
 # Or use stty
 stty rows 10 cols 40
@@ -53161,37 +53814,55 @@ Tags: production, web-tier
 
 ```bash
 # Information
---help, -h                    # Show help
---version, -v                 # Show version (same format as server)
---shell completions [SHELL]   # Print shell completions (auto-detect if SHELL omitted)
---shell init [SHELL]          # Print shell init command (auto-detect if SHELL omitted)
---status                      # Show status and health (exit 0=healthy, 1=unhealthy)
+# Show help
+--help, -h
+# Show version (same format as server)
+--version, -v
+# Print shell completions (auto-detect if SHELL omitted)
+--shell completions [SHELL]
+# Print shell init command (auto-detect if SHELL omitted)
+--shell init [SHELL]
+# Show status and health (exit 0=healthy, 1=unhealthy)
+--status
 
 # Configuration
---config {path}               # Config directory (default: {config_dir})
---data {path}                 # Data directory override
---log {path}                  # Log directory override
+# Config directory (default: {config_dir})
+--config {path}
+# Data directory override
+--data {path}
+# Log directory override
+--log {path}
 
 # Connection (can also be set in agent.toml)
---server {url}                # Server URL to connect to
---token {token}               # Authentication token (from server)
+# Server URL to connect to
+--server {url}
+# Authentication token (from server)
+--token {token}
 
 # Runtime
---mode {production|development}  # Force mode (auto-detected by default)
---debug                       # Enable debug logging (implies development features)
---color {auto|yes|no}   # Color output (default: auto, respects NO_COLOR)
---lang {code}                 # Language for output (default: auto, from LANG env)
+# Force mode (auto-detected by default)
+--mode {production|development}
+# Enable debug logging (implies development features)
+--debug
+# Color output (default: auto, respects NO_COLOR)
+--color {auto|yes|no}
+# Language for output (default: auto, from LANG env)
+--lang {code}
 
 # Commands (subcommands like server)
-status                        # Show agent status
-test                          # Test server connection
-register                      # Interactive registration with server
+# Show agent status
+status
+# Test server connection
+test
+# Interactive registration with server
+register
 
 # Service management (same as server)
 --service {install|uninstall|start|stop|restart|status}
 
 # Updates (same as server/CLI)
---update [check|yes]          # Check for or perform self-update
+# Check for or perform self-update
+--update [check|yes]
 ```
 
 ### Agent --help Output
@@ -53272,11 +53943,16 @@ Shells: bash, zsh, fish, sh, dash, ksh, powershell, pwsh
   Agent is now sending data to server for admin scope.
 
 # Service management
-{project_name}-agent --service install   # Install as system service
-{project_name}-agent --service start     # Start service
-{project_name}-agent --service stop      # Stop service
-{project_name}-agent --service status    # Show service status
-{project_name}-agent --service uninstall # Remove service
+# Install as system service
+{project_name}-agent --service install
+# Start service
+{project_name}-agent --service start
+# Stop service
+{project_name}-agent --service stop
+# Show service status
+{project_name}-agent --service status
+# Remove service
+{project_name}-agent --service uninstall
 ```
 
 ### Agent Setup Process
@@ -53401,50 +54077,76 @@ pub fn generate_agent_token(scope: AgentScope) -> String {
 # Agent configuration - ALL options with defaults
 
 # Language for agent output and API requests
-lang = "auto"                        # auto = detect from env, or "en", "es", etc.
+# auto = detect from env, or "en", "es", etc.
+lang = "auto"
 
 [server]
-primary = ""                         # Server URL (required, set during registration)
-cluster = []                         # Auto-discovered cluster nodes
-api_version = "v1"                   # API version prefix (default: v1, must match server)
-admin_path = "admin"                 # Admin path (default: admin, must match server)
-timeout = "30s"                      # Request timeout (match server default)
-retry = 3                            # Retry attempts on failure
-retry_delay = "5s"                   # Delay between retries
-reconnect_delay = "10s"              # Delay before reconnect attempt
+# Server URL (required, set during registration)
+primary = ""
+# Auto-discovered cluster nodes
+cluster = []
+# API version prefix (default: v1, must match server)
+api_version = "v1"
+# Admin path (default: admin, must match server)
+admin_path = "admin"
+# Request timeout (match server default)
+timeout = "30s"
+# Retry attempts on failure
+retry = 3
+# Delay between retries
+retry_delay = "5s"
+# Delay before reconnect attempt
+reconnect_delay = "10s"
 
 [auth]
-token = ""                           # Agent token ({scope}_agt_xxx, see PART 11)
-token_file = ""                      # Read token from file instead
+# Agent token ({scope}_agt_xxx, see PART 11)
+token = ""
+# Read token from file instead
+token_file = ""
 
 [identity]
-hostname = ""                        # Hostname (auto-detect if empty)
-display_name = ""                    # Friendly name (defaults to hostname)
-tags = []                            # Tags for grouping ["production", "web-tier"]
+# Hostname (auto-detect if empty)
+hostname = ""
+# Friendly name (defaults to hostname)
+display_name = ""
+# Tags for grouping ["production", "web-tier"]
+tags = []
 
-[identity.labels]                    # Key-value labels {environment: prod, tier: web}
+# Key-value labels {environment: prod, tier: web}
+[identity.labels]
 
 [collection]
-enabled = true                       # Enable data collection
-interval = "60s"                     # Collection interval
-batch_size = 100                     # Max items per batch
-buffer_size = 1000                   # Max buffered items if offline
+# Enable data collection
+enabled = true
+# Collection interval
+interval = "60s"
+# Max items per batch
+batch_size = 100
+# Max buffered items if offline
+buffer_size = 1000
 
 [logging]
-level = "info"                       # debug, info, warn, error (match server default)
-file = ""                            # Log file path (empty = {log_dir}/agent.log)
-max_size = "10MB"                    # Max log file size (match server default)
-max_files = 5                        # Max log files to keep (match server default)
+# debug, info, warn, error (match server default)
+level = "info"
+# Log file path (empty = {log_dir}/agent.log)
+file = ""
+# Max log file size (match server default)
+max_size = "10MB"
+# Max log files to keep (match server default)
+max_files = 5
 
 [health]
-enabled = true                       # Report agent health to server
-interval = "30s"                     # Health check interval
+# Report agent health to server
+enabled = true
+# Health check interval
+interval = "30s"
 
 # Enable debug mode (same as --debug)
 debug = false
 
 # Mode (auto-detected, can override)
-mode = ""                            # production, development (empty = auto-detect)
+# production, development (empty = auto-detect)
+mode = ""
 ```
 
 **Config precedence (highest to lowest):**
@@ -53556,14 +54258,20 @@ mode = ""                            # production, development (empty = auto-det
 
 ```bash
 # Client (user context - runs as "alice")
-~/.config/{project_org}/{internal_name}/cli.toml        # Alice's config
-~/.local/share/{project_org}/{internal_name}/           # Alice's data
-~/.local/log/{project_org}/{internal_name}/cli.log      # Alice's logs
+# Alice's config
+~/.config/{project_org}/{internal_name}/cli.toml
+# Alice's data
+~/.local/share/{project_org}/{internal_name}/
+# Alice's logs
+~/.local/log/{project_org}/{internal_name}/cli.log
 
 # Agent (system context - runs as root)
-/etc/{project_org}/{internal_name}/agent.toml           # System config
-/var/lib/{project_org}/{internal_name}/                 # System data
-/var/log/{project_org}/{internal_name}/agent.log        # System logs
+# System config
+/etc/{project_org}/{internal_name}/agent.toml
+# System data
+/var/lib/{project_org}/{internal_name}/
+# System logs
+/var/log/{project_org}/{internal_name}/agent.log
 ```
 
 **Platform-Specific Paths:**
@@ -53701,11 +54409,16 @@ SERVER STARTUP                          AGENT STARTUP
 
 **Admin flags (Client only):**
 ```bash
-{project_name}-cli --admin users list          # List all users
-{project_name}-cli --admin users create ...    # Create user
-{project_name}-cli --admin server status       # Server status
-{project_name}-cli --admin server config       # View/edit config
-{project_name}-cli --admin backup create       # Create backup
+# List all users
+{project_name}-cli --admin users list
+# Create user
+{project_name}-cli --admin users create ...
+# Server status
+{project_name}-cli --admin server status
+# View/edit config
+{project_name}-cli --admin server config
+# Create backup
+{project_name}-cli --admin backup create
 ```
 
 ### Agent = Purpose-Specific Worker
@@ -53906,7 +54619,8 @@ enabled = true
 
 [users.registration]
 # Registration mode: open, invite, admin_only, disabled
-mode = "open"   # Default: anyone can self-register
+# Default: anyone can self-register
+mode = "open"
 ```
 
 ### Registration Mode Definitions
@@ -54511,10 +55225,12 @@ pub static EMAIL_DOMAIN_BLOCKLIST: &[&str] = &[
 **Database Fields:**
 ```sql
 -- Users
-visibility TEXT NOT NULL DEFAULT 'public'  -- public, private
+-- public, private
+visibility TEXT NOT NULL DEFAULT 'public'
 
 -- Organizations
-visibility TEXT NOT NULL DEFAULT 'public'  -- public, private
+-- public, private
+visibility TEXT NOT NULL DEFAULT 'public'
 ```
 
 **API Behavior:**
@@ -55131,7 +55847,8 @@ server:
             groups: "groups"
           # Username confirmation behavior for new external accounts
           username_resolution:
-            mode: prompt_on_first_login   # prompt_on_first_login | prompt_if_conflict | reject_if_conflict
+            # prompt_on_first_login | prompt_if_conflict | reject_if_conflict
+            mode: prompt_on_first_login
             allow_custom_on_first_login: true
           # Map external groups to Server Admin role
           # Users in these groups become Server Admins
@@ -55168,7 +55885,8 @@ server:
               name: "cn"
               groups: "memberOf"
             username_resolution:
-              mode: prompt_on_first_login   # prompt_on_first_login | prompt_if_conflict | reject_if_conflict
+              # prompt_on_first_login | prompt_if_conflict | reject_if_conflict
+              mode: prompt_on_first_login
               allow_custom_on_first_login: true
             # Map LDAP groups to Server Admin role
             admin_groups:
@@ -55413,11 +56131,14 @@ server:
       require_email_verification: true
 
       # Email domain restrictions (applies to open mode)
-      allowed_domains: []      # Empty = all domains allowed
-      blocked_domains: []      # Block specific domains
+      # Empty = all domains allowed
+      allowed_domains: []
+      # Block specific domains
+      blocked_domains: []
 
       # Invite / activation settings (admin-generated links)
-      invite_expiration_days: 7     # How long invite or activation links are valid
+      # How long invite or activation links are valid
+      invite_expiration_days: 7
 
     roles:
       # Available roles
@@ -56130,11 +56851,16 @@ PATCH /api/{api_version}/users/settings
 
 ```bash
 # All of these are valid search patterns:
-curl "/?q=hello"                           # Web search from root
-curl "/api/{api_version}/?q=hello"                    # API search from root
-curl "/search?q=hello"                     # Web dedicated search
-curl "/api/{api_version}/search?q=hello"              # API dedicated search
-curl "/api/{api_version}/search/hello"                # Path-based search (also valid)
+# Web search from root
+curl "/?q=hello"
+# API search from root
+curl "/api/{api_version}/?q=hello"
+# Web dedicated search
+curl "/search?q=hello"
+# API dedicated search
+curl "/api/{api_version}/search?q=hello"
+# Path-based search (also valid)
+curl "/api/{api_version}/search/hello"
 ```
 
 ### /api/autodiscover
@@ -56973,7 +57699,8 @@ All nodes need shared access to:
 server:
   database:
     driver: postgres
-    url: ${DATABASE_URL}  # postgres://user:pass@host:5432/dbname?sslmode=require
+    # postgres://user:pass@host:5432/dbname?sslmode=require
+    url: ${DATABASE_URL}
 ```
 
 **Using individual fields:**
@@ -58538,17 +59265,16 @@ GET /api/{api_version}/orgs/acme-corp/members/private_user
 }
 ```
 
-**Private user with org_visibility=true, viewed publicly:**
+**Private user with org_visibility=true, viewed publicly — returns 404, not 403 (don't leak existence):**
 ```json
 GET /api/{api_version}/public/users/private_user
 {
     "error": "not_found",
     "message": "User not found"
 }
-// Returns 404, not 403 (don't leak existence)
 ```
 
-**Private user with org_visibility=false, viewed by org member:**
+**Private user with org_visibility=false, viewed by org member — only username and role shown, no avatar, no display name:**
 ```json
 GET /api/{api_version}/orgs/acme-corp/members/very_private_user
 {
@@ -58557,7 +59283,6 @@ GET /api/{api_version}/orgs/acme-corp/members/very_private_user
     "joined_at": "2024-08-01T10:00:00Z",
     "profile_visibility": "hidden"
 }
-// Only username and role shown - no avatar, no display name
 ```
 
 ### Database Schema Update
@@ -58932,36 +59657,55 @@ CREATE TABLE IF NOT EXISTS custom_domains (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
 
     -- Ownership
-    owner_type          TEXT NOT NULL,                      -- user, org
-    owner_id            INTEGER NOT NULL,                   -- FK to users or orgs
+    -- user, org
+    owner_type          TEXT NOT NULL,
+    -- FK to users or orgs
+    owner_id            INTEGER NOT NULL,
 
     -- Domain info
-    domain              TEXT NOT NULL UNIQUE,               -- The custom domain
-    is_apex             INTEGER NOT NULL DEFAULT 0,         -- Is apex domain (no subdomain)
-    is_wildcard         INTEGER NOT NULL DEFAULT 0,         -- Is wildcard (*.example.com)
+    -- The custom domain
+    domain              TEXT NOT NULL UNIQUE,
+    -- Is apex domain (no subdomain)
+    is_apex             INTEGER NOT NULL DEFAULT 0,
+    -- Is wildcard (*.example.com)
+    is_wildcard         INTEGER NOT NULL DEFAULT 0,
 
     -- Verification (domain must resolve to server IP)
-    verification_status TEXT NOT NULL DEFAULT 'pending',    -- pending, verified, failed
-    verified_at         INTEGER,                            -- When domain was verified
-    verified_ip         TEXT,                               -- IP that domain resolved to
-    last_check_at       INTEGER,                            -- Last verification check
-    check_count         INTEGER NOT NULL DEFAULT 0,         -- Number of verification attempts
+    -- pending, verified, failed
+    verification_status TEXT NOT NULL DEFAULT 'pending',
+    -- When domain was verified
+    verified_at         INTEGER,
+    -- IP that domain resolved to
+    verified_ip         TEXT,
+    -- Last verification check
+    last_check_at       INTEGER,
+    -- Number of verification attempts
+    check_count         INTEGER NOT NULL DEFAULT 0,
 
     -- SSL Configuration
     ssl_enabled         INTEGER NOT NULL DEFAULT 0,
-    ssl_status          TEXT NOT NULL DEFAULT 'none',       -- none, pending, active, expired, error
-    ssl_challenge       TEXT,                               -- http-01, tls-alpn-01, dns-01
-    ssl_provider        TEXT,                               -- DNS provider (only for dns-01)
-    ssl_credentials     TEXT,                               -- Encrypted provider credentials (only for dns-01)
-    ssl_cert_pem        TEXT,                               -- Encrypted certificate (PEM)
-    ssl_key_pem         TEXT,                               -- Encrypted private key (PEM)
+    -- none, pending, active, expired, error
+    ssl_status          TEXT NOT NULL DEFAULT 'none',
+    -- http-01, tls-alpn-01, dns-01
+    ssl_challenge       TEXT,
+    -- DNS provider (only for dns-01)
+    ssl_provider        TEXT,
+    -- Encrypted provider credentials (only for dns-01)
+    ssl_credentials     TEXT,
+    -- Encrypted certificate (PEM)
+    ssl_cert_pem        TEXT,
+    -- Encrypted private key (PEM)
+    ssl_key_pem         TEXT,
     ssl_issued_at       INTEGER,
     ssl_expires_at      INTEGER,
-    ssl_last_error      TEXT,                               -- Last SSL error message
+    -- Last SSL error message
+    ssl_last_error      TEXT,
 
     -- Status
-    status              TEXT NOT NULL DEFAULT 'pending',    -- pending, active, suspended, error
-    suspended_reason    TEXT,                               -- Why domain was suspended
+    -- pending, active, suspended, error
+    status              TEXT NOT NULL DEFAULT 'pending',
+    -- Why domain was suspended
+    suspended_reason    TEXT,
 
     -- Timestamps
     created_at          INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
@@ -58979,10 +59723,13 @@ CREATE INDEX IF NOT EXISTS idx_custom_domains_ssl_expires ON custom_domains(ssl_
 CREATE TABLE IF NOT EXISTS custom_domain_audit (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     domain_id       INTEGER NOT NULL REFERENCES custom_domains(id) ON DELETE CASCADE,
-    action          TEXT NOT NULL,                          -- created, verified, ssl_issued, suspended, deleted
-    actor_type      TEXT NOT NULL,                          -- user, org, admin, system
+    -- created, verified, ssl_issued, suspended, deleted
+    action          TEXT NOT NULL,
+    -- user, org, admin, system
+    actor_type      TEXT NOT NULL,
     actor_id        INTEGER,
-    details         TEXT,                                   -- JSON details
+    -- JSON details
+    details         TEXT,
     created_at      INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
 
@@ -59610,18 +60357,21 @@ server:
     tasks:
       custom_domain_verification:
         enabled: true
-        schedule: "*/15 * * * *"        # Every 15 minutes
+        # Every 15 minutes
+        schedule: "*/15 * * * *"
         description: "Retry pending domain verifications"
 
       custom_domain_ssl_renewal:
         enabled: true
-        schedule: "0 4 * * *"           # Daily at 4:00 AM
+        # Daily at 4:00 AM
+        schedule: "0 4 * * *"
         description: "Renew expiring custom domain SSL certs"
         renew_before: 7d
 
       custom_domain_cleanup:
         enabled: true
-        schedule: "0 5 * * *"           # Daily at 5:00 AM
+        # Daily at 5:00 AM
+        schedule: "0 5 * * *"
         description: "Remove unverified domains after TTL"
 ```
 
@@ -60177,10 +60927,14 @@ cd "$TEMP_DIR" && docker compose up -d
 
 **Makefile Targets:**
 ```bash
-make dev    # Quick build → temp dir (no version info)
-make build  # Full build → binaries/ (with --release flags)
-make test   # Run tests in container
-make docker # Build Docker image
+# Quick build → temp dir (no version info)
+make dev
+# Full build → binaries/ (with --release flags)
+make build
+# Run tests in container
+make test
+# Build Docker image
+make docker
 ```
 
 **Cryptography:**
