@@ -37895,10 +37895,11 @@ RELDIR := releases
 
 # Cargo cache bind-mounted from host
 # CARGO_CACHE and SCCACHE_CACHE are safe to share across concurrent builds (cargo + sccache use file locking)
+# CARGO_TARGET is scoped per project — Cargo target artifacts are not safe to share across projects
 CARGO_CACHE   ?= $(HOME)/.cargo
 RUSTUP_CACHE  ?= $(HOME)/.rustup
 SCCACHE_CACHE ?= $(HOME)/.cache/sccache
-CARGO_TARGET   ?= $(HOME)/.cache/cargo-target
+CARGO_TARGET  ?= $(HOME)/.cache/cargo-target/$(PROJECTNAME)
 
 # Build targets
 PLATFORMS ?= linux/amd64,linux/arm64
@@ -37915,6 +37916,7 @@ RUST_DOCKER := docker run --rm \
 	-v $(CARGO_CACHE):/usr/local/share/cargo \
 	-v $(RUSTUP_CACHE):/usr/local/share/rustup \
 	-v $(SCCACHE_CACHE):/root/.cache/sccache \
+	-v $(CARGO_TARGET):/app/target \
 	-w /app \
 	-e VERSION="$(VERSION)" \
 	-e COMMIT_ID="$(COMMIT_ID)" \
@@ -37928,7 +37930,7 @@ RUST_DOCKER := docker run --rm \
 # BUILD - Build all platforms + local binary (via Docker with cached registry)
 # =============================================================================
 build: clean
-	@mkdir -p $(BINDIR) $(CARGO_CACHE) $(RUSTUP_CACHE) $(SCCACHE_CACHE)
+	@mkdir -p $(BINDIR) $(CARGO_CACHE) $(RUSTUP_CACHE) $(SCCACHE_CACHE) $(CARGO_TARGET)
 	@echo "Building version $(VERSION)..."
 
 	# Build for local OS/ARCH
@@ -38016,7 +38018,7 @@ build: clean
 # LOCAL - Build local binaries only (fast development builds)
 # =============================================================================
 local: clean
-	@mkdir -p $(BINDIR) $(CARGO_CACHE) $(RUSTUP_CACHE) $(SCCACHE_CACHE)
+	@mkdir -p $(BINDIR) $(CARGO_CACHE) $(RUSTUP_CACHE) $(SCCACHE_CACHE) $(CARGO_TARGET)
 	@echo "Building local binaries version $(VERSION)..."
 
 	# Build server binary
@@ -38192,13 +38194,14 @@ pub const OFFICIAL_SITE: &str = env!("OFFICIAL_SITE");
 
 ## Cargo Cache Volumes
 
-All Docker builds mount three host directories to persist Cargo, Rustup, and sccache state:
+All Docker builds mount four host directories to persist Cargo, Rustup, sccache, and Cargo target state:
 
 | Cache | Local Path | Container Path |
 |-------|-----------|----------------|
 | Cargo home | `~/.cargo` | `/usr/local/share/cargo` |
 | Rustup home | `~/.rustup` | `/usr/local/share/rustup` |
 | sccache | `~/.cache/sccache` | `/root/.cache/sccache` |
+| Cargo target | `~/.cache/cargo-target/{project_name}` | `/app/target` |
 
 **Benefits:**
 - First build downloads crates once
@@ -42395,7 +42398,7 @@ pipeline {
         PROJECTORG = '{project_org}'
         BINDIR = 'binaries'
         RELDIR = 'releases'
-        // Rust cache bind-mounted from host: CARGO_HOME, RUSTUP_HOME, SCCACHE_DIR, and CARGO_TARGET_DIR
+        // Rust cache bind-mounted from host: CARGO_CACHE, RUSTUP_CACHE, SCCACHE_CACHE, and CARGO_TARGET
 
         // =========================================================================
         // GIT PROVIDER CONFIGURATION
@@ -42472,10 +42475,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET_DIR:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
@@ -42493,10 +42496,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET_DIR:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
@@ -42515,10 +42518,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET_DIR:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
@@ -42536,10 +42539,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET_DIR:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
@@ -42558,10 +42561,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET_DIR:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
@@ -42579,10 +42582,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET_DIR:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
@@ -42601,10 +42604,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET_DIR:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
@@ -42622,10 +42625,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET_DIR:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
@@ -42652,10 +42655,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET_DIR:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
@@ -42673,10 +42676,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET_DIR:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
@@ -42693,10 +42696,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target x86_64-apple-darwin --bin {project_name}-cli
@@ -42710,10 +42713,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target aarch64-apple-darwin --bin {project_name}-cli
@@ -42727,10 +42730,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target x86_64-pc-windows-gnu --bin {project_name}-cli
@@ -42744,10 +42747,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target aarch64-pc-windows-gnullvm --bin {project_name}-cli
@@ -42761,10 +42764,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target x86_64-unknown-freebsd --bin {project_name}-cli
@@ -42778,10 +42781,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target aarch64-unknown-freebsd --bin {project_name}-cli
@@ -42804,10 +42807,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target x86_64-unknown-linux-musl --bin {project_name}-agent
@@ -42821,10 +42824,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target aarch64-unknown-linux-musl --bin {project_name}-agent
@@ -42838,10 +42841,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target x86_64-apple-darwin --bin {project_name}-agent
@@ -42855,10 +42858,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target aarch64-apple-darwin --bin {project_name}-agent
@@ -42872,10 +42875,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target x86_64-pc-windows-gnu --bin {project_name}-agent
@@ -42889,10 +42892,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target aarch64-pc-windows-gnullvm --bin {project_name}-agent
@@ -42906,10 +42909,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target x86_64-unknown-freebsd --bin {project_name}-agent
@@ -42923,10 +42926,10 @@ pipeline {
                             docker run --rm \
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
-                                -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cargo build --release --target aarch64-unknown-freebsd --bin {project_name}-agent
@@ -42943,10 +42946,10 @@ pipeline {
                     docker run --rm \
                         --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                         -v ${WORKSPACE}:/app \
-                        -v ${CARGO_HOME:-$HOME/.cargo}:/usr/local/share/cargo \
-                        -v ${RUSTUP_HOME:-$HOME/.rustup}:/usr/local/share/rustup \
-                        -v ${SCCACHE_DIR:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                        -v ${CARGO_TARGET:-$HOME/.cache/cargo-target}:/app/target \
+                        -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                        -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                        -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                        -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                         -w /app \
                         casjaysdev/rust:latest \
                         cargo nextest run
@@ -44154,19 +44157,19 @@ BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
 trap "rm -rf $BUILD_DIR" EXIT
 
 # Rust cache directories (same as Makefile)
-# Cargo cache bind-mounted from host: CARGO_HOME, RUSTUP_HOME, and CARGO_TARGET (build artifacts)
-CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
-RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
-CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target}"
-mkdir -p "$CARGO_HOME" "$RUSTUP_HOME" "${SCCACHE_DIR:-$HOME/.cache/sccache}" "$CARGO_TARGET"
+# Cargo cache bind-mounted from host: CARGO_CACHE, RUSTUP_CACHE, SCCACHE_CACHE, and CARGO_TARGET (build artifacts)
+CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "${SCCACHE_CACHE:-$HOME/.cache/sccache}" "$CARGO_TARGET"
 
 # Common docker run for Rust builds
 RUST_DOCKER="docker run --rm \
   --name \"${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)\" \
   -v $PWD:/app \
-  -v $CARGO_HOME:/usr/local/share/cargo \
-  -v $RUSTUP_HOME:/usr/local/share/rustup \
-  -v "${SCCACHE_DIR:-$HOME/.cache/sccache}":/root/.cache/sccache \
+  -v $CARGO_CACHE:/usr/local/share/cargo \
+  -v $RUSTUP_CACHE:/usr/local/share/rustup \
+  -v "${SCCACHE_CACHE:-$HOME/.cache/sccache}":/root/.cache/sccache \
   -v $CARGO_TARGET:/app/target \
   -w /app \
   casjaysdev/rust:latest"
@@ -44409,19 +44412,19 @@ BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
 trap "rm -rf $BUILD_DIR; incus delete $CONTAINER_NAME --force 2>/dev/null || true" EXIT
 
 # Rust cache directories (same as Makefile)
-# Cargo cache bind-mounted from host: CARGO_HOME, RUSTUP_HOME, and CARGO_TARGET (build artifacts)
-CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
-RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
-CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target}"
-mkdir -p "$CARGO_HOME" "$RUSTUP_HOME" "${SCCACHE_DIR:-$HOME/.cache/sccache}" "$CARGO_TARGET"
+# Cargo cache bind-mounted from host: CARGO_CACHE, RUSTUP_CACHE, SCCACHE_CACHE, and CARGO_TARGET (build artifacts)
+CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "${SCCACHE_CACHE:-$HOME/.cache/sccache}" "$CARGO_TARGET"
 
 # Common docker run for Rust builds
 RUST_DOCKER="docker run --rm \
   --name \"${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)\" \
   -v $PWD:/app \
-  -v $CARGO_HOME:/usr/local/share/cargo \
-  -v $RUSTUP_HOME:/usr/local/share/rustup \
-  -v "${SCCACHE_DIR:-$HOME/.cache/sccache}":/root/.cache/sccache \
+  -v $CARGO_CACHE:/usr/local/share/cargo \
+  -v $RUSTUP_CACHE:/usr/local/share/rustup \
+  -v "${SCCACHE_CACHE:-$HOME/.cache/sccache}":/root/.cache/sccache \
   -v $CARGO_TARGET:/app/target \
   -w /app \
   casjaysdev/rust:latest"
@@ -44914,19 +44917,19 @@ PROJECT_PATH="/root/Projects/github/apimgr/{project_name}"
 # PROJECT_PATH="/workspace/dev/myproject"                  # Example 4
 
 # Rust cache directories (same as Makefile - speeds up builds significantly)
-# Cargo cache bind-mounted from host: CARGO_HOME, RUSTUP_HOME, and CARGO_TARGET (build artifacts)
-CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
-RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
-CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target}"
-mkdir -p "$CARGO_HOME" "$RUSTUP_HOME" "${SCCACHE_DIR:-$HOME/.cache/sccache}" "$CARGO_TARGET"
+# Cargo cache bind-mounted from host: CARGO_CACHE, RUSTUP_CACHE, SCCACHE_CACHE, and CARGO_TARGET (build artifacts)
+CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "${SCCACHE_CACHE:-$HOME/.cache/sccache}" "$CARGO_TARGET"
 
 # Common docker run for Rust commands
 RUST_DOCKER="docker run --rm \
   --name \"${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)\" \
   -v $PROJECT_PATH:/app \
-  -v $CARGO_HOME:/usr/local/share/cargo \
-  -v $RUSTUP_HOME:/usr/local/share/rustup \
-  -v "${SCCACHE_DIR:-$HOME/.cache/sccache}":/root/.cache/sccache \
+  -v $CARGO_CACHE:/usr/local/share/cargo \
+  -v $RUSTUP_CACHE:/usr/local/share/rustup \
+  -v "${SCCACHE_CACHE:-$HOME/.cache/sccache}":/root/.cache/sccache \
   -v $CARGO_TARGET:/app/target \
   -w /app"
 
@@ -44955,8 +44958,8 @@ $RUST_DOCKER casjaysdev/rust:latest cargo audit
 docker run --rm \
   --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
   -v $PROJECT_PATH:/app \
-  -v $CARGO_HOME:/usr/local/share/cargo \
-  -v $RUSTUP_HOME:/usr/local/share/rustup \
+  -v $CARGO_CACHE:/usr/local/share/cargo \
+  -v $RUSTUP_CACHE:/usr/local/share/rustup \
   -v $CARGO_TARGET:/app/target \
   -w /app \
   casjaysdev/rust:latest sh
@@ -44968,19 +44971,19 @@ docker run --rm \
 
 ```bash
 # Rust cache directories (same as Makefile)
-# Cargo cache bind-mounted from host: CARGO_HOME, RUSTUP_HOME, and CARGO_TARGET (build artifacts)
-CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
-RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
-CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target}"
-mkdir -p "$CARGO_HOME" "$RUSTUP_HOME" "${SCCACHE_DIR:-$HOME/.cache/sccache}" "$CARGO_TARGET"
+# Cargo cache bind-mounted from host: CARGO_CACHE, RUSTUP_CACHE, SCCACHE_CACHE, and CARGO_TARGET (build artifacts)
+CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "${SCCACHE_CACHE:-$HOME/.cache/sccache}" "$CARGO_TARGET"
 
 # Build (with caching)
 docker run --rm \
   --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
   -v $PWD:/app \
-  -v $CARGO_HOME:/usr/local/share/cargo \
-  -v $RUSTUP_HOME:/usr/local/share/rustup \
-  -v "${SCCACHE_DIR:-$HOME/.cache/sccache}":/root/.cache/sccache \
+  -v $CARGO_CACHE:/usr/local/share/cargo \
+  -v $RUSTUP_CACHE:/usr/local/share/rustup \
+  -v "${SCCACHE_CACHE:-$HOME/.cache/sccache}":/root/.cache/sccache \
   -v $CARGO_TARGET:/app/target \
   -w /app \
   casjaysdev/rust:latest cargo build --release --target x86_64-unknown-linux-musl
@@ -45005,11 +45008,11 @@ incus delete test-{project_name} --force
 
 ```bash
 # Rust cache directories (same as Makefile)
-# Cargo cache bind-mounted from host: CARGO_HOME, RUSTUP_HOME, and CARGO_TARGET (build artifacts)
-CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
-RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}"
-CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target}"
-mkdir -p "$CARGO_HOME" "$RUSTUP_HOME" "${SCCACHE_DIR:-$HOME/.cache/sccache}" "$CARGO_TARGET"
+# Cargo cache bind-mounted from host: CARGO_CACHE, RUSTUP_CACHE, SCCACHE_CACHE, and CARGO_TARGET (build artifacts)
+CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "${SCCACHE_CACHE:-$HOME/.cache/sccache}" "$CARGO_TARGET"
 
 # Create prefixed temp dir for test data
 mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
@@ -45020,9 +45023,9 @@ mkdir -p $TEST_DIR/{config,data,logs}
 docker run --rm \
   --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
   -v $PWD:/app \
-  -v $CARGO_HOME:/usr/local/share/cargo \
-  -v $RUSTUP_HOME:/usr/local/share/rustup \
-  -v "${SCCACHE_DIR:-$HOME/.cache/sccache}":/root/.cache/sccache \
+  -v $CARGO_CACHE:/usr/local/share/cargo \
+  -v $RUSTUP_CACHE:/usr/local/share/rustup \
+  -v "${SCCACHE_CACHE:-$HOME/.cache/sccache}":/root/.cache/sccache \
   -v $CARGO_TARGET:/app/target \
   -w /app \
   casjaysdev/rust:latest cargo build --release --target x86_64-unknown-linux-musl
@@ -60957,9 +60960,9 @@ maintainer_email: jane@example.com
 
 **Rust Cache (Host Bind-Mounts):**
 ```bash
-# Rust cache bind-mounted from host: CARGO_HOME, RUSTUP_HOME, and CARGO_TARGET (build cache)
-# Defaults: CARGO_HOME=$HOME/.cargo, RUSTUP_HOME=$HOME/.rustup, CARGO_TARGET=$HOME/.cache/cargo-target
-# Mount in Docker: -v $CARGO_HOME:/usr/local/share/cargo -v $RUSTUP_HOME:/usr/local/share/rustup -v $CARGO_TARGET:/app/target
+# Rust cache bind-mounted from host: CARGO_CACHE, RUSTUP_CACHE, SCCACHE_CACHE, and CARGO_TARGET (build cache)
+# Defaults: CARGO_CACHE=$HOME/.cargo, RUSTUP_CACHE=$HOME/.rustup, SCCACHE_CACHE=$HOME/.cache/sccache, CARGO_TARGET=$HOME/.cache/cargo-target/${PROJECT_NAME}
+# Mount in Docker: -v $CARGO_CACHE:/usr/local/share/cargo -v $RUSTUP_CACHE:/usr/local/share/rustup -v $CARGO_TARGET:/app/target
 ```
 
 **Temp Directory Workflow:**

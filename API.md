@@ -376,7 +376,7 @@ permission rules, business invariants. The HOW lives in AI.md PARTS 0-33; PART 3
 | `cargo test` (directly) | `make test` |
 | `cargo run` | `make dev` then run binary in Docker |
 
-**Makefile targets use Docker internally (`casjaysdev/rust:latest`) with host cache dirs (`CARGO_HOME_CACHE`) — local machine stays clean.**
+**Makefile targets use Docker internally (`casjaysdev/rust:latest`) with host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`/`CARGO_TARGET`) — local machine stays clean.**
 
 ### Debugging & Quick Tests (Docker with Tools)
 
@@ -423,7 +423,7 @@ docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -
 - Consistent environment (same as CI/CD and production)
 - No Rust installation required on local machine
 - No local machine contamination with test data
-- Reproducible builds (host cache dir `CARGO_HOME_CACHE` speeds up rebuilds)
+- Reproducible builds (host cache dirs `CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`/`CARGO_TARGET` speed up rebuilds)
 
 **Local Development Workflow:**
 ```bash
@@ -26706,8 +26706,11 @@ RELDIR := releases
 
 # Rust cache directories (persistent across builds)
 # CARGO_CACHE mounts .cargo; RUSTUP_CACHE mounts .rustup; SCCACHE_CACHE mounts sccache dir
+# CARGO_TARGET is scoped per project — Cargo target artifacts are not safe to share across projects
 CARGO_CACHE   ?= $(HOME)/.cargo
 RUSTUP_CACHE  ?= $(HOME)/.rustup
+SCCACHE_CACHE ?= $(HOME)/.cache/sccache
+CARGO_TARGET  ?= $(HOME)/.cache/cargo-target/$(PROJECTNAME)
 
 # Build targets
 PLATFORMS ?= linux/amd64,linux/arm64
@@ -26720,6 +26723,7 @@ RUST_DOCKER := docker run --rm \
 	-v $(CARGO_CACHE):/usr/local/share/cargo \
 	-v $(RUSTUP_CACHE):/usr/local/share/rustup \
 	-v $(SCCACHE_CACHE):/root/.cache/sccache \
+	-v $(CARGO_TARGET):/app/target \
 	-w /app \
 	casjaysdev/rust:latest
 
@@ -26729,7 +26733,7 @@ RUST_DOCKER := docker run --rm \
 # BUILD - Build all platforms + local binary (via Docker with cached modules)
 # =============================================================================
 build: clean
-	@mkdir -p $(BINDIR) $(CARGO_CACHE) $(RUSTUP_CACHE) $(SCCACHE_CACHE)
+	@mkdir -p $(BINDIR) $(CARGO_CACHE) $(RUSTUP_CACHE) $(SCCACHE_CACHE) $(CARGO_TARGET)
 	@echo "Building version $(VERSION)..."
 
 	# Download crates
@@ -26771,7 +26775,7 @@ build: clean
 # LOCAL - Build local binaries only (fast development builds)
 # =============================================================================
 local: clean
-	@mkdir -p $(BINDIR) $(CARGO_CACHE) $(RUSTUP_CACHE) $(SCCACHE_CACHE)
+	@mkdir -p $(BINDIR) $(CARGO_CACHE) $(RUSTUP_CACHE) $(SCCACHE_CACHE) $(CARGO_TARGET)
 	@echo "Building local binaries version $(VERSION)..."
 
 	# Fetch crates
@@ -26936,6 +26940,7 @@ All Docker builds use persistent Rust crate caching to avoid re-downloading depe
 | Cargo (`CARGO_CACHE`) | `~/.cargo` | `/usr/local/share/cargo` |
 | Rustup (`RUSTUP_CACHE`) | `~/.rustup` | `/usr/local/share/rustup` |
 | sccache (`SCCACHE_CACHE`) | `~/.cache/sccache` | `/root/.cache/sccache` |
+| Cargo target (`CARGO_TARGET`) | `~/.cache/cargo-target/{project_name}` | `/app/target` |
 
 **Benefits:**
 - First build downloads crates once
@@ -28350,7 +28355,7 @@ networks:
 | Aspect | Local Development | CI/CD Workflows |
 |--------|-------------------|-----------------|
 | **Rust installation** | Docker `casjaysdev/rust:latest` | Docker `casjaysdev/rust:latest` |
-| **Caching** | Host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`) bind-mounted into container | CI-native cache mounted into `casjaysdev/rust:latest` |
+| **Caching** | Host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`/`CARGO_TARGET`) bind-mounted into container | CI-native cache mounted into `casjaysdev/rust:latest` |
 | **Build command** | `make dev`, `make local`, `make build` | Direct `cargo build --release` with explicit flags |
 | **Testing** | Docker/Incus containers | `casjaysdev/rust:latest` job container or explicit `docker run` |
 | **Makefile** | ALWAYS use Makefile targets | NEVER use Makefile (explicit commands) |
@@ -30303,7 +30308,7 @@ pipeline {
         PROJECTORG = '{project_org}'
         BINDIR = 'binaries'
         RELDIR = 'releases'
-        // Rust cache bind-mounted from host: CARGO_CACHE (.cargo), RUSTUP_CACHE (.rustup), SCCACHE_CACHE (sccache)
+        // Rust cache bind-mounted from host: CARGO_CACHE (.cargo), RUSTUP_CACHE (.rustup), SCCACHE_CACHE (sccache), CARGO_TARGET (target dir, scoped per project)
 
         // =========================================================================
         // GIT PROVIDER CONFIGURATION
@@ -30380,7 +30385,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target x86_64-unknown-linux-musl
@@ -30396,7 +30403,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target aarch64-unknown-linux-musl
@@ -30413,7 +30422,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target x86_64-apple-darwin
@@ -30429,7 +30440,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target aarch64-apple-darwin
@@ -30446,7 +30459,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target x86_64-pc-windows-gnu
@@ -30462,7 +30477,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target aarch64-pc-windows-gnullvm
@@ -30479,7 +30496,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target x86_64-unknown-freebsd
@@ -30495,7 +30514,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target aarch64-unknown-freebsd
@@ -30520,7 +30541,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-cli
@@ -30536,7 +30559,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target aarch64-unknown-linux-musl --bin ${PROJECT_NAME}-cli
@@ -30552,7 +30577,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target x86_64-apple-darwin --bin ${PROJECT_NAME}-cli
@@ -30568,7 +30595,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target aarch64-apple-darwin --bin ${PROJECT_NAME}-cli
@@ -30584,7 +30613,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-cli
@@ -30600,7 +30631,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-cli
@@ -30616,7 +30649,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-cli
@@ -30632,7 +30667,9 @@ pipeline {
                                 --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                                 -v ${WORKSPACE}:/app \
                                 -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
                                 cross build --release --target aarch64-unknown-freebsd --bin ${PROJECT_NAME}-cli
@@ -30651,7 +30688,9 @@ pipeline {
                         --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                         -v ${WORKSPACE}:/app \
                         -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                        -v ${RUST_TARGET:-$HOME/.cargo/target}:/app/target \
+                        -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                        -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+                        -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                         -w /app \
                         casjaysdev/rust:latest \
                         cargo test --verbose
@@ -31691,7 +31730,8 @@ make build
 CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
 RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
 SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
-mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE"
+CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE" "$CARGO_TARGET"
 mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
 BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
 docker run --rm \
@@ -31700,6 +31740,7 @@ docker run --rm \
   -v $CARGO_CACHE:/usr/local/share/cargo \
   -v $RUSTUP_CACHE:/usr/local/share/rustup \
   -v $SCCACHE_CACHE:/root/.cache/sccache \
+  -v $CARGO_TARGET:/app/target \
   -w /app \
   casjaysdev/rust:latest cargo build --release
 
@@ -31800,6 +31841,7 @@ else
   -v $CARGO_CACHE:/usr/local/share/cargo \
   -v $RUSTUP_CACHE:/usr/local/share/rustup \
   -v $SCCACHE_CACHE:/root/.cache/sccache \
+  -v $CARGO_TARGET:/app/target \
   -w /app \
   casjaysdev/rust:latest"
     echo "Building server binary in Docker..."
@@ -31982,6 +32024,7 @@ else
   -v $CARGO_CACHE:/usr/local/share/cargo \
   -v $RUSTUP_CACHE:/usr/local/share/rustup \
   -v $SCCACHE_CACHE:/root/.cache/sccache \
+  -v $CARGO_TARGET:/app/target \
   -w /app \
   casjaysdev/rust:latest"
     echo "Building server binary in Docker..."
@@ -32301,7 +32344,8 @@ make clean
 CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
 RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
 SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
-mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE"
+CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE" "$CARGO_TARGET"
 
 # Common docker run for Rust commands (what the Makefile does internally)
 RUST_DOCKER="docker run --rm \
@@ -32340,6 +32384,7 @@ docker run --rm \
   -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
   -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
   -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
+  -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
   -w /app \
   casjaysdev/rust:latest sh
 ```
@@ -32359,7 +32404,8 @@ make test
 CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
 RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
 SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
-mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE"
+CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE" "$CARGO_TARGET"
 
 # Build (with caching)
 docker run --rm \
@@ -32368,6 +32414,7 @@ docker run --rm \
   -v $CARGO_CACHE:/usr/local/share/cargo \
   -v $RUSTUP_CACHE:/usr/local/share/rustup \
   -v $SCCACHE_CACHE:/root/.cache/sccache \
+  -v $CARGO_TARGET:/app/target \
   -w /app \
   casjaysdev/rust:latest cargo build --release
 cp target/release/{project_name} binaries/{project_name}
