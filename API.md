@@ -3922,12 +3922,12 @@ ls -la docker/
 
 **Client-Side Preferences:**
 
-User preferences like theme, language, and UI settings can be stored client-side:
+User preferences like theme, language, and UI settings are stored client-side:
 
 | Storage | Use Case | Persistence |
 |---------|----------|-------------|
-| `localStorage` | Theme, language, UI preferences | Until cleared |
-| Cookies | Session preferences, consent flags | Configurable expiry |
+| Cookies | Theme, language, consent flags, announcement dismissals — anything the server benefits from reading (server-rendered, no FOUC, works without JS) | Configurable expiry |
+| `localStorage` | Resource-owner API tokens (PART 12) and pure client-only state the server must never receive automatically | Until cleared |
 
 ## AI Implementation Process
 
@@ -15105,7 +15105,7 @@ When GDPR/CCPA (right to erasure) conflicts with HIPAA/SOC2 (retention requireme
 | `/server/privacy` | GET | Privacy policy |
 | `/server/dpo` | GET | Data Protection Officer contact (GDPR) |
 
-**Compliance is configured entirely in `server.yml`. Consent state is stored client-side (localStorage/cookies) — there is no server-side user consent table. Operators run `{project_name} compliance report` for a compliance summary.**
+**Compliance is configured entirely in `server.yml`. Consent state is stored client-side in the `consent` cookie (server-readable on every request) — there is no server-side user consent table. Operators run `{project_name} compliance report` for a compliance summary.**
 
 ### Compliance Audit Events
 
@@ -16470,8 +16470,8 @@ pub struct ConsentState {
     pub timestamp: i64,
 }
 
-// Stored in localStorage as JSON:
-// cookieConsent = {"essential":true,"preferences":true,"analytics":false,"timestamp":1704067200}
+// Stored in the consent cookie as URL-encoded JSON (server-readable on every request):
+// consent = {"essential":true,"preferences":true,"analytics":false,"timestamp":1704067200}
 ```
 
 ### Granular Consent UI (Manage Preferences)
@@ -18610,13 +18610,13 @@ See the **"Themes (NON-NEGOTIABLE - PROJECT-WIDE)"** section for the complete th
 **Theme Implementation Requirements:**
 
 1. **Theme Detection:**
-   - Check `localStorage` or cookie for user preference
-   - Fall back to `prefers-color-scheme` media query if auto mode
+   - Check the `theme` cookie (`light|dark|auto`) for user preference — a cookie, not `localStorage`, because the server must read it to render the theme class on `<html>` (no FOUC, works without JS)
+   - Fall back to the `prefers-color-scheme` media query if auto mode — pure CSS, so a no-JS visitor still gets correct auto theming
    - Default to dark if no preference set
 
 2. **Theme Switching:**
    - Provide theme toggle in UI (light/dark/auto)
-   - Store preference in `localStorage` or cookie
+   - Store preference in the `theme` cookie (server-readable)
    - Apply theme class to root element (`theme-light`, `theme-dark`)
    - NO page reload required
 
@@ -20413,27 +20413,31 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
   <div class="modal-content">
     <header class="modal-header">
       <h2 id="modal-title" class="modal-title">Confirm Delete</h2>
-      <button type="button" class="btn btn-icon modal-close" aria-label="Close dialog">
-        <svg>…</svg>
-      </button>
+      <form method="dialog">
+        <button class="btn btn-icon modal-close" aria-label="Close dialog">
+          <svg>…</svg>
+        </button>
+      </form>
     </header>
     <div class="modal-body">
       <p>Are you sure you want to delete this item? This action cannot be undone.</p>
     </div>
     <footer class="modal-footer">
-      <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+      <form method="dialog">
+        <button class="btn btn-secondary">Cancel</button>
+      </form>
       <button type="submit" class="btn btn-danger" form="delete-form">Delete</button>
     </footer>
   </div>
 </dialog>
 ```
 
+The Cancel and X buttons close the dialog natively via `<form method="dialog">` — zero JavaScript, and `Esc` closes it as well. Only opening the modal uses JS (`showModal()` has no HTML equivalent for `<dialog>`), which is a permitted enhancement: without JS the triggering action falls back to its plain-page flow.
+
 ```javascript
-// Open
+// Open — the only JS the modal needs; closing is native <form method="dialog">
 document.getElementById('confirm-delete-modal').showModal();
-// Close
-document.getElementById('confirm-delete-modal').close();
-// Close on backdrop click
+// Close on backdrop click (enhancement)
 modal.addEventListener('click', e => { if (e.target === modal) modal.close(); });
 ```
 
@@ -20458,6 +20462,8 @@ function showToast(message, type = 'info', duration = 4000) {
   }, duration);
 }
 ```
+
+Toasts are a JS enhancement for AJAX actions. Non-AJAX form POSTs get a server-rendered flash message instead: the redirect target renders the message in the same toast styling (auto-fade via CSS animation), so action feedback works without JavaScript — no dead ends.
 
 ```css
 .toast-container {
@@ -20530,7 +20536,7 @@ messages:
 
 ### Site Banner
 
-**Site-wide announcements (scheduled maintenance, service notices) are a server-rendered banner — the FIRST element inside `<body>`, before `<main>`. No notification center, no bell icon — API projects have no user accounts and no server-side notification storage (see PART 17 → "Notification Storage"). The banner renders without JavaScript; JS is only used for dismissal.**
+**Site-wide announcements (scheduled maintenance, service notices) are a server-rendered banner — the FIRST element inside `<body>`, before `<main>`. No notification center, no bell icon — API projects have no user accounts and no server-side notification storage (see PART 17 → "Notification Storage"). The banner renders without JavaScript, and dismissal works without JavaScript too — the X button is a tiny POST form; JS only removes the reload.**
 
 **Banner Behavior:**
 
@@ -20540,7 +20546,8 @@ messages:
 | **Placement** | Immediately after `<body>`, before `<main>` — rendered server-side in the base template, so there is no layout shift and no JS dependency |
 | **Types** | `info`, `warning`, `error`, `success` |
 | **ARIA** | `role="status"` for `info` and `success`; `role="alert"` for `warning` and `error` |
-| **Dismissal** | X button (only when `dismissible: true`); dismissal key in `localStorage` is the announcement `id`, so changing the `id` reshows the banner for everyone |
+| **Dismissal** | X button (only when `dismissible: true`) — a tiny `<form method="post" action="/announcements/dismiss">`; the server appends the announcement `id` to the `dismissed_announcements` cookie (comma-separated ids) and redirects back, so dismissal works with zero JS. The cookie is keyed on the announcement `id`, so changing the `id` reshows the banner for everyone |
+| **Storage** | `dismissed_announcements` cookie — server-readable, so the server skips rendering dismissed announcements entirely; no flash of a dismissed banner and no JS dependency |
 | **Expiry** | Per-announcement `start`/`end` (ISO 8601, UTC); outside the window = banner not rendered |
 | **Stacking** | Multiple active announcements stack in config order; cookie consent and the PWA update banner share the slot, ordered: cookie consent → announcements → PWA update |
 
@@ -20549,7 +20556,11 @@ messages:
   <div class="site-banner site-banner-warning" role="alert" data-announcement-id="maintenance-2025-01">
     <span class="site-banner-icon" aria-hidden="true">⚠</span>
     <span class="site-banner-text">Scheduled maintenance: 2026-07-06 02:00–04:00 UTC</span>
-    <button type="button" class="site-banner-close" aria-label="Dismiss announcement">&times;</button>
+    <form method="post" action="/announcements/dismiss">
+      <input type="hidden" name="id" value="maintenance-2025-01">
+      <input type="hidden" name="return_to" value="{{ current_path }}">
+      <button type="submit" class="site-banner-close" aria-label="Dismiss announcement">&times;</button>
+    </form>
   </div>
 
   <main>
@@ -20557,6 +20568,8 @@ messages:
   </main>
 </body>
 ```
+
+The server only renders banners whose `id` is absent from the `dismissed_announcements` cookie; `POST /announcements/dismiss` appends the submitted `id` to that cookie and redirects back to `return_to` (same-site relative paths only, as with `/consent`).
 
 ```css
 .site-banner {
@@ -20584,16 +20597,18 @@ messages:
 ```
 
 ```javascript
-// Dismissal is keyed on the announcement id — changing the id resets dismissals
-document.querySelectorAll(".site-banner").forEach((banner) => {
-  const key = "announcement_dismissed:" + banner.dataset.announcementId;
-  if (localStorage.getItem(key)) {
-    banner.remove();
-    return;
-  }
-  banner.querySelector(".site-banner-close")?.addEventListener("click", () => {
-    localStorage.setItem(key, "1");
-    banner.remove();
+// No-reload enhancement — the POST /announcements/dismiss fallback always works.
+// Dismissal is keyed on the announcement id — changing the id resets dismissals.
+document.querySelectorAll(".site-banner form").forEach((form) => {
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const id = form.elements.id.value;
+    const match = document.cookie.match(/(?:^|;\s*)dismissed_announcements=([^;]*)/);
+    const ids = match ? decodeURIComponent(match[1]).split(",").filter(Boolean) : [];
+    if (!ids.includes(id)) ids.push(id);
+    const value = encodeURIComponent(ids.join(","));
+    document.cookie = `dismissed_announcements=${value}; path=/; max-age=${60*60*24*365}; SameSite=Lax; Secure`;
+    form.closest(".site-banner").remove();
   });
 });
 ```
@@ -20607,26 +20622,21 @@ document.querySelectorAll(".site-banner").forEach((banner) => {
 </button>
 ```
 
+Theme preference is a `theme=light|dark|auto` COOKIE — server-readable, so `detect_theme()` (see "System Theme Detection") renders the correct class on `<html>` before the first byte of CSS applies: no FOUC, and theme selection works without JavaScript. `auto` (or no cookie) renders no override class; pure CSS `@media (prefers-color-scheme: light)` overrides the dark-default custom properties, so a no-JS visitor gets correct auto theming purely from CSS. There is no client-side init and no `matchMedia` script — the only JS is the toggle click handler (external file):
+
 ```javascript
+// static/js/theme.js — enhancement only; the server already rendered the
+// correct theme class from the theme cookie, so there is no init code
 const toggle = document.querySelector('.theme-toggle');
 const root   = document.documentElement;
 
-function applyTheme(theme) {
+toggle?.addEventListener('click', () => {
+  const next = root.classList.contains('theme-light') ? 'dark' : 'light';
   root.classList.remove('theme-dark', 'theme-light');
-  root.classList.add(`theme-${theme}`);
-  toggle.setAttribute('aria-pressed', theme === 'light' ? 'true' : 'false');
-  localStorage.setItem('theme', theme);
-}
-
-toggle.addEventListener('click', () => {
-  const current = localStorage.getItem('theme') || 'dark';
-  applyTheme(current === 'dark' ? 'light' : 'dark');
+  root.classList.add(`theme-${next}`);
+  toggle.setAttribute('aria-pressed', next === 'light' ? 'true' : 'false');
+  document.cookie = `theme=${next}; path=/; max-age=${60*60*24*365}; SameSite=Lax; Secure`;
 });
-
-// Init
-const saved = localStorage.getItem('theme');
-const preferred = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-applyTheme(saved || preferred);
 ```
 
 
@@ -20674,23 +20684,27 @@ applyTheme(saved || preferred);
 </div>
 ```
 
-```javascript
-function validateField(input) {
-  const error = document.getElementById(`${input.id}-error`);
-  if (!error) return;
-  if (input.validity.valid) {
-    input.setAttribute('aria-invalid', 'false');
-    error.hidden = true;
-    error.textContent = '';
-  } else {
-    input.setAttribute('aria-invalid', 'true');
-    error.hidden = false;
-    error.textContent = input.validationMessage;
-  }
+Error-after-interaction styling is pure CSS via `:user-invalid` (baseline 2023) — it matches only after the user has interacted with the field, so there is no blur-handler JS toggling `aria-invalid` classes and native validation blocks submission without any script (see "HTML5/CSS over JavaScript"). JS is optional and only mirrors the browser's `validationMessage` into the styled message element:
+
+```css
+.input:user-invalid {
+  border-color: var(--color-error);
 }
+.input:user-invalid ~ .field-error {
+  display: block;
+}
+```
+
+```javascript
+// Optional enhancement: mirror the native validationMessage into the styled
+// error element — styling and submit-blocking already work without this
 document.querySelectorAll('.field input, .field select, .field textarea').forEach(el => {
-  el.addEventListener('blur',  () => validateField(el));
-  el.addEventListener('input', () => { if (el.getAttribute('aria-invalid') === 'true') validateField(el); });
+  el.addEventListener('invalid', () => {
+    const error = document.getElementById(`${el.id}-error`);
+    if (!error) return;
+    error.hidden = false;
+    error.textContent = el.validationMessage;
+  });
 });
 ```
 
@@ -20920,6 +20934,8 @@ localStorage.removeItem('api_token');
 The operator token is never stored in the browser — it lives in the server config and is used from CLI tools or API clients only.
 
 ### Client-Side Preferences
+
+This helper is for pure client-only state the server must never receive automatically. Server-relevant preferences (theme, language, consent, announcement dismissals) are cookies — the server reads them to render the correct page (see "Client-Side Preferences" in PART 32).
 
 ```javascript
 const prefs = {
@@ -21250,7 +21266,7 @@ Prefer native HTML5 and CSS for UI features where possible. Use JavaScript only 
 |---|---|
 | Dropdown menus | `<details>` + `<summary>` |
 | Modals | `<dialog>` |
-| Form validation | `required`, `type`, `pattern`, `minlength`, `maxlength` |
+| Form validation | `required`, `type`, `pattern`, `minlength`, `maxlength`; error styling via CSS `:user-invalid` |
 | Tooltips | `title` attribute + CSS `[title]::after` |
 | Accordions | `<details>` + `<summary>` |
 | Progress | `<progress>` |
@@ -21466,7 +21482,7 @@ pub fn theme_palette_light() -> ThemePalette {
 ### System Theme Detection
 
 ```rust
-// Detect from Accept header or cookie
+// Resolve the theme cookie: explicit light/dark wins; "auto" (or no cookie) defers to CSS
 pub fn detect_theme(headers: &axum::http::HeaderMap, cookies: &CookieJar) -> &'static str {
     if let Some(c) = cookies.get("theme") {
         match c.value() {
@@ -21475,16 +21491,19 @@ pub fn detect_theme(headers: &axum::http::HeaderMap, cookies: &CookieJar) -> &'s
             _ => {}
         }
     }
-    "dark"
+    "auto"
 }
 ```
 
-In JavaScript, mirror the server-side default:
+The base template renders `<html class="theme-light">` or `<html class="theme-dark">` for an explicit choice, and no theme class for `auto`. No client-side mirror is needed — system-preference detection is pure CSS:
 
-```javascript
-const preferred = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-const theme = localStorage.getItem('theme') || preferred;
-document.documentElement.classList.add(`theme-${theme}`);
+```css
+/* Auto theme: dark-default custom properties, overridden when the OS prefers light */
+@media (prefers-color-scheme: light) {
+  html:not(.theme-dark):not(.theme-light) {
+    /* light palette custom properties */
+  }
+}
 ```
 
 
@@ -21849,7 +21868,7 @@ pub fn validate_footer_html(html: &str) -> Result<String> {
 
 ### Implementation
 
-The cookie consent banner blocks all optional scripts/embeds until the user grants consent. Consent is stored in a cookie and re-read on every page load.
+The cookie consent banner blocks all optional scripts/embeds until the user grants consent. Consent is stored in a cookie and re-read on every page load — the server must be able to read it, so consent state NEVER lives in `localStorage`. The banner is fully server-rendered: when no valid consent cookie exists (or its version is stale), the server renders the banner visible; once a valid cookie is present, the server omits it entirely. Accept/Reject/Save are plain form submits to `POST /consent`, so consent works with zero JavaScript.
 
 ```rust
 // src/server/consent.rs
@@ -21876,85 +21895,119 @@ pub fn get_consent_from_request(headers: &axum::http::HeaderMap) -> Option<Conse
 }
 ```
 
-```javascript
-// static/js/consent.js
-const CONSENT_COOKIE = 'consent';
-const CONSENT_VERSION = 1;
+**Banner visibility is decided server-side.** The base template renders the banner when `get_consent_from_request` returns `None` (no cookie, or stale `version`) — or when the request carries `?consent=manage`, which re-opens the banner for a visitor who wants to change their choices. There is no `hidden` attribute and no JS `init()` reveal: a no-JS visitor sees the banner exactly when the server decides they should.
 
-function getConsent() {
-  const match = document.cookie.match(/(?:^|;\s*)consent=([^;]+)/);
-  if (!match) return null;
-  try { return JSON.parse(decodeURIComponent(match[1])); }
-  catch { return null; }
+```rust
+// src/server/consent.rs
+// Bump to re-prompt every visitor after a policy change
+pub const CONSENT_VERSION: u32 = 1;
+
+#[derive(Debug, Deserialize)]
+pub struct ConsentForm {
+    pub action: String,
+    pub analytics: Option<String>,
+    pub preferences: Option<String>,
+    pub marketing: Option<String>,
+    pub return_to: Option<String>,
 }
 
-function setConsent(prefs) {
-  const value = encodeURIComponent(JSON.stringify({ ...prefs, version: CONSENT_VERSION }));
-  document.cookie = `${CONSENT_COOKIE}=${value}; path=/; max-age=${60*60*24*365}; SameSite=Lax; Secure`;
-  window.location.reload();
+// POST /consent — sets the consent cookie and redirects back to the originating page
+pub async fn post_consent(
+    axum::Form(form): axum::Form<ConsentForm>,
+) -> impl axum::response::IntoResponse {
+    let prefs = match form.action.as_str() {
+        "accept_all" => ConsentPreferences { analytics: true,  preferences: true,  marketing: true },
+        "reject_all" => ConsentPreferences { analytics: false, preferences: false, marketing: false },
+        _ => ConsentPreferences {
+            analytics:   form.analytics.is_some(),
+            preferences: form.preferences.is_some(),
+            marketing:   form.marketing.is_some(),
+        },
+    };
+    let value = urlencoding::encode(
+        &serde_json::json!({
+            "analytics": prefs.analytics,
+            "preferences": prefs.preferences,
+            "marketing": prefs.marketing,
+            "version": CONSENT_VERSION,
+        }).to_string()
+    ).into_owned();
+    let cookie = format!(
+        "consent={value}; Path=/; Max-Age={}; SameSite=Lax; Secure",
+        60 * 60 * 24 * 365
+    );
+    // Only same-site relative paths are accepted for the redirect target
+    let target = form.return_to
+        .filter(|p| p.starts_with('/') && !p.starts_with("//"))
+        .unwrap_or_else(|| "/".to_string());
+    (
+        [(axum::http::header::SET_COOKIE, cookie)],
+        axum::response::Redirect::to(&target),
+    )
 }
-
-function showBanner() {
-  document.getElementById('consent-banner')?.removeAttribute('hidden');
-}
-
-function hideBanner() {
-  document.getElementById('consent-banner')?.setAttribute('hidden', '');
-}
-
-(function init() {
-  const consent = getConsent();
-  if (!consent || consent.version !== CONSENT_VERSION) { showBanner(); return; }
-  hideBanner();
-})();
-
-document.getElementById('consent-accept-all')?.addEventListener('click', () => {
-  setConsent({ analytics: true, preferences: true, marketing: true });
-});
-document.getElementById('consent-reject-all')?.addEventListener('click', () => {
-  setConsent({ analytics: false, preferences: false, marketing: false });
-});
-document.getElementById('consent-save')?.addEventListener('click', () => {
-  setConsent({
-    analytics:   document.getElementById('consent-analytics')?.checked ?? false,
-    preferences: document.getElementById('consent-preferences')?.checked ?? false,
-    marketing:   document.getElementById('consent-marketing')?.checked ?? false,
-  });
-});
 ```
 
+A request carrying `Sec-GPC: 1` is still handled by the compliance layer (see "Privacy Signal Headers") — the GPC opt-out overrides any affirmative consent for data-sale/sharing categories regardless of what this form submits.
+
 ```html
+{% if show_consent_banner %}
 <div id="consent-banner" class="consent-banner" role="dialog"
-     aria-label="Cookie preferences" aria-modal="false" hidden>
-  <div class="consent-banner-inner">
+     aria-label="Cookie preferences" aria-modal="false">
+  <form method="post" action="/consent" class="consent-banner-inner">
+    <input type="hidden" name="return_to" value="{{ current_path }}">
     <div class="consent-text">
       <h2 class="consent-title">Cookie Preferences</h2>
       <p>{{ consent_message }}</p>
     </div>
     <div class="consent-options">
       <label class="toggle">
-        <input type="checkbox" id="consent-analytics">
+        <input type="checkbox" id="consent-analytics" name="analytics" value="1">
         <span class="toggle-track"><span class="toggle-thumb"></span></span>
         <span class="toggle-label">Analytics</span>
       </label>
       <label class="toggle">
-        <input type="checkbox" id="consent-preferences">
+        <input type="checkbox" id="consent-preferences" name="preferences" value="1">
         <span class="toggle-track"><span class="toggle-thumb"></span></span>
         <span class="toggle-label">Preferences</span>
       </label>
       <label class="toggle">
-        <input type="checkbox" id="consent-marketing">
+        <input type="checkbox" id="consent-marketing" name="marketing" value="1">
         <span class="toggle-track"><span class="toggle-thumb"></span></span>
         <span class="toggle-label">Marketing</span>
       </label>
     </div>
     <div class="consent-actions">
-      <button type="button" id="consent-reject-all"  class="btn btn-secondary">Reject All</button>
-      <button type="button" id="consent-save"        class="btn btn-secondary">Save Preferences</button>
-      <button type="button" id="consent-accept-all"  class="btn btn-primary">Accept All</button>
+      <button type="submit" name="action" value="reject_all" class="btn btn-secondary">Reject All</button>
+      <button type="submit" name="action" value="save"       class="btn btn-secondary">Save Preferences</button>
+      <button type="submit" name="action" value="accept_all" class="btn btn-primary">Accept All</button>
     </div>
-  </div>
+  </form>
 </div>
+{% endif %}
+```
+
+**Progressive enhancement (external file, optional):** the consent module in `static/js/app.js` may intercept the form's `submit` event, write the same `consent` cookie from the submitted values, and remove the banner from the DOM without a page reload. The server-side `POST /consent` path remains the source of truth; the script only removes the round trip.
+
+```javascript
+// static/js/app.js — consent module; no-reload enhancement; the POST /consent fallback always works
+const CONSENT_VERSION = 1;
+
+document.getElementById('consent-banner')?.querySelector('form')
+  ?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const action = e.submitter?.value ?? 'save';
+    const all = action === 'accept_all';
+    const none = action === 'reject_all';
+    const prefs = {
+      analytics:   all || (!none && e.target.elements.analytics.checked),
+      preferences: all || (!none && e.target.elements.preferences.checked),
+      marketing:   all || (!none && e.target.elements.marketing.checked),
+      version: CONSENT_VERSION,
+    };
+    const value = encodeURIComponent(JSON.stringify(prefs));
+    document.cookie = `consent=${value}; path=/; max-age=${60*60*24*365}; SameSite=Lax; Secure`;
+    document.getElementById('consent-banner').remove();
+  });
 ```
 
 ```rust
@@ -21981,14 +22034,14 @@ In templates:
 {% if not preferences_allowed %}
 <div class="embed-blocked">
   <p>Enable Preferences cookies to see this content.</p>
-  <button type="button" class="btn btn-secondary" onclick="document.getElementById('consent-banner').removeAttribute('hidden')">
-    Manage Cookies
-  </button>
+  <a href="?consent=manage" class="btn btn-secondary">Manage Cookies</a>
 </div>
 {% else %}
 <!-- Actual embed -->
 {% endif %}
 ```
+
+The Manage Cookies link navigates with `?consent=manage`; the server answers by re-rendering the page with the banner shown. No inline handler — the CSP blocks inline event handlers, and this path works without JavaScript.
 
 Dynamic consent message selection:
 
@@ -22601,7 +22654,7 @@ Templates are stored as files on disk. Override any built-in template by placing
 
 ## Public WebUI Notification System
 
-**The public frontend has exactly two visitor-facing mechanisms: toasts for immediate action feedback and a server-rendered site banner for site-wide announcements. There is NO notification center, NO bell icon, and NO notification history — API projects have no user accounts, so there is nothing to accumulate. Dismissal state lives in `localStorage`, the same mechanism as theme/language preferences (see "Client-Side Preferences"). Neither ever shows operator or server-internal events (version, backups, SSL, disk — Tier 3 information, Public Endpoint Safety Principle, PART 11), and both work regardless of SMTP configuration.**
+**The public frontend has exactly two visitor-facing mechanisms: toasts for immediate action feedback and a server-rendered site banner for site-wide announcements. There is NO notification center, NO bell icon, and NO notification history — API projects have no user accounts, so there is nothing to accumulate. Dismissal state lives in the `dismissed_announcements` cookie, the same mechanism as theme/language preferences (see "Client-Side Preferences") — server-readable, so dismissed banners are never rendered and dismissal works without JavaScript. Neither ever shows operator or server-internal events (version, backups, SSL, disk — Tier 3 information, Public Endpoint Safety Principle, PART 11), and both work regardless of SMTP configuration.**
 
 ### How It Works
 
@@ -22625,7 +22678,7 @@ Templates are stored as files on disk. Override any built-in template by placing
 | Element | Use For | Behavior |
 |---------|---------|----------|
 | **Toast** | Immediate feedback for visitor actions | Auto-dismiss, stacks in corner; ephemeral (DOM only) |
-| **Banner** | Site-wide notices requiring attention | Server-rendered from config; stays until dismissed; dismissal stored in `localStorage`, keyed on banner content |
+| **Banner** | Site-wide notices requiring attention | Server-rendered from config; stays until dismissed; dismissal stored in the `dismissed_announcements` cookie, keyed on announcement `id` |
 
 **When to Use Each (visitor-facing events only):**
 
@@ -22703,7 +22756,7 @@ Templates are stored as files on disk. Override any built-in template by placing
 | Data | Where |
 |------|-------|
 | Visitor toasts | Ephemeral (DOM only, gone on dismiss) |
-| Banner dismissals | `localStorage` (client-side, keyed on banner content, visitor-clearable — same store as theme/language preferences) |
+| Banner dismissals | `dismissed_announcements` cookie (client-side, keyed on announcement `id`, visitor-clearable, server-readable — same store as theme/language preferences) |
 | Operator record | Structured logs + email (SMTP) |
 
 ## Sane Defaults
@@ -33619,12 +33672,17 @@ pub async fn language_middleware(
 **Language selector UI (in header/footer):**
 
 ```html
-<select onchange="window.location.search='?lang='+this.value" aria-label="{{t .Lang `common.select_language`}}">
-  {{range .AvailableLanguages}}
-    <option value="{{.Code}}" {{if eq .Code $.Lang}}selected{{end}}>{{.NativeName}}</option>
-  {{end}}
-</select>
+<form method="get" action="">
+  <select name="lang" aria-label="{{t .Lang `common.select_language`}}">
+    {{range .AvailableLanguages}}
+      <option value="{{.Code}}" {{if eq .Code $.Lang}}selected{{end}}>{{.NativeName}}</option>
+    {{end}}
+  </select>
+  <button type="submit">Go</button>
+</form>
 ```
+
+Submitting the form navigates to `?lang={code}`, which the language middleware above already reads — language switching works with zero JavaScript. External JS may auto-submit the form on `change` and hide the Go button as progressive enhancement (`addEventListener` in an external file, never inline).
 
 **Shareable links:** Users can share `https://example.com/page?lang=fr` to force French for the recipient. After the first visit, the cookie persists and `?lang=` is no longer needed.
 
@@ -34222,6 +34280,8 @@ pub fn translate(lang: &str, key: &str) -> String {
 
 **JavaScript (for dynamic frontend strings):**
 
+Server-rendered pages never depend on this fetch — it exists only for strings generated by JS at runtime (toasts, screen-reader announcements); all static page text is translated server-side.
+
 ```javascript
 // Load translations for current language
 const translations = await fetch(`/locales/${lang}.json`).then(r => r.json());
@@ -34727,16 +34787,15 @@ server:
 
 ### Screen Reader Announcements
 
-**Announce dynamic changes without moving focus:**
+**Announce dynamic changes without moving focus.** The live region is a static element in the base Tera template (like the toast container) — screen readers only announce changes to live regions that already exist in the DOM, and a static element needs no JS to be created. JS only swaps its text:
+
+```html
+<div id="sr-announcer" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+```
 
 ```javascript
-// Create announcement element once
-const announcer = document.createElement('div');
-announcer.setAttribute('role', 'status');
-announcer.setAttribute('aria-live', 'polite');
-announcer.setAttribute('aria-atomic', 'true');
-announcer.className = 'sr-only';
-document.body.appendChild(announcer);
+// The live region is static in the base template; JS only updates its text
+const announcer = document.getElementById('sr-announcer');
 
 // Announce messages
 function announce(message) {
@@ -39824,7 +39883,7 @@ make docker
 - [ ] Theme system: light, dark, auto
 - [ ] Dark theme is DEFAULT
 - [ ] Theme toggle in UI
-- [ ] Theme persisted in localStorage
+- [ ] Theme persisted in the `theme` cookie (server-readable)
 - [ ] NO inline CSS - external stylesheets only
 - [ ] NO JavaScript alerts - toast notifications
 - [ ] Mobile-first responsive design
@@ -40388,7 +40447,7 @@ make docker
 - [ ] Dark theme is DEFAULT
 - [ ] Light theme available
 - [ ] Auto theme (system preference)
-- [ ] Theme persisted in localStorage
+- [ ] Theme persisted in the `theme` cookie (server-readable)
 - [ ] Theme toggle in UI
 - [ ] Same theme system everywhere
 
