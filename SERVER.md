@@ -5141,15 +5141,16 @@ For code that runs in the application, NEVER use bare `/path`. Always use `{fqdn
 let redirect_url = "/server/auth/callback".to_string();
 let link = format!("/api/{}/users/{}", api_version, user_id);
 
-// ✅ CORRECT - Using FQDN
+// ❌ WRONG — hardcodes https; ignores reverse proxy headers; breaks behind a proxy
 let redirect_url = format!("https://{}/server/auth/callback", cfg.fqdn);
 let link = format!("https://{}/api/{}/users/{}", cfg.fqdn, api_version, user_id);
 
-// ✅ CORRECT - Helper function
-fn build_url(cfg: &ServerConfig, path: &str) -> String {
-    format!("https://{}{}", cfg.fqdn, path)
-}
-let link = build_url(&cfg, &format!("/api/{}/users/{}", api_version, user_id));
+// ❌ WRONG — proxy-blind helper; physically cannot read X-Forwarded-* headers
+// See PART 12 → build_url / URL Variable Resolution for the full request-aware implementation.
+
+// ✅ CORRECT — request-aware; reverse-proxy headers first (PART 12 → "build_url")
+let redirect_url = build_url(headers, "/server/auth/callback");
+let link = build_url(headers, &format!("/api/{}/users/{}", api_version, user_id));
 ```
 
 **JavaScript examples:**
@@ -5171,8 +5172,11 @@ fetch(`${config.apiBaseUrl}/api/${apiVersion}/users`)
 <!-- ❌ WRONG - Bare path (breaks in emails, notifications) -->
 <a href="/verify?token={{ token }}">Verify Email</a>
 
-<!-- ✅ CORRECT - Full URL using FQDN -->
+<!-- ❌ WRONG — hardcodes https; ignores proxy headers; breaks behind a proxy -->
 <a href="https://{{ fqdn }}/verify?token={{ token }}">Verify Email</a>
+
+<!-- ✅ CORRECT — handler computes full URL via build_url(headers, ...) and passes it to the template -->
+<a href="{{ verify_url }}">Verify Email</a>
 ```
 
 **Exception - Internal routing only:**
@@ -8229,7 +8233,7 @@ impl CreateResourceRequest {
 
 **URL Variable Resolution (Reverse Proxy Preferred):**
 - `{fqdn}`: Reverse Proxy Headers → `DOMAIN` → `gethostname()` → `$HOSTNAME` → Global IP → `localhost`
-- `{proto}`: `X-Forwarded-Proto` → `X-Forwarded-Ssl` → TLS detection → `http`
+- `{proto}`: `X-Forwarded-Proto` → `X-Forwarded-Ssl` → `X-Url-Scheme` → TLS detection → `http`
 - `{port}`: `X-Forwarded-Port` → Host header → Server port → Proto default
 - `{baseurl}`: `X-Forwarded-Prefix` → `X-Forwarded-Path` → `X-Script-Name` → `server.baseurl` → `/`
 
@@ -18029,7 +18033,17 @@ server:
     additional: []
 ```
 
-**Used by `X-Forwarded-*` trust gate.** Every header-based detection chain in the spec — `build_url(req, ...)` (PART 12 → "Resolution Order"), CORS allow-list resolution (PART 16), CSP `connect-src` learning, domain-learning algorithm — only honors `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Forwarded-Port`, `X-Real-IP`, `X-Original-Host` when the **immediate peer's IP** is in `trusted_proxies` (private ranges + the `additional` allow-list). Headers from non-trusted peers are dropped before resolution runs, so an attacker reaching the binary directly cannot inject a forged Host into the learned-origins list.
+**Used by `X-Forwarded-*` trust gate.** Every header-based detection chain in the spec — `build_url(headers, ...)` (PART 12 → "Resolution Order"), CORS allow-list resolution (PART 16), CSP `connect-src` learning, domain-learning algorithm — only honors the following proxy headers when the **immediate peer's IP** is in `trusted_proxies` (private ranges + the `additional` allow-list):
+
+| Category | Trusted headers |
+|----------|----------------|
+| **FQDN** | `X-Forwarded-Host`, `X-Real-Host`, `X-Original-Host` |
+| **Proto** | `X-Forwarded-Proto`, `X-Forwarded-Ssl`, `X-Url-Scheme` |
+| **Port** | `X-Forwarded-Port` |
+| **Base path** | `X-Forwarded-Prefix`, `X-Forwarded-Path`, `X-Script-Name` |
+| **Client IP** | `X-Real-IP`, `X-Forwarded-For`, `CF-Connecting-IP`, `True-Client-IP`, `X-Client-IP` |
+
+All of these headers are supported regardless of proxy vendor (Nginx, Caddy, HAProxy, Traefik, Apache, Cloudflare Tunnels, AWS ALB, etc.). Headers from non-trusted peers are dropped before resolution runs, so an attacker reaching the binary directly cannot inject a forged Host into the learned-origins list.
 
 | Always trusted (no config required) | Reason |
 |--------------------------------------|--------|

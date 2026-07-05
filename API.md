@@ -4958,14 +4958,14 @@ For code that runs in the application, NEVER use bare `/path`. Always use `{fqdn
 // ❌ WRONG - Bare path
 let link = format!("/api/{}/items/{}", api_version, item_id);
 
-// ✅ CORRECT - Using FQDN
+// ❌ WRONG — hardcodes https; ignores reverse proxy headers; breaks behind a proxy
 let link = format!("https://{}/api/{}/items/{}", cfg.fqdn, api_version, item_id);
 
-// ✅ CORRECT - Helper function
-fn build_url(cfg: &Config, path: &str) -> String {
-    format!("https://{}{}", cfg.fqdn, path)
-}
-let link = build_url(&cfg, &format!("/api/{}/items/{}", api_version, item_id));
+// ❌ WRONG — proxy-blind helper; physically cannot read X-Forwarded-* headers
+// See PART 12 → build_url / URL Variable Resolution for the full request-aware implementation.
+
+// ✅ CORRECT — request-aware; reverse-proxy headers first (PART 12 → "build_url")
+let link = build_url(req.headers(), &format!("/api/{}/items/{}", api_version, item_id));
 ```
 
 **JavaScript examples:**
@@ -4987,8 +4987,11 @@ fetch(`${config.apiBaseUrl}/api/${apiVersion}/items`)
 <!-- ❌ WRONG - Bare path (breaks in emails, notifications) -->
 <a href="/server/security/report/{{.Token}}">View Report</a>
 
-<!-- ✅ CORRECT - Full URL using FQDN -->
+<!-- ❌ WRONG — hardcodes https; ignores proxy headers; breaks behind a proxy -->
 <a href="https://{{.FQDN}}/server/security/report/{{.Token}}">View Report</a>
+
+<!-- ✅ CORRECT — handler computes full URL via build_url(headers, ...) and passes it to the template -->
+<a href="{{ report_url }}">View Report</a>
 ```
 
 **Exception - Internal routing only:**
@@ -7627,8 +7630,8 @@ impl CreateResourceRequest {
 | `SMTP_TLS` | TLS mode: `auto`, `starttls`, `tls`, `none` (default: `auto`) |
 
 **URL Variable Resolution (Reverse Proxy Preferred):**
-- `{fqdn}`: Reverse Proxy Headers → `DOMAIN` → `os.Hostname()` → `$HOSTNAME` → Global IP → `localhost`
-- `{proto}`: `X-Forwarded-Proto` → `X-Forwarded-Ssl` → TLS detection → `http`
+- `{fqdn}`: Reverse Proxy Headers → `DOMAIN` → `gethostname()` → `$HOSTNAME` → Global IP → `localhost`
+- `{proto}`: `X-Forwarded-Proto` → `X-Forwarded-Ssl` → `X-Url-Scheme` → TLS detection → `http`
 - `{port}`: `X-Forwarded-Port` → Host header → Server port → Proto default
 - `{baseurl}`: `X-Forwarded-Prefix` → `X-Forwarded-Path` → `X-Script-Name` → `server.baseurl` → `/`
 
@@ -12126,51 +12129,43 @@ server:
 **Usage in Code:**
 
 ```rust
-use axum::http::Request;
+use axum::http::HeaderMap;
 
-// get_url_vars returns resolved URL variables from request
-// Checks reverse proxy headers first, triggers live reload on detection
-// Port is empty string for 80/443 (always stripped)
-fn get_url_vars<B>(req: &Request<B>) -> (String, String, String) {
-    // Returns (proto, fqdn, port)
-    todo!()
-}
+/// Returns resolved URL variables from request headers.
+/// Checks reverse proxy headers first, triggers live reload on detection.
+/// Port is None for 80/443 (always stripped).
+pub fn get_url_vars(headers: &HeaderMap) -> (String, String, Option<u16>)
 
-// build_url constructs full URL with automatic port stripping
-// :80 and :443 are NEVER included
-fn build_url<B>(req: &Request<B>, path: &str) -> String {
-    let (proto, fqdn, port) = get_url_vars(req);
-    if port.is_empty() {
-        format!("{}://{}{}", proto, fqdn, path)
-    } else {
-        format!("{}://{}:{}{}", proto, fqdn, port, path)
+/// Builds full URL with automatic port stripping.
+/// :80 and :443 are NEVER included in the returned string.
+pub fn build_url(headers: &HeaderMap, path: &str) -> String {
+    let (proto, fqdn, port) = get_url_vars(headers);
+    match port {
+        None => format!("{}://{}{}", proto, fqdn, path),
+        Some(p) => format!("{}://{}:{}{}", proto, fqdn, p, path),
     }
 }
 
-// get_base_domain returns inferred base domain from learning
-// Returns: "myapp.com" even if accessed via "www.myapp.com"
-fn get_base_domain() -> String {
-    todo!()
-}
+/// Returns inferred base domain from learning.
+/// Returns "myapp.com" even if accessed via "www.myapp.com".
+pub fn get_base_domain() -> String
 
-// get_wildcard_domain returns inferred wildcard if detected
-// Returns: "*.myapp.com" or empty if no wildcard pattern
-fn get_wildcard_domain() -> String {
-    todo!()
-}
+/// Returns inferred wildcard domain if detected.
+/// Returns Some("*.myapp.com") or None if no wildcard pattern.
+pub fn get_wildcard_domain() -> Option<String>
 ```
 
 **Usage in Templates/Swagger/GraphQL:**
 
 | Component | Base URL Source |
 |-----------|-----------------|
-| HTML templates | `build_url(req, "/path")` |
-| Swagger/OpenAPI | `servers[0].url` = `build_url(req, "")` |
-| GraphQL | `build_url(req, "/api/{api_version}/server/graphql")` (or `/api/graphql` alias for the latest version) |
-| Email links | `build_url(req, "/server/security/report/{id}")` |
+| HTML templates | `build_url(headers, "/path")` |
+| Swagger/OpenAPI | `servers[0].url` = `build_url(headers, "")` |
+| GraphQL | `build_url(headers, "/api/{api_version}/server/graphql")` (or `/api/graphql` alias for the latest version) |
+| Email links | `build_url(headers, "/server/security/report/{id}")` |
 | CORS origins | Auto-include `get_wildcard_domain()` if detected |
-| Generated well-known files (`/.well-known/security.txt`, `/.well-known/llms.txt`) | `build_url(req, "/path")` for every embedded URL — resolved per request, never frozen at startup |
-| `/server/security` page | `build_url(req, "/path")` for every rendered URL — must match the `security.txt` the same client fetches |
+| Generated well-known files (`/.well-known/security.txt`, `/.well-known/llms.txt`) | `build_url(headers, "/path")` for every embedded URL — resolved per request, never frozen at startup |
+| `/server/security` page | `build_url(headers, "/path")` for every rendered URL — must match the `security.txt` the same client fetches |
 
 ### FQDN Validation Rules
 
@@ -15474,7 +15469,17 @@ server:
     additional: []
 ```
 
-**Used by `X-Forwarded-*` trust gate.** Every header-based detection chain in the spec — `BuildURL(r, ...)` (PART 12 → "Resolution Order"), CORS allow-list resolution (PART 16), CSP `connect-src` learning, domain-learning algorithm — only honors `X-Forwarded-Host`, `X-Forwarded-Proto`, `X-Forwarded-Port`, `X-Real-IP`, `X-Original-Host` when the **immediate peer's IP** is in `trusted_proxies` (private ranges + the `additional` allow-list). Headers from non-trusted peers are dropped before resolution runs, so an attacker reaching the binary directly cannot inject a forged Host into the learned-origins list.
+**Used by `X-Forwarded-*` trust gate.** Every header-based detection chain in the spec — `build_url(headers, ...)` (PART 12 → "Resolution Order"), CORS allow-list resolution (PART 16), CSP `connect-src` learning, domain-learning algorithm — only honors the following proxy headers when the **immediate peer's IP** is in `trusted_proxies` (private ranges + the `additional` allow-list):
+
+| Category | Trusted headers |
+|----------|----------------|
+| **FQDN** | `X-Forwarded-Host`, `X-Real-Host`, `X-Original-Host` |
+| **Proto** | `X-Forwarded-Proto`, `X-Forwarded-Ssl`, `X-Url-Scheme` |
+| **Port** | `X-Forwarded-Port` |
+| **Base path** | `X-Forwarded-Prefix`, `X-Forwarded-Path`, `X-Script-Name` |
+| **Client IP** | `X-Real-IP`, `X-Forwarded-For`, `CF-Connecting-IP`, `True-Client-IP`, `X-Client-IP` |
+
+All of these headers are supported regardless of proxy vendor (Nginx, Caddy, HAProxy, Traefik, Apache, Cloudflare Tunnels, AWS ALB, etc.). Headers from non-trusted peers are dropped before resolution runs, so an attacker reaching the binary directly cannot inject a forged Host into the learned-origins list.
 
 | Always trusted (no config required) | Reason |
 |--------------------------------------|--------|
@@ -15498,7 +15503,7 @@ server:
       - lb.internal.example
 ```
 
-**On a public-facing direct deployment (no proxy in front)** leave `additional: []`. The X-Forwarded headers from random internet peers are then dropped, falling back to `r.Host` and `r.RemoteAddr` for URL construction — exactly the behavior we want.
+**On a public-facing direct deployment (no proxy in front)** leave `additional: []`. The X-Forwarded headers from random internet peers are then dropped, falling back to the `Host` header and `peer_addr` for URL construction — exactly the behavior we want.
 
 ## Rate Limiting
 
@@ -17459,7 +17464,7 @@ Before adding ANY route, verify:
 | **Server** | `/server/*` | `/api/{api_version}/server/*` | No | Server-owned public pages, docs, health |
 | **Project** | `/*` | `/api/{api_version}/*` | Varies | Project-specific resources (open, no auth) |
 
-**Note:** Examples throughout this document use `/api/{api_version}/` as the default value. In code, always use `APIBasePath()` or `{api_version}` - never hardcode `v1`.
+**Note:** Examples throughout this document use `/api/{api_version}/` as the default value. In code, always use `api_base_path()` or `{api_version}` - never hardcode `v1`.
 
 ### Frontend Must Match Backend
 
@@ -19052,7 +19057,7 @@ Before proceeding, confirm you understand:
 |----------|--------|
 | 1 | Reverse Proxy Headers (`X-Forwarded-Host`, etc.) |
 | 2 | `DOMAIN` env var |
-| 3 | `os.Hostname()` |
+| 3 | `gethostname()` |
 | 4 | `$HOSTNAME` env var |
 | 5 | Public IPv6 (excludes private/link-local) |
 | 6 | Public IPv4 (excludes 10/8, 172.16/12, 192.168/16) |
