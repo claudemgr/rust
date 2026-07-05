@@ -19957,23 +19957,12 @@ Startup (for configured FQDN)
 
 ## Frontend Route Structure
 
-Routes are registered with `axum::Router`. Public routes use no auth middleware; authenticated routes are wrapped with the bearer-token auth layer (operator token or resource owner token — no sessions, no user accounts).
+Routes are registered with `axum::Router`. All frontend routes are public — there is no admin web UI, no dashboard, and no settings pages (no auth, no user accounts). Auth is bearer-token only (operator token or resource owner token) and applies to `/api/` routes, never to HTML pages.
 
 ```rust
 // Public frontend routes (no auth required)
 router.route("/", get(home_handler))
 router.route("/search", get(search_handler))
-
-// Authenticated frontend routes
-router.route("/dashboard", get(dashboard_handler))
-router.route("/settings", get(settings_handler))
-router.route("/settings/profile", get(profile_settings_handler).post(profile_settings_submit_handler))
-router.route("/settings/security", get(security_settings_handler).post(security_settings_submit_handler))
-router.route("/settings/notifications", get(notification_settings_handler).post(notification_settings_submit_handler))
-
-// Admin frontend routes
-router.route("/admin", get(admin_dashboard_handler))
-router.route("/admin/users", get(admin_users_handler))
 
 // Server info pages (public)
 router.route("/server/about", get(about_handler))
@@ -20000,7 +19989,7 @@ router.route("/:slug/:sub", get(slug_handler))
 
 ## Reserved Names
 
-Names that must never be used as user-supplied slugs or usernames:
+Names that must never be used as user-supplied slugs:
 
 ```rust
 let reserved_names: Vec<&str> = vec![
@@ -20053,11 +20042,9 @@ Middleware execution order (outer → inner):
 1. `url_normalize_middleware` — canonical URL enforcement
 2. `request_id_middleware` — attach `X-Request-ID`
 3. `real_ip_middleware` — resolve client IP behind proxies
-4. `rate_limit_middleware` — per-IP / per-user throttle
-5. `session_middleware` — load session cookie
-6. `auth_middleware` — validate session, attach user context
-7. `csrf_middleware` — verify CSRF token on mutating requests
-8. Handler
+4. `rate_limit_middleware` — per-IP throttle
+5. `csrf_middleware` — verify CSRF token on mutating browser form requests (see "CSRF Protection")
+6. Handler
 
 ---
 
@@ -20096,7 +20083,6 @@ All CRUD handlers follow this pattern:
 ```rust
 async fn create_handler(
     State(state): State<AppState>,
-    session: Session,
     Form(form): Form<CreateForm>,
 ) -> impl axum::response::IntoResponse {
     // validate
@@ -20110,7 +20096,6 @@ async fn create_handler(
 ```rust
 async fn list_handler(
     State(state): State<AppState>,
-    session: Session,
     Query(params): Query<ListParams>,
 ) -> impl axum::response::IntoResponse {
     // query db
@@ -20123,7 +20108,6 @@ async fn list_handler(
 ```rust
 async fn update_handler(
     State(state): State<AppState>,
-    session: Session,
     Path(id): Path<u64>,
     Form(form): Form<UpdateForm>,
 ) -> impl axum::response::IntoResponse {
@@ -20138,7 +20122,6 @@ async fn update_handler(
 ```rust
 async fn delete_handler(
     State(state): State<AppState>,
-    session: Session,
     Path(id): Path<u64>,
 ) -> impl axum::response::IntoResponse {
     // validate ownership
@@ -20846,40 +20829,6 @@ document.querySelector('.install-btn')?.addEventListener('click', async () => {
 });
 ```
 
-### Push Notifications
-
-```javascript
-async function subscribeToPush(vapidPublicKey) {
-  const reg = await navigator.serviceWorker.ready;
-  const sub = await reg.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-  });
-  await fetch('/api/v1/push/subscribe', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(sub),
-  });
-}
-
-self.addEventListener('push', event => {
-  const data = event.data?.json() ?? {};
-  event.waitUntil(
-    self.registration.showNotification(data.title ?? 'Notification', {
-      body: data.body ?? '',
-      icon: '/static/icons/icon-192.png',
-      badge: '/static/icons/badge-72.png',
-      data: { url: data.url ?? '/' },
-    })
-  );
-});
-
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  event.waitUntil(clients.openWindow(event.notification.data.url));
-});
-```
-
 ### Background Sync
 
 ```javascript
@@ -20915,7 +20864,7 @@ async function requestLocation() {
 
 ### API Token Storage
 
-Store tokens in `localStorage` only for SPAs with no sensitive data. For all other cases, prefer `HttpOnly` cookies set server-side.
+Resource owner tokens are stored client-side in `localStorage` — this IS the documented model (see PART 12 → API Tokens): the raw token is shown once at creation, only its SHA-256 hash is stored server-side, and the browser keeps the raw token so the owner can manage their resources.
 
 ```javascript
 // Write
@@ -20926,7 +20875,7 @@ const token = localStorage.getItem('api_token');
 localStorage.removeItem('api_token');
 ```
 
-Never store raw tokens for admin sessions. Use server-side `HttpOnly`+`Secure`+`SameSite=Strict` cookies exclusively.
+The operator token is never stored in the browser — it lives in the server config and is used from CLI tools or API clients only.
 
 ### Client-Side Preferences
 
@@ -21021,7 +20970,6 @@ static/
     icon-512.png
     icon-maskable-512.png
     apple-touch-icon.png
-    badge-72.png
     favicon.ico
   splash/
     launch-2048x2732.png   ← iOS 12.9" iPad Pro
@@ -21191,10 +21139,12 @@ server:
 
 ## CSRF Protection
 
-Use double-submit cookie pattern. Require `X-CSRF-Token` header on all mutating requests.
+Use the stateless double-submit cookie pattern — there are no sessions, so the token is never stored server-side. The server sets a `csrf_token` cookie (`SameSite=Strict`, `Secure`, NOT `HttpOnly` — JavaScript must read it) and every mutating browser request must echo the same value in the `X-CSRF-Token` header or a `csrf_token` form field. The middleware compares the two in constant time.
+
+Validation applies only to POST/PUT/PATCH/DELETE requests. Requests authenticated with a `Bearer` token bypass CSRF entirely (a bearer header cannot be sent cross-site by a form), as do safe methods and paths listed in `server.csrf.exempt_paths`.
 
 ```rust
-// Generate token (store in session)
+// Generate a random token for the double-submit cookie
 pub fn generate_csrf_token() -> String {
     use rand::Rng;
     rand::thread_rng()
@@ -21206,21 +21156,30 @@ pub fn generate_csrf_token() -> String {
 
 // Middleware
 async fn csrf_middleware(
-    session: Session,
+    cookies: axum_extra::extract::CookieJar,
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> Result<axum::response::Response, axum::http::StatusCode> {
     let method = request.method().clone();
     if matches!(method, axum::http::Method::POST | axum::http::Method::PUT |
                 axum::http::Method::PATCH | axum::http::Method::DELETE) {
-        let session_token: Option<String> = session.get("csrf_token").await.ok().flatten();
-        let header_token = request
+        // Bearer-authenticated API requests bypass CSRF
+        let is_bearer = request
             .headers()
-            .get("X-CSRF-Token")
-            .and_then(|v| v.to_str().ok());
-        match (session_token, header_token) {
-            (Some(s), Some(h)) if constant_time_eq(s.as_bytes(), h.as_bytes()) => {}
-            _ => return Err(axum::http::StatusCode::FORBIDDEN),
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.starts_with("Bearer "))
+            .unwrap_or(false);
+        if !is_bearer {
+            let cookie_token = cookies.get("csrf_token").map(|c| c.value().to_string());
+            let header_token = request
+                .headers()
+                .get("X-CSRF-Token")
+                .and_then(|v| v.to_str().ok());
+            match (cookie_token, header_token) {
+                (Some(c), Some(h)) if constant_time_eq(c.as_bytes(), h.as_bytes()) => {}
+                _ => return Err(axum::http::StatusCode::FORBIDDEN),
+            }
         }
     }
     Ok(next.run(request).await)
@@ -21269,8 +21228,6 @@ template/
   layout/
     base.html.tera
     public.html.tera
-    auth.html.tera
-    admin.html.tera
   partial/
     public/
       header.html.tera
@@ -21278,16 +21235,8 @@ template/
       nav.html.tera
       head.html.tera
       scripts.html.tera
-    auth/
-      header.html.tera
-      sidebar.html.tera
-    admin/
-      header.html.tera
-      sidebar.html.tera
   page/
     home.html.tera
-    dashboard.html.tera
-    settings.html.tera
     search.html.tera
     error.html.tera
     offline.html.tera
@@ -21314,9 +21263,7 @@ template/
 | Layout | Purpose |
 |---|---|
 | `base.html.tera` | Root shell: `<html>`, `<head>`, `<body>` wrapper |
-| `public.html.tera` | Unauthenticated pages (header, footer, no sidebar) |
-| `auth.html.tera` | Authenticated pages (sidebar, user nav) |
-| `admin.html.tera` | Admin pages (admin sidebar, breadcrumbs) |
+| `public.html.tera` | All pages (header, footer, no sidebar) — every page is public; there is no auth or admin layout |
 
 ```
 {# base.html.tera #}
@@ -38467,7 +38414,7 @@ pub fn build_api_url(
 }
 
 // encode_path_segment encodes a single path segment
-// Use for: usernames, org names, resource IDs, filenames
+// Use for: slugs, org names, resource IDs, filenames
 pub fn encode_path_segment(segment: &str) -> String {
     urlencoding::encode(segment).into_owned()
 }
