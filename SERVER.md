@@ -1702,31 +1702,30 @@ Both files use the same structure. Settings are merged: `settings.local.json` ov
       "Read(**)",
       "Write(**)",
       "Edit(**)",
-      "Bash(cargo:*)",
-      "Bash(make:*)",
-      "Bash(docker:*)",
-      "Bash(docker-compose:*)",
-      "Bash(git:*)",
-      "Bash(curl:*)",
-      "Bash(tree:*)",
-      "Bash(find:*)",
-      "Bash(grep:*)",
-      "Bash(rm:*)",
-      "Bash(mv:*)",
-      "Bash(cp:*)",
-      "Bash(mkdir:*)",
-      "Bash(chmod:*)",
-      "Bash(ln:*)",
-      "Bash(cat:*)",
-      "Bash(head:*)",
-      "Bash(tail:*)",
-      "Bash(ls:*)",
-      "Bash(pwd:*)",
-      "Bash(timeout:*)",
-      "Bash(sort:*)",
-      "Bash(wc:*)",
-      "Bash(diff:*)",
-      "Bash(:*::*)",
+      "Bash(cargo *)",
+      "Bash(make *)",
+      "Bash(docker *)",
+      "Bash(docker-compose *)",
+      "Bash(git *)",
+      "Bash(curl *)",
+      "Bash(tree *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(rm *)",
+      "Bash(mv *)",
+      "Bash(cp *)",
+      "Bash(mkdir *)",
+      "Bash(chmod *)",
+      "Bash(ln *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(ls *)",
+      "Bash(pwd *)",
+      "Bash(timeout *)",
+      "Bash(sort *)",
+      "Bash(wc *)",
+      "Bash(diff *)",
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:crates.io)",
@@ -1734,16 +1733,15 @@ Both files use the same structure. Settings are merged: `settings.local.json` ov
       "WebFetch(domain:rust-lang.org)"
     ],
     "deny": [
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(git push:+)",
-      "Bash(rm -rf /*:*)",
-      "Bash(sudo:*)"
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(rm -rf *)",
+      "Bash(sudo *)"
     ],
     "ask": [
-      "Bash(git rebase:*)",
-      "Bash(git reset:*)",
-      "Bash(git checkout -- :*)"
+      "Bash(git rebase *)",
+      "Bash(git reset *)",
+      "Bash(git checkout -- *)"
     ]
   },
   "preferences": {
@@ -1784,10 +1782,8 @@ Both files use the same structure. Settings are merged: `settings.local.json` ov
 | `Read(**)` | Read any file | All files recursively |
 | `Write(**)` | Write any file | All files recursively |
 | `Edit(**)` | Edit any file | All files recursively |
-| `Bash(cmd:*)` | Command with zero or more args | `Bash(cargo:*)` → `cargo`, `cargo build`, `cargo nextest run` |
-| `Bash(cmd:+)` | Command with one or more args | `Bash(git push:+)` → `git push origin`, NOT bare `git push` |
-| `Bash(cmd arg:*)` | Command with specific prefix | `Bash(git commit:*)` → `git commit -m "msg"` |
-| `Bash(:*::*)` | Piped/chained commands | `cmd1 | cmd2`, `cmd1 && cmd2` |
+| `Bash(cmd *)` | Command with zero or more args | `Bash(cargo *)` → `cargo`, `cargo build`, `cargo nextest run` |
+| `Bash(cmd arg *)` | Command with specific prefix | `Bash(git commit *)` → `git commit -m "msg"` |
 | `WebFetch(domain:x)` | Fetch from specific domain | `WebFetch(domain:github.com)` |
 | `WebSearch` | Allow web searches | N/A |
 
@@ -1796,7 +1792,6 @@ Both files use the same structure. Settings are merged: `settings.local.json` ov
 | Wildcard | Meaning | Notes |
 |----------|---------|-------|
 | `*` | Zero or more of anything | Matches empty string too |
-| `+` | One or more of anything | Requires at least one character/arg |
 | `**` | Recursive glob | For file paths (all subdirectories) |
 
 **Permission Sections:**
@@ -1825,15 +1820,15 @@ Both files use the same structure. Settings are merged: `settings.local.json` ov
 
 | Project Type | Additional Allows | Additional Denies |
 |--------------|-------------------|-------------------|
-| Rust project | `Bash(cargo:*)`, `Bash(rustfmt:*)`, `Bash(clippy:*)` | - |
-| Docker project | `Bash(docker:*)`, `Bash(docker-compose:*)` | `Bash(docker system prune:*)` |
-| Node project | `Bash(npm:*)`, `Bash(node:*)` | `Bash(npm publish:*)` |
-| Python project | `Bash(python:*)`, `Bash(pip:*)`, `Bash(uv:*)` | `Bash(pip install --user:*)` |
+| Rust project | `Bash(cargo *)`, `Bash(rustfmt *)`, `Bash(clippy *)` | - |
+| Docker project | `Bash(docker *)`, `Bash(docker-compose *)` | `Bash(docker system prune *)` |
+| Node project | `Bash(npm *)`, `Bash(node *)` | `Bash(npm publish *)` |
+| Python project | `Bash(python *)`, `Bash(pip *)`, `Bash(uv *)` | `Bash(pip install --user *)` |
 
 **CRITICAL Rules:**
-- NEVER allow `Bash(sudo:*)` - privilege escalation should be explicit and manual
-- NEVER allow `Bash(rm -rf /*:*)` or similar destructive patterns
-- ALWAYS deny `Bash(git commit:*)` and `Bash(git push:*)` - plain git commit/push are blocked because they bypass the signed-commit wrapper. AI commits via `gitcommit <command>` instead (see "gitcommit Script" rules)
+- NEVER allow `Bash(sudo *)` - privilege escalation should be explicit and manual
+- NEVER allow `Bash(rm -rf *)` or similar destructive patterns
+- ALWAYS deny `Bash(git commit *)` and `Bash(git push *)` - plain git commit/push are blocked because they bypass the signed-commit wrapper. AI commits via `gitcommit <command>` instead (see "gitcommit Script" rules)
 - Use `PreToolUse` hooks to enforce project standards (formatting, no vendor names)
 - The `env` section sets environment variables for ALL Bash commands in the session
 - Settings are merged: project settings extend/override global `~/.claude/settings.json`
