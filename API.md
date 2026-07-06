@@ -15566,6 +15566,8 @@ Expires: {expiry_date}
 - `Preferred-Languages:` line is **omitted** (locale fingerprinting risk on Tor)
 - Served per-request via `build_url(headers, path)`; never cached or frozen at startup
 
+> **Full Tor implementation:** The above covers request detection, `build_url` integration, and privacy rules only. For Tor binary lifecycle, hidden service setup, outbound routing, and `bine`/`arti` integration, see **PART 31 → "Tor Hidden Service"**.
+
 ## Rate Limiting
 
 Rate limiting is the primary abuse defense. All limits are per-IP using a sliding window counter stored in `server.db`.
@@ -19997,7 +19999,7 @@ Startup (for configured FQDN)
 - `{config_dir}/ssl/local/{fqdn}/` → app uses but does NOT auto-renew (user manages)
 
 ---
-# PART 16 — WEB FRONTEND API
+# PART 16: WEB FRONTEND
 
 ---
 
@@ -34981,6 +34983,8 @@ mod tests {
 ---
 
 # PART 31: TOR HIDDEN SERVICE
+
+> **Trust chain integration:** Tor detection is priority 0 in the FQDN resolution table — evaluated before reverse proxy headers, always trusted, no IP check required. See **PART 12 → "Tor Hidden Service Configuration"** for request detection rules, `build_url` / `get_url_vars` behavior, privacy rules, and the Tor security.txt variant.
 
 ## Overview
 
