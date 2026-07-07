@@ -31420,7 +31420,7 @@ rm -rf "${TMPDIR:-/tmp}/${PROJECT_ORG}/"
 | Phase | Files | Run With | Tests |
 |-------|-------|----------|-------|
 | **Phase 1 — Toolchain Gate** | `#[cfg(test)]` blocks or `tests/` dir | `make test` | Source-code logic via `cargo test`; pre-commit gate |
-| **Phase 2 — Binary Validation** | `./tests/*.sh` | `./tests/run_tests.sh` | Compiled binary behavior — routes, auth, debugging |
+| **Phase 2 — Binary Validation** | `./tests/*.sh` | `./tests/run_tests.sh` | Compiled binary behavior — routes, auth, debugging — **manual, developer-initiated** |
 
 **Phase 1 — Toolchain Gate (`#[cfg(test)]` blocks or `tests/` dir):**
 - Tests individual functions and modules via `cargo test` inside Docker
@@ -31429,7 +31429,7 @@ rm -rf "${TMPDIR:-/tmp}/${PROJECT_ORG}/"
 - Create or update the matching test module immediately when you add or change module logic
 - Run with `make test`
 
-**Phase 2 — Binary Validation (`./tests/*.sh`):**
+**Phase 2 — Binary Validation (`./tests/*.sh`) — manual, developer-initiated:**
 - Tests the complete running server binary
 - Tests API endpoints, .txt extension, Accept headers
 - Tests authentication, API token validation
@@ -31461,7 +31461,7 @@ rm -rf "${TMPDIR:-/tmp}/${PROJECT_ORG}/"
 **BOTH types of tests are REQUIRED for all projects:**
 
 1. **Phase 1 — Toolchain Gate** (`make test`) — source-code logic via `cargo test`, pre-commit gate
-2. **Phase 2 — Binary Validation** (`./tests/*.sh`) — compiled binary behavior, debugging
+2. **Phase 2 — Binary Validation** (`./tests/*.sh`) — compiled binary behavior, debugging — **manual, developer-initiated**
 
 **Integration tests MUST be comprehensive:**
 - ✓ Test ALL project-specific endpoints (IDEA.md)
