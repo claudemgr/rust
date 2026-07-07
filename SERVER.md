@@ -375,6 +375,7 @@ permission rules, business invariants. The HOW lives in AI.md PARTS 0-36; PART 3
 | `cargo build ...` | `make dev` or `make local` or `make build` |
 | `cargo nextest run ...` | `make test` |
 | `cargo run ...` | `make dev` then run binary in Docker |
+| Run binary on host directly | `docker run --rm -v "$BUILD_DIR:/app" alpine:latest /app/{project_name}` or Phase 2 scripts |
 
 **Makefile targets use Docker internally (`casjaysdev/rust:latest`) with host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`/`CARGO_TARGET`) bind-mounted — local machine stays clean.**
 
@@ -43456,6 +43457,7 @@ When a test or debug step requires `reboot`, `systemctl`, `iptables`, `mount`, p
 
 | Test Need | Run It Where |
 |-----------|--------------|
+| Run or test the compiled binary | `docker run --rm -v "$BUILD_DIR:/app" alpine:latest /app/{project_name}` or `./tests/docker.sh` / `./tests/incus.sh` |
 | Test systemd service install/start/stop | `incus exec test-{project_name} -- systemctl ...` |
 | Test firewall integration | `docker run --rm --name "{project_name}-test" --cap-add=NET_ADMIN ...` |
 | Test network interface behavior | `ip netns exec {ns} ...` or inside Incus |
