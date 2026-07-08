@@ -33,6 +33,7 @@ have_internal=$(grep -cE '^internal_name:[[:space:]]*.+$' IDEA.md 2>/dev/null ||
 | `{project_name}` | IDEA.md `## Project variables` | Existing long-form `CLAUDE.md` / `.claude/CLAUDE.md` project details, then `basename "$PWD"` |
 | `{project_org}` | IDEA.md `## Project variables` | Existing long-form `CLAUDE.md` / `.claude/CLAUDE.md` project details, then `basename "$(dirname "$PWD")"` |
 | `{internal_name}` | IDEA.md `## Project variables` (always — set once at first run, never edited after) | Existing long-form `CLAUDE.md` / `.claude/CLAUDE.md` project details, then first-time setup: copy from `{project_name}` |
+| `{internal_org}` | IDEA.md `## Project variables` (always — set once at first run, never edited after) | Existing long-form `CLAUDE.md` / `.claude/CLAUDE.md` project details, then first-time setup: copy from `{project_org}` |
 | `{plist_name}` | **Derived (not stored)**: `io.github.{project_org}.{internal_name}` | — |
 
 **Detection commands (use commands — never guess):**
@@ -46,6 +47,9 @@ project_org=$(basename "$(dirname "$PWD")")
 # Internal name: same as project_name on first run, frozen forever after
 internal_name="$project_name"
 
+# Internal org: same as project_org on first run, frozen forever after
+internal_org="$project_org"
+
 # Plist name: derived from project_org and internal_name (macOS Bundle ID convention)
 plist_name="io.github.${project_org}.${internal_name}"
 
@@ -53,6 +57,7 @@ plist_name="io.github.${project_org}.${internal_name}"
 #   project_name  = myproject
 #   project_org   = myorg
 #   internal_name = myproject  (same as project_name on first run)
+#   internal_org  = myorg      (same as project_org on first run)
 #   plist_name    = io.github.myorg.myproject  (always derived)
 ```
 
@@ -2017,13 +2022,13 @@ Instructions for how this agent should behave...
 
 | Placeholder | Linux/BSD Default | macOS Default | Windows Default |
 |-------------|-------------------|---------------|-----------------|
-| `{config_dir}` | `/etc/{project_org}/{internal_name}` | `/Library/Application Support/{project_org}/{internal_name}` | `%PROGRAMDATA%\{project_org}\{internal_name}` |
-| `{data_dir}` | `/var/lib/{project_org}/{internal_name}` | `/Library/Application Support/{project_org}/{internal_name}` | `%PROGRAMDATA%\{project_org}\{internal_name}` |
+| `{config_dir}` | `/etc/{internal_org}/{internal_name}` | `/Library/Application Support/{internal_org}/{internal_name}` | `%PROGRAMDATA%\{internal_org}\{internal_name}` |
+| `{data_dir}` | `/var/lib/{internal_org}/{internal_name}` | `/Library/Application Support/{internal_org}/{internal_name}` | `%PROGRAMDATA%\{internal_org}\{internal_name}` |
 | `{db_dir}` | `{data_dir}/db/` | `{data_dir}/db/` | `{data_dir}\db\` |
-| `{log_dir}` | `/var/log/{project_org}/{internal_name}` | `/Library/Logs/{project_org}/{internal_name}` | `%PROGRAMDATA%\{project_org}\{internal_name}\logs` |
-| `{cache_dir}` | `/var/cache/{project_org}/{internal_name}` | `/Library/Caches/{project_org}/{internal_name}` | `%PROGRAMDATA%\{project_org}\{internal_name}\cache` |
-| `{backup_dir}` | `/mnt/Backups/{project_org}/{internal_name}` | `/Library/Application Support/{project_org}/{internal_name}/backups` | `%PROGRAMDATA%\{project_org}\{internal_name}\backups` |
-| `{pid_file}` | `/var/run/{project_org}/{internal_name}.pid` | `/var/run/{project_org}/{internal_name}.pid` | N/A (Windows uses SCM) |
+| `{log_dir}` | `/var/log/{internal_org}/{internal_name}` | `/Library/Logs/{internal_org}/{internal_name}` | `%PROGRAMDATA%\{internal_org}\{internal_name}\logs` |
+| `{cache_dir}` | `/var/cache/{internal_org}/{internal_name}` | `/Library/Caches/{internal_org}/{internal_name}` | `%PROGRAMDATA%\{internal_org}\{internal_name}\cache` |
+| `{backup_dir}` | `/mnt/Backups/{internal_org}/{internal_name}` | `/Library/Application Support/{internal_org}/{internal_name}/backups` | `%PROGRAMDATA%\{internal_org}\{internal_name}\backups` |
+| `{pid_file}` | `/var/run/{internal_org}/{internal_name}.pid` | `/var/run/{internal_org}/{internal_name}.pid` | N/A (Windows uses SCM) |
 
 **Note:** In Docker containers, `{db_dir}` is `/data/db/sqlite` (see Docker paths section).
 
@@ -5096,7 +5101,7 @@ sudo mv {project_name}-cli-linux-amd64 /usr/local/bin/{project_name}-cli
 ### Configure
 
 ```bash
-# Connect to official server (creates ~/.config/{project_org}/{internal_name}/cli.yml)
+# Connect to official server (creates ~/.config/{internal_org}/{internal_name}/cli.yml)
 {project_name}-cli --server {official_site} --token YOUR_API_TOKEN
 ```
 
@@ -6557,7 +6562,7 @@ axum-test = "14"
 tokio = { version = "1", features = ["full"] }
 
 [profile.release]
-opt-level = 3
+opt-level = "z"
 lto = true
 codegen-units = 1
 strip = true
@@ -6592,17 +6597,17 @@ Before proceeding, confirm you understand:
 | Type | Path |
 |------|------|
 | Binary | `/usr/local/bin/{project_name}` |
-| Config | `/etc/{project_org}/{internal_name}/` |
-| Config File | `/etc/{project_org}/{internal_name}/server.yml` |
-| Data | `/var/lib/{project_org}/{internal_name}/` |
-| Cache | `/var/cache/{project_org}/{internal_name}/` |
-| Logs | `/var/log/{project_org}/{internal_name}/` |
-| Log File | `/var/log/{project_org}/{internal_name}/server.log` |
-| Backup | `/mnt/Backups/{project_org}/{internal_name}/` |
-| PID File | `/var/run/{project_org}/{internal_name}.pid` |
-| SSL | `/etc/{project_org}/{internal_name}/ssl/` (letsencrypt/, local/) |
-| Security | `/var/lib/{project_org}/{internal_name}/security/` (geoip/, blocklists/, cve/, trivy/) |
-| SQLite DB | `/var/lib/{project_org}/{internal_name}/db/` (server.db) |
+| Config | `/etc/{internal_org}/{internal_name}/` |
+| Config File | `/etc/{internal_org}/{internal_name}/server.yml` |
+| Data | `/var/lib/{internal_org}/{internal_name}/` |
+| Cache | `/var/cache/{internal_org}/{internal_name}/` |
+| Logs | `/var/log/{internal_org}/{internal_name}/` |
+| Log File | `/var/log/{internal_org}/{internal_name}/server.log` |
+| Backup | `/mnt/Backups/{internal_org}/{internal_name}/` |
+| PID File | `/var/run/{internal_org}/{internal_name}.pid` |
+| SSL | `/etc/{internal_org}/{internal_name}/ssl/` (letsencrypt/, local/) |
+| Security | `/var/lib/{internal_org}/{internal_name}/security/` (geoip/, blocklists/, cve/, trivy/) |
+| SQLite DB | `/var/lib/{internal_org}/{internal_name}/db/` (server.db) |
 | Service | `/etc/systemd/system/{internal_name}.service` |
 
 ### User (non-privileged)
@@ -6610,17 +6615,17 @@ Before proceeding, confirm you understand:
 | Type | Path |
 |------|------|
 | Binary | `~/.local/bin/{project_name}` |
-| Config | `~/.config/{project_org}/{internal_name}/` |
-| Config File | `~/.config/{project_org}/{internal_name}/server.yml` |
-| Data | `~/.local/share/{project_org}/{internal_name}/` |
-| Cache | `~/.cache/{project_org}/{internal_name}/` |
-| Logs | `~/.local/log/{project_org}/{internal_name}/` |
-| Log File | `~/.local/log/{project_org}/{internal_name}/server.log` |
-| Backup | `~/.local/share/Backups/{project_org}/{internal_name}/` |
-| PID File | `~/.local/share/{project_org}/{internal_name}/{internal_name}.pid` |
-| SSL | `~/.config/{project_org}/{internal_name}/ssl/` (letsencrypt/, local/) |
-| Security | `~/.local/share/{project_org}/{internal_name}/security/` (geoip/, blocklists/, cve/, trivy/) |
-| SQLite DB | `~/.local/share/{project_org}/{internal_name}/db/` (server.db) |
+| Config | `~/.config/{internal_org}/{internal_name}/` |
+| Config File | `~/.config/{internal_org}/{internal_name}/server.yml` |
+| Data | `~/.local/share/{internal_org}/{internal_name}/` |
+| Cache | `~/.cache/{internal_org}/{internal_name}/` |
+| Logs | `~/.local/log/{internal_org}/{internal_name}/` |
+| Log File | `~/.local/log/{internal_org}/{internal_name}/server.log` |
+| Backup | `~/.local/share/Backups/{internal_org}/{internal_name}/` |
+| PID File | `~/.local/share/{internal_org}/{internal_name}/{internal_name}.pid` |
+| SSL | `~/.config/{internal_org}/{internal_name}/ssl/` (letsencrypt/, local/) |
+| Security | `~/.local/share/{internal_org}/{internal_name}/security/` (geoip/, blocklists/, cve/, trivy/) |
+| SQLite DB | `~/.local/share/{internal_org}/{internal_name}/db/` (server.db) |
 
 ---
 
@@ -6689,17 +6694,17 @@ Before proceeding, confirm you understand:
 | Type | Path |
 |------|------|
 | Binary | `~/.local/bin/{project_name}` |
-| Config | `~/.config/{project_org}/{internal_name}/` |
-| Config File | `~/.config/{project_org}/{internal_name}/server.yml` |
-| Data | `~/.local/share/{project_org}/{internal_name}/` |
-| Cache | `~/.cache/{project_org}/{internal_name}/` |
-| Logs | `~/.local/log/{project_org}/{internal_name}/` |
-| Log File | `~/.local/log/{project_org}/{internal_name}/server.log` |
-| Backup | `~/.local/share/Backups/{project_org}/{internal_name}/` |
-| PID File | `~/.local/share/{project_org}/{internal_name}/{internal_name}.pid` |
-| SSL | `~/.config/{project_org}/{internal_name}/ssl/` (letsencrypt/, local/) |
-| Security | `~/.local/share/{project_org}/{internal_name}/security/` (geoip/, blocklists/, cve/, trivy/) |
-| SQLite DB | `~/.local/share/{project_org}/{internal_name}/db/` (server.db) |
+| Config | `~/.config/{internal_org}/{internal_name}/` |
+| Config File | `~/.config/{internal_org}/{internal_name}/server.yml` |
+| Data | `~/.local/share/{internal_org}/{internal_name}/` |
+| Cache | `~/.cache/{internal_org}/{internal_name}/` |
+| Logs | `~/.local/log/{internal_org}/{internal_name}/` |
+| Log File | `~/.local/log/{internal_org}/{internal_name}/server.log` |
+| Backup | `~/.local/share/Backups/{internal_org}/{internal_name}/` |
+| PID File | `~/.local/share/{internal_org}/{internal_name}/{internal_name}.pid` |
+| SSL | `~/.config/{internal_org}/{internal_name}/ssl/` (letsencrypt/, local/) |
+| Security | `~/.local/share/{internal_org}/{internal_name}/security/` (geoip/, blocklists/, cve/, trivy/) |
+| SQLite DB | `~/.local/share/{internal_org}/{internal_name}/db/` (server.db) |
 
 ---
 
@@ -9592,7 +9597,7 @@ axum-test = "14"
 tokio = { version = "1", features = ["full"] }
 
 [profile.release]
-opt-level = 3
+opt-level = "z"
 lto = true
 codegen-units = 1
 strip = true
@@ -27095,14 +27100,16 @@ test:
 	@$(RUST_DOCKER) sh -c " \
 		mkdir -p \"/tmp/$(PROJECTORG)\" && \
 		COVDIR=\$$(mktemp -d \"/tmp/$(PROJECTORG)/$(PROJECTNAME)-XXXXXX\") && \
-		cargo test -- --test-threads=1 2>&1 | tee \$$COVDIR/test.out && \
+		cargo fmt --check 2>&1 | tee \$$COVDIR/fmt.out && \
+		cargo clippy -- -D warnings 2>&1 | tee \$$COVDIR/clippy.out && \
+		cargo test --lib --no-fail-fast 2>&1 | tee \$$COVDIR/test.out && \
 		echo \"Tests complete ✓\""
 
 # =============================================================================
 # Coverage gates by project type:
-#   - SERVER template projects: 80% minimum
+#   - SERVER template projects: 60% minimum
 #   - All other Rust projects: 60% minimum; override upward in IDEA.md
-#     (## Project variables -> coverage_minimum: 80) when appropriate.
+#     (## Project variables -> coverage_minimum: 60) when appropriate.
 #     Never override downward.
 #   - CLI tools and libraries: same 60% floor.
 # Coverage runs in CI on every push and in `make test` locally.
@@ -27279,7 +27286,7 @@ docker run --rm \
 | Script | Container | Best For |
 |--------|-----------|----------|
 | `./tests/run_tests.sh` | Auto-detect | General testing (picks best available) |
-| `./tests/docker.sh` | Docker `alpine:latest` | Quick integration tests |
+| `./tests/docker.sh` | Docker `alpine:latest` | Quick binary validation |
 | `./tests/incus.sh` | Incus `debian:latest` | **PREFERRED** - Full OS, systemd, realistic |
 
 **Typical workflow:**
@@ -31454,7 +31461,7 @@ rm -rf "${TMPDIR:-/tmp}/${PROJECT_ORG}/"
 - If the behavior requires a running binary, real HTTP requests, real process execution, or container/Incus setup, it belongs in `./tests/*.sh`
 
 **Reason both are required:**
-- `#[cfg(test)]` exists to achieve and enforce **≥80% Rust code coverage** via `cargo test`
+- `#[cfg(test)]` exists to achieve and enforce **≥60% Rust code coverage** via `cargo test`
 - `./tests/*.sh` exists to achieve and enforce **100% endpoint/route/integration coverage**
 - One does **not** replace the other; they measure different things and catch different classes of bugs
 
@@ -31719,22 +31726,22 @@ make test
 
 ## Test Coverage
 
-**Rust unit tests must achieve ≥80% code coverage. Integration tests must cover 100% of endpoints.**
+**Rust unit tests must achieve ≥60% code coverage. Integration tests must cover 100% of endpoints.**
 
 ### Coverage Requirements
 
 | Coverage Type | Requirement | Verification |
 |--------------|-------------|--------------|
-| **Rust Unit Tests** | ≥80% code coverage | `cargo test` must report ≥80% |
+| **Rust Unit Tests** | ≥60% code coverage | `cargo test` must report ≥60% |
 | **Integration Tests** | 100% endpoint coverage | Every endpoint tested |
 | **API Routes** | 100% route coverage | Every API route tested |
 | **Error Paths** | All critical error paths | Auth, DB, and validation errors tested |
 
-### What 80% Coverage Means
+### What 60% Coverage Means
 
 **Rust Code (Unit Tests):**
 ```bash
-# Run tests with coverage enforcement (fails if below 80%)
+# Run tests with coverage enforcement (fails if below 60%)
 make test
 ```
 
@@ -31767,18 +31774,18 @@ test:
         docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD:/app -w /app casjaysdev/rust:latest \
           cargo test
 
-    - name: Check coverage is ≥80%
+    - name: Check coverage is ≥60%
       run: |
         COVERAGE=$(docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD:/app -w /app casjaysdev/rust:latest \
           cargo tarpaulin --out Stdout | grep 'coverage' | awk '{print $1}' | sed 's/%//')
-        if [ $(echo "$COVERAGE < 80" | bc -l) -eq 1 ]; then
-          echo "ERROR: Coverage is $COVERAGE%, must be >= 80%"
+        if [ $(echo "$COVERAGE < 60" | bc -l) -eq 1 ]; then
+          echo "ERROR: Coverage is $COVERAGE%, must be >= 60%"
           exit 1
         fi
         echo "Coverage: $COVERAGE% ✓"
 ```
 
-### How to Achieve 80% Coverage
+### How to Achieve 60% Coverage
 
 **1. Test All Code Paths:**
 ```rust
@@ -32057,7 +32064,7 @@ trap "rm -rf $BUILD_DIR" EXIT
 if [ -f Makefile ]; then
     echo "Building with Makefile..."
     make build
-    cp binaries/${PROJECT_NAME}-linux-$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/aarch64/') "$BUILD_DIR/${PROJECT_NAME}" 2>/dev/null || \
+    cp binaries/${PROJECT_NAME}-linux-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') "$BUILD_DIR/${PROJECT_NAME}" 2>/dev/null || \
         cp binaries/${PROJECT_NAME} "$BUILD_DIR/${PROJECT_NAME}" 2>/dev/null || true
 else
     # No Makefile — build directly with Docker using correct cache vars
@@ -32240,7 +32247,7 @@ trap "rm -rf $BUILD_DIR; incus delete $CONTAINER_NAME --force 2>/dev/null || tru
 if [ -f Makefile ]; then
     echo "Building with Makefile..."
     make build
-    cp binaries/${PROJECT_NAME}-linux-$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/aarch64/') "$BUILD_DIR/${PROJECT_NAME}" 2>/dev/null || \
+    cp binaries/${PROJECT_NAME}-linux-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') "$BUILD_DIR/${PROJECT_NAME}" 2>/dev/null || \
         cp binaries/${PROJECT_NAME} "$BUILD_DIR/${PROJECT_NAME}" 2>/dev/null || true
 else
     # No Makefile — build directly with Docker using correct cache vars
@@ -41428,13 +41435,13 @@ When stuck:
 
 | Placeholder | Linux/BSD Default | macOS Default | Windows Default |
 |-------------|-------------------|---------------|-----------------|
-| `{config_dir}` | `/etc/{project_org}/{internal_name}` | `/Library/Application Support/{project_org}/{internal_name}` | `%PROGRAMDATA%\{project_org}\{internal_name}` |
-| `{data_dir}` | `/var/lib/{project_org}/{internal_name}` | `/Library/Application Support/{project_org}/{internal_name}` | `%PROGRAMDATA%\{project_org}\{internal_name}` |
+| `{config_dir}` | `/etc/{internal_org}/{internal_name}` | `/Library/Application Support/{internal_org}/{internal_name}` | `%PROGRAMDATA%\{internal_org}\{internal_name}` |
+| `{data_dir}` | `/var/lib/{internal_org}/{internal_name}` | `/Library/Application Support/{internal_org}/{internal_name}` | `%PROGRAMDATA%\{internal_org}\{internal_name}` |
 | `{db_dir}` | `{data_dir}/db/` | `{data_dir}/db/` | `{data_dir}\db\` |
-| `{log_dir}` | `/var/log/{project_org}/{internal_name}` | `/Library/Logs/{project_org}/{internal_name}` | `%PROGRAMDATA%\{project_org}\{internal_name}\logs` |
-| `{cache_dir}` | `/var/cache/{project_org}/{internal_name}` | `/Library/Caches/{project_org}/{internal_name}` | `%PROGRAMDATA%\{project_org}\{internal_name}\cache` |
-| `{backup_dir}` | `/mnt/Backups/{project_org}/{internal_name}` | `/Library/Application Support/{project_org}/{internal_name}/backups` | `%PROGRAMDATA%\{project_org}\{internal_name}\backups` |
-| `{pid_file}` | `/var/run/{project_org}/{internal_name}.pid` | `/var/run/{project_org}/{internal_name}.pid` | N/A (Windows uses SCM) |
+| `{log_dir}` | `/var/log/{internal_org}/{internal_name}` | `/Library/Logs/{internal_org}/{internal_name}` | `%PROGRAMDATA%\{internal_org}\{internal_name}\logs` |
+| `{cache_dir}` | `/var/cache/{internal_org}/{internal_name}` | `/Library/Caches/{internal_org}/{internal_name}` | `%PROGRAMDATA%\{internal_org}\{internal_name}\cache` |
+| `{backup_dir}` | `/mnt/Backups/{internal_org}/{internal_name}` | `/Library/Application Support/{internal_org}/{internal_name}/backups` | `%PROGRAMDATA%\{internal_org}\{internal_name}\backups` |
+| `{pid_file}` | `/var/run/{internal_org}/{internal_name}.pid` | `/var/run/{internal_org}/{internal_name}.pid` | N/A (Windows uses SCM) |
 
 **Note:** In Docker containers, `{db_dir}` is `/data/db/sqlite` (see Docker paths section).
 

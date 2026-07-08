@@ -367,33 +367,33 @@ Distribution artifact names follow the schema:
 
 | Token | Allowed values |
 |-------|----------------|
-| `{platform}` | `linux`, `windows`, `macos`, `freebsd`, `netbsd`, `openbsd` (lowercase, normalized OS name — never the full Rust target triple) |
-| `{arch}` | `x86_64`, `aarch64`, `armv7`, `i686`, `riscv64`, … (the architecture portion of the Rust target triple) |
+| `{platform}` | `linux`, `windows`, `darwin`, `freebsd`, `netbsd`, `openbsd` (lowercase, normalized OS name — never the full Rust target triple; macOS is always `darwin`, never `macos`) |
+| `{arch}` | `amd64`, `arm64`, `armv7`, `i686`, `riscv64`, … (normalized architecture name — `x86_64` maps to `amd64`, `aarch64` maps to `arm64`; other arches keep the triple's arch token) |
 | `{.ext}` | `.exe` on Windows; empty everywhere else |
 
 **Normalization rules:**
-- Strip the `-musl` libc suffix from the artifact name. `x86_64-unknown-linux-musl` → `linux-x86_64`, NOT `linux-x86_64-musl`. Static linkage is the project default (PART 0 → "Single Static Binary"), so calling it out in the filename is redundant.
+- Strip the `-musl` libc suffix from the artifact name. `x86_64-unknown-linux-musl` → `linux-amd64`, NOT `linux-amd64-musl`. Static linkage is the project default (PART 0 → "Single Static Binary"), so calling it out in the filename is redundant.
 - Strip the vendor token (`unknown`, `pc`, `apple`) from the artifact name.
 - Strip the ABI token (`gnu`, `msvc`, `eabihf`, …) from the artifact name unless multiple ABIs of the same `{platform}-{arch}` ship in the same release; in that rare case append `-{abi}` after `{arch}`.
-- `apple-darwin` maps to `macos`. `pc-windows-msvc` maps to `windows`. `unknown-linux-musl` maps to `linux`.
+- `apple-darwin` maps to `darwin`. `pc-windows-msvc` maps to `windows`. `unknown-linux-musl` maps to `linux`. `x86_64` maps to `amd64`; `aarch64` maps to `arm64` — artifact names use Go-style OS/arch terms so Go and Rust releases are named identically.
 
 **Worked examples:**
 
 | Rust target triple | Artifact name |
 |--------------------|---------------|
-| `x86_64-unknown-linux-musl` | `{project_name}-linux-x86_64` |
-| `aarch64-unknown-linux-musl` | `{project_name}-linux-aarch64` |
+| `x86_64-unknown-linux-musl` | `{project_name}-linux-amd64` |
+| `aarch64-unknown-linux-musl` | `{project_name}-linux-arm64` |
 | `armv7-unknown-linux-musleabihf` | `{project_name}-linux-armv7` |
-| `x86_64-pc-windows-msvc` | `{project_name}-windows-x86_64.exe` |
-| `aarch64-pc-windows-msvc` | `{project_name}-windows-aarch64.exe` |
-| `x86_64-apple-darwin` | `{project_name}-macos-x86_64` |
-| `aarch64-apple-darwin` | `{project_name}-macos-aarch64` |
-| `x86_64-unknown-freebsd` | `{project_name}-freebsd-x86_64` |
+| `x86_64-pc-windows-msvc` | `{project_name}-windows-amd64.exe` |
+| `aarch64-pc-windows-msvc` | `{project_name}-windows-arm64.exe` |
+| `x86_64-apple-darwin` | `{project_name}-darwin-amd64` |
+| `aarch64-apple-darwin` | `{project_name}-darwin-arm64` |
+| `x86_64-unknown-freebsd` | `{project_name}-freebsd-amd64` |
 
 **Other rules:**
 - Local (in-tree) primary binary name: `{project_name}` (no platform/arch suffix during local development inside the Docker image)
 - If optional helper binaries exist, use `{project_name}-{tool}` for the in-tree name and `{project_name}-{tool}-{platform}-{arch}{.ext}` for distribution
-- Checksum files mirror the artifact name plus `.sha256` (e.g., `{project_name}-linux-x86_64.sha256`)
+- Checksum files mirror the artifact name plus `.sha256` (e.g., `{project_name}-linux-amd64.sha256`)
 
 **Single-binary rule:** the default user experience is "download one file, run it." The primary binary MUST be self-sufficient (PART 0 → "Self-Contained Assets"). Helper binaries are not a substitute for putting features into the primary binary; if a feature can live behind a CLI subcommand of the primary binary, it MUST.
 
@@ -644,8 +644,8 @@ This list is not exhaustive; treat it as the starting point. When introducing a 
 |-----------------|---------|
 | `cargo fmt --all` | Format code |
 | `cargo fmt --all --check` | Formatting verification |
-| `cargo clippy --workspace --all-targets --all-features -- -D warnings` | Lint enforcement |
-| `cargo test --workspace --all-features` | Test suite |
+| `cargo clippy -- -D warnings` | Lint enforcement |
+| `cargo test --lib --no-fail-fast` | Test suite |
 | `cargo build` | Debug build |
 | `cargo build --release` | Release build |
 | `cargo doc --workspace --no-deps` | Documentation build |
@@ -688,10 +688,10 @@ Bare `cargo …` invocations on the host are forbidden by PART 0 → "No Host To
 
 ```toml
 [profile.release]
-opt-level     = 3
-lto           = "fat"
+opt-level     = "z"
+lto           = true
 codegen-units = 1
-strip         = "symbols"
+strip         = true
 panic         = "abort"
 ```
 
@@ -760,7 +760,7 @@ The `assets/` directory in the repo holds source files (fonts, icons, default th
 ## Release Artifacts
 
 - Primary binary follows the naming schema `{project_name}-{platform}-{arch}{.ext}` defined in PART 2 → "Binary Model" — single statically linked file, `-musl`/vendor/ABI tokens stripped
-- Each release MUST publish artifacts for at minimum: `{project_name}-linux-x86_64`, `{project_name}-linux-aarch64`, `{project_name}-windows-x86_64.exe`, `{project_name}-windows-aarch64.exe`, `{project_name}-macos-x86_64`, `{project_name}-macos-aarch64` (subset acceptable only when IDEA.md narrows platform scope)
+- Each release MUST publish artifacts for at minimum: `{project_name}-linux-amd64`, `{project_name}-linux-arm64`, `{project_name}-windows-amd64.exe`, `{project_name}-windows-arm64.exe`, `{project_name}-darwin-amd64`, `{project_name}-darwin-arm64` (subset acceptable only when IDEA.md narrows platform scope)
 - A static-linkage verification step is part of release: `ldd` / `otool -L` / `dumpbin /dependents` output is captured and checked against an allowlist (kernel vDSO, Apple system frameworks, Windows kernel32/user32 etc.) — anything outside the allowlist fails the release
 - No companion files (no `.so`, `.dylib`, `.dll`, no asset bundles, no font directories) ship next to the binary
 - Include SHA-256 checksums for every published artifact, named `{artifact}.sha256`
@@ -1445,18 +1445,18 @@ Every `actions/upload-artifact` step MUST set a finite `retention-days`:
 - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
   with:
     name: {project_name}-${{ matrix.target }}
-    path: dist/
+    path: binaries/
     # release-job artifacts may use up to 30; build-job CI artifacts use 7
     retention-days: 7
 ```
 
 ```bash
 # Prepare output directory for release artifacts (binaries, checksums, SBOM)
-mkdir -p dist
+mkdir -p binaries
 
 # Run gates inside the image (casjaysdev/rust:latest — all tools pre-installed)
-docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo fmt --all --check
-docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo clippy --workspace --all-targets --all-features -- -D warnings
+docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo fmt --check
+docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo clippy -- -D warnings
 docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo test --workspace --all-features
 docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo doc --workspace --no-deps
 
@@ -1482,14 +1482,14 @@ for TARGET in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
     -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
     cargo build --release --target "$TARGET"
 
-  # Map triple → artifact name: x86_64-unknown-linux-musl → linux-x86_64
+  # Map triple → artifact name: x86_64-unknown-linux-musl → linux-amd64
   case "$TARGET" in
-    x86_64-unknown-linux-musl)   ARTIFACT="{project_name}-linux-x86_64" ;;
-    aarch64-unknown-linux-musl)  ARTIFACT="{project_name}-linux-aarch64" ;;
+    x86_64-unknown-linux-musl)   ARTIFACT="{project_name}-linux-amd64" ;;
+    aarch64-unknown-linux-musl)  ARTIFACT="{project_name}-linux-arm64" ;;
   esac
 
-  cp "target/$TARGET/release/{project_name}" "dist/$ARTIFACT"
-  sha256sum "dist/$ARTIFACT" > "dist/$ARTIFACT.sha256"
+  cp "target/$TARGET/release/{project_name}" "binaries/$ARTIFACT"
+  sha256sum "binaries/$ARTIFACT" > "binaries/$ARTIFACT.sha256"
 
   # Verify static linkage for this target — fails the build if unexpected
   # dynamic deps appear. Use the appropriate inspector per target family:
@@ -1502,10 +1502,10 @@ done
 
 # Generate the SBOM (CycloneDX) — published alongside the release artifacts.
 # `cargo cyclonedx --format json` writes `bom.json` next to Cargo.toml; rename
-# into dist/ for inclusion in the release.
+# into binaries/ for inclusion in the release.
 docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
   cargo cyclonedx --format json
-cp bom.json "dist/{project_name}-bom.json"
+cp bom.json "binaries/{project_name}-bom.json"
 ```
 
 For GUI smoke tests in CI, use a virtual X server (e.g., `Xvfb`) and a headless Wayland compositor (e.g., `cage`, `weston --backend=headless`) **inside** the container or as a sidecar service — both backends MUST be exercised, not just one.
@@ -1810,7 +1810,7 @@ Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI fai
 - [ ] X11 forwarding sample command is documented and works against a real Xorg/XWayland session
 - [ ] Wayland forwarding sample command is documented and works against a real Wayland compositor
 - [ ] `rust-toolchain.toml` pins the toolchain; `.cargo/config.toml` pins static-link rustflags
-- [ ] `Cargo.toml` release profile uses `lto = "fat"`, `codegen-units = 1`, `strip = "symbols"`, `panic = "abort"`
+- [ ] `Cargo.toml` release profile uses `opt-level = "z"`, `lto = true`, `codegen-units = 1`, `strip = true`, `panic = "abort"`
 - [ ] Repo has `assets/` (build-time source) and a Rust embedding module (`include_bytes!` / `rust-embed`) wiring it into the binary
 - [ ] No source files in any language other than Rust contribute to the binary (small Docker shell helpers excepted)
 - [ ] `deny.toml` exists at project root with the spec's default allowlist / denylist (PART 11 → "License Compliance")
@@ -1873,7 +1873,7 @@ All gates run inside the project Docker image — never on the host.
 - [ ] `LICENSE.md` regenerated and committed if `Cargo.lock` changed; CI license-drift check is green
 - [ ] Distributed binary's actual license matches what README and "About" claim (no silent GPL/LGPL relicensing via a transitive crate)
 - [ ] Artifact filenames follow `{project_name}-{platform}-{arch}{.ext}` with `-musl`/vendor/ABI tokens stripped
-- [ ] Artifacts cover the supported target matrix declared in IDEA.md (defaults: `{project_name}-linux-{x86_64,aarch64}`, `{project_name}-windows-{x86_64,aarch64}.exe`, `{project_name}-macos-{x86_64,aarch64}`)
+- [ ] Artifacts cover the supported target matrix declared in IDEA.md (defaults: `{project_name}-linux-{amd64,arm64}`, `{project_name}-windows-{amd64,arm64}.exe`, `{project_name}-darwin-{amd64,arm64}`)
 - [ ] SBOM generated via `cargo-cyclonedx` and published with the release; provenance/attestation included when the platform supports it
 - [ ] Packaging metadata matches supported GUI/TUI/CLI surfaces
 

@@ -1,96 +1,31 @@
 # 🦀 claudemgr/rust
 
-Rust project specification for Claude AI — the single source of truth for building CasjaysDev Rust projects.
+Template specifications for CasjaysDev Rust projects. Each file is a master template — copied into a generated project as `AI.md` — covering the full project lifecycle from layout and build system through CI/CD, testing, and release.
 
-## 📄 What's Here
+## Templates
+
+| File | App type | When to use |
+|------|----------|-------------|
+| `API.md` | REST / JSON API server | HTTP services that expose a structured API; may include a companion CLI client |
+| `APPLICATION.md` | Native GUI / TUI / CLI application | Single-binary desktop or terminal applications with no server component |
+| `SERVER.md` | Full-stack web server | Server-side rendered HTML with optional REST endpoints; similar to API but ships a frontend |
+
+## Files
 
 | File | Purpose |
 |------|---------|
-| `API.md` | Complete ~40,000-line Rust project specification (34 PARTs) |
-| `IDEA.md` | Project-scope description and variables |
-| `CLAUDE.md` | Short loader — reads `API.md` at session start |
+| `API.md` | Rust API server template — source of truth for API projects (PARTs 0–33) |
+| `APPLICATION.md` | Rust application template — source of truth for GUI/TUI/CLI projects |
+| `SERVER.md` | Rust web server template — source of truth for full-stack server projects |
+| `README.md` | This file |
+| `LICENSE.md` | Repository license (WTFPL) |
 
-## 📦 What API.md Covers
+## Related
 
-All 34 PARTs of the Rust project specification:
+`IDEA.md` and `CLAUDE.md` are not stored here — they are generated inside each project that uses one of these templates. Global implementation conventions live in `~/.claude/memory/` (rust_conventions.md, makefile_conventions.md, testing_conventions.md, etc.).
 
-| PART | Topic |
-|------|-------|
-| 0–6 | Project structure, Cargo.toml, release profile, binary naming |
-| 7–9 | Makefile pattern (local dev), Docker build, cache scheme |
-| 10–13 | Error handling, `?` operator, logging, tracing |
-| 14–18 | HTTP server, routing, middleware, request/response types |
-| 19–22 | Authentication, authorization, session management |
-| 23–25 | CLI flags, NO_COLOR, clap derive API |
-| 26–28 | CI/CD — GitHub/GitLab/Gitea/Forgejo workflows |
-| 29–31 | Release workflow, binary artifacts, Docker image publishing |
-| 32–34 | Testing, Docker/Incus dev workflow, security hardening |
+## License
 
-## 🏗️ Build Model
+This repository (the templates themselves) is licensed under **WTFPL** — see [LICENSE.md](LICENSE.md).
 
-```
-Local development / AI work → make build / make test / make release
-CI/CD pipelines            → cargo build --release / cargo test (direct)
-```
-
-**Makefile is a local development tool only.** CI/CD workflow files always use direct `cargo` commands — never `make`.
-
-All builds run inside Docker via `casjaysdev/rust:latest` — never on the host machine.
-
-### Cache Scheme
-
-| Variable | Local Default | Container Path |
-|----------|--------------|----------------|
-| `CARGO_CACHE` | `~/.cargo` | `/usr/local/share/cargo` |
-| `RUSTUP_CACHE` | `~/.rustup` | `/usr/local/share/rustup` |
-| `SCCACHE_CACHE` | `~/.cache/sccache` | `/root/.cache/sccache` |
-
-## ⚙️ Required Release Profile
-
-```toml
-[profile.release]
-opt-level      = "z"
-lto            = true
-codegen-units  = 1
-strip          = true
-panic          = "abort"
-```
-
-All five fields are non-negotiable.
-
-## 🏷️ Binary Naming
-
-Schema: `{name}-{os}-{arch}`
-
-| Term | Valid values |
-|------|-------------|
-| OS | `linux` `macos` `windows` `freebsd` |
-| Arch | `x86_64` `aarch64` |
-
-Never use Go terms (`darwin`, `amd64`, `arm64`) or a `-musl` suffix.
-
-## 🤖 AI Quick Start
-
-```text
-You are working in the current project directory.
-
-The project specification is ./API.md. It is the single source of truth.
-
-Before doing anything else:
-1. Fully read ./API.md from the top through PART 5.
-2. Follow ./API.md exactly as written.
-3. Do not guess or assume when ./API.md says to detect, read, verify, or ask.
-4. If ./TODO.AI.md exists, review and update it as needed.
-5. Commit all COMMIT, NEVER, and MUST rules from ./API.md to memory.
-6. Before making changes, read the relevant section of ./API.md and follow it exactly.
-
-If any file conflicts with ./API.md, ./API.md wins.
-```
-
-## 👤 Author
-
-**Jason Hempstead** · [GitHub](https://github.com/casjay) · [Casjays Developments](https://casjaysdev.pro)
-
-## 📄 License
-
-MIT — see [LICENSE.md](LICENSE.md)
+Projects generated from these templates are licensed under **MIT** (each generated project ships its own `LICENSE.md`).

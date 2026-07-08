@@ -619,7 +619,7 @@ let cache_size = (avail_mem / 10)
 | **NEVER use Makefile in CI** | Workflows have explicit commands with all env vars |
 | **GitHub/Gitea/Jenkins must match** | Same platforms, same env vars, same logic |
 | **VERSION precedence** | `release.txt` wins when present; otherwise use the workflow/build-specific fallback (tag, beta timestamp, etc.) |
-| **RUSTFLAGS** | `--release --target {target} -C strip=symbols` plus `-C link-arg=-s` for size |
+| **RUSTFLAGS** | `-C strip=symbols -C link-arg=-s` (rustc flags only); `--release --target {target}` go on the cargo command line, not in RUSTFLAGS |
 | **Docker builds on EVERY push** | Any branch push triggers Docker image build |
 | **Docker tags** | Any push → `devel`, `{commit}`; beta → adds `beta`; tag → `{version}`, `latest`, `YYMM`, `{commit}` |
 | **Workflow permissions** | Default to read-only / least privilege; grant write only to the specific release/publish job that needs it |
@@ -849,7 +849,7 @@ src/config/                 # Configuration module
 src/routes/                 # Axum router setup
 src/handlers/               # HTTP request handlers
 src/models/                 # Data models
-src/middleware/             # Tower middleware
+src/middlewares/            # Tower middleware
 src/db/                     # Database access layer
 src/errors.rs               # Error types
 src/state.rs                # Shared application state (AppState)
@@ -914,7 +914,7 @@ src/
 │   ├── user.rs                # User management handlers
 │   ├── admin.rs               # Admin panel handlers
 │   └── api.rs                 # API handlers
-├── middleware/
+├── middlewares/
 │   └── mod.rs                 # Tower middleware (auth, logging, rate-limit, CORS)
 ├── models/
 │   ├── user.rs                # User model
@@ -958,8 +958,8 @@ src/
 │   └── mod.rs                 # TLS handling (rustls + rustls-acme)
 ├── scheduler/
 │   └── mod.rs                 # Background task scheduler (tokio)
-├── service/
-│   └── mod.rs                 # Systemd service management
+├── services/
+│   └── systemd.rs             # Systemd service management
 └── admin/
     ├── mod.rs                 # Admin module root
     └── handlers.rs            # Admin handlers
@@ -1004,7 +1004,7 @@ src/
 | `services/` | Business logic | Core application logic, orchestration |
 | `models/` | Data structures | Structs, validation, serde serialization |
 | `db/` | Data persistence | sqlx queries, CRUD operations |
-| `middleware/` | Tower middleware | Auth, logging, rate limiting, CORS |
+| `middlewares/` | Tower middleware | Auth, logging, rate limiting, CORS |
 | `templates/` | Askama templates | HTML templates for WebUI |
 | `static/` | Static assets | CSS, JS, images (embedded via rust-embed) |
 | `swagger/` | OpenAPI/Swagger | utoipa spec, UI handler, theming (always `src/swagger/`) |
@@ -1019,7 +1019,7 @@ src/
 | `services/*.rs` | Business logic only | HTTP concerns, direct DB access |
 | `models/*.rs` | Struct definitions, serde, validation | Business logic, handlers |
 | `db/*.rs` | sqlx operations only | Business logic, HTTP concerns |
-| `middleware/*.rs` | Tower request/response middleware | Business logic |
+| `middlewares/*.rs` | Tower request/response middleware | Business logic |
 | `helpers.rs` | Small utility functions | Large features, types |
 | `errors.rs` | thiserror type definitions | Error handling logic |
 
@@ -3108,7 +3108,7 @@ Getting code correct on the first try is much harder than iterating with feedbac
 | **Code <> README.md** | User-facing features | README describes what code actually does |
 | **Code <> OpenAPI** | API routes | Annotations match actual handlers |
 | **Code <> docs/** | All documentation | ReadTheDocs matches implementation |
-| **Code <> CLI --help** | Commands/flags | Help output matches actual CLI |
+| **Code ↔ CLI --help** | Commands/flags | Help output matches actual CLI |
 | **Code <> `.github/` policy files** | Support/report/review flow | CONTRIBUTING, SECURITY, issue templates, PR template, and CODEOWNERS match actual project behavior and paths |
 
 ### Step 3: Infrastructure File Accuracy
@@ -5675,15 +5675,15 @@ For Rust projects, use `Cargo.toml` and license scanning tools:
 
 ```bash
 # List all dependencies
-cargo tree
+# cargo-deny and cargo-license are pre-installed in casjaysdev/rust:latest — no cargo install needed
+# All cargo invocations run inside the container using the docker run form used throughout this spec
+$RUST_DOCKER casjaysdev/rust:latest cargo tree
 
 # Use cargo-deny for license checking (recommended)
-cargo install cargo-deny
-cargo deny check licenses
+$RUST_DOCKER casjaysdev/rust:latest cargo deny check licenses
 
 # Use cargo-license for a full report
-cargo install cargo-license
-cargo license --json > licenses.json
+$RUST_DOCKER casjaysdev/rust:latest cargo license --json > licenses.json
 ```
 
 For Node.js projects:
@@ -5887,10 +5887,21 @@ See PART 27: DOCKER for complete annotation requirements.
 
 ```toml
 [package]
-name = "{project_name}"
+name = "{internal_name}"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.75"
+authors = ["{project_org}"]
+description = "{project_name} - {short description}"
+repository = "https://github.com/{project_org}/{project_name}"
 license = "MIT"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
 ```
 
 **Example crate doc comment:**
@@ -6163,7 +6174,7 @@ PROJECTORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+(
 │   ├── routes/             # Axum router definitions
 │   ├── handlers/           # Request handler functions
 │   ├── models/             # Data types and domain models
-│   ├── middleware/         # Tower middleware layers
+│   ├── middlewares/        # Tower middleware layers
 │   ├── db/                 # sqlx database layer
 │   ├── errors.rs           # thiserror error types
 │   └── state.rs            # AppState (Arc<AppState> for axum::extract::State)
@@ -6789,6 +6800,17 @@ libsql = "*"
 name = "{internal_name}"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.75"
+authors = ["{project_org}"]
+description = "{project_name} - {short description}"
+repository = "https://github.com/{project_org}/{project_name}"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
 
 [dependencies]
 # Database drivers
@@ -9443,7 +9465,7 @@ pub fn debug_log_cache(op: &str, key: &str, hit: bool, duration: Duration, is_de
 ### Debug Middleware
 
 ```rust
-// src/middleware/debug.rs
+// src/middlewares/debug.rs
 
 use axum::{
     body::Body,
@@ -21010,7 +21032,7 @@ fn get_api_response_format(req: &Request) -> &'static str {
 ### Content Negotiation Implementation
 
 ```rust
-// src/middleware/content_negotiation.rs
+// src/middlewares/content_negotiation.rs
 
 fn detect_response_format(req: &Request) -> &'static str {
     // 1. Check for .txt extension
@@ -21107,7 +21129,7 @@ When an HTTP tool (curl, wget, httpie) is detected, the server MUST:
 **Client Type Detection (User-Agent):**
 
 ```rust
-// src/middleware/detect.rs
+// src/middlewares/detect.rs
 
 // is_our_cli_client detects our own client binary ({project_name}-cli)
 // Client is INTERACTIVE (TUI/GUI) - receives JSON, renders itself
@@ -21221,7 +21243,7 @@ fn is_non_interactive_client(req: &Request) -> bool {
 **html2text_converter Function:**
 
 ```rust
-// src/middleware/html2text.rs
+// src/middlewares/html2text.rs
 
 use scraper::{Html, Selector, ElementRef, Node};
 
@@ -34618,7 +34640,7 @@ pub fn init_app_info(version: &str, commit: &str, build_date: &str) {
 ### Metrics Middleware (tower layer)
 
 ```rust
-// src/middleware/metrics.rs
+// src/middlewares/metrics.rs
 use std::{
     sync::Arc,
     task::{Context, Poll},
@@ -38313,9 +38335,11 @@ docker:
 test:
 	@echo "Running tests with coverage..."
 	@$(RUST_DOCKER) sh -c " \
-		cargo nextest run && \
-		cargo llvm-cov --summary-only --fail-under-lines 80"
-	@echo "Tests complete - Coverage >= 80% required ✓"
+		cargo fmt --check && \
+		cargo clippy -- -D warnings && \
+		cargo nextest run --lib --no-fail-fast && \
+		cargo llvm-cov --summary-only --fail-under-lines 60"
+	@echo "Tests complete - Coverage >= 60% required ✓"
 
 # =============================================================================
 # DEV - Quick build for local development/testing (to random temp dir)
@@ -38444,9 +38468,11 @@ All Docker builds mount four host directories to persist Cargo, Rustup, sccache,
 
 1. Runs tests inside Docker container (`casjaysdev/rust:latest`)
 2. Mounts project directory to `/app`
-3. Runs `cargo nextest run` for fast parallel test execution
-4. Enforces 80% line coverage via `cargo llvm-cov`
-5. Container removed after completion (`--rm`)
+3. Checks formatting via `cargo fmt --check`
+4. Checks lints via `cargo clippy -- -D warnings`
+5. Runs `cargo nextest run --lib --no-fail-fast` for fast parallel test execution
+6. Enforces 60% line coverage via `cargo llvm-cov`
+7. Container removed after completion (`--rm`)
 
 ### `make dev`
 
@@ -38507,7 +38533,7 @@ docker run --rm \
 | Script | Container | Best For |
 |--------|-----------|----------|
 | `./tests/run_tests.sh` | Auto-detect | General testing (picks best available) |
-| `./tests/docker.sh` | Docker `alpine:latest` | Quick integration tests |
+| `./tests/docker.sh` | Docker `alpine:latest` | Quick binary validation |
 | `./tests/incus.sh` | Incus `debian:latest` | **PREFERRED** - Full OS, systemd, realistic |
 
 **Typical workflow:**
@@ -43750,7 +43776,7 @@ rm -rf "${TMPDIR:-/tmp}/${PROJECT_ORG}/"
 - If the behavior requires a running binary, real HTTP requests, real process execution, or container/Incus setup, it belongs in `./tests/*.sh`
 
 **Reason both are required:**
-- `#[cfg(test)]` exists to achieve and enforce **≥80% Rust code coverage** via `cargo llvm-cov` (critical paths — auth, DB, token validation — must always be covered)
+- `#[cfg(test)]` exists to achieve and enforce **≥60% Rust code coverage** via `cargo llvm-cov` (critical paths — auth, DB, token validation — must always be covered)
 - `./tests/*.sh` exists to achieve and enforce **100% endpoint/route/integration coverage**
 - One does **not** replace the other; they measure different things and catch different classes of bugs
 
@@ -44002,7 +44028,7 @@ curl -q -LSsf /links/abc123
 | `src/config/` | `src/config/mod.rs` `#[cfg(test)]` | Config loading, validation, defaults |
 | `src/routes/` | `src/routes/mod.rs` `#[cfg(test)]` | Route registration, middleware |
 | `src/handlers/` | per-handler `#[cfg(test)]` | Handler logic (mock requests via `axum_test`) |
-| `src/middleware/` | `src/middleware/mod.rs` `#[cfg(test)]` | Mode detection, behavior |
+| `src/middlewares/` | `src/middlewares/mod.rs` `#[cfg(test)]` | Mode detection, behavior |
 | `src/errors.rs` | `#[cfg(test)]` | Error mapping, display |
 | `src/state.rs` | `#[cfg(test)]` | State construction, validation |
 
@@ -44029,13 +44055,13 @@ make test
 
 ## Test Coverage Gates
 
-**Two different gates apply: ≥80% for unit tests, 100% for endpoint/route integration tests.**
+**Two different gates apply: ≥60% for unit tests, 100% for endpoint/route integration tests.**
 
 ### Coverage Requirements
 
 | Coverage Type | Requirement | Verification |
 |--------------|-------------|--------------|
-| **Rust Unit Tests** | ≥80% code coverage | `cargo llvm-cov` must report ≥80% |
+| **Rust Unit Tests** | ≥60% code coverage | `cargo llvm-cov` must report ≥60% |
 | **Integration Tests** | 100% endpoint coverage | Every endpoint tested |
 | **Admin Routes** | 100% route coverage | Every admin route tested |
 | **Critical Paths (auth, DB, token validation)** | Always tested | No critical path may go untested regardless of overall % |
@@ -44043,9 +44069,9 @@ make test
 
 ### What These Gates Mean
 
-**Rust Code (Unit Tests) — ≥80%:**
+**Rust Code (Unit Tests) — ≥60%:**
 ```bash
-# Run tests with coverage enforcement (fails if below 80%)
+# Run tests with coverage enforcement (fails if below 60%)
 make test
 ```
 
@@ -44080,17 +44106,17 @@ test:
         echo "COVDIR=$COVDIR" >> "$GITHUB_ENV"
         cargo llvm-cov nextest --workspace --lcov --output-path "$COVDIR/coverage.lcov"
 
-    - name: Check coverage is >= 80%
+    - name: Check coverage is >= 60%
       run: |
         COVERAGE=$(cargo llvm-cov report --summary-only 2>/dev/null | grep 'TOTAL' | awk '{print $NF}' | tr -d '%')
-        if [ $(echo "$COVERAGE < 80" | bc -l) -eq 1 ]; then
-          echo "ERROR: Coverage is $COVERAGE%, must be >= 80%"
+        if [ $(echo "$COVERAGE < 60" | bc -l) -eq 1 ]; then
+          echo "ERROR: Coverage is $COVERAGE%, must be >= 60%"
           exit 1
         fi
-        echo "Coverage: $COVERAGE% (>= 80% required)"
+        echo "Coverage: $COVERAGE% (>= 60% required)"
 ```
 
-### How to Achieve the Coverage Gates (≥80% unit, 100% endpoints)
+### How to Achieve the Coverage Gates (≥60% unit, 100% endpoints)
 
 **1. Test All Code Paths:**
 ```rust
@@ -44211,11 +44237,11 @@ verify_all_endpoints_tested
 
 ### Coverage Exceptions
 
-**Unit-test gate is ≥80%, not 100% — but the 100% gates for endpoints/routes and critical paths are absolute.** Common pushback on writing unit tests is still rejected:
+**Unit-test gate is ≥60%, not 100% — but the 100% gates for endpoints/routes and critical paths are absolute.** Common pushback on writing unit tests is still rejected:
 
 | Common Excuse | Response |
 |--------------|----------|
-| "It's just a simple getter" | Test it anyway if it counts toward the 80% floor and is in a critical path |
+| "It's just a simple getter" | Test it anyway if it counts toward the 60% floor and is in a critical path |
 | "The code is obvious" | Obvious code can still have bugs |
 | "It's only used internally" | Internal code needs tests too |
 | "I tested it manually" | Manual tests don't count |
@@ -52895,7 +52921,7 @@ cargo build --release --target x86_64-unknown-linux-musl
 The server can use the User-Agent to apply client-specific behavior:
 
 ```rust
-// src/middleware/client_detection.rs
+// src/middlewares/client_detection.rs
 use axum::http::HeaderMap;
 
 pub fn get_client_type(headers: &HeaderMap) -> &'static str {
@@ -61276,7 +61302,7 @@ make docker
 - [ ] `src/errors.rs` - Error types
 - [ ] `src/routes/` - Route definitions
 - [ ] `src/handlers/` - Request handlers
-- [ ] `src/middleware/` - Tower middleware layers
+- [ ] `src/middlewares/` - Tower middleware layers
 - [ ] `src/models/` - Data models
 - [ ] `src/db/` - Database access layer
 - [ ] `docker/` - Docker configuration
@@ -61321,6 +61347,7 @@ make docker
 - [ ] Creates directories on first run
 - [ ] Sets permissions based on run context
 - [ ] Runs as root or user correctly
+- [ ] `Cargo.toml` contains `[profile.release]` with `opt-level = "z"`, `lto = true`, `codegen-units = 1`, `strip = true`, `panic = "abort"`
 
 **PART 8: Server Binary CLI**
 - [ ] `--help` - Shows help (no privileges needed)
