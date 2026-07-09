@@ -26919,9 +26919,9 @@ PROJECTORG := $(shell git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]
 # Version precedence: release.txt > env/default fallback
 VERSION ?= $(shell cat release.txt 2>/dev/null || echo "devel")
 
-# Build info - use TZ env var or system timezone
-# Format: "December 4, 2025 at 13:05:13"
-BUILD_DATE := $(shell date +"%%B %%-d, %%Y at %%H:%%M:%%S")
+# Build info - ISO 8601 UTC
+# Format: "2025-12-04T13:05:13Z"
+BUILD_DATE := $(shell date -u +"%%Y-%%m-%%dT%%H:%%M:%%SZ")
 COMMIT_ID := $(shell git rev-parse --short HEAD 2>/dev/null || echo "N/A")
 # COMMIT_ID used directly - no VCS_REF alias
 
@@ -26955,16 +26955,25 @@ CARGO_TARGET  ?= $(HOME)/.cache/cargo-target/$(PROJECTNAME)
 # Build targets
 PLATFORMS ?= linux/amd64,linux/arm64
 
+# Resource limits — overrideable; prevents any single container from starving concurrent agent builds
+DOCKER_MEM  ?= 4g
+DOCKER_CPUS ?= 2
+
 # Docker - Set REGISTRY based on your platform (ghcr.io, registry.gitlab.com, git.example.com)
 REGISTRY ?= ghcr.io/$(PROJECTORG)/$(PROJECTNAME)
 RUST_DOCKER := docker run --rm \
 	--name $(PROJECTNAME)-$$(tr -dc 'a-z0-9' </dev/urandom | head -c8) \
+	--memory=$(DOCKER_MEM) --cpus=$(DOCKER_CPUS) \
 	-v $(PWD):/app \
 	-v $(CARGO_CACHE):/usr/local/share/cargo \
 	-v $(RUSTUP_CACHE):/usr/local/share/rustup \
 	-v $(SCCACHE_CACHE):/root/.cache/sccache \
 	-v $(CARGO_TARGET):/app/target \
 	-w /app \
+	-e VERSION="$(VERSION)" \
+	-e COMMIT_ID="$(COMMIT_ID)" \
+	-e BUILD_DATE="$(BUILD_DATE)" \
+	-e OFFICIALSITE="$(OFFICIALSITE)" \
 	casjaysdev/rust:latest
 
 .PHONY: build local release docker test dev clean
@@ -27104,8 +27113,8 @@ docker:
 test:
 	@echo "Running tests with coverage..."
 	@$(RUST_DOCKER) sh -c " \
-		mkdir -p \"/tmp/$(PROJECTORG)\" && \
-		COVDIR=\$$(mktemp -d \"/tmp/$(PROJECTORG)/$(PROJECTNAME)-XXXXXX\") && \
+		mkdir -p \"\$${TMPDIR:-/tmp}/$(PROJECTORG)\" && \
+		COVDIR=\$$(mktemp -d \"\$${TMPDIR:-/tmp}/$(PROJECTORG)/$(PROJECTNAME)-XXXXXX\") && \
 		cargo fmt --check 2>&1 | tee \$$COVDIR/fmt.out && \
 		cargo clippy -- -D warnings 2>&1 | tee \$$COVDIR/clippy.out && \
 		cargo test --lib --no-fail-fast 2>&1 | tee \$$COVDIR/test.out && \
