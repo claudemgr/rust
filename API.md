@@ -11466,6 +11466,8 @@ POST /pastes
 ```
 The server generates the token, stores `SHA-256(token)` in `api_tokens` with `resource_type="paste"` and `resource_id="abc123"`, then returns the raw token **once**. It is never retrievable again. API clients store it themselves (config file, env var). Browsers get **dual delivery**: the web-form create response shows the token once (copy button) AND sets an `owner_token` cookie (HttpOnly + Secure + SameSite=Strict + Path=/, Max-Age matching the token lifetime), so web management works with JS disabled; JS may additionally save it to `localStorage` as a convenience copy — never load-bearing.
 
+**Naming:** the JSON response field `owner_token` is fixed across all projects — never rename it. Browser storage names are project-unique: both the cookie and the localStorage key are `{project_name}_owner_token_XXXXXX`, where `XXXXXX` is a random suffix generated once at project creation and recorded verbatim in IDEA.md (e.g. `owner_token: pastebin_owner_token_5qvQQyc5`) — fixed for the project's lifetime so the server always knows which cookie to read, and unique so apps, forks, or sibling deployments on one domain never collide. The suffix is not a secret (cookie names are visible); HttpOnly protects the value. Spec text uses `owner_token` as shorthand for that cookie.
+
 **Ownership check (every write/delete on a resource):**
 1. Extract `Authorization: Bearer tok_...` header
 2. If matches `server.token` hash → **operator access, allow unconditionally**
@@ -21060,12 +21062,12 @@ Resource owner tokens use **dual delivery** in the browser (see PART 12 → API 
 `localStorage` holds an optional JS convenience copy (pre-fill, copy button) — never load-bearing:
 
 ```javascript
-// Write
-localStorage.setItem('api_token', token);
+// Write - the literal key name comes from IDEA.md (owner_token: ...)
+localStorage.setItem('{project_name}_owner_token_XXXXXX', token);
 // Read
-const token = localStorage.getItem('api_token');
+const token = localStorage.getItem('{project_name}_owner_token_XXXXXX');
 // Remove
-localStorage.removeItem('api_token');
+localStorage.removeItem('{project_name}_owner_token_XXXXXX');
 ```
 
 The operator token is never stored in the browser — not in localStorage and not in a cookie; it lives in the server config and is used from CLI tools or API clients only.
