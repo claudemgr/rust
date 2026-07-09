@@ -3927,8 +3927,8 @@ User preferences like theme, language, and UI settings are stored client-side:
 
 | Storage | Use Case | Persistence |
 |---------|----------|-------------|
-| Cookies | Theme, language, consent flags, announcement dismissals — anything the server benefits from reading (server-rendered, no FOUC, works without JS) | Configurable expiry |
-| `localStorage` | Resource-owner API tokens (PART 12) and pure client-only state the server must never receive automatically | Until cleared |
+| Cookies | Theme, language, consent flags, announcement dismissals — anything the server benefits from reading (server-rendered, no FOUC, works without JS); plus the `owner_token` cookie (HttpOnly + Secure + SameSite=Strict) set on web-form resource creation so token-gated web management works with JS disabled | Configurable expiry |
+| `localStorage` | Optional JS-enhancement copy of the resource-owner API token (PART 12) and pure client-only state — never load-bearing; every flow must also work via the `owner_token` cookie with JS disabled | Until cleared |
 
 ## AI Implementation Process
 
@@ -11464,7 +11464,7 @@ POST /pastes
     }
   }
 ```
-The server generates the token, stores `SHA-256(token)` in `api_tokens` with `resource_type="paste"` and `resource_id="abc123"`, then returns the raw token **once**. It is never retrievable again. The client stores it in `localStorage`.
+The server generates the token, stores `SHA-256(token)` in `api_tokens` with `resource_type="paste"` and `resource_id="abc123"`, then returns the raw token **once**. It is never retrievable again. API clients store it themselves (config file, env var). Browsers get **dual delivery**: the web-form create response shows the token once (copy button) AND sets an `owner_token` cookie (HttpOnly + Secure + SameSite=Strict + Path=/, Max-Age matching the token lifetime), so web management works with JS disabled; JS may additionally save it to `localStorage` as a convenience copy — never load-bearing.
 
 **Ownership check (every write/delete on a resource):**
 1. Extract `Authorization: Bearer tok_...` header
@@ -11473,6 +11473,8 @@ The server generates the token, stores `SHA-256(token)` in `api_tokens` with `re
 4. Verify hash matches, `revoked_at IS NULL`, `expires_at > now()` or NULL
 5. Verify `resource_type` + `resource_id` match the target resource
 6. Update `last_used_at`
+
+**Cookie auth scope:** the EXISTING web management forms (plain `POST`: edit, delete — no new routes) MAY fall back to the `owner_token` cookie when no `Authorization` header is present — same hash + constant-time match + revoked/expiry/resource checks as the Bearer path. API routes (`/api/...`) accept the `Authorization` header ONLY and MUST ignore cookies — no ambient authority for programmatic endpoints. `SameSite=Strict` plus POST-only mutations keeps the web fallback CSRF-safe.
 
 **Anonymous access** (no `Authorization` header): allowed for all public GET endpoints, subject to default rate limits.
 
@@ -21053,7 +21055,9 @@ async function requestLocation() {
 
 ### API Token Storage
 
-Resource owner tokens are stored client-side in `localStorage` — this IS the documented model (see PART 12 → API Tokens): the raw token is shown once at creation, only its SHA-256 hash is stored server-side, and the browser keeps the raw token so the owner can manage their resources.
+Resource owner tokens use **dual delivery** in the browser (see PART 12 → API Tokens): the raw token is shown once at creation (copy button), only its SHA-256 hash is stored server-side, and the create response also sets an `owner_token` cookie (HttpOnly + Secure + SameSite=Strict, Max-Age matching the token lifetime). WEB management routes authenticate via that cookie as plain POST forms, so every owner flow works with JS disabled. API routes accept the `Authorization: Bearer` header only and ignore cookies. No dedicated forget/revoke route: the cookie expires via its Max-Age, and clearing site data (or uninstalling the PWA) removes it along with any local copies.
+
+`localStorage` holds an optional JS convenience copy (pre-fill, copy button) — never load-bearing:
 
 ```javascript
 // Write
@@ -21064,7 +21068,7 @@ const token = localStorage.getItem('api_token');
 localStorage.removeItem('api_token');
 ```
 
-The operator token is never stored in the browser — it lives in the server config and is used from CLI tools or API clients only.
+The operator token is never stored in the browser — not in localStorage and not in a cookie; it lives in the server config and is used from CLI tools or API clients only.
 
 ### Client-Side Preferences
 
