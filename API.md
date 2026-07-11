@@ -6569,6 +6569,8 @@ strip = true
 panic = "abort"
 ```
 
+When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
+
 **Notes:**
 - Version numbers are examples - always use latest stable versions
 - Not all projects need all modules - include only what you use
@@ -9603,6 +9605,8 @@ codegen-units = 1
 strip = true
 panic = "abort"
 ```
+
+When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
 
 ### Display Module
 
@@ -27703,7 +27707,7 @@ All Dockerfiles MUST include these labels:
 
 | Label | Value |
 |-------|-------|
-| `maintainer` | `{maintainer_name} <{maintainer_email}>` |
+| `maintainer` | `{maintainer_name} <{maintainer_email}>` — email part omitted when `maintainer_email` is unset (label becomes just `{maintainer_name}`) |
 | `org.opencontainers.image.vendor` | `{project_org}` |
 | `org.opencontainers.image.authors` | `{project_org}` |
 | `org.opencontainers.image.title` | `{project_name}` |
@@ -39567,8 +39571,8 @@ project_org:     {project_org}
 internal_name:   {project_name}        # FROZEN — equals project_name on first install, never changes
 app_name:        {project_name}
 official_site:   {fqdn}
-maintainer_name: {maintainer_name}
-maintainer_email: {maintainer_email}
+maintainer_name: {maintainer_name — defaults to {project_org} if unset}
+maintainer_email: {maintainer_email — or empty; used only if set}
 
 ## Business logic
 

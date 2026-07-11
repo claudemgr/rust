@@ -2012,8 +2012,8 @@ internal_org:     {project_org}
 app_name:         {App Display Name}
 crate_name:       {project_name}
 official_site:    {full URL with scheme, e.g., https://example.com — or empty}
-maintainer_name:  {Maintainer Name}
-maintainer_email: {maintainer@example.com}
+maintainer_name:  {Maintainer Name — defaults to {project_org} if unset}
+maintainer_email: {maintainer@example.com — or empty; used only if set}
 
 ## Business logic
 
