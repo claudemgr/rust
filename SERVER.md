@@ -2298,44 +2298,44 @@ server:
 | PART | Line | Topic | When to Read |
 |------|------|-------|--------------|
 | 0 | ~2430 | AI Assistant Rules | **AI Behavior Rules**, **Translation Rule** |
-| 1 | ~4281 | Critical Rules | Read before implementing features |
-| 2 | ~5608 | License & Attribution | License requirements |
-| 3 | ~5952 | Project Structure | Setting up new project, **CI/CD badge detection** |
-| 4 | ~6995 | OS-Specific Paths | Path handling |
-| 5 | ~7191 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
-| 6 | ~9176 | Application Modes | Mode handling, debug endpoints |
-| 7 | ~9730 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~10411 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
-| 9 | ~13903 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~14340 | Database & Cluster | Database work |
-| 11 | ~14985 | Security & Logging | Security features, **Scoped Agent Tokens**, **Context Detection** |
-| 12 | ~18005 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~19611 | Health & Versioning | Health endpoints |
-| 14 | ~20415 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~22223 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~23194 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~29676 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
-| 18 | ~32189 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 19 | ~33523 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 20 | ~34022 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 21 | ~34121 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 22 | ~35486 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
-| 23 | ~36249 | Update Command | Update feature |
-| 24 | ~36744 | Privilege Escalation & Service | Service/privilege work |
-| 25 | ~37659 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 26 | ~38016 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 27 | ~38855 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 28 | ~40367 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 29 | ~43590 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 30 | ~45583 | ReadTheDocs Documentation | Documentation |
-| 31 | ~46413 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
-| 32 | ~48488 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 33 | ~50148 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
-| 34 | ~55045 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
-| 35 | ~59212 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
-| 36 | ~59932 | Custom Domains | **OPTIONAL** - user/org branded domains |
-| 37 | ~61010 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | ~61241 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 1 | ~4282 | Critical Rules | Read before implementing features |
+| 2 | ~5609 | License & Attribution | License requirements |
+| 3 | ~5953 | Project Structure | Setting up new project, **CI/CD badge detection** |
+| 4 | ~6996 | OS-Specific Paths | Path handling |
+| 5 | ~7192 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
+| 6 | ~9177 | Application Modes | Mode handling, debug endpoints |
+| 7 | ~9731 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
+| 8 | ~10412 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
+| 9 | ~13904 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~14341 | Database & Cluster | Database work |
+| 11 | ~14986 | Security & Logging | Security features, **Scoped Agent Tokens**, **Context Detection** |
+| 12 | ~18006 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~19612 | Health & Versioning | Health endpoints |
+| 14 | ~20416 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~22224 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~23195 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~29677 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
+| 18 | ~32190 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 19 | ~33524 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 20 | ~34023 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 21 | ~34122 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 22 | ~35487 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
+| 23 | ~36250 | Update Command | Update feature |
+| 24 | ~36745 | Privilege Escalation & Service | Service/privilege work |
+| 25 | ~37660 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 26 | ~38017 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 27 | ~38856 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 28 | ~40368 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 29 | ~43591 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 30 | ~45584 | ReadTheDocs Documentation | Documentation |
+| 31 | ~46414 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
+| 32 | ~48489 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 33 | ~50149 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
+| 34 | ~55046 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
+| 35 | ~59213 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
+| 36 | ~59933 | Custom Domains | **OPTIONAL** - user/org branded domains |
+| 37 | ~61011 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~61242 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 **When Implementing OPTIONAL PARTs (34-36, Agent from 33):**
 1. Change PART title from `OPTIONAL` → `NON-NEGOTIABLE` in AI.md
@@ -3432,6 +3432,7 @@ sqlx::query!("DELETE FROM users WHERE id = $1", id).execute(&pool).await?;
 | **Text responses** | N/A | N/A | Single `\n` | `format!("{}\n", text)` |
 
 **Universal Rules:**
+- **Any filetype not listed above:** 2 spaces (4 if the ecosystem standard says so); tabs only where the format requires them — filetype requirement wins over preference
 - **Every file** ends with exactly ONE newline character — never blank lines at EOF
 - **Trailing-newline exceptions (no `\n`):** raw-value secret/token files (the newline becomes part of the credential), files interpolated verbatim into strings by strict tooling, fragment files spliced mid-line into another file, and binary/generated artifacts
 - **Every response** (JSON, TXT, HTML, XML) ends with exactly ONE newline
