@@ -2312,30 +2312,30 @@ server:
 | 12 | ~18004 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
 | 13 | ~19610 | Health & Versioning | Health endpoints |
 | 14 | ~20414 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~22217 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~23188 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~29670 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
-| 18 | ~32183 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 19 | ~33517 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 20 | ~34016 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 21 | ~34115 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 22 | ~35480 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
-| 23 | ~36243 | Update Command | Update feature |
-| 24 | ~36738 | Privilege Escalation & Service | Service/privilege work |
-| 25 | ~37653 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 26 | ~38010 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 27 | ~38849 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 28 | ~40361 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 29 | ~43584 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 30 | ~45577 | ReadTheDocs Documentation | Documentation |
-| 31 | ~46407 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
-| 32 | ~48482 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 33 | ~50142 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
-| 34 | ~55039 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
-| 35 | ~59206 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
-| 36 | ~59926 | Custom Domains | **OPTIONAL** - user/org branded domains |
-| 37 | ~61004 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | ~61235 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 15 | ~22222 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~23193 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~29675 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
+| 18 | ~32188 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 19 | ~33522 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 20 | ~34021 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 21 | ~34120 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 22 | ~35485 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
+| 23 | ~36248 | Update Command | Update feature |
+| 24 | ~36743 | Privilege Escalation & Service | Service/privilege work |
+| 25 | ~37658 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 26 | ~38015 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 27 | ~38854 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 28 | ~40366 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 29 | ~43589 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 30 | ~45582 | ReadTheDocs Documentation | Documentation |
+| 31 | ~46412 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
+| 32 | ~48487 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 33 | ~50147 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
+| 34 | ~55044 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
+| 35 | ~59211 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
+| 36 | ~59931 | Custom Domains | **OPTIONAL** - user/org branded domains |
+| 37 | ~61009 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~61240 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 **When Implementing OPTIONAL PARTs (34-36, Agent from 33):**
 1. Change PART title from `OPTIONAL` → `NON-NEGOTIABLE` in AI.md
@@ -20417,6 +20417,11 @@ OS/Arch: {target_os}/{target_arch}
 - Admin Web Routes: PART 17 (Admin Panel)
 - Admin API Routes: PART 17 (Admin Panel → API Routes)
 - Project-specific Routes: IDEA.md
+
+## Authentication & CORS (Cross-References)
+
+- **Auth token extraction:** every auth-protected API endpoint MUST accept a valid token from ANY header in PART 8 → "Auth Token Headers (All Headers Supported)", plus the `?token=` query param, following the PART 8 priority order (first found wins). A valid token grants access regardless of which header carried it.
+- **CORS policy:** browser cross-origin rules for these endpoints — headers table, allow-list resolution order, and preflight caveats — are defined in PART 16 → "CORS".
 
 ## Legacy vs Compatibility Endpoints
 
