@@ -2185,14 +2185,14 @@ server:
 
 ## How to Read This Large File
 
-**rust/API.md is ~1.6MB and ~41,850 lines. You CANNOT read it all at once. Follow these procedures.**
+**rust/API.md is ~1.6MB and ~41,860 lines. You CANNOT read it all at once. Follow these procedures.**
 
 ### File Size Reality
 
 | Constraint | Value |
 |------------|-------|
 | File size | ~1.6MB |
-| Line count | ~41,850 lines |
+| Line count | ~41,860 lines |
 | Read limit | ~500 lines per read |
 | Full reads needed | ~84 reads (impractical) |
 
@@ -2221,23 +2221,23 @@ server:
 | 14 | ~17477 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
 | 15 | ~19181 | SSL/TLS & Let's Encrypt | SSL certificates |
 | 16 | ~20115 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~22467 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~23038 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~23464 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~23572 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~24856 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~25397 | Update Command | Update feature |
-| 23 | ~25869 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~26492 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~26816 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~27589 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~28679 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~31258 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~33004 | ReadTheDocs Documentation | Documentation |
-| 30 | ~33798 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~35162 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 32 | ~36420 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~39566 | IDEA.md Reference | **Examples only** - NEVER modify |
+| 17 | ~22483 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~23054 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~23480 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~23588 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~24872 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~25413 | Update Command | Update feature |
+| 23 | ~25885 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~26508 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~26832 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~27605 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~28695 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~31274 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~33020 | ReadTheDocs Documentation | Documentation |
+| 30 | ~33814 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~35178 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 32 | ~36436 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~39582 | IDEA.md Reference | **Examples only** - NEVER modify |
 | FINAL | — | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File
@@ -21353,10 +21353,26 @@ let cors = CorsLayer::new()
         axum::http::Method::DELETE,
         axum::http::Method::OPTIONS,
     ])
+    // Never AllowHeaders::any() — the `*` wildcard does NOT cover Authorization and is
+    // invalid with credentials; list every supported auth header by name.
+    // Keep in sync with PART 8 → "Auth Token Headers (All Headers Supported)".
     .allow_headers([
         axum::http::header::CONTENT_TYPE,
-        axum::http::header::AUTHORIZATION,
         axum::http::header::ACCEPT,
+        axum::http::header::AUTHORIZATION,
+        axum::http::HeaderName::from_static("x-requested-with"),
+        axum::http::HeaderName::from_static("x-api-key"),
+        axum::http::HeaderName::from_static("api-key"),
+        axum::http::HeaderName::from_static("apikey"),
+        axum::http::HeaderName::from_static("x-auth-token"),
+        axum::http::HeaderName::from_static("x-access-token"),
+        axum::http::HeaderName::from_static("x-token"),
+        axum::http::HeaderName::from_static("token"),
+        axum::http::HeaderName::from_static("x-csrf-token"),
+        axum::http::HeaderName::from_static("x-xsrf-token"),
+        axum::http::HeaderName::from_static("x-session-id"),
+        axum::http::HeaderName::from_static("x-service-token"),
+        axum::http::HeaderName::from_static("x-internal-token"),
     ])
     .allow_credentials(true)
     .max_age(std::time::Duration::from_secs(86400));
@@ -41702,14 +41718,14 @@ server:
 
 ## How to Read This Large File
 
-**rust/API.md is ~1.6MB and ~41,850 lines. You CANNOT read it all at once. Follow these procedures.**
+**rust/API.md is ~1.6MB and ~41,860 lines. You CANNOT read it all at once. Follow these procedures.**
 
 ### File Size Reality
 
 | Constraint | Value |
 |------------|-------|
 | File size | ~1.6MB |
-| Line count | ~41,850 lines |
+| Line count | ~41,860 lines |
 | Read limit | ~500 lines per read |
 | Full reads needed | ~84 reads (impractical) |
 
@@ -41738,23 +41754,23 @@ server:
 | 14 | ~17477 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
 | 15 | ~19181 | SSL/TLS & Let's Encrypt | SSL certificates |
 | 16 | ~20115 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~22467 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~23038 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~23464 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~23572 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~24856 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~25397 | Update Command | Update feature |
-| 23 | ~25869 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~26492 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~26816 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~27589 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~28679 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~31258 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~33004 | ReadTheDocs Documentation | Documentation |
-| 30 | ~33798 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~35162 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 32 | ~36420 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~39566 | IDEA.md Reference | **Examples only** - NEVER modify |
+| 17 | ~22483 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~23054 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~23480 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~23588 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~24872 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~25413 | Update Command | Update feature |
+| 23 | ~25885 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~26508 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~26832 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~27605 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~28695 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~31274 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~33020 | ReadTheDocs Documentation | Documentation |
+| 30 | ~33814 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~35178 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 32 | ~36436 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~39582 | IDEA.md Reference | **Examples only** - NEVER modify |
 | FINAL | — | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File

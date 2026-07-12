@@ -2278,14 +2278,14 @@ server:
 
 ## How to Read This Large File
 
-**AI.md is ~2.4MB and ~63,060 lines. You CANNOT read it all at once. Follow these procedures.**
+**AI.md is ~2.4MB and ~63,090 lines. You CANNOT read it all at once. Follow these procedures.**
 
 ### File Size Reality
 
 | Constraint | Value |
 |------------|-------|
 | File size | ~2.4MB |
-| Line count | ~63,060 lines |
+| Line count | ~63,090 lines |
 | Read limit | ~500 lines per read |
 | Full reads needed | ~127 reads (impractical) |
 
@@ -2314,28 +2314,28 @@ server:
 | 14 | ~20414 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
 | 15 | ~22217 | SSL/TLS & Let's Encrypt | SSL certificates |
 | 16 | ~23188 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~29644 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
-| 18 | ~32157 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 19 | ~33491 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 20 | ~33990 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 21 | ~34089 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 22 | ~35454 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
-| 23 | ~36217 | Update Command | Update feature |
-| 24 | ~36712 | Privilege Escalation & Service | Service/privilege work |
-| 25 | ~37627 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 26 | ~37984 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 27 | ~38823 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 28 | ~40335 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 29 | ~43558 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 30 | ~45551 | ReadTheDocs Documentation | Documentation |
-| 31 | ~46381 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
-| 32 | ~48456 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 33 | ~50116 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
-| 34 | ~55013 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
-| 35 | ~59180 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
-| 36 | ~59900 | Custom Domains | **OPTIONAL** - user/org branded domains |
-| 37 | ~60978 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | ~61209 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 17 | ~29668 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
+| 18 | ~32181 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 19 | ~33515 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 20 | ~34014 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 21 | ~34113 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 22 | ~35478 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
+| 23 | ~36241 | Update Command | Update feature |
+| 24 | ~36736 | Privilege Escalation & Service | Service/privilege work |
+| 25 | ~37651 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 26 | ~38008 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 27 | ~38847 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 28 | ~40359 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 29 | ~43582 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 30 | ~45575 | ReadTheDocs Documentation | Documentation |
+| 31 | ~46405 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
+| 32 | ~48480 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 33 | ~50140 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
+| 34 | ~55037 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
+| 35 | ~59204 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
+| 36 | ~59924 | Custom Domains | **OPTIONAL** - user/org branded domains |
+| 37 | ~61002 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~61233 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 **When Implementing OPTIONAL PARTs (34-36, Agent from 33):**
 1. Change PART title from `OPTIONAL` → `NON-NEGOTIABLE` in AI.md
@@ -28176,9 +28176,11 @@ web:
 |--------|-------|
 | `Access-Control-Allow-Origin` | Configured origin(s) or `*` |
 | `Access-Control-Allow-Methods` | `GET, POST, PUT, PATCH, DELETE, OPTIONS` |
-| `Access-Control-Allow-Headers` | `*` |
+| `Access-Control-Allow-Headers` | `Content-Type, Accept, X-Requested-With, Authorization, X-API-Key, X-Api-Key, API-Key, ApiKey, X-Auth-Token, X-Access-Token, X-Token, Token, X-CSRF-Token, X-XSRF-Token, X-Session-ID, X-Service-Token, X-Internal-Token` |
 | `Access-Control-Allow-Credentials` | `true` (only when specific origin, not `*`) |
 | `Access-Control-Max-Age` | `86400` (24 hours) |
+
+**Never `*` here:** the Fetch spec's `Access-Control-Allow-Headers: *` wildcard does NOT cover `Authorization`, and wildcards are invalid when credentials are allowed. Every supported auth header is listed by name — keep in sync with PART 8 → "Auth Token Headers (All Headers Supported)".
 
 ### Behavior
 
@@ -28212,7 +28214,29 @@ Configure CORS in Axum using `tower_http::cors::CorsLayer`:
 
 ```rust
 use tower_http::cors::{CorsLayer, AllowOrigin, AllowMethods, AllowHeaders};
-use axum::http::{HeaderValue, Method};
+use axum::http::{header, HeaderName, HeaderValue, Method};
+
+// Every supported auth header, by name — the `*` wildcard does NOT cover Authorization
+// and wildcards are invalid with credentials.
+// Keep in sync with PART 8 → "Auth Token Headers (All Headers Supported)".
+const CORS_ALLOW_HEADERS: [HeaderName; 16] = [
+    header::CONTENT_TYPE,
+    header::ACCEPT,
+    header::AUTHORIZATION,
+    HeaderName::from_static("x-requested-with"),
+    HeaderName::from_static("x-api-key"),
+    HeaderName::from_static("api-key"),
+    HeaderName::from_static("apikey"),
+    HeaderName::from_static("x-auth-token"),
+    HeaderName::from_static("x-access-token"),
+    HeaderName::from_static("x-token"),
+    HeaderName::from_static("token"),
+    HeaderName::from_static("x-csrf-token"),
+    HeaderName::from_static("x-xsrf-token"),
+    HeaderName::from_static("x-session-id"),
+    HeaderName::from_static("x-service-token"),
+    HeaderName::from_static("x-internal-token"),
+];
 
 pub fn build_cors_layer(cors_config: &str) -> CorsLayer {
     match cors_config {
@@ -28229,7 +28253,7 @@ pub fn build_cors_layer(cors_config: &str) -> CorsLayer {
                     Method::GET, Method::POST, Method::PUT,
                     Method::PATCH, Method::DELETE, Method::OPTIONS,
                 ])
-                .allow_headers(AllowHeaders::any())
+                .allow_headers(AllowHeaders::list(CORS_ALLOW_HEADERS))
                 .allow_credentials(true)
                 .max_age(std::time::Duration::from_secs(86400))
         }
