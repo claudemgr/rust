@@ -1248,6 +1248,7 @@ paths:
 - ✅ Source /server/about and /server/help content from IDEA.md
 - ✅ Implement features 100% complete - no stubs, no TODOs, no "future"
 - ✅ ONE thing at a time - finish current task completely before starting another
+- ✅ Return after cross-references - a "See PART X" jump never replaces the rest of the PART/section you were reading; read it, then continue from where you left off
 
 ## KEY DECISIONS (pre-answered)
 | Question | Answer | Reference |
@@ -2297,45 +2298,45 @@ server:
 
 | PART | Line | Topic | When to Read |
 |------|------|-------|--------------|
-| 0 | ~2430 | AI Assistant Rules | **AI Behavior Rules**, **Translation Rule** |
-| 1 | ~4282 | Critical Rules | Read before implementing features |
-| 2 | ~5609 | License & Attribution | License requirements |
-| 3 | ~5953 | Project Structure | Setting up new project, **CI/CD badge detection** |
-| 4 | ~6996 | OS-Specific Paths | Path handling |
-| 5 | ~7192 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
-| 6 | ~9177 | Application Modes | Mode handling, debug endpoints |
-| 7 | ~9731 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~10412 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
-| 9 | ~13904 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~14341 | Database & Cluster | Database work |
-| 11 | ~14986 | Security & Logging | Security features, **Scoped Agent Tokens**, **Context Detection** |
-| 12 | ~18006 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~19612 | Health & Versioning | Health endpoints |
-| 14 | ~20416 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~22224 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~23195 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~29677 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
-| 18 | ~32190 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 19 | ~33524 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 20 | ~34023 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 21 | ~34122 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 22 | ~35487 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
-| 23 | ~36250 | Update Command | Update feature |
-| 24 | ~36745 | Privilege Escalation & Service | Service/privilege work |
-| 25 | ~37660 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 26 | ~38017 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 27 | ~38856 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 28 | ~40368 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 29 | ~43591 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 30 | ~45584 | ReadTheDocs Documentation | Documentation |
-| 31 | ~46414 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
-| 32 | ~48489 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 33 | ~50149 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
-| 34 | ~55046 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
-| 35 | ~59213 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
-| 36 | ~59933 | Custom Domains | **OPTIONAL** - user/org branded domains |
-| 37 | ~61011 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | ~61242 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 0 | ~2431 | AI Assistant Rules | **AI Behavior Rules**, **Translation Rule** |
+| 1 | ~4283 | Critical Rules | Read before implementing features |
+| 2 | ~5610 | License & Attribution | License requirements |
+| 3 | ~5954 | Project Structure | Setting up new project, **CI/CD badge detection** |
+| 4 | ~6997 | OS-Specific Paths | Path handling |
+| 5 | ~7193 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
+| 6 | ~9178 | Application Modes | Mode handling, debug endpoints |
+| 7 | ~9732 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
+| 8 | ~10413 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
+| 9 | ~13905 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~14342 | Database & Cluster | Database work |
+| 11 | ~14987 | Security & Logging | Security features, **Scoped Agent Tokens**, **Context Detection** |
+| 12 | ~18007 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~19613 | Health & Versioning | Health endpoints |
+| 14 | ~20417 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~22225 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~23196 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~29678 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
+| 18 | ~32191 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 19 | ~33525 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 20 | ~34024 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 21 | ~34123 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 22 | ~35488 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
+| 23 | ~36251 | Update Command | Update feature |
+| 24 | ~36746 | Privilege Escalation & Service | Service/privilege work |
+| 25 | ~37661 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 26 | ~38018 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 27 | ~38857 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 28 | ~40369 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 29 | ~43592 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 30 | ~45585 | ReadTheDocs Documentation | Documentation |
+| 31 | ~46415 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
+| 32 | ~48490 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 33 | ~50150 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
+| 34 | ~55047 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
+| 35 | ~59214 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
+| 36 | ~59934 | Custom Domains | **OPTIONAL** - user/org branded domains |
+| 37 | ~61012 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~61243 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 **When Implementing OPTIONAL PARTs (34-36, Agent from 33):**
 1. Change PART title from `OPTIONAL` → `NON-NEGOTIABLE` in AI.md

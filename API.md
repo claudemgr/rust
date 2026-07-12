@@ -1249,6 +1249,7 @@ paths:
 - ✅ Source /server/about and /server/help content from IDEA.md
 - ✅ Implement features 100% complete - no stubs, no TODOs, no "future"
 - ✅ ONE thing at a time - finish current task completely before starting another
+- ✅ Return after cross-references - a "See PART X" jump never replaces the rest of the PART/section you were reading; read it, then continue from where you left off
 
 ## KEY DECISIONS (pre-answered)
 | Question | Answer | Reference |
@@ -2204,40 +2205,40 @@ server:
 
 | PART | Line | Topic | When to Read |
 |------|------|-------|--------------|
-| 0 | ~2333 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
-| 1 | ~4140 | Critical Rules | **ALWAYS READ FIRST** |
-| 2 | ~5404 | License & Attribution | License requirements |
-| 3 | ~5733 | Project Structure | Setting up new project, **CI/CD badge detection** |
-| 4 | ~6595 | OS-Specific Paths | Path handling |
-| 5 | ~6791 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
-| 6 | ~8528 | Application Modes | Mode handling, debug endpoints |
-| 7 | ~9017 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~9731 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
-| 9 | ~12579 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~13003 | Database | Database work |
-| 11 | ~13418 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
-| 12 | ~15446 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~16844 | Health & Versioning | Health endpoints |
-| 14 | ~17479 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~19188 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~20122 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~22492 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~23063 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~23489 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~23597 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~24881 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~25422 | Update Command | Update feature |
-| 23 | ~25894 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~26517 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~26841 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~27614 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~28704 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~31283 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~33029 | ReadTheDocs Documentation | Documentation |
-| 30 | ~33823 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~35187 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 32 | ~36445 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~39591 | IDEA.md Reference | **Examples only** - NEVER modify |
+| 0 | ~2334 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
+| 1 | ~4141 | Critical Rules | **ALWAYS READ FIRST** |
+| 2 | ~5405 | License & Attribution | License requirements |
+| 3 | ~5734 | Project Structure | Setting up new project, **CI/CD badge detection** |
+| 4 | ~6596 | OS-Specific Paths | Path handling |
+| 5 | ~6792 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
+| 6 | ~8529 | Application Modes | Mode handling, debug endpoints |
+| 7 | ~9018 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
+| 8 | ~9732 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
+| 9 | ~12580 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~13004 | Database | Database work |
+| 11 | ~13419 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
+| 12 | ~15447 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~16845 | Health & Versioning | Health endpoints |
+| 14 | ~17480 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~19189 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~20123 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~22493 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~23064 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~23490 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~23598 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~24882 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~25423 | Update Command | Update feature |
+| 23 | ~25895 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~26518 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~26842 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~27615 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~28705 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~31284 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~33030 | ReadTheDocs Documentation | Documentation |
+| 30 | ~33824 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~35188 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 32 | ~36446 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~39592 | IDEA.md Reference | **Examples only** - NEVER modify |
 | FINAL | — | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File
@@ -41746,40 +41747,40 @@ server:
 
 | PART | Line | Topic | When to Read |
 |------|------|-------|--------------|
-| 0 | ~2333 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
-| 1 | ~4140 | Critical Rules | **ALWAYS READ FIRST** |
-| 2 | ~5404 | License & Attribution | License requirements |
-| 3 | ~5733 | Project Structure | Setting up new project, **CI/CD badge detection** |
-| 4 | ~6595 | OS-Specific Paths | Path handling |
-| 5 | ~6791 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
-| 6 | ~8528 | Application Modes | Mode handling, debug endpoints |
-| 7 | ~9017 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~9731 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
-| 9 | ~12579 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~13003 | Database | Database work |
-| 11 | ~13418 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
-| 12 | ~15446 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~16844 | Health & Versioning | Health endpoints |
-| 14 | ~17479 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~19188 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~20122 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~22492 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~23063 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~23489 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~23597 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~24881 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~25422 | Update Command | Update feature |
-| 23 | ~25894 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~26517 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~26841 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~27614 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~28704 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~31283 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~33029 | ReadTheDocs Documentation | Documentation |
-| 30 | ~33823 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~35187 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 32 | ~36445 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~39591 | IDEA.md Reference | **Examples only** - NEVER modify |
+| 0 | ~2334 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
+| 1 | ~4141 | Critical Rules | **ALWAYS READ FIRST** |
+| 2 | ~5405 | License & Attribution | License requirements |
+| 3 | ~5734 | Project Structure | Setting up new project, **CI/CD badge detection** |
+| 4 | ~6596 | OS-Specific Paths | Path handling |
+| 5 | ~6792 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
+| 6 | ~8529 | Application Modes | Mode handling, debug endpoints |
+| 7 | ~9018 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
+| 8 | ~9732 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
+| 9 | ~12580 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~13004 | Database | Database work |
+| 11 | ~13419 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
+| 12 | ~15447 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~16845 | Health & Versioning | Health endpoints |
+| 14 | ~17480 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~19189 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~20123 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~22493 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~23064 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~23490 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~23598 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~24882 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~25423 | Update Command | Update feature |
+| 23 | ~25895 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~26518 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~26842 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~27615 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~28705 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~31284 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~33030 | ReadTheDocs Documentation | Documentation |
+| 30 | ~33824 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~35188 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 32 | ~36446 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~39592 | IDEA.md Reference | **Examples only** - NEVER modify |
 | FINAL | — | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File
