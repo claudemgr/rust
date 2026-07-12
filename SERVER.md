@@ -2279,14 +2279,14 @@ server:
 
 ## How to Read This Large File
 
-**AI.md is ~2.4MB and ~63,090 lines. You CANNOT read it all at once. Follow these procedures.**
+**AI.md is ~2.4MB and ~63,100 lines. You CANNOT read it all at once. Follow these procedures.**
 
 ### File Size Reality
 
 | Constraint | Value |
 |------------|-------|
 | File size | ~2.4MB |
-| Line count | ~63,090 lines |
+| Line count | ~63,100 lines |
 | Read limit | ~500 lines per read |
 | Full reads needed | ~127 reads (impractical) |
 
@@ -2307,36 +2307,36 @@ server:
 | 6 | ~9178 | Application Modes | Mode handling, debug endpoints |
 | 7 | ~9732 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
 | 8 | ~10413 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
-| 9 | ~13905 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~14342 | Database & Cluster | Database work |
-| 11 | ~14987 | Security & Logging | Security features, **Scoped Agent Tokens**, **Context Detection** |
-| 12 | ~18007 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~19613 | Health & Versioning | Health endpoints |
-| 14 | ~20417 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~22225 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~23196 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~29678 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
-| 18 | ~32191 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 19 | ~33525 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 20 | ~34024 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 21 | ~34123 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 22 | ~35488 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
-| 23 | ~36251 | Update Command | Update feature |
-| 24 | ~36746 | Privilege Escalation & Service | Service/privilege work |
-| 25 | ~37661 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 26 | ~38018 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 27 | ~38857 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 28 | ~40369 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 29 | ~43592 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 30 | ~45585 | ReadTheDocs Documentation | Documentation |
-| 31 | ~46415 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
-| 32 | ~48490 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 33 | ~50150 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
-| 34 | ~55047 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
-| 35 | ~59214 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
-| 36 | ~59934 | Custom Domains | **OPTIONAL** - user/org branded domains |
-| 37 | ~61012 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | ~61243 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 9 | ~13916 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~14353 | Database & Cluster | Database work |
+| 11 | ~14998 | Security & Logging | Security features, **Scoped Agent Tokens**, **Context Detection** |
+| 12 | ~18018 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~19624 | Health & Versioning | Health endpoints |
+| 14 | ~20428 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~22236 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~23207 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~29689 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
+| 18 | ~32202 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 19 | ~33536 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 20 | ~34035 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 21 | ~34134 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 22 | ~35499 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
+| 23 | ~36262 | Update Command | Update feature |
+| 24 | ~36757 | Privilege Escalation & Service | Service/privilege work |
+| 25 | ~37672 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 26 | ~38029 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 27 | ~38868 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 28 | ~40380 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 29 | ~43603 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 30 | ~45596 | ReadTheDocs Documentation | Documentation |
+| 31 | ~46426 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
+| 32 | ~48501 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 33 | ~50161 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
+| 34 | ~55058 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
+| 35 | ~59225 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
+| 36 | ~59945 | Custom Domains | **OPTIONAL** - user/org branded domains |
+| 37 | ~61023 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~61254 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 **When Implementing OPTIONAL PARTs (34-36, Agent from 33):**
 1. Change PART title from `OPTIONAL` → `NON-NEGOTIABLE` in AI.md
@@ -10797,7 +10797,12 @@ pub fn check_pid_file(pid_path: &Path) -> Result<(bool, u32)> {
 #[cfg(unix)]
 pub fn is_process_running(pid: u32) -> bool {
     // send signal 0 to check existence without delivering a signal
-    unsafe { libc::kill(pid as libc::pid_t, 0) == 0 }
+    let rc = unsafe { libc::kill(pid as libc::pid_t, 0) };
+    if rc == 0 {
+        return true;
+    }
+    // EPERM means the process exists but belongs to another user - it IS running
+    std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
 }
 
 // is_our_process verifies the process is actually our binary (Unix)
@@ -10809,7 +10814,8 @@ pub fn is_our_process(pid: u32) -> bool {
         return exe_path
             .file_name()
             .and_then(|n| n.to_str())
-            .map(|n| n.contains("{project_name}"))
+            // Exact match - substring matching would also match {project_name}-cli
+            .map(|n| n == "{project_name}")
             .unwrap_or(false);
     }
     // macOS/BSD: fall back to ps
@@ -10822,7 +10828,8 @@ fn is_our_process_darwin(pid: u32) -> bool {
         .args(["-p", &pid.to_string(), "-o", "comm="])
         .output();
     match output {
-        Ok(o) => String::from_utf8_lossy(&o.stdout).contains("{project_name}"),
+        // Exact match - substring matching would also match {project_name}-cli
+        Ok(o) => String::from_utf8_lossy(&o.stdout).trim() == "{project_name}",
         Err(_) => false,
     }
 }
@@ -10878,7 +10885,11 @@ pub fn is_our_process(pid: u32) -> bool {
         std::path::Path::new(&name)
             .file_name()
             .and_then(|n| n.to_str())
-            .map(|n| n.to_lowercase().contains("{project_name}"))
+            // Exact match (case-insensitive) - substring matching would also match {project_name}-cli.exe
+            .map(|n| {
+                let n = n.to_lowercase();
+                n == "{project_name}.exe" || n == "{project_name}"
+            })
             .unwrap_or(false)
     }
 }

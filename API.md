@@ -2186,14 +2186,14 @@ server:
 
 ## How to Read This Large File
 
-**rust/API.md is ~1.6MB and ~41,870 lines. You CANNOT read it all at once. Follow these procedures.**
+**rust/API.md is ~1.6MB and ~41,900 lines. You CANNOT read it all at once. Follow these procedures.**
 
 ### File Size Reality
 
 | Constraint | Value |
 |------------|-------|
 | File size | ~1.6MB |
-| Line count | ~41,870 lines |
+| Line count | ~41,900 lines |
 | Read limit | ~500 lines per read |
 | Full reads needed | ~84 reads (impractical) |
 
@@ -2214,31 +2214,31 @@ server:
 | 6 | ~8529 | Application Modes | Mode handling, debug endpoints |
 | 7 | ~9018 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
 | 8 | ~9732 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
-| 9 | ~12580 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~13004 | Database | Database work |
-| 11 | ~13419 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
-| 12 | ~15447 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~16845 | Health & Versioning | Health endpoints |
-| 14 | ~17480 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~19189 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~20123 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~22493 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~23064 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~23490 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~23598 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~24882 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~25423 | Update Command | Update feature |
-| 23 | ~25895 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~26518 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~26842 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~27615 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~28705 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~31284 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~33030 | ReadTheDocs Documentation | Documentation |
-| 30 | ~33824 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~35188 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 32 | ~36446 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~39592 | IDEA.md Reference | **Examples only** - NEVER modify |
+| 9 | ~12615 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~13039 | Database | Database work |
+| 11 | ~13454 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
+| 12 | ~15482 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~16880 | Health & Versioning | Health endpoints |
+| 14 | ~17515 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~19224 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~20158 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~22528 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~23099 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~23525 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~23633 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~24917 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~25458 | Update Command | Update feature |
+| 23 | ~25930 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~26553 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~26877 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~27650 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~28740 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~31319 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~33065 | ReadTheDocs Documentation | Documentation |
+| 30 | ~33859 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~35223 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 32 | ~36481 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~39627 | IDEA.md Reference | **Examples only** - NEVER modify |
 | FINAL | — | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File
@@ -10110,9 +10110,11 @@ fn check_pid_file(pid_path: &Path) -> anyhow::Result<(bool, u32)> {
 // isProcessRunning checks if a process with given PID exists (Unix)
 #[cfg(unix)]
 fn is_process_running(pid: u32) -> bool {
-    use nix::sys::signal::{kill, Signal};
+    use nix::errno::Errno;
+    use nix::sys::signal::kill;
     use nix::unistd::Pid;
-    kill(Pid::from_raw(pid as i32), None).is_ok()
+    // EPERM means the process exists but belongs to another user - it IS running
+    matches!(kill(Pid::from_raw(pid as i32), None), Ok(()) | Err(Errno::EPERM))
 }
 
 // is_our_process verifies the process is actually our binary (Unix)
@@ -10123,7 +10125,8 @@ fn is_our_process(pid: u32) -> bool {
         Ok(path) => path
             .file_name()
             .and_then(|n| n.to_str())
-            .map(|n| n.contains("{project_name}"))
+            // Exact match - substring matching would also match {project_name}-cli
+            .map(|n| n == "{project_name}")
             .unwrap_or(false),
         Err(_) => is_our_process_darwin(pid),
     }
@@ -10135,7 +10138,8 @@ fn is_our_process_darwin(pid: u32) -> bool {
         .args(&["-p", &pid.to_string(), "-o", "comm="])
         .output();
     match output {
-        Ok(out) => String::from_utf8_lossy(&out.stdout).contains("{project_name}"),
+        // Exact match - substring matching would also match {project_name}-cli
+        Ok(out) => String::from_utf8_lossy(&out.stdout).trim() == "{project_name}",
         Err(_) => false,
     }
 }
@@ -10159,9 +10163,40 @@ fn is_process_running(pid: u32) -> bool {
 // is_our_process verifies the process is actually our binary (Windows)
 #[cfg(windows)]
 fn is_our_process(pid: u32) -> bool {
-    // Use Windows API to get process image name
-    // Implementation omitted for brevity - uses QueryFullProcessImageName
-    false
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
+        PROCESS_NAME_WIN32,
+    };
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::core::PWSTR;
+    unsafe {
+        let Ok(handle) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else {
+            return false;
+        };
+        let mut buf = vec![0u16; 260];
+        let mut size = buf.len() as u32;
+        let ok = QueryFullProcessImageNameW(
+            handle,
+            PROCESS_NAME_WIN32,
+            PWSTR(buf.as_mut_ptr()),
+            &mut size,
+        )
+        .is_ok();
+        let _ = CloseHandle(handle);
+        if !ok {
+            return false;
+        }
+        let name = String::from_utf16_lossy(&buf[..size as usize]);
+        // Exact match (case-insensitive) - substring matching would also match {project_name}-cli.exe
+        std::path::Path::new(&name)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(|n| {
+                let n = n.to_lowercase();
+                n == "{project_name}.exe" || n == "{project_name}"
+            })
+            .unwrap_or(false)
+    }
 }
 
 // write_pid_file writes current process PID to file
@@ -41728,14 +41763,14 @@ server:
 
 ## How to Read This Large File
 
-**rust/API.md is ~1.6MB and ~41,870 lines. You CANNOT read it all at once. Follow these procedures.**
+**rust/API.md is ~1.6MB and ~41,900 lines. You CANNOT read it all at once. Follow these procedures.**
 
 ### File Size Reality
 
 | Constraint | Value |
 |------------|-------|
 | File size | ~1.6MB |
-| Line count | ~41,870 lines |
+| Line count | ~41,900 lines |
 | Read limit | ~500 lines per read |
 | Full reads needed | ~84 reads (impractical) |
 
@@ -41756,31 +41791,31 @@ server:
 | 6 | ~8529 | Application Modes | Mode handling, debug endpoints |
 | 7 | ~9018 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
 | 8 | ~9732 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
-| 9 | ~12580 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~13004 | Database | Database work |
-| 11 | ~13419 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
-| 12 | ~15447 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~16845 | Health & Versioning | Health endpoints |
-| 14 | ~17480 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~19189 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~20123 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~22493 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~23064 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~23490 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~23598 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~24882 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~25423 | Update Command | Update feature |
-| 23 | ~25895 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~26518 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~26842 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~27615 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~28705 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~31284 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~33030 | ReadTheDocs Documentation | Documentation |
-| 30 | ~33824 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~35188 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 32 | ~36446 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~39592 | IDEA.md Reference | **Examples only** - NEVER modify |
+| 9 | ~12615 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~13039 | Database | Database work |
+| 11 | ~13454 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
+| 12 | ~15482 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~16880 | Health & Versioning | Health endpoints |
+| 14 | ~17515 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~19224 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~20158 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~22528 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~23099 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~23525 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~23633 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~24917 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~25458 | Update Command | Update feature |
+| 23 | ~25930 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~26553 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~26877 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~27650 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~28740 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~31319 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~33065 | ReadTheDocs Documentation | Documentation |
+| 30 | ~33859 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~35223 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 32 | ~36481 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~39627 | IDEA.md Reference | **Examples only** - NEVER modify |
 | FINAL | — | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File
