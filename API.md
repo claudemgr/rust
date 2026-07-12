@@ -32057,6 +32057,8 @@ docker run --rm \
   -v $CARGO_TARGET:/app/target \
   -w /app \
   casjaysdev/rust:latest cargo build --release
+mkdir -p binaries
+cp "$CARGO_TARGET/release/${PROJECT_NAME}" binaries/${PROJECT_NAME}
 
 # 2. Test (prefer Incus, fallback to Docker)
 if command -v incus &>/dev/null; then
@@ -32101,7 +32103,7 @@ fi
 | `tests/incus.sh` | Beta testing with Incus | `debian:latest` | Full integration + systemd tests |
 
 **docker.sh and incus.sh MUST:**
-1. Host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`) provide persistent Rust cache across builds
+1. Host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`/`CARGO_TARGET`) provide persistent Rust cache across builds
 2. Build all binaries using Docker (casjaysdev/rust:latest) in temp directory:
    - Server (`./src`)
    - Client (`./src/client`) if exists
@@ -32148,7 +32150,8 @@ else
     CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
     RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
     SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
-    mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE"
+    CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+    mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE" "$CARGO_TARGET"
     RUST_DOCKER="docker run --rm \
   --name \"${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)\" \
   -v $PWD:/app \
@@ -32160,11 +32163,11 @@ else
   casjaysdev/rust:latest"
     echo "Building server binary in Docker..."
     $RUST_DOCKER cargo build --release
-    cp target/release/${PROJECT_NAME} "$BUILD_DIR/${PROJECT_NAME}"
+    cp "$CARGO_TARGET"/release/${PROJECT_NAME} "$BUILD_DIR/${PROJECT_NAME}"
     if [ -d "src/client" ]; then
         echo "Building client in Docker..."
         $RUST_DOCKER cargo build --release --bin ${PROJECT_NAME}-cli
-        cp target/release/${PROJECT_NAME}-cli "$BUILD_DIR/${PROJECT_NAME}-cli"
+        cp "$CARGO_TARGET"/release/${PROJECT_NAME}-cli "$BUILD_DIR/${PROJECT_NAME}-cli"
     fi
 fi
 
@@ -32331,7 +32334,8 @@ else
     CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
     RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
     SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
-    mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE"
+    CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+    mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE" "$CARGO_TARGET"
     RUST_DOCKER="docker run --rm \
   --name \"${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)\" \
   -v $PWD:/app \
@@ -32343,11 +32347,11 @@ else
   casjaysdev/rust:latest"
     echo "Building server binary in Docker..."
     $RUST_DOCKER cargo build --release
-    cp target/release/${PROJECT_NAME} "$BUILD_DIR/${PROJECT_NAME}"
+    cp "$CARGO_TARGET"/release/${PROJECT_NAME} "$BUILD_DIR/${PROJECT_NAME}"
     if [ -d "src/client" ]; then
         echo "Building client in Docker..."
         $RUST_DOCKER cargo build --release --bin ${PROJECT_NAME}-cli
-        cp target/release/${PROJECT_NAME}-cli "$BUILD_DIR/${PROJECT_NAME}-cli"
+        cp "$CARGO_TARGET"/release/${PROJECT_NAME}-cli "$BUILD_DIR/${PROJECT_NAME}-cli"
     fi
 fi
 
@@ -32526,7 +32530,7 @@ fi
 | **Location** | `tests/run_tests.sh`, `tests/docker.sh`, `tests/incus.sh` |
 | **Permissions** | Executable (`chmod +x tests/*.sh`) |
 | **Build method** | Use `make build` if Makefile exists; otherwise Docker (`casjaysdev/rust:latest`) with host cache dirs |
-| **Rust cache** | `CARGO_CACHE` (`~/.cargo`) → `/usr/local/share/cargo`; `RUSTUP_CACHE` (`~/.rustup`) → `/usr/local/share/rustup`; `SCCACHE_CACHE` (`~/.cache/sccache`) → `/root/.cache/sccache` |
+| **Rust cache** | `CARGO_CACHE` (`~/.cargo`) → `/usr/local/share/cargo`; `RUSTUP_CACHE` (`~/.rustup`) → `/usr/local/share/rustup`; `SCCACHE_CACHE` (`~/.cache/sccache`) → `/root/.cache/sccache`; `CARGO_TARGET` (`~/.cache/cargo-target/{project_name}`) → `/app/target` |
 | **Build location** | ALWAYS use temp directory |
 | **Build all components** | Build server, client (if `src/client/` exists) |
 | **Test container tools** | Docker alpine MUST install: `apk add --no-cache curl bash file jq` |
@@ -32705,7 +32709,7 @@ docker run --rm \
 
 ## Build and Test
 
-**Build outputs to `target/release/` (copied to `binaries/`), test by running in container. Host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`) keep builds fast.**
+**Build outputs to `target/release/` (copied to `binaries/`), test by running in container. Host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`/`CARGO_TARGET`) keep builds fast.**
 
 ```bash
 # If a Makefile exists (preferred for all project work)
@@ -32731,7 +32735,7 @@ docker run --rm \
   -v $CARGO_TARGET:/app/target \
   -w /app \
   casjaysdev/rust:latest cargo build --release
-cp target/release/{project_name} binaries/{project_name}
+cp "$CARGO_TARGET"/release/{project_name} binaries/{project_name}
 
 # Test in Docker (quick) - install tools first
 docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD/binaries:/app alpine:latest sh -c "
@@ -32763,16 +32767,18 @@ else
     CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
     RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
     SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
-    mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE"
+    CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+    mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE" "$CARGO_TARGET"
     docker run --rm \
       --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
       -v $PWD:/app \
       -v $CARGO_CACHE:/usr/local/share/cargo \
       -v $RUSTUP_CACHE:/usr/local/share/rustup \
       -v $SCCACHE_CACHE:/root/.cache/sccache \
+      -v $CARGO_TARGET:/app/target \
       -w /app \
       casjaysdev/rust:latest cargo build --release
-    cp target/release/{project_name} binaries/{project_name}
+    cp "$CARGO_TARGET"/release/{project_name} binaries/{project_name}
 fi
 
 # Quick test in Docker (install tools first)
@@ -32813,16 +32819,18 @@ else
     CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
     RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
     SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
-    mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE"
+    CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+    mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE" "$CARGO_TARGET"
     docker run --rm \
       --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
       -v $PWD:/app \
       -v $CARGO_CACHE:/usr/local/share/cargo \
       -v $RUSTUP_CACHE:/usr/local/share/rustup \
       -v $SCCACHE_CACHE:/root/.cache/sccache \
+      -v $CARGO_TARGET:/app/target \
       -w /app \
       casjaysdev/rust:latest cargo build --release
-    cp target/release/{project_name} binaries/{project_name}
+    cp "$CARGO_TARGET"/release/{project_name} binaries/{project_name}
 fi
 
 # Launch Incus container (use latest Debian stable)
@@ -39873,9 +39881,9 @@ maintainer_email: jane@example.com
 
 **Rust Cache (Host Bind-Mounts):**
 ```bash
-# Rust cache bind-mounted from host: CARGO_CACHE (.cargo), RUSTUP_CACHE (.rustup), SCCACHE_CACHE (sccache)
-# Defaults: CARGO_CACHE=$HOME/.cargo  RUSTUP_CACHE=$HOME/.rustup  SCCACHE_CACHE=$HOME/.cache/sccache
-# Mount in Docker: -v $CARGO_CACHE:/usr/local/share/cargo -v $RUSTUP_CACHE:/usr/local/share/rustup -v $SCCACHE_CACHE:/root/.cache/sccache
+# Rust cache bind-mounted from host: CARGO_CACHE (.cargo), RUSTUP_CACHE (.rustup), SCCACHE_CACHE (sccache), CARGO_TARGET (target dir, per project)
+# Defaults: CARGO_CACHE=$HOME/.cargo  RUSTUP_CACHE=$HOME/.rustup  SCCACHE_CACHE=$HOME/.cache/sccache  CARGO_TARGET=$HOME/.cache/cargo-target/${PROJECT_NAME}
+# Mount in Docker: -v $CARGO_CACHE:/usr/local/share/cargo -v $RUSTUP_CACHE:/usr/local/share/rustup -v $SCCACHE_CACHE:/root/.cache/sccache -v $CARGO_TARGET:/app/target
 ```
 
 **Temp Directory Workflow:**

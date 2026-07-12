@@ -43460,7 +43460,7 @@ pipeline {
 | Agent labels | `amd64` and `arm64` MUST be available |
 | Docker | Required on all agents (builds use casjaysdev/rust:latest) |
 | Docker buildx | Required on amd64 agent for multi-arch builds |
-| Cargo caches | `/tmp/{project_org}/cargo-home` and `/tmp/{project_org}/cargo-target` |
+| Cargo caches | `CARGO_CACHE` (`~/.cargo`) / `RUSTUP_CACHE` (`~/.rustup`) / `SCCACHE_CACHE` (`~/.cache/sccache`) / `CARGO_TARGET` (`~/.cache/cargo-target/{project_name}`) |
 
 ### Credentials Setup (Jenkins → Credentials → Add Credentials)
 
@@ -44359,9 +44359,20 @@ verify_all_endpoints_tested
 # 1. Build in Docker (always use Docker for builds)
 mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
 BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
-docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD:/app -w /app \
+CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
+CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE" "$CARGO_TARGET"
+docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+  -v $PWD:/app \
+  -v $CARGO_CACHE:/usr/local/share/cargo \
+  -v $RUSTUP_CACHE:/usr/local/share/rustup \
+  -v $SCCACHE_CACHE:/root/.cache/sccache \
+  -v $CARGO_TARGET:/app/target \
+  -w /app \
   casjaysdev/rust:latest cargo build --release --target x86_64-unknown-linux-musl
-cp target/x86_64-unknown-linux-musl/release/{project_name} "$BUILD_DIR/"
+cp "$CARGO_TARGET"/x86_64-unknown-linux-musl/release/{project_name} "$BUILD_DIR/"
 
 # 2. Test (prefer Incus, fallback to Docker)
 if command -v incus &>/dev/null; then
@@ -44464,20 +44475,20 @@ RUST_DOCKER="docker run --rm \
 
 echo "Building server binary in Docker..."
 $RUST_DOCKER cargo build --release --target x86_64-unknown-linux-musl
-cp target/x86_64-unknown-linux-musl/release/"${PROJECT_NAME}" "$BUILD_DIR/${PROJECT_NAME}"
+cp "$CARGO_TARGET"/x86_64-unknown-linux-musl/release/"${PROJECT_NAME}" "$BUILD_DIR/${PROJECT_NAME}"
 
 # Build client if exists (as a separate binary target)
 if grep -q "name = \"${PROJECT_NAME}-cli\"" Cargo.toml 2>/dev/null || [ -f "src/bin/client.rs" ]; then
     echo "Building client in Docker..."
     $RUST_DOCKER cargo build --release --bin "${PROJECT_NAME}-cli" --target x86_64-unknown-linux-musl
-    cp target/x86_64-unknown-linux-musl/release/"${PROJECT_NAME}-cli" "$BUILD_DIR/${PROJECT_NAME}-cli"
+    cp "$CARGO_TARGET"/x86_64-unknown-linux-musl/release/"${PROJECT_NAME}-cli" "$BUILD_DIR/${PROJECT_NAME}-cli"
 fi
 
 # Build agent if exists (as a separate binary target)
 if grep -q "name = \"${PROJECT_NAME}-agent\"" Cargo.toml 2>/dev/null || [ -f "src/bin/agent.rs" ]; then
     echo "Building agent in Docker..."
     $RUST_DOCKER cargo build --release --bin "${PROJECT_NAME}-agent" --target x86_64-unknown-linux-musl
-    cp target/x86_64-unknown-linux-musl/release/"${PROJECT_NAME}-agent" "$BUILD_DIR/${PROJECT_NAME}-agent"
+    cp "$CARGO_TARGET"/x86_64-unknown-linux-musl/release/"${PROJECT_NAME}-agent" "$BUILD_DIR/${PROJECT_NAME}-agent"
 fi
 
 echo "Testing in Docker (Alpine)..."
@@ -44719,20 +44730,20 @@ RUST_DOCKER="docker run --rm \
 
 echo "Building server binary in Docker..."
 $RUST_DOCKER cargo build --release --target x86_64-unknown-linux-musl
-cp target/x86_64-unknown-linux-musl/release/"${PROJECT_NAME}" "$BUILD_DIR/${PROJECT_NAME}"
+cp "$CARGO_TARGET"/x86_64-unknown-linux-musl/release/"${PROJECT_NAME}" "$BUILD_DIR/${PROJECT_NAME}"
 
 # Build client if exists (as a separate binary target)
 if grep -q "name = \"${PROJECT_NAME}-cli\"" Cargo.toml 2>/dev/null || [ -f "src/bin/client.rs" ]; then
     echo "Building client in Docker..."
     $RUST_DOCKER cargo build --release --bin "${PROJECT_NAME}-cli" --target x86_64-unknown-linux-musl
-    cp target/x86_64-unknown-linux-musl/release/"${PROJECT_NAME}-cli" "$BUILD_DIR/${PROJECT_NAME}-cli"
+    cp "$CARGO_TARGET"/x86_64-unknown-linux-musl/release/"${PROJECT_NAME}-cli" "$BUILD_DIR/${PROJECT_NAME}-cli"
 fi
 
 # Build agent if exists (as a separate binary target)
 if grep -q "name = \"${PROJECT_NAME}-agent\"" Cargo.toml 2>/dev/null || [ -f "src/bin/agent.rs" ]; then
     echo "Building agent in Docker..."
     $RUST_DOCKER cargo build --release --bin "${PROJECT_NAME}-agent" --target x86_64-unknown-linux-musl
-    cp target/x86_64-unknown-linux-musl/release/"${PROJECT_NAME}-agent" "$BUILD_DIR/${PROJECT_NAME}-agent"
+    cp "$CARGO_TARGET"/x86_64-unknown-linux-musl/release/"${PROJECT_NAME}-agent" "$BUILD_DIR/${PROJECT_NAME}-agent"
 fi
 
 echo "Launching Incus container (Debian + systemd)..."
@@ -45276,7 +45287,7 @@ docker run --rm \
   -w /app \
   casjaysdev/rust:latest cargo build --release --target x86_64-unknown-linux-musl
 mkdir -p binaries
-cp target/x86_64-unknown-linux-musl/release/{project_name} binaries/
+cp "$CARGO_TARGET"/x86_64-unknown-linux-musl/release/{project_name} binaries/
 
 # Test in Docker (quick) - install tools first
 docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD/binaries:/app alpine:latest sh -c "
@@ -45318,7 +45329,7 @@ docker run --rm \
   -w /app \
   casjaysdev/rust:latest cargo build --release --target x86_64-unknown-linux-musl
 mkdir -p binaries
-cp target/x86_64-unknown-linux-musl/release/{project_name} binaries/
+cp "$CARGO_TARGET"/x86_64-unknown-linux-musl/release/{project_name} binaries/
 
 # Quick test in Docker (install tools first)
 docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD/binaries:/app alpine:latest sh -c "
@@ -45352,10 +45363,21 @@ TEST_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
 mkdir -p $TEST_DIR/{config,data,logs}
 
 # Build
-docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD:/app -w /app \
+CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+SCCACHE_CACHE="${SCCACHE_CACHE:-$HOME/.cache/sccache}"
+CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$SCCACHE_CACHE" "$CARGO_TARGET"
+docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+  -v $PWD:/app \
+  -v $CARGO_CACHE:/usr/local/share/cargo \
+  -v $RUSTUP_CACHE:/usr/local/share/rustup \
+  -v $SCCACHE_CACHE:/root/.cache/sccache \
+  -v $CARGO_TARGET:/app/target \
+  -w /app \
   casjaysdev/rust:latest cargo build --release --target x86_64-unknown-linux-musl
 mkdir -p binaries
-cp target/x86_64-unknown-linux-musl/release/{project_name} binaries/
+cp "$CARGO_TARGET"/x86_64-unknown-linux-musl/release/{project_name} binaries/
 
 # Launch Incus container (use latest Debian stable)
 incus launch images:debian/trixie test-{project_name}
@@ -61275,7 +61297,7 @@ maintainer_email: jane@example.com
 ```bash
 # Rust cache bind-mounted from host: CARGO_CACHE, RUSTUP_CACHE, SCCACHE_CACHE, and CARGO_TARGET (build cache)
 # Defaults: CARGO_CACHE=$HOME/.cargo, RUSTUP_CACHE=$HOME/.rustup, SCCACHE_CACHE=$HOME/.cache/sccache, CARGO_TARGET=$HOME/.cache/cargo-target/${PROJECT_NAME}
-# Mount in Docker: -v $CARGO_CACHE:/usr/local/share/cargo -v $RUSTUP_CACHE:/usr/local/share/rustup -v $CARGO_TARGET:/app/target
+# Mount in Docker: -v $CARGO_CACHE:/usr/local/share/cargo -v $RUSTUP_CACHE:/usr/local/share/rustup -v $SCCACHE_CACHE:/root/.cache/sccache -v $CARGO_TARGET:/app/target
 ```
 
 **Temp Directory Workflow:**
