@@ -2279,14 +2279,14 @@ server:
 
 ## How to Read This Large File
 
-**AI.md is ~2.4MB and ~63,100 lines. You CANNOT read it all at once. Follow these procedures.**
+**AI.md is ~2.4MB and ~63,110 lines. You CANNOT read it all at once. Follow these procedures.**
 
 ### File Size Reality
 
 | Constraint | Value |
 |------------|-------|
 | File size | ~2.4MB |
-| Line count | ~63,100 lines |
+| Line count | ~63,110 lines |
 | Read limit | ~500 lines per read |
 | Full reads needed | ~127 reads (impractical) |
 
@@ -2307,36 +2307,36 @@ server:
 | 6 | ~9178 | Application Modes | Mode handling, debug endpoints |
 | 7 | ~9732 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
 | 8 | ~10413 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
-| 9 | ~13916 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~14353 | Database & Cluster | Database work |
-| 11 | ~14998 | Security & Logging | Security features, **Scoped Agent Tokens**, **Context Detection** |
-| 12 | ~18018 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~19624 | Health & Versioning | Health endpoints |
-| 14 | ~20428 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~22236 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~23207 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~29689 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
-| 18 | ~32202 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 19 | ~33536 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 20 | ~34035 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 21 | ~34134 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 22 | ~35499 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
-| 23 | ~36262 | Update Command | Update feature |
-| 24 | ~36757 | Privilege Escalation & Service | Service/privilege work |
-| 25 | ~37672 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 26 | ~38029 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 27 | ~38868 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 28 | ~40380 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 29 | ~43603 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 30 | ~45596 | ReadTheDocs Documentation | Documentation |
-| 31 | ~46426 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
-| 32 | ~48501 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 33 | ~50161 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
-| 34 | ~55058 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
-| 35 | ~59225 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
-| 36 | ~59945 | Custom Domains | **OPTIONAL** - user/org branded domains |
-| 37 | ~61023 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | ~61254 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 9 | ~13925 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~14362 | Database & Cluster | Database work |
+| 11 | ~15007 | Security & Logging | Security features, **Scoped Agent Tokens**, **Context Detection** |
+| 12 | ~18027 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~19633 | Health & Versioning | Health endpoints |
+| 14 | ~20437 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~22245 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~23216 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~29698 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
+| 18 | ~32211 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 19 | ~33545 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 20 | ~34044 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 21 | ~34143 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 22 | ~35508 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
+| 23 | ~36271 | Update Command | Update feature |
+| 24 | ~36766 | Privilege Escalation & Service | Service/privilege work |
+| 25 | ~37681 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 26 | ~38038 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 27 | ~38877 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 28 | ~40389 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 29 | ~43612 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 30 | ~45605 | ReadTheDocs Documentation | Documentation |
+| 31 | ~46435 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
+| 32 | ~48510 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 33 | ~50170 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
+| 34 | ~55067 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
+| 35 | ~59234 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
+| 36 | ~59954 | Custom Domains | **OPTIONAL** - user/org branded domains |
+| 37 | ~61032 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~61263 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 **When Implementing OPTIONAL PARTs (34-36, Agent from 33):**
 1. Change PART title from `OPTIONAL` → `NON-NEGOTIABLE` in AI.md
@@ -10747,6 +10747,8 @@ pub fn ensure_pid_file(path: &Path, is_root: bool) -> Result<()> {
 
 **Stale PID detection is REQUIRED.** A crash or kill -9 leaves stale PID files.
 
+**Containers: no PID file.** When `is_container()` is true, skip PID file creation and checking entirely (the `pidfile: true` config default is ignored). The container runtime supervises the process, and PIDs are namespace-local - a PID file on a mounted volume read from the host or another container points at the wrong process or produces a false "already running".
+
 ```rust
 use std::fs;
 use std::path::Path;
@@ -10896,6 +10898,12 @@ pub fn is_our_process(pid: u32) -> bool {
 
 // write_pid_file writes current process PID to file
 pub fn write_pid_file(pid_path: &Path) -> Result<()> {
+    // Containers: skip entirely - the runtime supervises the process, and a
+    // namespace-local pid in a PID file is wrong when read across namespaces
+    if is_container() {
+        return Ok(());
+    }
+
     let (running, existing_pid) = check_pid_file(pid_path)?;
     if running {
         anyhow::bail!("already running (pid {})", existing_pid);
@@ -10915,6 +10923,7 @@ pub fn remove_pid_file(pid_path: &Path) -> Result<()> {
 **Startup Flow:**
 
 ```
+0. Running in a container (is_container()) -> skip PID file entirely
 1. Check if PID file exists
    ├─► No  → Create PID file, start server
    └─► Yes → Read PID from file
