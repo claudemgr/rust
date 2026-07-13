@@ -656,9 +656,9 @@ let cache_size = (avail_mem / 10)
 | **NEVER use Makefile in CI** | Workflows have explicit commands with all env vars |
 | **GitHub/Gitea/Jenkins must match** | Same platforms, same env vars, same logic |
 | **VERSION precedence** | `release.txt` wins when present; otherwise use the workflow/build-specific fallback (tag, beta timestamp, etc.) |
-| **LDFLAGS** | Set via `RUSTFLAGS` and build metadata embedded using `built` or `vergen` crates: version, commit ID, build date, official site |
+| **Build metadata** | Passed as env vars (VERSION, COMMIT_ID, BUILD_DATE, OFFICIAL_SITE) and embedded via `build.rs` → `option_env!("APP_*")`: version, commit ID, build date, official site |
 | **Docker builds on EVERY push** | Any branch push triggers Docker image build |
-| **Docker tags** | Any push → `devel`, `{commit}`; beta → adds `beta`; tag → `{version}`, `latest`, `YYMM`, `{commit}` |
+| **Docker tags** | Any push → `{commit}`; beta → adds `beta`; tag → `{version}`, `latest`, `YYMM`, `{commit}`; `devel` = local Dockerfile.dev build only, never CI |
 | **Workflow permissions** | Default to read-only / least privilege; grant write only to the specific release/publish job that needs it |
 | **Third-party action pinning** | External actions MUST be pinned to a full commit SHA — never float on `@main`, `@master`, or broad tags; verify runtime and maintenance status on every SHA update |
 | **Unsafe PR triggers forbidden by default** | Do NOT use `pull_request_target` for untrusted code execution, build, test, or artifact upload paths |
@@ -885,8 +885,8 @@ src/config/                 # Configuration module
 src/config/mod.rs
 src/handlers/               # HTTP handlers
 src/handlers/mod.rs
-src/middleware/             # HTTP middleware
-src/middleware/mod.rs
+src/middlewares/            # HTTP middleware
+src/middlewares/mod.rs
 src/models/                 # Data models
 src/models/mod.rs
 src/db/                     # Database access layer
@@ -1046,7 +1046,7 @@ src/
 | `services/` | Business logic | Core application logic, orchestration |
 | `models/` | Data structures | Structs, validation, serialization |
 | `store/` | Data persistence | Database queries, CRUD operations |
-| `middleware/` | HTTP middleware | Auth, logging, rate limiting, CORS |
+| `middlewares/` | HTTP middleware | Auth, logging, rate limiting, CORS |
 | `templates/` | HTML templates | Tera/Askama templates for WebUI |
 | `static/` | Static assets | CSS, JS, images (embedded) |
 | `swagger/` | OpenAPI/Swagger | Spec generation, UI handler, theming (always `src/swagger/`) |
@@ -1149,7 +1149,7 @@ Quick reference: Accept `yes/no`, `true/false`, `1/0`, `on/off`, `enable/disable
 | `config/` in root | Config is embedded, runtime-generated in OS dirs |
 | `data/` in root | Data goes to OS data directory at runtime |
 | `logs/` in root | Logs go to OS log directory at runtime |
-| `tmp/`, `temp/` in root | Use `/tmp/{project_org}/{internal_name}-XXXXXX/` |
+| `tmp/`, `temp/` in root | Use `{tempdir}/{project_org}/{internal_name}-XXXXXX/` |
 | `test-data/` in root | Test data goes to temp directories |
 | `build/`, `dist/`, `out/` | Use `binaries/` (gitignored) |
 | `vendor/` | Use Cargo dependencies, not vendoring |
@@ -1166,6 +1166,8 @@ Quick reference: Accept `yes/no`, `true/false`, `1/0`, `on/off`, `enable/disable
 | `AI.md` | ✓ | Project specification (HOW - implementation patterns) |
 | `IDEA.md` | ✓ | Project idea (WHAT - business logic, features) |
 | `CLAUDE.md` | ✓ | Claude Code quick loader - critical rules + references into `AI.md` |
+| `CLAUDE.local.md` | Optional | Personal Claude Code preferences — gitignored |
+| `SPEC.md` | Optional | Project-specific rule overrides — SPEC.md wins over AI.md (may be empty) |
 | `PLAN.md` | Optional | Project plan — human edits/owns. AI reads, interprets, executes, and marks items done in place. Never rewrite or restructure |
 | `PLAN.AI.md` | Optional | Project plan — AI creates/updates. If it exists, this is THE plan |
 | `TODO.md` | Optional | Task list — human edits/owns. AI reads, interprets, executes, and marks items done in place. Never delete, empty, or restructure |
@@ -1182,9 +1184,12 @@ Quick reference: Accept `yes/no`, `true/false`, `1/0`, `on/off`, `enable/disable
 | `.gitignore` | ✓ | Git ignore rules |
 | `.dockerignore` | ✓ | Docker ignore rules |
 | `.gitattributes` | Optional | Git attributes |
+| `.editorconfig` | Optional | Editor configuration |
 | `Jenkinsfile` | ✓ | Jenkins pipeline — required on every project per `cicd_conventions.md` |
 | `mkdocs.yml` | ✓ | MkDocs configuration |
 | `.readthedocs.yaml` | ✓ | ReadTheDocs configuration |
+
+**RULE: If a root file doesn't appear in this list, it MUST NOT exist - ask before creating.**
 
 ### AI-Specific Files and Directories
 
@@ -1213,8 +1218,8 @@ Claude Code creates `.claude/rules/` on first session (see PART 0: Session Initi
 | `ai-rules.md` | 0, 1 | AI Assistant Rules, Critical Rules |
 | `project-rules.md` | 2, 3, 4 | License & Attribution, Project Structure, OS-Specific Paths |
 | `config-rules.md` | 5, 6, 12 | Configuration, Application Modes, Server Configuration |
-| `binary-rules.md` | 7, 8, 33 | Binary Requirements, Server Binary CLI, Client |
-| `backend-rules.md` | 9, 10, 11, 32 | Error Handling & Caching, Database, Security & Logging, Tor Hidden Service |
+| `binary-rules.md` | 7, 8, 32 | Binary Requirements, Server Binary CLI, Client |
+| `backend-rules.md` | 9, 10, 11, 31 | Error Handling & Caching, Database, Security & Logging, Tor Hidden Service |
 | `api-rules.md` | 13, 14, 15 | Health & Versioning, API Structure, SSL/TLS & Let's Encrypt |
 | `frontend-rules.md` | 16 | Web Frontend |
 | `features-rules.md` | 17-22 | Email & Notifications, Scheduler, GeoIP, Metrics, Backup & Restore, Update Command |
@@ -1224,7 +1229,7 @@ Claude Code creates `.claude/rules/` on first session (see PART 0: Session Initi
 | `cicd-rules.md` | 27 | CI/CD Workflows |
 | `testing-rules.md` | 28, 29, 30 | Testing & Development, ReadTheDocs Documentation, I18N & A11Y |
 
-**Note:** PART 33 (IDEA.md Reference) and FINAL (Compliance Checklist) are reference-only, not rule files. PART 30 (Tor Hidden Service) is REQUIRED - auto-enabled when Tor binary is found.
+**Note:** PART 33 (IDEA.md Reference) and FINAL (Compliance Checklist) are reference-only, not rule files. PART 31 (Tor Hidden Service) is REQUIRED - auto-enabled when Tor binary is found.
 
 **Rules File Features:**
 - All `.md` files in `rules/` are automatically discovered recursively
@@ -1240,7 +1245,7 @@ Rules can be limited to specific file paths using YAML frontmatter:
 ---
 paths:
   - "src/handlers/**/*.rs"
-  - "src/middleware/**/*.rs"
+  - "src/middlewares/**/*.rs"
 ---
 
 # API Handler Rules
@@ -1399,8 +1404,8 @@ Cursor uses `.mdc` files. Create the same logical groupings:
 | `ai-rules.mdc` | 0, 1 | AI Assistant Rules, Critical Rules |
 | `project-rules.mdc` | 2, 3, 4 | License & Attribution, Project Structure, OS-Specific Paths |
 | `config-rules.mdc` | 5, 6, 12 | Configuration, Application Modes, Server Configuration |
-| `binary-rules.mdc` | 7, 8, 33 | Binary Requirements, Server Binary CLI, Client |
-| `backend-rules.mdc` | 9, 10, 11, 32 | Error Handling & Caching, Database, Security & Logging, Tor Hidden Service |
+| `binary-rules.mdc` | 7, 8, 32 | Binary Requirements, Server Binary CLI, Client |
+| `backend-rules.mdc` | 9, 10, 11, 31 | Error Handling & Caching, Database, Security & Logging, Tor Hidden Service |
 | `api-rules.mdc` | 13, 14, 15 | Health & Versioning, API Structure, SSL/TLS & Let's Encrypt |
 | `frontend-rules.mdc` | 16 | Web Frontend |
 | `features-rules.mdc` | 17-22 | Email & Notifications, Scheduler, GeoIP, Metrics, Backup & Restore, Update Command |
@@ -1533,7 +1538,7 @@ Purpose:
 7. Create premium tiers → All features free, no paywalls
 8. Use Makefile in CI/CD → Explicit commands only
 9. Guess or assume values that a command can produce → Run the command (`date`, `basename "$PWD"`, `git config user.email`, `git rev-parse --short HEAD`, `uname -m`, etc.) — when no command applies, read spec or ask user
-10. Skip platforms → Build all 8 (linux/darwin/windows × amd64/arm64)
+10. Skip platforms → Build all 8 (linux/darwin/windows/freebsd × amd64/arm64)
 11. Client-side rendering (React/Vue) → Server-side Tera/Askama templates
 12. Require JavaScript for core features → Progressive enhancement only
 13. Let long strings break mobile → Use word-break CSS
@@ -1618,7 +1623,7 @@ Each `.claude/rules/*.md` file should contain:
 For complete details, see AI.md PART X, Y, Z
 ```
 
-**3. Context Compaction Survival:**
+**2. Context Compaction Survival:**
 
 | What Survives | How | Content |
 |---------------|-----|---------|
@@ -1628,7 +1633,7 @@ For complete details, see AI.md PART X, Y, Z
 
 **Key principle:** Put only the most critical rules and the right `AI.md` references in `CLAUDE.md`. Keep it efficient. `AI.md` is the full spec and source of truth.
 
-**4. Enforcement Language:**
+**3. Enforcement Language:**
 
 Use strong, unambiguous language in CLAUDE.md and rules files:
 
@@ -1639,7 +1644,7 @@ Use strong, unambiguous language in CLAUDE.md and rules files:
 | "Consider..." | "Non-negotiable" |
 | "You might want to..." | "Failure to do this is a bug" |
 
-**5. Self-Check Prompt (add to CLAUDE.md):**
+**4. Self-Check Prompt (add to CLAUDE.md):**
 
 ```markdown
 ## Before ANY Code Change
@@ -1900,39 +1905,20 @@ Instructions for how this agent should behave...
 | `tests/` | ✓ | Repository-root executable integration test scripts (`run_tests.sh`, `docker.sh`, `incus.sh`, optional helpers). Rust unit tests live alongside code as `#[cfg(test)]` modules | No |
 | `.github/` | If GitHub / public repo | GitHub Actions, community files, templates | No |
 | `.gitea/` | If Gitea | Gitea Actions, templates | No |
-| `.claude/` | Auto | Claude Code config (regenerated) | **Yes** |
-| `.cursor/` | Auto | Cursor AI config (regenerated) | **Yes** |
+| `.claude/` | Auto | Claude Code config — team config (settings, rules, agents, hooks) committed; personal/runtime files gitignored | Partial |
+| `.cursor/` | Auto | Cursor AI config — team config (rules, mcp.json) committed; personal settings gitignored | Partial |
 | `.aider/` | Auto | Aider AI config (regenerated) | **Yes** |
 | `.ai/` | Auto | Generic AI config (regenerated) | **Yes** |
-| `.windsurf/` | Auto | Windsurf AI config (regenerated) | **Yes** |
+| `.windsurf/` | Auto | Windsurf AI config — team config (rules) committed; personal settings gitignored | Partial |
 | `binaries/` | Auto | Build output | **Yes** |
 | `releases/` | Auto | Release artifacts | **Yes** |
 | `volumes/` | Auto | Runtime volume data (if created locally) | **Yes** |
 
 **RULE: If a directory doesn't appear in this list, it MUST NOT exist - ask before creating.**
 
-### Allowed Root Files (Exhaustive List)
+### Allowed Root Files
 
-| File | Required | Purpose | Gitignored |
-|------|:--------:|---------|:----------:|
-| `AI.md` | ✓ | Project specification (source of truth) | No |
-| `IDEA.md` | ✓ | Project plan and features | No |
-| `CLAUDE.md` | ✓ | Claude Code project memory (primary location) | No |
-| `CLAUDE.local.md` | - | Personal Claude Code preferences | **Yes** |
-| `README.md` | ✓ | Project documentation | No |
-| `LICENSE.md` | ✓ | MIT license + embedded third-party licenses | No |
-| `Cargo.toml` | ✓ | Rust package manifest | No |
-| `Cargo.lock` | ✓ | Rust dependency lockfile | No |
-| `Makefile` | ✓ | Local development only | No |
-| `mkdocs.yml` | ✓ | MkDocs configuration | No |
-| `.gitignore` | ✓ | Git ignore patterns | No |
-| `.dockerignore` | ✓ | Docker ignore patterns | No |
-| `.gitattributes` | ✓ | Git attributes | No |
-| `.editorconfig` | - | Editor configuration | No |
-| `release.txt` | ✓ | Version source of truth | No |
-| `site.txt` | - | Official site URL (optional, never guess) | No |
-
-**RULE: If a root file doesn't appear in this list, it MUST NOT exist - ask before creating.**
+See the **Allowed Root Files (Exhaustive List)** table under "Files & Directories Master Rules" earlier in this file — it is the single authoritative list of allowed root files.
 
 ### GitHub-Specific Files (`.github/` directory)
 
@@ -2047,7 +2033,6 @@ Instructions for how this agent should behave...
 | `{project_version}` | Current version (semver format) | `1.0.0`, `2.3.1` |
 | `{PROJECT_NAME}` | Uppercase project name (for constants, env vars) | `JOKES`, `ECHOIP` |
 | `{official_site}` | Official project website | `https://jokes.example.com` |
-| `{fqdn}` | Fully qualified domain name | `api.example.com` |
 | `{fqdn}` | Fully qualified domain name | `api.example.com` |
 | `{baseurl}` | URL path prefix (auto-detected from reverse proxy) | `/`, `/myproject` |
 | `{api_version}` | API version prefix (default: `v1`) | `v1`, `v2` |
@@ -2240,40 +2225,40 @@ server:
 
 | PART | Line | Topic | When to Read |
 |------|------|-------|--------------|
-| 0 | ~2369 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
-| 1 | ~4176 | Critical Rules | **ALWAYS READ FIRST** |
-| 2 | ~5440 | License & Attribution | License requirements |
-| 3 | ~5769 | Project Structure | Setting up new project, **CI/CD badge detection** |
-| 4 | ~6631 | OS-Specific Paths | Path handling |
-| 5 | ~6827 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
-| 6 | ~8564 | Application Modes | Mode handling, debug endpoints |
-| 7 | ~9063 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~9777 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
-| 9 | ~12669 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~13093 | Database | Database work |
-| 11 | ~13508 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
-| 12 | ~15554 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~16952 | Health & Versioning | Health endpoints |
-| 14 | ~17587 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~19296 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~20230 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~22600 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~23171 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~23597 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~23705 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~24989 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~25530 | Update Command | Update feature |
-| 23 | ~26002 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~26625 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~26949 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~27722 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~28812 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~31391 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~33137 | ReadTheDocs Documentation | Documentation |
-| 30 | ~33931 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~35295 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 32 | ~36553 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~39699 | IDEA.md Reference | **Examples only** - NEVER modify |
+| 0 | ~2354 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
+| 1 | ~4164 | Critical Rules | **ALWAYS READ FIRST** |
+| 2 | ~5428 | License & Attribution | License requirements |
+| 3 | ~5757 | Project Structure | Setting up new project, **CI/CD badge detection** |
+| 4 | ~6619 | OS-Specific Paths | Path handling |
+| 5 | ~6815 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
+| 6 | ~8569 | Application Modes | Mode handling, debug endpoints |
+| 7 | ~9071 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
+| 8 | ~9786 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
+| 9 | ~12673 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~13097 | Database | Database work |
+| 11 | ~13512 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
+| 12 | ~15526 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~16924 | Health & Versioning | Health endpoints |
+| 14 | ~17559 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~19277 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~20222 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~22676 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~23247 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~23672 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~23779 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~25065 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~25606 | Update Command | Update feature |
+| 23 | ~26109 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~26731 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~27056 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~27867 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~28962 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~31609 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~33355 | ReadTheDocs Documentation | Documentation |
+| 30 | ~34149 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~35512 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 32 | ~36804 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~39953 | IDEA.md Reference | **Examples only** - NEVER modify |
 | FINAL | — | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File
@@ -2311,20 +2296,20 @@ Example: If you're partway through PART 5 and it says "See PART 10", read PART 1
 
 | Task | Read These PARTs |
 |------|------------------|
-| **Migrating existing app** | 0, Migration sections, 1, 2, 6, 30 |
-| **New project/app setup** | 0, New Project Rules, 1, 2, 7, 30, 34 |
-| **CLI implementation** | 0, 1, 6, 8, 24 |
-| **API development** | 0, 1, 14, 18, 16 |
-| **Frontend/UI work** | 0, 1, 13, 17, 18 |
+| **Migrating existing app** | 0, Migration sections, 1, 2, 6, 26 |
+| **New project/app setup** | 0, New Project Rules, 1, 2, 3, 7, 26, 32 |
+| **CLI implementation** | 0, 1, 6, 8, 32 |
+| **API development** | 0, 1, 13, 14, 16 |
+| **Frontend/UI work** | 0, 1, 16, 30 |
 | **Database work** | 0, 1, 4, 10 |
-| **User/auth system** | 0, 1, 15, 11 |
-| **Docker/deployment** | 0, 1, 7, 30, 28 |
-| **Documentation** | 0, 1, 31 |
-| **Security features** | 0, 1, 11, 16 |
-| **Background tasks** | 0, 1, 20 |
-| **Email features** | 0, 1, 19 |
-| **Backup features** | 0, 1, 23 |
-| **Debugging/profiling** | 0, 1, 5 |
+| **User/auth system** | 0, 1, 11, 14 |
+| **Docker/deployment** | 0, 1, 7, 26, 27 |
+| **Documentation** | 0, 1, 29 |
+| **Security features** | 0, 1, 11, 15 |
+| **Background tasks** | 0, 1, 18 |
+| **Email features** | 0, 1, 17 |
+| **Backup features** | 0, 1, 21 |
+| **Debugging/profiling** | 0, 1, 5, 6 |
 
 ### Search Before Reading
 
@@ -2577,16 +2562,16 @@ Before I proceed, can you confirm [specific question]?
 | `.claude/rules/ai-rules.md` | 0, 1 | AI Assistant Rules, Critical Rules |
 | `.claude/rules/project-rules.md` | 2, 3, 4 | License & Attribution, Project Structure, OS-Specific Paths |
 | `.claude/rules/config-rules.md` | 5, 6, 12 | Configuration, Application Modes, Server Configuration |
-| `.claude/rules/binary-rules.md` | 7, 8, 33 | Binary Requirements, Server Binary CLI, Client |
-| `.claude/rules/backend-rules.md` | 9, 10, 11, 32 | Error Handling & Caching, Database, Security & Logging, Tor Hidden Service |
+| `.claude/rules/binary-rules.md` | 7, 8, 32 | Binary Requirements, Server Binary CLI, Client |
+| `.claude/rules/backend-rules.md` | 9, 10, 11, 31 | Error Handling & Caching, Database, Security & Logging, Tor Hidden Service |
 | `.claude/rules/api-rules.md` | 13, 14, 15 | Health & Versioning, API Structure, SSL/TLS & Let's Encrypt |
 | `.claude/rules/frontend-rules.md` | 16 | Web Frontend |
 | `.claude/rules/features-rules.md` | 17-22 | Email & Notifications, Scheduler, GeoIP, Metrics, Backup & Restore, Update Command |
 | `.claude/rules/service-rules.md` | 23, 24 | Privilege Escalation & Service, Service Support |
-| `.claude/rules/makefile-rules.md` | 26 | Makefile (local dev only, NOT CI/CD) |
-| `.claude/rules/docker-rules.md` | 27 | Docker |
-| `.claude/rules/cicd-rules.md` | 28 | CI/CD Workflows |
-| `.claude/rules/testing-rules.md` | 29, 30, 31 | Testing & Development, ReadTheDocs Documentation, I18N & A11Y |
+| `.claude/rules/makefile-rules.md` | 25 | Makefile (local dev only, NOT CI/CD) |
+| `.claude/rules/docker-rules.md` | 26 | Docker |
+| `.claude/rules/cicd-rules.md` | 27 | CI/CD Workflows |
+| `.claude/rules/testing-rules.md` | 28, 29, 30 | Testing & Development, ReadTheDocs Documentation, I18N & A11Y |
 
 **Each rule file MUST contain:**
 1. Header with PART numbers: `# {Topic} Rules (PART X, Y, Z)`
@@ -2773,17 +2758,17 @@ fi
 
 | Trigger | Required Action |
 |---------|-----------------|
-| Adding a new `http.Error()` call | Use `t(r, "errors.*")` — never hardcoded English |
-| Adding `fmt::eprintln!`/`fmt::println!` with user-visible text | Use `i18n.T(lang, "key")` or `i18n.Tf(lang, "key", args)` |
+| Adding a new error response (`AppError`) | Use an `errors.*` translation key — never hardcoded English |
+| Adding `eprintln!`/`println!` with user-visible text | Use `i18n::t(lang, "key")` or `i18n::tf(lang, "key", args)` |
 | Adding a new web page/section | Add translation keys for ALL labels, buttons, messages, tooltips |
 | Adding a new CLI command/flag | Add `cli.*` translation keys for help text and output |
 | Adding a new CLI feature | Add `cli.*` translation keys for status/output |
 | Adding a new notification type | Add notification translation key |
 | Adding a new error type | Add `errors.*` translation key |
 | Adding new config with user-visible default | Ensure default falls back to translation key |
-| Adding HTML templates | Use `{{t .Lang "key"}}` — never hardcoded text |
+| Adding HTML templates | Use the Tera `t` function: `{{ t(lang=lang, key="key") }}` — never hardcoded text |
 | Adding JavaScript UI text | Use `translations[key]` from loaded locale |
-| Modifying `<html>` tag | Use `lang="{{.Lang}}" dir="{{.Dir}}"` — never hardcoded `lang="en"` |
+| Modifying `<html>` tag | Use `lang="{{ lang }}" dir="{{ dir }}"` — never hardcoded `lang="en"` |
 
 **After adding translation keys, AI MUST:**
 1. Add the key to the Spanish (`es.json`) example in PART 30 with proper translation
@@ -3326,6 +3311,15 @@ pub struct Config {
 
 **YAML comments - same rule:**
 ```yaml
+# Correct - comment above the key
+server:
+  # Server port number
+  port: 64580
+  # Enable debug mode
+  debug: false
+
+# Incorrect - inline comments are forbidden
+# port: 64580  # Server port - WRONG (inline)
 ```
 
 ### Code Quality Rules
@@ -3487,7 +3481,7 @@ When the specification is unclear:
 | Element | Reason |
 |---------|--------|
 | **CLI flags** | `--help`, `--version`, `--config`, etc. - standardized across all apps |
-| **CLI commands** | `serve`, `migrate`, `--maintenance` - same interface everywhere |
+| **CLI commands** | `--service`, `--maintenance`, `--update` action flags - same interface everywhere (the CLI is flags-only; no subcommands) |
 | **Flag formats** | Short/long flag patterns, output formats |
 | **Makefile structure** | Targets, variables, Docker commands |
 | **Makefile targets** | `build`, `release`, `docker`, `test`, `dev`, `clean` |
@@ -3532,7 +3526,7 @@ handlers.rs                        src/server/routes.rs
 run.sh                             Makefile
 Dockerfile                         docker/Dockerfile
 
---port 8080                        --address :8080 (standard flag)
+--port 8080                        --port 8080 (standard flag)
 --jokes-file                       server.data.jokes_file (config)
 
 All jokes preserved
@@ -3951,13 +3945,7 @@ ls -la docker/
 
 ### PART 32: Client (REQUIRED)
 
-**PART 32: Client**
-
-| Include | Skip | Reason |
-|---------|------|--------|
-| API with complex queries | Simple web-only app | Power users need CLI access |
-| DevOps/admin tools | Consumer mobile app | Automation requires CLI |
-| Database management | Static content site | Bulk operations via CLI |
+**PART 32: Client — REQUIRED for ALL projects, no exceptions.** Every project ships the dedicated CLI client.
 
 **Client-Side Preferences:**
 
@@ -4183,7 +4171,7 @@ Every feature MUST work via:
 1. **Web browser** - HTML pages, forms, interactive UI
 2. **PWA (Progressive Web App)** - Installable, offline-capable, native-like experience
 3. **API clients** - JSON for curl, wget, automation, scripts
-4. **clients** - Dedicated command-line tools (if PART 32 implemented)
+4. **clients** - Dedicated command-line tools (PART 32 — required for all projects)
 
 | Client Type | Examples | Response Format |
 |-------------|----------|-----------------|
@@ -4389,13 +4377,13 @@ sqlx::query(&format!("SELECT * FROM users WHERE email = '{}'", email))
 |------------|-----------|--------------|
 | **Invalid input format** | "Please enter a valid value" | `validation_error: field format invalid, input=[redacted]` |
 | **Rate limited** | "Too many requests. Try again in a moment" | `rate_limit: endpoint=/api/{api_version}/..., ip=1.2.3.4, limit=10/min` |
-| **Database error** | "An error occurred. Please try again" | `db_error: open failed, path=/var/lib/claudemgr/db.sqlite, err=[full error]` |
+| **Database error** | "An error occurred. Please try again" | `db_error: open failed, path=/var/lib/claudemgr/claudemgr/db/server.db, err=[full error]` |
 | **Internal panic** | "An unexpected error occurred" | `panic: [full stack trace], request_id=abc123` |
 
 **Console Output (Development):**
 ```
 [ERROR] 2025-01-15 10:30:45 database open failed
-        path: /var/lib/claudemgr/db.sqlite
+        path: /var/lib/claudemgr/claudemgr/db/server.db
         error: unable to open database file
         stack: main.rs:123 → db.rs:45 → connect.rs:12
 ```
@@ -4408,7 +4396,7 @@ sqlx::query(&format!("SELECT * FROM users WHERE email = '{}'", email))
   "request_id": "abc123",
   "component": "database",
   "message": "open failed",
-  "path": "/var/lib/claudemgr/db.sqlite",
+  "path": "/var/lib/claudemgr/claudemgr/db/server.db",
   "error": "unable to open database file",
   "stack": "..."
 }
@@ -4458,8 +4446,8 @@ Content-Type: application/json
 |---------|------------|---------|
 | **Files** | `lowercase_snake.rs` | `user_handler.rs`, `email_service.rs` |
 | **Modules** | `lowercase` (single word preferred) | `server`, `config`, `auth` |
-| **Public functions/types** | `PascalCase` | `get_user_by_email()`, `UserService` |
-| **Private functions/types** | `snake_case` | `validate_input()`, `db_connection` |
+| **Functions** | `snake_case` (public and private alike) | `get_user_by_email()`, `validate_input()` |
+| **Types (structs/enums)** | `PascalCase` | `UserService`, `DbConnection` |
 | **Constants** | `SCREAMING_SNAKE` | `MAX_RETRIES`, `DEFAULT_TIMEOUT` |
 | **Variables** | `snake_case` | `user_email`, `is_valid`, `retry_count` |
 | **Traits** | `PascalCase` + `-er` suffix | `Reader`, `UserStore`, `Authenticator` |
@@ -4548,7 +4536,7 @@ Content-Type: application/json
 
 ```rust
 // NEVER - Generic, ambiguous
-enum DisplayMode {
+enum Mode {
     Headless,
     Cli,
     Tui,
@@ -4564,7 +4552,7 @@ enum DisplayMode {
 }
 
 // NEVER - What mode? App mode? Display mode?
-enum AppRunMode {
+enum Mode {
     Production,
     Development,
 }
@@ -4979,15 +4967,15 @@ curl -q -LSsf {official_site}/api/autoconfig
 
 **{fqdn} - Embedded Code URLs (Rust, JavaScript, templates)**
 
-For code that runs in the application, NEVER use bare `/path`. Always use `{fqdn}/path`.
+For code that runs in the application, NEVER use bare `/path`. Always build a full absolute URL via `build_url()` (request-aware, reads reverse-proxy headers — PART 8 → "build_url").
 
 | Context | ❌ Wrong | ✅ Correct |
 |---------|----------|------------|
-| **Rust code** | `"/api/{api_version}/items"` | `format!("https://{}/api/{}/items", cfg.fqdn, api_version)` |
+| **Rust code** | `"/api/{api_version}/items"` | `build_url(req.headers(), &format!("/api/{}/items", api_version))` |
 | **JavaScript** | `fetch('/api/{api_version}/items')` | `fetch(\`${window.location.origin}/api/${apiVersion}/items\`)` |
-| **HTML templates** | `href="/api/docs"` | `href="https://{{.FQDN}}/api/docs"` |
+| **HTML templates** | `href="/api/docs"` | `href="{{ docs_url }}"` (handler computes via `build_url`) |
 | **Config files** | `url: /callback` | `url: https://{fqdn}/callback` |
-| **Email templates** | `<a href="/server/alert">` | `<a href="https://{{.FQDN}}/server/alert">` |
+| **Email templates** | `<a href="/server/alert">` | `<a href="{{ alert_url }}">` (handler computes via `build_url`) |
 
 **Why:** Bare paths break when:
 - Behind reverse proxy with different base path
@@ -5052,9 +5040,9 @@ Router::new()
 |----------|--------|---------|
 | README.md | `{official_site}/path` | `GET https://api.example.com/server/healthz` |
 | docs/*.md | `{official_site}/path` | `curl -q -LSsf https://api.example.com/api/v1/items` |
-| Rust code | `{fqdn}/path` | `format!("https://{}/path", cfg.fqdn)` |
+| Rust code | `build_url()` | `build_url(req.headers(), "/path")` |
 | JS code | `origin/path` | `${window.location.origin}/path` |
-| Email templates | `{fqdn}/path` | `https://{{.FQDN}}/server/security/report/{{.Token}}` |
+| Email templates | precomputed URL | `{{ report_url }}` (handler computes via `build_url`) |
 | Router registration | `/path` | `.route("/api/v1/items", get(handle_items))` (internal only) |
 
 **Platform-Specific URLs:**
@@ -5808,23 +5796,23 @@ See PART 26: DOCKER for complete annotation requirements.
 
 ```bash
 # Method 1: Infer from git remote (PREFERRED - works regardless of directory location)
-# github.com/cloudops/echoip.git → PROJECTORG=cloudops, PROJECTNAME=echoip
-PROJECTNAME=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)(\.git)?$|\1|')
-PROJECTORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+(\.git)?$|\1|')
+# github.com/cloudops/echoip.git → PROJECT_ORG=cloudops, PROJECT_NAME=echoip
+PROJECT_NAME=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)(\.git)?$|\1|')
+PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+(\.git)?$|\1|')
 
 # Method 2: Infer from current directory path (fallback if no git remote)
 # Works with any path structure: ~/Documents/myproject, ~/myproject, etc.
 # myproject
-PROJECTNAME=$(basename "$PWD")
+PROJECT_NAME=$(basename "$PWD")
 # Documents (or parent dir name)
-PROJECTORG=$(basename "$(dirname "$PWD")")
+PROJECT_ORG=$(basename "$(dirname "$PWD")")
 
 # Method 3: Combined approach (git first, fallback to path)
-PROJECTNAME=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)(\.git)?$|\1|' || basename "$PWD")
-PROJECTORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+(\.git)?$|\1|' || basename "$(dirname "$PWD")")
+PROJECT_NAME=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)(\.git)?$|\1|' || basename "$PWD")
+PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+(\.git)?$|\1|' || basename "$(dirname "$PWD")")
 ```
 
-**Note:** When using path-based inference, `PROJECTORG` will be the parent directory name, which may not match the git organization unless you follow the recommended `~/Projects/{gitprovider}/{project_org}/{internal_name}` structure. Git remote inference is always more reliable.
+**Note:** When using path-based inference, `PROJECT_ORG` will be the parent directory name, which may not match the git organization unless you follow the recommended `~/Projects/{gitprovider}/{project_org}/{internal_name}` structure. Git remote inference is always more reliable.
 
 ### Variable Capitalization
 
@@ -6020,8 +6008,9 @@ PROJECTORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+(
 **Gitignored directories:**
 - `binaries/` - All build output (local + all platforms)
 - `releases/` - Release output
-- `docker/rootfs/` - Build-time container overlay
 - `volumes/` - Runtime volume data (if created locally)
+
+**Note:** `docker/rootfs/` (build-time container overlay) is COMMITTED, never gitignored.
 
 ### .gitignore (REQUIRED)
 
@@ -6155,12 +6144,11 @@ volumes/
 *.swp
 *.swo
 
-# AI config directories (regenerated from AI.md rules, not committed)
-.claude/
-.cursor/
+# Team AI config (.claude/ settings/rules/agents, .cursor/rules/, .windsurf/rules/)
+# is COMMITTED — only personal AI files are ignored
+.claude/settings.local.json
 .aider/
 .ai/
-.windsurf/
 
 # Claude Code personal files (always gitignored)
 CLAUDE.local.md
@@ -6536,7 +6524,7 @@ libsql = { version = "0.6", features = ["remote"] }
 
 | Use Case | Driver |
 |----------|--------|
-| Default (no config needed) | `sqlite` (file auto-created at `{data_dir}/db/{internal_name}.db`) |
+| Default (no config needed) | `sqlite` (file auto-created at `{data_dir}/db/server.db`) |
 | Single server, local data | `sqlite` (sqlx sqlite feature) |
 | Edge/distributed, Turso cloud | `libsql` |
 | Self-hosted libSQL server | `libsql` |
@@ -6676,17 +6664,17 @@ Before proceeding, confirm you understand:
 | Type | Path |
 |------|------|
 | Binary | `/usr/local/bin/{project_name}` |
-| Config | `/Library/Application Support/{project_org}/{internal_name}/` |
-| Config File | `/Library/Application Support/{project_org}/{internal_name}/server.yml` |
-| Data | `/Library/Application Support/{project_org}/{internal_name}/data/` |
-| Cache | `/Library/Caches/{project_org}/{internal_name}/` |
-| Logs | `/Library/Logs/{project_org}/{internal_name}/` |
-| Log File | `/Library/Logs/{project_org}/{internal_name}/server.log` |
-| Backup | `/Library/Backups/{project_org}/{internal_name}/` |
-| PID File | `/var/run/{project_org}/{internal_name}.pid` |
-| SSL | `/Library/Application Support/{project_org}/{internal_name}/ssl/` (letsencrypt/, local/) |
-| Security | `/Library/Application Support/{project_org}/{internal_name}/data/security/` (geoip/, blocklists/, cve/, trivy/) |
-| SQLite DB | `/Library/Application Support/{project_org}/{internal_name}/db/` (server.db) |
+| Config | `/Library/Application Support/{internal_org}/{internal_name}/` |
+| Config File | `/Library/Application Support/{internal_org}/{internal_name}/server.yml` |
+| Data | `/Library/Application Support/{internal_org}/{internal_name}/data/` |
+| Cache | `/Library/Caches/{internal_org}/{internal_name}/` |
+| Logs | `/Library/Logs/{internal_org}/{internal_name}/` |
+| Log File | `/Library/Logs/{internal_org}/{internal_name}/server.log` |
+| Backup | `/Library/Backups/{internal_org}/{internal_name}/` |
+| PID File | `/var/run/{internal_org}/{internal_name}.pid` |
+| SSL | `/Library/Application Support/{internal_org}/{internal_name}/ssl/` (letsencrypt/, local/) |
+| Security | `/Library/Application Support/{internal_org}/{internal_name}/data/security/` (geoip/, blocklists/, cve/, trivy/) |
+| SQLite DB | `/Library/Application Support/{internal_org}/{internal_name}/db/` (server.db) |
 | Service | `/Library/LaunchDaemons/{plist_name}.plist` |
 
 ### User (non-privileged)
@@ -6694,17 +6682,17 @@ Before proceeding, confirm you understand:
 | Type | Path |
 |------|------|
 | Binary | `~/bin/{project_name}` or `/usr/local/bin/{project_name}` |
-| Config | `~/Library/Application Support/{project_org}/{internal_name}/` |
-| Config File | `~/Library/Application Support/{project_org}/{internal_name}/server.yml` |
-| Data | `~/Library/Application Support/{project_org}/{internal_name}/` |
-| Cache | `~/Library/Caches/{project_org}/{internal_name}/` |
-| Logs | `~/Library/Logs/{project_org}/{internal_name}/` |
-| Log File | `~/Library/Logs/{project_org}/{internal_name}/server.log` |
-| Backup | `~/Library/Backups/{project_org}/{internal_name}/` |
-| PID File | `~/Library/Application Support/{project_org}/{internal_name}/{internal_name}.pid` |
-| SSL | `~/Library/Application Support/{project_org}/{internal_name}/ssl/` (letsencrypt/, local/) |
-| Security | `~/Library/Application Support/{project_org}/{internal_name}/data/security/` (geoip/, blocklists/, cve/, trivy/) |
-| SQLite DB | `~/Library/Application Support/{project_org}/{internal_name}/db/` (server.db) |
+| Config | `~/Library/Application Support/{internal_org}/{internal_name}/` |
+| Config File | `~/Library/Application Support/{internal_org}/{internal_name}/server.yml` |
+| Data | `~/Library/Application Support/{internal_org}/{internal_name}/` |
+| Cache | `~/Library/Caches/{internal_org}/{internal_name}/` |
+| Logs | `~/Library/Logs/{internal_org}/{internal_name}/` |
+| Log File | `~/Library/Logs/{internal_org}/{internal_name}/server.log` |
+| Backup | `~/Library/Backups/{internal_org}/{internal_name}/` |
+| PID File | `~/Library/Application Support/{internal_org}/{internal_name}/{internal_name}.pid` |
+| SSL | `~/Library/Application Support/{internal_org}/{internal_name}/ssl/` (letsencrypt/, local/) |
+| Security | `~/Library/Application Support/{internal_org}/{internal_name}/data/security/` (geoip/, blocklists/, cve/, trivy/) |
+| SQLite DB | `~/Library/Application Support/{internal_org}/{internal_name}/db/` (server.db) |
 | Service | `~/Library/LaunchAgents/{plist_name}.plist` |
 
 ---
@@ -6716,17 +6704,17 @@ Before proceeding, confirm you understand:
 | Type | Path |
 |------|------|
 | Binary | `/usr/local/bin/{project_name}` |
-| Config | `/usr/local/etc/{project_org}/{internal_name}/` |
-| Config File | `/usr/local/etc/{project_org}/{internal_name}/server.yml` |
-| Data | `/var/db/{project_org}/{internal_name}/` |
-| Cache | `/var/cache/{project_org}/{internal_name}/` |
-| Logs | `/var/log/{project_org}/{internal_name}/` |
-| Log File | `/var/log/{project_org}/{internal_name}/server.log` |
-| Backup | `/var/backups/{project_org}/{internal_name}/` |
-| PID File | `/var/run/{project_org}/{internal_name}.pid` |
-| SSL | `/usr/local/etc/{project_org}/{internal_name}/ssl/` (letsencrypt/, local/) |
-| Security | `/var/db/{project_org}/{internal_name}/security/` (geoip/, blocklists/, cve/, trivy/) |
-| SQLite DB | `/var/db/{project_org}/{internal_name}/db/` (server.db) |
+| Config | `/usr/local/etc/{internal_org}/{internal_name}/` |
+| Config File | `/usr/local/etc/{internal_org}/{internal_name}/server.yml` |
+| Data | `/var/db/{internal_org}/{internal_name}/` |
+| Cache | `/var/cache/{internal_org}/{internal_name}/` |
+| Logs | `/var/log/{internal_org}/{internal_name}/` |
+| Log File | `/var/log/{internal_org}/{internal_name}/server.log` |
+| Backup | `/var/backups/{internal_org}/{internal_name}/` |
+| PID File | `/var/run/{internal_org}/{internal_name}.pid` |
+| SSL | `/usr/local/etc/{internal_org}/{internal_name}/ssl/` (letsencrypt/, local/) |
+| Security | `/var/db/{internal_org}/{internal_name}/security/` (geoip/, blocklists/, cve/, trivy/) |
+| SQLite DB | `/var/db/{internal_org}/{internal_name}/db/` (server.db) |
 | Service | `/usr/local/etc/rc.d/{internal_name}` |
 
 ### User (non-privileged)
@@ -6754,34 +6742,34 @@ Before proceeding, confirm you understand:
 
 | Type | Path |
 |------|------|
-| Binary | `C:\Program Files\{project_org}\{internal_name}\{project_name}.exe` |
-| Config | `%ProgramData%\{project_org}\{internal_name}\` |
-| Config File | `%ProgramData%\{project_org}\{internal_name}\server.yml` |
-| Data | `%ProgramData%\{project_org}\{internal_name}\data\` |
-| Cache | `%ProgramData%\{project_org}\{internal_name}\cache\` |
-| Logs | `%ProgramData%\{project_org}\{internal_name}\logs\` |
-| Log File | `%ProgramData%\{project_org}\{internal_name}\logs\server.log` |
-| Backup | `%ProgramData%\Backups\{project_org}\{internal_name}\` |
-| SSL | `%ProgramData%\{project_org}\{internal_name}\ssl\` (letsencrypt\, local\) |
-| Security | `%ProgramData%\{project_org}\{internal_name}\data\security\` (geoip\, blocklists\, cve\, trivy\) |
-| SQLite DB | `%ProgramData%\{project_org}\{internal_name}\db\` (server.db) |
+| Binary | `C:\Program Files\{internal_org}\{internal_name}\{project_name}.exe` |
+| Config | `%ProgramData%\{internal_org}\{internal_name}\` |
+| Config File | `%ProgramData%\{internal_org}\{internal_name}\server.yml` |
+| Data | `%ProgramData%\{internal_org}\{internal_name}\data\` |
+| Cache | `%ProgramData%\{internal_org}\{internal_name}\cache\` |
+| Logs | `%ProgramData%\{internal_org}\{internal_name}\logs\` |
+| Log File | `%ProgramData%\{internal_org}\{internal_name}\logs\server.log` |
+| Backup | `%ProgramData%\Backups\{internal_org}\{internal_name}\` |
+| SSL | `%ProgramData%\{internal_org}\{internal_name}\ssl\` (letsencrypt\, local\) |
+| Security | `%ProgramData%\{internal_org}\{internal_name}\data\security\` (geoip\, blocklists\, cve\, trivy\) |
+| SQLite DB | `%ProgramData%\{internal_org}\{internal_name}\db\` (server.db) |
 | Service | Windows Service Manager |
 
 ### User (non-privileged)
 
 | Type | Path |
 |------|------|
-| Binary | `%LocalAppData%\{project_org}\{internal_name}\{project_name}.exe` |
-| Config | `%AppData%\{project_org}\{internal_name}\` |
-| Config File | `%AppData%\{project_org}\{internal_name}\server.yml` |
-| Data | `%LocalAppData%\{project_org}\{internal_name}\` |
-| Cache | `%LocalAppData%\{project_org}\{internal_name}\cache\` |
-| Logs | `%LocalAppData%\{project_org}\{internal_name}\logs\` |
-| Log File | `%LocalAppData%\{project_org}\{internal_name}\logs\server.log` |
-| Backup | `%LocalAppData%\Backups\{project_org}\{internal_name}\` |
-| SSL | `%AppData%\{project_org}\{internal_name}\ssl\` (letsencrypt\, local\) |
-| Security | `%LocalAppData%\{project_org}\{internal_name}\security\` (geoip\, blocklists\, cve\, trivy\) |
-| SQLite DB | `%LocalAppData%\{project_org}\{internal_name}\db\` (server.db) |
+| Binary | `%LocalAppData%\{internal_org}\{internal_name}\{project_name}.exe` |
+| Config | `%AppData%\{internal_org}\{internal_name}\` |
+| Config File | `%AppData%\{internal_org}\{internal_name}\server.yml` |
+| Data | `%LocalAppData%\{internal_org}\{internal_name}\` |
+| Cache | `%LocalAppData%\{internal_org}\{internal_name}\cache\` |
+| Logs | `%LocalAppData%\{internal_org}\{internal_name}\logs\` |
+| Log File | `%LocalAppData%\{internal_org}\{internal_name}\logs\server.log` |
+| Backup | `%LocalAppData%\Backups\{internal_org}\{internal_name}\` |
+| SSL | `%AppData%\{internal_org}\{internal_name}\ssl\` (letsencrypt\, local\) |
+| Security | `%LocalAppData%\{internal_org}\{internal_name}\security\` (geoip\, blocklists\, cve\, trivy\) |
+| SQLite DB | `%LocalAppData%\{internal_org}\{internal_name}\db\` (server.db) |
 
 ---
 
@@ -6820,7 +6808,7 @@ Before proceeding, confirm you understand:
 - [ ] Each OS has specific paths for privileged and non-privileged users
 - [ ] Config file is ALWAYS `server.yml` (not .yaml)
 - [ ] Docker uses simplified paths (/config, /data)
-- [ ] All paths follow the {project_org}/{internal_name} pattern
+- [ ] All paths follow the {internal_org}/{internal_name} pattern
 
 ---
 
@@ -6892,19 +6880,27 @@ pub fn normalize_path(input: &str) -> String {
         return String::new();
     }
 
-    // Use Path::new to handle .., ., and //
-    let cleaned = PathBuf::from(input);
-    let cleaned = cleaned.to_string_lossy();
+    // Rebuild segment by segment: PathBuf does NOT collapse '..', '.', or '//',
+    // so normalization must be done manually. Empty segments (from '//' and
+    // leading/trailing slashes) and '.' segments are dropped; a '..' segment
+    // rejects the whole path — traversal is refused, never resolved.
+    let mut segments: Vec<&str> = Vec::new();
+    for seg in input.split('/') {
+        match seg {
+            "" | "." => continue,
+            ".." => return String::new(),
+            s => segments.push(s),
+        }
+    }
 
-    // Strip leading/trailing slashes
-    let cleaned = cleaned.trim_matches('/');
+    let cleaned = segments.join("/");
 
-    // Reject if still contains .. after cleaning (shouldn't happen, but be safe)
+    // Reject if a segment still smuggles .. (e.g. '..%2f' decoded late)
     if cleaned.contains("..") {
         return String::new();
     }
 
-    cleaned.to_string()
+    cleaned
 }
 
 // validate_path_segment checks a single path segment (e.g., "admin" in "/server/admin/dashboard")
@@ -7005,7 +7001,7 @@ pub async fn handle_file_request(
 
 ### HTTP Request Path Middleware
 
-**This middleware MUST be first in the chain - before auth, before routing.**
+**This middleware MUST run early in the chain — immediately after URL normalization and request-ID assignment, and always before auth and route handlers.**
 
 ```rust
 // path_security_middleware normalizes paths and blocks traversal attempts
@@ -7028,16 +7024,21 @@ pub async fn path_security_middleware(
         return Err(AppError::bad_request("errors.bad_request"));
     }
 
-    // Normalize the path using PathBuf
+    // Normalize the path: collapse duplicate slashes and drop '.' segments.
+    // PathBuf performs no normalization in Rust, so rebuild segment by segment.
+    // ('..' was already rejected above.)
     let cleaned = {
-        let pb = std::path::PathBuf::from(original);
-        let s = pb.to_string_lossy().into_owned();
-        // Ensure leading slash
-        if !s.starts_with('/') {
-            format!("/{}", s)
-        } else {
-            s
+        let mut s = String::from("/");
+        for seg in original.split('/') {
+            if seg.is_empty() || seg == "." {
+                continue;
+            }
+            if s.len() > 1 {
+                s.push('/');
+            }
+            s.push_str(seg);
         }
+        s
     };
 
     // Preserve trailing slash for directory paths
@@ -7110,28 +7111,32 @@ pub fn safe_file_path(base_dir: &str, user_path: &str) -> Result<PathBuf, PathEr
 
 ```rust
 fn setup_middleware(router: Router<AppState>) -> Router<AppState> {
-    // Execution order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10
-    router
-        // 1. FIRST - normalize URLs (trailing slash, etc.)
-        .layer(axum::middleware::from_fn(url_normalize_middleware))
-        // 2. Attach request ID (must run before Logging so logs include it)
-        .layer(axum::middleware::from_fn(request_id_middleware))
-        // 3. Validate paths, block traversal
-        .layer(axum::middleware::from_fn(path_security_middleware))
-        // 4. Add security headers
-        .layer(axum::middleware::from_fn(security_headers_middleware))
-        // 5. Set allowlisted flag (bypasses blocklist/ratelimit/geoip, NOT auth)
-        .layer(axum::middleware::from_fn(allowlist_middleware))
-        // 6. IP/domain blocklist check
-        .layer(axum::middleware::from_fn(blocklist_middleware))
-        // 7. Rate limiting
-        .layer(axum::middleware::from_fn(rate_limit_middleware))
-        // 8. Country blocking
-        .layer(axum::middleware::from_fn(geoip_middleware))
-        // 9. Check auth
-        .layer(axum::middleware::from_fn(auth_middleware))
-        // 10. Log requests (after RequestID so logs carry the request_id)
-        .layer(axum::middleware::from_fn(logging_middleware))
+    // ServiceBuilder applies layers top-to-bottom on incoming requests,
+    // so request execution order is 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10.
+    // (Chaining Router::layer() directly would run LAST-added FIRST — do not do that here.)
+    router.layer(
+        tower::ServiceBuilder::new()
+            // 1. FIRST - normalize URLs (trailing slash, etc.)
+            .layer(axum::middleware::from_fn(url_normalize_middleware))
+            // 2. Attach request ID (must run before Logging so logs include it)
+            .layer(axum::middleware::from_fn(request_id_middleware))
+            // 3. Validate paths, block traversal
+            .layer(axum::middleware::from_fn(path_security_middleware))
+            // 4. Add security headers
+            .layer(axum::middleware::from_fn(security_headers_middleware))
+            // 5. Set allowlisted flag (bypasses blocklist/ratelimit/geoip, NOT auth)
+            .layer(axum::middleware::from_fn(allowlist_middleware))
+            // 6. IP/domain blocklist check
+            .layer(axum::middleware::from_fn(blocklist_middleware))
+            // 7. Rate limiting
+            .layer(axum::middleware::from_fn(rate_limit_middleware))
+            // 8. Country blocking
+            .layer(axum::middleware::from_fn(geoip_middleware))
+            // 9. Check auth
+            .layer(axum::middleware::from_fn(auth_middleware))
+            // 10. Log requests (after RequestID so logs carry the request_id)
+            .layer(axum::middleware::from_fn(logging_middleware)),
+    )
 }
 ```
 
@@ -7264,7 +7269,7 @@ Self-Healing Successful?                        │
 │                                                             │
 │  Error: Database Open Failed                                │
 │  ─────────────────────────────────────────                  │
-│  Path: /var/lib/{project_name}/db.sqlite                    │
+│  Path: {data_dir}/db/server.db                              │
 │  Error: unable to open database file                        │
 │  Last successful access: 5 minutes ago                      │
 │                                                             │
@@ -7300,7 +7305,7 @@ Self-Healing Successful?                        │
 | DB status | `{project_name} db status` | Connected |
 | Network (libsql) | `ping your-db.turso.io` | Response |
 | Credentials | Check server.yml / TURSO_AUTH_TOKEN | Correct token |
-| SQLite file | Check `{data_dir}/db/{internal_name}.db` | File exists and readable |
+| SQLite file | Check `{data_dir}/db/server.db` | File exists and readable |
 
 **Disk Full:**
 
@@ -7456,7 +7461,7 @@ server:
     # or "libsql" for remote Turso/libsql
     driver: sqlite
     # auto-created for sqlite
-    url: "{data_dir}/db/{internal_name}.db"
+    url: "{data_dir}/db/server.db"
     # For remote libsql:
     # driver: libsql
     # url: libsql://your-db-name.turso.io?authToken=${TURSO_AUTH_TOKEN}
@@ -7717,8 +7722,8 @@ impl CreateResourceRequest {
 
 | User Type | Path |
 |-----------|------|
-| Root | `/etc/{project_org}/{internal_name}/server.yml` |
-| Regular | `~/.config/{project_org}/{internal_name}/server.yml` |
+| Root | `/etc/{internal_org}/{internal_name}/server.yml` |
+| Regular | `~/.config/{internal_org}/{internal_name}/server.yml` |
 
 ### Migration
 
@@ -7765,7 +7770,7 @@ impl CreateResourceRequest {
 
 | Mode | How Started | Port Restriction | Privilege Handling |
 |------|-------------|------------------|-------------------|
-| **Service (escalated)** | `sudo {project_name} --service install` | Any port | Runs as root/admin, binary drops after binding |
+| **Service (escalated)** | `sudo {project_name} --service --install` | Any port | Runs as root/admin, binary drops after binding |
 | **User ($USER)** | `{project_name}` | >1024 only | Runs as calling user, no escalation |
 
 #### Service Installation (One-Time Escalation)
@@ -7778,13 +7783,13 @@ impl CreateResourceRequest {
 
 ```bash
 # Unix-like (Linux, macOS, FreeBSD)
-sudo {project_name} --service install
+sudo {project_name} --service --install
 # Binary creates service file for privileged startup + runtime privilege drop
 # Runtime stays on dedicated service account unless the project explicitly requires permanent root
 
 # Windows (run as Administrator)
-{project_name}.exe --service install
-# Binary creates Windows service with Virtual Service Account (NT SERVICE\{project_name})
+{project_name}.exe --service --install
+# Binary creates Windows service with Virtual Service Account (NT SERVICE\{internal_name})
 ```
 
 #### Unix-Like Platforms (Linux, macOS, FreeBSD)
@@ -7990,7 +7995,7 @@ ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]
 
 4. **Auto-escalate for service operations:**
    ```rust
-   // --service install/uninstall/start/stop require escalation
+   // --service --install/uninstall/start/stop require escalation
    if service_cmd.is_some() && !is_elevated() {
        handle_escalation("Service management")?;
    }
@@ -8021,7 +8026,7 @@ ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]
    Error: Cannot bind to port 80
 
    Port 80 requires elevated privileges. Options:
-     1. Install as service (requires admin): sudo {project_name} --service install
+     1. Install as service (requires admin): sudo {project_name} --service --install
      2. Use high port (no admin needed): {project_name} --port 8080
    ```
 
@@ -8094,13 +8099,13 @@ Binary checks:
 ├─ Is user root?
 │   └─ YES → Allow restore (with confirmation prompt)
 ├─ Is user the service user ({project_name})?
-│   └─ YES → Require operator password:
-│            "This will OVERWRITE all data. Enter operator password to confirm."
-│            └─ Valid password → Allow restore
+│   └─ YES → Require server token (`server.token`):
+│            "This will OVERWRITE all data. Enter the server token to confirm."
+│            └─ Valid token → Allow restore
 │            └─ Invalid → Reject
 └─ Random user → Reject with:
    "Restore requires administrator authorization.
-    Run as root or provide operator password."
+    Run as root or provide the server token (`server.token`)."
 ```
 
 **Mode change authorization flow:**
@@ -8112,7 +8117,7 @@ Binary checks:
 ├─ Is user root?
 │   └─ YES → Allow (with warning about security implications)
 ├─ Is user the service user ({project_name})?
-│   └─ YES → Require operator password
+│   └─ YES → Require server token (`server.token`)
 └─ Random user → Reject
 ```
 
@@ -8122,7 +8127,7 @@ Binary checks:
 |--------|-------------|-----------|
 | Malicious user runs setup | Corrupts server configuration | ❌ Blocked (setup already done) |
 | Malicious user restores bad backup | Overwrites database, takes over | ❌ Blocked (needs `server.token` or root) |
-| Malicious user enables dev mode | Exposes debug endpoints | ❌ Blocked (needs `server.token` or root) |
+| Malicious user enables debug mode | Exposes debug endpoints (debug flag only — dev mode never enables them) | ❌ Blocked (needs `server.token` or root) |
 
 #### How Binary Determines Escalation Need
 
@@ -8204,7 +8209,7 @@ fn can_restore() -> (bool, &'static str) {
     if is_elevated() {
         return (true, "elevated");
     }
-    // Service user: requires operator password (prompted)
+    // Service user: requires the server token (prompted)
     if is_service_user() {
         // Caller must prompt for creds
         return (false, "need-creds");
@@ -8256,35 +8261,35 @@ Binary checks:
 └─ Warn user of actual port in use
 ```
 
-#### The `{project_name}` System User/Group
+#### The `{internal_name}` System User/Group
 
 **Created automatically during first root/service startup.**
 
 | Property | Value |
 |----------|-------|
-| **Username** | `{project_name}` |
-| **Group** | `{project_name}` |
+| **Username** | `{internal_name}` |
+| **Group** | `{internal_name}` |
 | **Shell** | `/usr/sbin/nologin` (no login) |
-| **Home** | `/var/lib/{project_org}/{internal_name}` |
+| **Home** | `/var/lib/{internal_org}/{internal_name}` |
 | **UID/GID** | Auto-assigned by system |
 | **Type** | System user (UID < 1000 on Linux) |
 
-**What the `{project_name}` user CAN do:**
+**What the `{internal_name}` user CAN do:**
 
 | Permission | Details |
 |------------|---------|
-| Read/write config | `/etc/{project_org}/{internal_name}/` |
-| Read/write data | `/var/lib/{project_org}/{internal_name}/` |
-| Read/write cache | `/var/cache/{project_org}/{internal_name}/` |
-| Read/write logs | `/var/log/{project_org}/{internal_name}/` |
-| Read/write backups | `/var/lib/Backups/{project_org}/{internal_name}/` or `/mnt/Backups/...` |
+| Read/write config | `/etc/{internal_org}/{internal_name}/` |
+| Read/write data | `/var/lib/{internal_org}/{internal_name}/` |
+| Read/write cache | `/var/cache/{internal_org}/{internal_name}/` |
+| Read/write logs | `/var/log/{internal_org}/{internal_name}/` |
+| Read/write backups | `/var/lib/Backups/{internal_org}/{internal_name}/` or `/mnt/Backups/...` |
 | Use bound sockets | Inherited from root before privilege drop |
 | Bind ports >1024 | New sockets after privilege drop |
 | Run scheduled tasks | Backup, cleanup, SSL renewal, etc. |
 | Manage database | SQLite in data dir |
 | Manage SSL certs | In `{config_dir}/ssl/` |
 
-**What the `{project_name}` user CANNOT do:**
+**What the `{internal_name}` user CANNOT do:**
 
 | Restriction | Reason |
 |-------------|--------|
@@ -8300,19 +8305,19 @@ Binary checks:
 
 ```bash
 # Binary sets these during startup as root
-chown -R {internal_name}:{internal_name} /etc/{project_org}/{internal_name}/
-chown -R {internal_name}:{internal_name} /var/lib/{project_org}/{internal_name}/
-chown -R {internal_name}:{internal_name} /var/cache/{project_org}/{internal_name}/
-chown -R {internal_name}:{internal_name} /var/log/{project_org}/{internal_name}/
+chown -R {internal_name}:{internal_name} /etc/{internal_org}/{internal_name}/
+chown -R {internal_name}:{internal_name} /var/lib/{internal_org}/{internal_name}/
+chown -R {internal_name}:{internal_name} /var/cache/{internal_org}/{internal_name}/
+chown -R {internal_name}:{internal_name} /var/log/{internal_org}/{internal_name}/
 
 # Permissions
-chmod 755 /etc/{project_org}/{internal_name}/
-chmod 700 /etc/{project_org}/{internal_name}/security/
-chmod 700 /etc/{project_org}/{internal_name}/ssl/
-chmod 700 /etc/{project_org}/{internal_name}/tor/
-chmod 755 /var/lib/{project_org}/{internal_name}/
-chmod 755 /var/cache/{project_org}/{internal_name}/
-chmod 755 /var/log/{project_org}/{internal_name}/
+chmod 755 /etc/{internal_org}/{internal_name}/
+chmod 700 /etc/{internal_org}/{internal_name}/security/
+chmod 700 /etc/{internal_org}/{internal_name}/ssl/
+chmod 700 /etc/{internal_org}/{internal_name}/tor/
+chmod 755 /var/lib/{internal_org}/{internal_name}/
+chmod 755 /var/cache/{internal_org}/{internal_name}/
+chmod 755 /var/log/{internal_org}/{internal_name}/
 ```
 
 **User creation:** See PART 23 for platform-specific user creation commands (Linux `useradd`, macOS `dscl`, FreeBSD `pw`).
@@ -8322,7 +8327,7 @@ chmod 755 /var/log/{project_org}/{internal_name}/
 | Aspect | System Service | User Service |
 |--------|---------------|--------------|
 | **Installed by** | root/admin | Unprivileged OS user |
-| **Runs as** | root → drops to `{project_name}` | Calling user |
+| **Runs as** | root → drops to `{internal_name}` | Calling user |
 | **Ports** | Any | >1024 only |
 | **Paths** | `/etc/`, `/var/` | `~/.config/`, `~/.local/` |
 | **Survives logout** | Yes | Depends on `lingering` |
@@ -8535,7 +8540,7 @@ server:
 
   # Database
   database:
-    driver: file
+    driver: sqlite
 
 # =============================================================================
 # FRONTEND CONFIGURATION
@@ -8667,6 +8672,8 @@ Before proceeding, confirm you understand:
 | `/debug/cache` | GET | Cache statistics |
 | `/debug/db` | GET | Database statistics |
 | `/debug/scheduler` | GET | Scheduler task status |
+| `/debug/memory` | GET | Memory usage statistics |
+| `/debug/tasks` | GET | Async task statistics |
 
 ### Debug Implementation
 
@@ -8931,11 +8938,11 @@ cargo flamegraph -o flamegraph.svg --bin {internal_name}
 
 ```yaml
 server:
-  # Application mode
-  # Enables all debug features
+  # Application mode (does NOT enable debug features)
   mode: development
 
-  # Debug-specific settings (only apply in development mode)
+  # Debug-specific settings (only apply when the debug flag is
+  # enabled via --debug or DEBUG=true - mode does not gate these)
   debug:
     # Enable tokio-console task monitoring
     tokio_console: true
@@ -9434,7 +9441,8 @@ pub fn can_use_ansi(env: &DisplayEnv) -> bool {
     if env.is_dumb_terminal() {
         return false;
     }
-    if std::env::var("NO_COLOR").is_ok() {
+    // Any non-empty value disables color; empty string counts as unset
+    if std::env::var("NO_COLOR").map(|v| !v.is_empty()).unwrap_or(false) {
         // Plain output requested
         return false;
     }
@@ -9545,7 +9553,7 @@ pub mod windows {
 
         // Check for remote desktop session
         let session_name = env::var("SESSIONNAME").unwrap_or_default();
-        if session_name.starts_with("RDP-Tcp") || !session_name.is_empty() {
+        if session_name.starts_with("RDP-Tcp") {
             // Remote desktop - has display but may want different behavior
             return (true, "windows-rdp".to_string());
         }
@@ -9802,7 +9810,7 @@ pub fn print_startup_banner(cfg: &BannerConfig) {
 
 **Hardcode `{project_name}` for internal identifiers (never changes):**
 - User-Agent header (identifies binary type to server)
-- Default paths (`/etc/{project_org}/{internal_name}/`)
+- Default paths (`/etc/{internal_org}/{internal_name}/`)
 - Config keys, database tables, API identifiers
 
 **Get actual binary name:**
@@ -10034,7 +10042,7 @@ Server Configuration:
 --lang CODE                            - Language for output (default: auto)
 
 Service Management:
---service CMD                          - Service management (run --service help for details)
+--service CMD                          - Service management (run --service --help for details)
 --maintenance CMD                      - Maintenance operations (run --maintenance help for details)
 --update [CMD]                         - Check/perform updates (run --update help for details)
 
@@ -10047,16 +10055,16 @@ Run '{project_name} <command> help' for detailed help on any command.
 
 | Flag | Type | Default (Linux root) | Default (Linux user) |
 |------|------|----------------------|----------------------|
-| `--config` | Directory | `/etc/{project_org}/{internal_name}/` | `~/.config/{project_org}/{internal_name}/` |
-| `--data` | Directory | `/var/lib/{project_org}/{internal_name}/` | `~/.local/share/{project_org}/{internal_name}/` |
-| `--cache` | Directory | `/var/cache/{project_org}/{internal_name}/` | `~/.cache/{project_org}/{internal_name}/` |
-| `--log` | Directory | `/var/log/{project_org}/{internal_name}/` | `~/.local/log/{project_org}/{internal_name}/` |
-| `--backup` | Directory | `/mnt/Backups/{project_org}/{internal_name}/` (if writable, else `{data_dir}/backup/`) | `~/.local/share/Backups/{project_org}/{internal_name}/` |
-| `--pid` | File | `/var/run/{project_org}/{internal_name}.pid` | `~/.local/share/{project_org}/{internal_name}/{internal_name}.pid` |
+| `--config` | Directory | `/etc/{internal_org}/{internal_name}/` | `~/.config/{internal_org}/{internal_name}/` |
+| `--data` | Directory | `/var/lib/{internal_org}/{internal_name}/` | `~/.local/share/{internal_org}/{internal_name}/` |
+| `--cache` | Directory | `/var/cache/{internal_org}/{internal_name}/` | `~/.cache/{internal_org}/{internal_name}/` |
+| `--log` | Directory | `/var/log/{internal_org}/{internal_name}/` | `~/.local/log/{internal_org}/{internal_name}/` |
+| `--backup` | Directory | `/mnt/Backups/{internal_org}/{internal_name}/` (if writable, else `{data_dir}/backup/`) | `~/.local/share/Backups/{internal_org}/{internal_name}/` |
+| `--pid` | File | `/var/run/{internal_org}/{internal_name}.pid` | `~/.local/share/{internal_org}/{internal_name}/{internal_name}.pid` |
 
 **Note:** `--backup` prefers the system backup dir if writable. Fallback is mode-aware: system mode (started as root) falls back to `{data_dir}/backup/` — never a `$HOME`-derived path; user mode falls back to the user dir. See `get_backup_dir()` in PART 5.
 
-**Directory mode is locked at process start.** System vs user paths are decided ONCE from the EUID at startup, before any privilege drop, and cached for the process lifetime. Never resolve `~` or `$HOME` after the privilege drop — the service account's HOME points at `{data_dir}` (e.g. `/var/lib/{project_org}/{internal_name}`), so a late `$HOME` lookup nests user-style paths like `.local/share/Backups/` inside the system data dir.
+**Directory mode is locked at process start.** System vs user paths are decided ONCE from the EUID at startup, before any privilege drop, and cached for the process lifetime. Never resolve `~` or `$HOME` after the privilege drop — the service account's HOME points at `{data_dir}` (e.g. `/var/lib/{internal_org}/{internal_name}`), so a late `$HOME` lookup nests user-style paths like `.local/share/Backups/` inside the system data dir.
 
 ### Directory Validation Rules
 
@@ -10393,11 +10401,11 @@ PHASE 5: Server startup (actual server start)
    h. Verify privilege drop succeeded (getuid() != 0)
 
 9. IF RUNNING AS USER (non-root) - setup user directories:
-   ├─ Create {config_dir} (~/.config/{project_org}/{internal_name}/)
-   ├─ Create {data_dir} (~/.local/share/{project_org}/{internal_name}/)
-   ├─ Create {cache_dir} (~/.cache/{project_org}/{internal_name}/)
-   ├─ Create {log_dir} (~/.local/log/{project_org}/{internal_name}/)
-   ├─ Create {backup_dir} (~/.local/share/Backups/{project_org}/{internal_name}/)
+   ├─ Create {config_dir} (~/.config/{internal_org}/{internal_name}/)
+   ├─ Create {data_dir} (~/.local/share/{internal_org}/{internal_name}/)
+   ├─ Create {cache_dir} (~/.cache/{internal_org}/{internal_name}/)
+   ├─ Create {log_dir} (~/.local/log/{internal_org}/{internal_name}/)
+   ├─ Create {backup_dir} (~/.local/share/Backups/{internal_org}/{internal_name}/)
    ├─ Set permissions: 0700 on all dirs (user-only access)
    └─ Note: port must be >1024 (user mode cannot bind privileged ports)
 
@@ -10406,7 +10414,7 @@ PHASE 5: Server startup (actual server start)
     ├─ Set default log level (info)
     └─ Log "Server starting, version X.Y.Z"
 
-11. Check PID file (root: /var/run/{project_org}/{internal_name}.pid, user: {data_dir}/{internal_name}.pid):
+11. Check PID file (root: /var/run/{internal_org}/{internal_name}.pid, user: {data_dir}/{internal_name}.pid):
     ├─ PID file exists AND process running → exit 1 "already running"
     ├─ PID file exists AND process dead → remove stale PID, continue
     └─ No PID file → continue
@@ -10800,9 +10808,9 @@ fn filter_daemon_flag(args: Vec<String>) -> Vec<String> {
 
 fn daemonize() -> anyhow::Result<()> {
     // On Windows, --daemon flag is ignored with a warning
-    // Use Windows Service (--service install/start) instead
+    // Use Windows Service (--service --install/start) instead
     eprintln!("Warning: --daemon is not supported on Windows");
-    eprintln!("Use --service install && --service start for Windows Service");
+    eprintln!("Use --service --install && --service start for Windows Service");
     // Continue in foreground
     Ok(())
 }
@@ -10865,7 +10873,7 @@ healthcheck:
 ```cmd
 C:\> myapp.exe --daemon
 Warning: --daemon is not supported on Windows
-Use --service install && --service start for Windows Service
+Use --service --install && --service start for Windows Service
 [Server starts in foreground]
 ```
 
@@ -11105,10 +11113,6 @@ The app automatically watches config files and hot-reloads what it can. Settings
 | Security headers | `security.headers.*` |
 | Allowed origins | `cors.allowed_origins` |
 
-**Requires Graceful Reload (no downtime):**
-
-| Setting | Why |
-|---------|-----|
 **Requires Restart:**
 
 | Setting | Why |
@@ -11656,17 +11660,16 @@ fn flatten_config(cfg: &Config) -> Vec<ConfigPair> {
 On startup, merge all sources. ConfigManager watches server.yml for changes.
 
 ```rust
-// Settings that require restart
+// Settings that require restart - whole namespaces use a trailing dot
+// so starts_with covers every key under them (matches the Requires
+// Restart table: ssl.*, database.*, tor.*)
 const RESTART_REQUIRED_SETTINGS: &[&str] = &[
     "server.port",
     "server.address",
-    "ssl.enabled",
-    "ssl.cert",
-    "ssl.key",
-    "ssl.min_version",
     "server.daemonize",
-    "database.path",
-    "tor.enabled",
+    "ssl.",
+    "database.",
+    "tor.",
 ];
 
 fn categorize_changes(changes: &[String]) -> (Vec<String>, Vec<String>) {
@@ -11703,7 +11706,7 @@ Operators check pending-restart state via CLI: `{project_name} status`
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 
 // GET /server/healthz - full health response (see PART 13 for JSON structure)
-// GET /healthz - same handler as /server/healthz when cfg.Server.Healthz.Root.Enabled
+// GET /healthz - same handler as /server/healthz when cfg.server.healthz.root.enabled
 // GET /api/{api_version}/server/healthz - same response, JSON by default
 pub async fn health_handler(State(state): State<AppState>) -> impl IntoResponse {
     // Content negotiation handled by middleware (PART 14)
@@ -11733,7 +11736,7 @@ async fn build_health_response(state: &AppState) -> HealthResponse {
     HealthResponse {
         // Project info (from branding config)
         project: ProjectInfo {
-            name: state.config.branding.name.clone(),
+            name: state.config.branding.title.clone(),
             description: state.config.branding.description.clone(),
         },
 
@@ -11863,7 +11866,7 @@ $ kill -TERM $(cat /var/run/myapp.pid)
 | (none) | `DATABASE_DIR` | SQLite database directory (Docker: `/data/db/sqlite`, Native: `{data_dir}/db/`) |
 | (none) | `BACKUP_DIR` | Backup directory (defaults to `{data_dir}/backup/`, changeable) |
 
-**External backup mounts:** In production, `BACKUP_DIR` should typically point to external storage (NAS, separate disk, etc.) rather than staying under `{data_dir}`. Example: `BACKUP_DIR=/mnt/Backups/{project_org}/{internal_name}`. The default `{data_dir}/backup/` is for development/testing only.
+**External backup mounts:** In production, `BACKUP_DIR` should typically point to external storage (NAS, separate disk, etc.) rather than staying under `{data_dir}`. Example: `BACKUP_DIR=/mnt/Backups/{internal_org}/{internal_name}`. The default `{data_dir}/backup/` is for development/testing only.
 
 **Implementation:**
 
@@ -11929,7 +11932,7 @@ fn started_elevated() -> bool {
 // System mode (started_elevated): system backup dir if writable, else
 // {data_dir}/backup/ — NEVER a $HOME-derived path. Service accounts have
 // HOME set to {data_dir}, so a $HOME fallback would nest user-style dirs
-// inside /var/lib/{project_org}/{internal_name}/.
+// inside /var/lib/{internal_org}/{internal_name}/.
 // User mode: system backup dir if writable, else user backup dir.
 fn get_backup_dir(flag_value: &str, data_dir: &str) -> String {
     if !flag_value.is_empty() {
@@ -11988,41 +11991,41 @@ fn is_writable(path: &str) -> bool {
 }
 
 // system_backup_dir returns the system-level backup directory
-// Linux: /mnt/Backups/{project_org}/{internal_name}
-// macOS: /Library/Backups/{project_org}/{internal_name}
-// BSD:   /var/backups/{project_org}/{internal_name}
-// Windows: %ProgramData%\Backups\{project_org}\{internal_name}
+// Linux: /mnt/Backups/{internal_org}/{internal_name}
+// macOS: /Library/Backups/{internal_org}/{internal_name}
+// BSD:   /var/backups/{internal_org}/{internal_name}
+// Windows: %ProgramData%\Backups\{internal_org}\{internal_name}
 fn system_backup_dir() -> String {
     #[cfg(target_os = "macos")]
-    return format!("/Library/Backups/{}/{}", PROJECT_ORG, PROJECT_NAME);
+    return format!("/Library/Backups/{}/{}", INTERNAL_ORG, INTERNAL_NAME);
 
     #[cfg(windows)]
     return format!(
         "{}\\Backups\\{}\\{}",
         env::var("ProgramData").unwrap_or_default(),
-        PROJECT_ORG,
-        PROJECT_NAME
+        INTERNAL_ORG,
+        INTERNAL_NAME
     );
 
     #[cfg(any(target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))]
-    return format!("/var/backups/{}/{}", PROJECT_ORG, PROJECT_NAME);
+    return format!("/var/backups/{}/{}", INTERNAL_ORG, INTERNAL_NAME);
 
     #[cfg(target_os = "linux")]
-    format!("/mnt/Backups/{}/{}", PROJECT_ORG, PROJECT_NAME)
+    format!("/mnt/Backups/{}/{}", INTERNAL_ORG, INTERNAL_NAME)
 }
 
 // user_backup_dir returns the user-level backup directory
 // USER MODE ONLY — never call when started_elevated() is true: $HOME belongs
 // to the service account after a privilege drop and points at {data_dir}.
-// Linux/BSD: ~/.local/share/Backups/{project_org}/{internal_name}
-// macOS: ~/Library/Backups/{project_org}/{internal_name}
-// Windows: %LocalAppData%\Backups\{project_org}\{internal_name}
+// Linux/BSD: ~/.local/share/Backups/{internal_org}/{internal_name}
+// macOS: ~/Library/Backups/{internal_org}/{internal_name}
+// Windows: %LocalAppData%\Backups\{internal_org}\{internal_name}
 fn user_backup_dir() -> String {
     let home = dirs::home_dir().unwrap_or_default();
 
     #[cfg(target_os = "macos")]
     return home
-        .join(format!("Library/Backups/{}/{}", PROJECT_ORG, PROJECT_NAME))
+        .join(format!("Library/Backups/{}/{}", INTERNAL_ORG, INTERNAL_NAME))
         .to_string_lossy()
         .into_owned();
 
@@ -12030,11 +12033,11 @@ fn user_backup_dir() -> String {
     return format!(
         "{}\\Backups\\{}\\{}",
         env::var("LOCALAPPDATA").unwrap_or_default(),
-        PROJECT_ORG,
-        PROJECT_NAME
+        INTERNAL_ORG,
+        INTERNAL_NAME
     );
 
-    home.join(format!(".local/share/Backups/{}/{}", PROJECT_ORG, PROJECT_NAME))
+    home.join(format!(".local/share/Backups/{}/{}", INTERNAL_ORG, INTERNAL_NAME))
         .to_string_lossy()
         .into_owned()
 }
@@ -12082,7 +12085,7 @@ services:
       # PID file
       - /var/run:/run:z
     ports:
-      - "8080:8080"
+      - "172.17.0.1:64580:8080"
 ```
 
 **Minimal compose (uses container defaults):**
@@ -12095,7 +12098,7 @@ services:
     volumes:
       - {project_name}-data:/data
     ports:
-      - "8080:8080"
+      - "172.17.0.1:64580:80"
 
 volumes:
   {project_name}-data:
@@ -13231,7 +13234,7 @@ server:
     # or "libsql" for Turso remote
     driver: sqlite
     # auto-created; omit for default
-    url: "{data_dir}/db/{internal_name}.db"
+    url: "{data_dir}/db/server.db"
     # For Turso remote:
     # driver: libsql
     # url: libsql://your-db-name.turso.io?authToken=${TURSO_AUTH_TOKEN}
@@ -13736,7 +13739,7 @@ The root secret all other derived material hangs off. Without it, in-flight HMAC
 | Generated | First start. Stored in `server.db` row `app_secrets.installation_secret`, base64-encoded. |
 | Scope | Server-wide. Generated on first start and persisted to `server.db`. NEVER appears in a request, response, or log. |
 | Used by | `{security_id}` HMAC (PART 11 → "Security Reports"); PGP private-key KDF (PART 11 → "GPG Keypair Management"); future derived material (cookie signing salts, etc.). |
-| Rotation | Manual via CLI command or config file. Sensitive-operation flow (PART 5 → "Sensitive Operations"): re-prompt operator password, log to `audit.log` as `security.installation_secret_rotated`. Rotation re-encrypts the PGP private key and re-bases all live HMACs. The previous secret is kept for 7 days to validate any in-flight `{security_id}` URLs that referenced it. |
+| Rotation | Manual via CLI command or config file. Sensitive-operation flow (PART 5 → "Sensitive Operations"): re-prompt for the server token, log to `audit.log` as `security.installation_secret_rotated`. Rotation re-encrypts the PGP private key and re-bases all live HMACs. The previous secret is kept for 7 days to validate any in-flight `{security_id}` URLs that referenced it. |
 | Backup | Always — see PART 21 → "Backup Contents". Required for any restore: without it, the PGP private key in the backup is undecryptable. |
 | Loss = catastrophic | Lost = cannot decrypt PGP private key (and therefore cannot decrypt in-flight encrypted security reports); cannot validate `{security_id}` URLs on existing security.txt copies until the file regenerates. Recovery requires the operator to: regenerate keypair, regenerate `installation_secret`, accept that all in-flight encrypted reports are unreadable. |
 
@@ -13888,14 +13891,12 @@ web:
     # short-burst allowance
     rate_limit_per_ip_burst: 10
 
-  csrf:
-    # See "CSRF Protection" below for full schema.
+  # CSRF config lives under server.csrf — see PART 16 → "CSRF Protection" for full schema.
 
   csp:
     # See "Content Security Policy" below for full schema.
 
-  cors:
-    # See PART 16 → CORS for full schema.
+  # CORS config lives under server.cors — see PART 16 → CORS for full schema.
 
   headers:
     # Modern / privacy / cross-origin headers — see subsections below.
@@ -14179,9 +14180,9 @@ pub enum TargetType {
     Unknown,
     // Public routes (/, /api/{api_version}/, project-specific like /jokes, /weather, /ip)
     Public,
-    // Server pages - about, help, contact, privacy (/server/*, /api/{api_version}/server/*)
+    // Server pages - about, help, contact, privacy (/server/*, web routes only)
     ServerPages,
-    // Server administration routes (/api/{api_version}/server/*)
+    // Server API routes - server info and operator-token-protected endpoints (/api/{api_version}/server/*)
     Server,
 }
 ```
@@ -14212,7 +14213,7 @@ pub fn extract_context_from_path(path: &str) -> Result<Context, anyhow::Error> {
         "" => Ok(Context { target_type: TargetType::Public }),
         "server" => {
             // /api/{api_version}/server/* - server info and operator-token-protected endpoints
-            Ok(Context { target_type: TargetType::ServerPages })
+            Ok(Context { target_type: TargetType::Server })
         }
         _ => {
             // Project-specific public routes (e.g., /api/{api_version}/jokes, /weather, /ip)
@@ -14245,7 +14246,6 @@ pub fn extract_context_from_path(path: &str) -> Result<Context, anyhow::Error> {
 
 | Path | Purpose |
 |------|---------|
-| `/.well-known/acme-challenge/` | Let's Encrypt HTTP-01 challenge |
 | `/.well-known/acme-challenge/` | Let's Encrypt HTTP-01 challenge |
 
 ### Well-Known Namespace Contract
@@ -14547,7 +14547,7 @@ Repo-level (source-code) vulnerabilities are reported primarily via GitHub priva
 | **Rotate** | `--maintenance pgp rotate` | Generates a new keypair, signs the new pubkey with the old key, publishes the rotation to configured keyservers. Old key stays valid for 30 days for in-flight reports. |
 | **Publish to keyservers** | `--maintenance pgp publish` | POST the public key to each entry in `web.security.keyservers`. Uses the keyserver's HTTP submission endpoint (`https://keys.openpgp.org/vks/v1/upload` for keys.openpgp.org, similar for ubuntu). Triggered automatically on generate/rotate; manually via `--maintenance pgp publish`. Failures are logged + retried with exponential backoff. |
 | **Export public key** | `--maintenance pgp export public [path]` | Use the public URL `/.well-known/pgp-key.asc`, copy `{config_dir}/security/pgp.pub.asc` directly, or write it to `[path]` (stdout if omitted) via the CLI. |
-| **Export private key** | `--maintenance pgp export private <path>` | **Full export, ASCII-armored, decrypted with the operator's confirmation password.** Triggers a sensitive-operation flow (PART 5 → "Sensitive Operations"): re-prompt operator password, log to `audit.log` as `security.private_key_exported`, write the key to `<path>` with mode 0600. **The export is rate-limited to 1 per hour per operator and the audit entry includes operator IP and reason text the operator must type.** |
+| **Export private key** | `--maintenance pgp export private <path>` | **Full export, ASCII-armored, decrypted after server-token confirmation.** Triggers a sensitive-operation flow (PART 5 → "Sensitive Operations"): re-prompt for the server token, log to `audit.log` as `security.private_key_exported`, write the key to `<path>` with mode 0600. **The export is rate-limited to 1 per hour per operator and the audit entry includes operator IP and reason text the operator must type.** |
 | **Import private key** | `--maintenance pgp import <file>` | Import an existing `pgp.priv.asc` from a local file (e.g., restoring from backup, migrating from another instance). Same sensitive-operation gate. Validates the key's identity matches the project's expected identity (warns on mismatch — operator can override). |
 | **Delete** | `--maintenance pgp delete` | Sensitive-operation flow. Deletes both keys, sets `web.security.publish_pgp_key: false`, removes `Encryption:` line from security.txt. In-flight encrypted reports become un-decryptable — operator warned and must type confirmation. |
 
@@ -14586,27 +14586,9 @@ Repo-level (source-code) vulnerabilities are reported primarily via GitHub priva
 | `access.log` | HTTP requests | `apache` | `apache`, `nginx`, `json` |
 | `server.log` | Application events | `text` | `text`, `json` |
 | `error.log` | Error messages | `text` | `text`, `json` |
-| `app.log` (or `{project_name}.log`) | General application events (info/warn) | `logfmt` | `logfmt`, `json` |
-| `auth.log` | Authentication events (token issue/revoke, auth failures) | `syslog` | `syslog` (RFC 3164), `json` |
 | `audit.log` | Security events | `json` | `json` only (must be machine-parseable) |
 | `security.log` | Security/auth events | `fail2ban` | `fail2ban`, `syslog`, `cef`, `json`, `text` |
 | `debug.log` | Debug (dev mode) | `text` | `text`, `json` |
-
-**`app.log` (logfmt) — example line:**
-
-```
-time=2026-05-13T10:58:00-04:00 level=INFO msg="user created" id=abc123 ip=1.2.3.4
-```
-
-Logfmt: space-separated `key=value` pairs, values with spaces or `=` quoted with double quotes. One event per line. Time in RFC 3339 with timezone offset.
-
-**`auth.log` (syslog RFC 3164) — example line:**
-
-```
-May 13 10:58:00 hostname {project_name}[pid]: auth: user=xxx ip=1.2.3.4 result=fail reason=invalid_credentials
-```
-
-Syslog header: `<MMM DD HH:MM:SS> <hostname> <program>[<pid>]:` followed by the structured message. `result=` is one of `success` / `fail`. `reason=` is a stable machine code (never a free-form message — keeps Fail2ban / SIEM parsers stable).
 
 **All log files (every log listed above) — raw text only:**
 - No ANSI escape codes
@@ -14829,7 +14811,7 @@ server:
 - `keep: none` = do not retain old logs (default)
 - Built-in rotation support (no external logrotate needed)
 - Old logs deleted immediately after rotation (default)
-- Optional: compress before delete, retain with `keep: weekly:N` or `monthly:N`
+- Optional: compress before delete, retain with `keep: Nw` or `keep: Nm` (see Retention Options)
 
 ### Audit Log
 
@@ -14876,14 +14858,14 @@ server:
 | `backup.deleted` | Backup deleted | Filename |
 | `backup.failed` | Backup failed | Error message |
 | `server.started` | Application started | Version, mode |
-
-> **Suppression:** `scheduler.task_failed` is not emitted when `backup.failed` fires for the same execution — both would describe the same event. `scheduler.task_failed` fires only for tasks that produce no subsystem-specific audit event.
 | `server.stopped` | Application stopped | Reason, uptime |
 | `server.maintenance_entered` | Maintenance mode enabled | Reason |
 | `server.maintenance_exited` | Maintenance mode disabled | Duration |
 | `server.updated` | Application updated | Old version, new version |
 | `scheduler.task_failed` | Scheduled task failed | Task name, error |
 | `scheduler.task_manual_run` | Task manually triggered | Task name, IP |
+
+> **Suppression:** `scheduler.task_failed` is not emitted when `backup.failed` fires for the same execution — both would describe the same event. `scheduler.task_failed` fires only for tasks that produce no subsystem-specific audit event.
 
 ## Audit Log Format
 
@@ -14968,9 +14950,13 @@ server:
         backup: true
         # Server events (start, stop, maintenance)
         server: true
+        # Every token use (very noisy - off by default)
+        token_usage: false
 
       # Sensitive data handling
       include_user_agent: true
+      # Mask email addresses in entries
+      mask_emails: true
 ```
 
 ## Sane Defaults
@@ -14995,10 +14981,16 @@ server:
 ## Audit Log Rules
 
 **NEVER Log:**
+- ❌ Passwords (plain, hashed, or encrypted)
+- ❌ API tokens or secrets (full value)
+- ❌ Session tokens (full value)
+- ❌ Recovery keys
+- ❌ TOTP secrets
 - ❌ Private keys or TLS secrets
 - ❌ SMTP credentials
 - ❌ Full API credentials of any kind
 - ❌ Credit card numbers or financial data
+- ❌ Full email addresses (mask them)
 
 **ALWAYS Log:**
 - ✓ Timestamp in UTC with milliseconds
@@ -15011,40 +15003,24 @@ server:
 - Show only first 8 characters: `token_abc12345...`
 - Or use separate ID field that doesn't expose token value
 
-## Audit Log
+## Audit Log Access
 
-| Element | Type | Description |
-|---------|------|-------------|
-| Log viewer | Table | Paginated audit log entries |
-| Filters | Dropdowns | Filter by category, severity, date range |
-| Search | Text input | Search by actor, IP, event type |
-| Export | Button | Download filtered results as JSON/CSV |
-| Retention | Display | Show current retention policy |
-| Stats | Cards | Event counts by category/severity |
+**There is no admin web UI (PART 11) — the audit log is read on the server, not through web routes.**
 
-**Log Viewer Columns:**
-| Column | Description |
-|--------|-------------|
-| Time | Timestamp (local timezone) |
-| Event | Event type with icon |
-| Actor | Who performed action |
-| Target | What was affected |
-| IP | Source IP address |
-| Result | Success/failure badge |
-| Details | Expandable row |
+| Access Method | Description |
+|---------------|-------------|
+| Log files | JSONL files under `{log_dir}` — one JSON object per line |
+| `jq` / `grep` | Filter by category, severity, actor, IP, event type, or date range directly on the files |
+| Export | Files are already JSON; convert to CSV with `jq -r` if needed |
+| Retention | Governed by the `keep` setting in Audit Log Configuration above |
 
-**Filters:**
-- Category: All, Authentication, Configuration, Security, etc.
-- Severity: All, Info, Warn, Error, Critical
-- Result: All, Success, Failure
-- Date range: Today, Last 7 days, Last 30 days, Custom
-- Actor: Text search
-- IP: Text search
+**Filtering examples (operator, on the server):**
+- By category: `jq 'select(.category == "security")' audit.log`
+- By severity: `jq 'select(.severity == "error")' audit.log`
+- By actor or IP: `jq 'select(.actor == "admin" or .ip == "203.0.113.7")' audit.log`
+- By result: `jq 'select(.result == "failure")' audit.log`
 
-**Export Options:**
-- Format: JSON (default), CSV
-- Range: Current view, All matching filters, Full log
-- Note: Export respects same masking rules as display
+**Masking note:** entries are written with the masking rules above already applied, so exports and copies never expose raw tokens or emails.
 
 ## Audit Log Integrity
 
@@ -15502,11 +15478,7 @@ pub struct AllowlistEntry {
 }
 ```
 
-**Allowlist API:**
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-Allowlist entries are managed via config file (`server.security.allowlist`).
+**Allowlist API:** none — allowlist entries are managed via config file (`server.security.allowlist`).
 
 **Middleware:**
 
@@ -15789,11 +15761,11 @@ Expires: {expiry_date}
 - `Preferred-Languages:` line is **omitted** (locale fingerprinting risk on Tor)
 - Served per-request via `build_url(headers, path)`; never cached or frozen at startup
 
-> **Full Tor implementation:** The above covers request detection, `build_url` integration, and privacy rules only. For Tor binary lifecycle, hidden service setup, outbound routing, and `bine`/`arti` integration, see **PART 31 → "Tor Hidden Service"**.
+> **Full Tor implementation:** The above covers request detection, `build_url` integration, and privacy rules only. For Tor binary lifecycle, hidden service setup, outbound routing, and external tor binary integration, see **PART 31 → "Tor Hidden Service"**.
 
 ## Rate Limiting
 
-Rate limiting is the primary abuse defense. All limits are per-IP using a sliding window counter stored in `server.db`.
+Rate limiting is the primary abuse defense. All limits are per-IP using a sliding window counter stored in the cache layer (see Cache Usage in Application, PART 13).
 
 ```yaml
 server:
@@ -15822,7 +15794,7 @@ server:
 | Health / status | 120 req/min | 60s | `/healthz`, `/readyz`, `/livez` |
 | Global burst | 240 req/min | 60s | Absolute ceiling across all types |
 
-**Response when limited:** `429 Too Many Requests` with `Retry-After` header set to seconds until the window resets. Body: `{"ok":false,"error":"RATE_LIMITED","message":"Too many requests","retry_after":N}`.
+**Response when limited:** `429 Too Many Requests` with `Retry-After` header set to seconds until the window resets. Body: `{"ok":false,"error":"RATE_LIMITED","message":"Too many requests","details":{"retry_after":N}}` — retry seconds go in `details` and the `Retry-After` header, never as a top-level field (PART 14).
 
 **Note:** All limits are configurable under `server.rate_limit.*` in `server.yml`.
 
@@ -15949,7 +15921,7 @@ Every outbound webhook POST includes these headers so the receiver can verify th
 
 | Header | Value |
 |--------|-------|
-| `X-Webhook-Signature` | `sha256=<hex_hmac>` where `hmac = HMAC-SHA256(per_webhook_secret, request_body_bytes)`. The `per_webhook_secret` is auto-generated when the webhook URL is first saved (random 32 bytes, persisted in `server.yml` next to the URL as `webhooks.<name>_secret`) and returned ONCE in the API response for the operator to configure on the receiving end. |
+| `X-Webhook-Signature` | `sha256=<hex_hmac>` where `hmac = HMAC-SHA256(per_webhook_secret, request_body_bytes)`. The `per_webhook_secret` is auto-generated when the webhook URL is first saved (random 32 bytes, persisted in `server.yml` under the separate `webhook_secrets.<name>` key — never under `webhooks`, where every key is a transport name) and returned ONCE in the API response for the operator to configure on the receiving end. |
 | `X-Webhook-Timestamp` | Unix seconds — receiver SHOULD reject if delta exceeds `±5 min` to prevent replay |
 | `X-Webhook-ID` | UUID v7 (PART 13) — idempotency key the receiver can use to deduplicate retries |
 | `X-Webhook-Event` | The event type (e.g., `security.report_received`, `admin.backup_failed`) |
@@ -16001,7 +15973,7 @@ Do NOT introduce flat aliases, duplicate names, or migration shims for contact r
 
 ### Notification Configuration (config file)
 
-Notification channels are configured via config file. Three roles (admin, security, general) each have email and webhook settings.
+Notification channels are configured via config file. Four roles (admin, security, abuse, general) each have email and webhook settings.
 
 ## Analytics Tracking
 
@@ -17001,7 +16973,7 @@ All settings above are configured via config file:
 
 #### Backend Structure (Rust)
 
-**Based on template PARTS: branding (PART 16), modes (PART 6), database (PART 10), features (PARTS 20, 32), scheduler (PART 18).**
+**Based on template PARTS: branding (PART 16), modes (PART 6), database (PART 10), features (PARTS 19, 31), scheduler (PART 18).**
 
 ```rust
 // HealthResponse - canonical field order for /server/healthz
@@ -17037,7 +17009,7 @@ pub struct HealthResponse {
     // current UTC time
     pub timestamp: chrono::DateTime<chrono::Utc>,
 
-    // 5. Features - PUBLIC only (PARTS 20, 32)
+    // 5. Features - PUBLIC only (PARTS 19, 31)
     pub features: FeaturesInfo,
 
     // 6. Component health checks
@@ -17144,13 +17116,13 @@ pub struct StatsInfo {
 | `build.date` | `version::DATE` (build var) | 7 |
 | `uptime` | `format_uptime(start_time)` | - |
 | `mode` | `cfg.server.mode` | 6 |
-| `features.tor.*` | `tor_manager.*` | 32 |
-| `features.geoip` | `cfg.geoip.enabled` (true/false) | 20 |
+| `features.tor.*` | `tor_manager.*` | 31 |
+| `features.geoip` | `cfg.geoip.enabled` (true/false) | 19 |
 | `features.*` (project-specific) | Show actual status when project-specific optional features used | - |
 | `checks.database` | `check_database()` | 10 |
 | `checks.cache` | `check_cache()` | 10 |
-| `checks.scheduler` | `check_scheduler()` | 19 |
-| `checks.tor` | `check_tor()` | 32 |
+| `checks.scheduler` | `check_scheduler()` | 18 |
+| `checks.tor` | `check_tor()` | 31 |
 | `stats.*` | `stats_collector.*` | - |
 
 #### Frontend Display Order
@@ -17206,7 +17178,7 @@ pub struct StatsInfo {
 **Database/cache checks MUST be vague:**
 - ✅ `"database": "ok"` or `"database": "error"`
 - ❌ `"database": "libsql://user:token@host/db"` (exposes credentials)
-- ❌ `"database": {"path": "/var/lib/{project_name}/db.sqlite"}` (exposes filesystem layout)
+- ❌ `"database": {"path": "{data_dir}/db/server.db"}` (exposes filesystem layout)
 
 ### /server/healthz Response Formats
 
@@ -17529,9 +17501,9 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 | `features.*` | Enabled features (bool or object) |
 | `features.tor.enabled` | Tor hidden service enabled (auto-detected or `server.yml` setting) |
 | `features.tor.running` | Tor process currently running |
-| `features.tor.status` | healthy, error:{short message} |
+| `features.tor.status` | healthy, starting, error |
 | `features.tor.hostname` | Onion address (if running) |
-| `checks.*` | Service health (ok, degraded, error) |
+| `checks.*` | Service health (ok, error) |
 | `stats.requests_total` | Total requests served |
 | `stats.requests_24h` | Requests in last 24 hours |
 | `stats.active_connections` | Current active connections |
@@ -17934,19 +17906,19 @@ server:
 ### Rust Code Formatting
 
 ```rust
-// Use tabs for indentation (rustfmt standard)
+// Use 4-space indentation (rustfmt standard)
 pub async fn handler(
     State(state): State<AppState>,
     req: Request,
 ) -> Result<impl IntoResponse, AppError> {
-	// Tab indent
-	if let Err(e) = validate(&req) {
-		// Tab indent
-		return Err(AppError::bad_request("errors.bad_request"));
-	}
+    // 4-space indent
+    if let Err(e) = validate(&req) {
+        // 4-space indent
+        return Err(AppError::bad_request("errors.bad_request"));
+    }
 
-	// Response
-	Ok("OK\n")
+    // Response
+    Ok("OK\n")
 }
 ⏎
 ```
@@ -18073,21 +18045,26 @@ fn get_api_response_format(req: &Request) -> &'static str {
         return "text";
     }
 
-    // 2. Check Accept header
+    // 2. Check Accept header — explicit JSON wins over client detection
     let accept = req.headers()
         .get("Accept")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
+    if accept.contains("application/json") {
+        return "json";
+    }
+
+    // 3. Explicit plain-text request
     if accept.contains("text/plain") {
         return "text";
     }
 
-    // 3. Check if non-interactive client (uses same detection as frontend)
+    // 4. Check if non-interactive client (uses same detection as frontend)
     if is_non_interactive_client(req) {
         return "text";
     }
 
-    // 4. Default to JSON
+    // 5. Default to JSON
     "json"
 }
 ```
@@ -18143,7 +18120,8 @@ fn get_api_response_format(req: &Request) -> &'static str {
 | **1** | `.txt` extension | `/api/{api_version}/joke.txt` | Plain text (ALWAYS) |
 | **2** | `Accept: application/json` header | `Accept: application/json` | JSON |
 | **3** | `Accept: text/plain` header | `Accept: text/plain` | Plain text |
-| **4** | Default | `/api/{api_version}/joke` | JSON |
+| **4** | Non-interactive client (CLI/curl UA) | `curl /api/{api_version}/joke` | Plain text |
+| **5** | Default | `/api/{api_version}/joke` | JSON |
 
 **For frontend routes (`/**`), response format is determined in this order:**
 
@@ -19203,13 +19181,16 @@ Need additional compatible endpoints?"
 
 ```json
 {
-  "id": "item_123",
-  "name": "Example",
-  "created_at": "2024-01-15T10:30:00Z"
+  "ok": true,
+  "data": {
+    "id": "item_123",
+    "name": "Example",
+    "created_at": "2024-01-15T10:30:00Z"
+  }
 }
 ```
 
-*Returns the item directly without wrapper.*
+*The item is carried in `data` — every success response uses the `{ "ok": true, "data": ... }` envelope so it is programmatically distinguishable from errors.*
 
 #### Action Response (Create, Update, Delete)
 
@@ -19464,7 +19445,12 @@ pub fn get_global_ipv6() -> Option<String> {
         for ip in iface.ips {
             if let IpAddr::V6(v6) = ip.ip() {
                 // Must be IPv6, globally routable, and not private
-                if !v6.is_loopback() && !v6.is_unspecified() {
+                // is_unicast_link_local/is_unique_local are stable since Rust 1.84
+                if !v6.is_loopback()
+                    && !v6.is_unspecified()
+                    && !v6.is_unicast_link_local()
+                    && !v6.is_unique_local()
+                {
                     return Some(v6.to_string());
                 }
             }
@@ -19494,7 +19480,12 @@ pub fn get_global_ipv4() -> Option<String> {
 pub fn is_public_ip(ip: std::net::IpAddr) -> bool {
     match ip {
         std::net::IpAddr::V4(v4) => !v4.is_loopback() && !v4.is_private() && !v4.is_link_local() && !v4.is_unspecified(),
-        std::net::IpAddr::V6(v6) => !v6.is_loopback() && !v6.is_unspecified(),
+        std::net::IpAddr::V6(v6) => {
+            !v6.is_loopback()
+                && !v6.is_unspecified()
+                && !v6.is_unicast_link_local()
+                && !v6.is_unique_local()
+        }
     }
 }
 
@@ -19600,8 +19591,11 @@ pub fn is_dev_tld(host: &str, project_name: &str) -> bool {
     let lower = host.to_lowercase();
 
     // Check dynamic project-specific TLD (e.g., app.jokes, dev.quotes, quotes, jokes, {project_name})
-    if !project_name.is_empty() && lower.ends_with(&format!(".{}", project_name.to_lowercase())) {
-        return true;
+    if !project_name.is_empty() {
+        let name = project_name.to_lowercase();
+        if lower == name || lower.ends_with(&format!(".{}", name)) {
+            return true;
+        }
     }
 
     // Check static dev TLDs
@@ -19831,7 +19825,7 @@ Displayed immediately after the header line, before URLs. Shows current mode and
 | development | false | `🔧 Running in mode: development` |
 | development | true | `🔧 Running in mode: development [debugging]` |
 
-**Note:** Development mode always has debug features enabled internally, but `[debugging]` only shows when `--debug` flag or `DEBUG=true` is explicitly set.
+**Note:** Development mode does NOT enable debug features — only the debug flag does. `[debugging]` shows exactly when the debug flag is on (`--debug`, `DEBUG=true`, or the `MODE=debug` alias when `DEBUG` is not explicitly set).
 
 **Port Configuration (Project-Wide, NON-NEGOTIABLE):**
 
@@ -19894,31 +19888,29 @@ format_url(host, 8443, true);
 
 **Overlay Network Protocol Rules (Tor, I2P, etc.):**
 
-| Network | Default | HTTPS-Only Mode | Certificate |
-|---------|---------|-----------------|-------------|
-| Clearnet | HTTP/HTTPS | Port 443 | Let's Encrypt or local |
-| Tor (.onion) | HTTP | When clearnet is HTTPS-only | Self-signed (LE doesn't support .onion) |
-| I2P (.i2p) | HTTP | When clearnet is HTTPS-only | Self-signed (LE doesn't support .i2p) |
+| Network | Protocol | Certificate |
+|---------|----------|-------------|
+| Clearnet | HTTP/HTTPS (HTTPS-only on port 443) | Let's Encrypt or local |
+| Tor (.onion) | Always HTTP | None (TLS terminates in the Tor layer) |
+| I2P (.i2p) | Always HTTP | None (TLS terminates in the I2P layer) |
 
 **Rules:**
-- Overlay networks inherit HTTPS-only mode from clearnet configuration
-- If clearnet port is 443 (HTTPS-only) → overlay also uses HTTPS
-- If clearnet is dual port (80,443) → overlay uses HTTP (encryption provided by overlay)
-- Overlay HTTPS requires self-signed certificates (Let's Encrypt doesn't support .onion/.i2p)
+- Overlay networks are ALWAYS `http://` regardless of clearnet configuration (see PART 12)
+- Clearnet HTTPS-only mode (port 443) does NOT propagate to overlays
+- Let's Encrypt doesn't support .onion/.i2p; the overlay layer already provides end-to-end encryption
 
 **Banner Examples:**
 
 | Clearnet Config | Tor URL | I2P URL |
 |-----------------|---------|---------|
 | `--port 8080` | `http://{onion_address}` | `http://{i2p_address}` |
-| `--port 443` | `https://{onion_address}` | `https://{i2p_address}` |
+| `--port 443` | `http://{onion_address}` | `http://{i2p_address}` |
 | `--port 80,443` | `http://{onion_address}` | `http://{i2p_address}` |
 | `--port 8080,8443` | `http://{onion_address}` | `http://{i2p_address}` |
 
-**Why HTTP for overlays in dual mode?**
+**Why HTTP for overlays?**
 - Tor/I2P provide end-to-end encryption at the network layer
 - HTTPS adds overhead without additional security benefit
-- Only use HTTPS on overlays when HTTPS-only mode is required (port 443)
 
 **Footer timestamp format:** `%B %-d, %Y at %H:%M:%S %Z` → `December 4, 2025 at 13:05:13 EST` — anything user-facing MUST use this format; use `%Y-%m-%dT%H:%M:%S%:z` (RFC 3339) only where machine-readability matters (API responses, logs, health endpoints)
 
@@ -20427,26 +20419,22 @@ async fn delete_handler(
 
 All UI is designed mobile-first. Breakpoints:
 
-| Breakpoint | Min Width | Target |
-|---|---|---|
-| `xs` | — | < 480 px (default, no media query) |
-| `sm` | 480 px | Small phones, landscape |
-| `md` | 768 px | Tablets |
-| `lg` | 1024 px | Laptops |
-| `xl` | 1280 px | Desktops |
-| `2xl` | 1536 px | Wide screens |
+| Breakpoint | Target | CSS |
+|------------|--------|-----|
+| Base (no query) | Mobile phones (<768px) | Default styles |
+| `min-width: 768px` | Tablets and up | `@media (min-width: 768px)` |
+| `min-width: 1024px` | Desktops and up | `@media (min-width: 1024px)` |
+| `min-width: 1280px` | Large desktops (optional) | `@media (min-width: 1280px)` |
 
 ```css
-/* Mobile-first: base styles target xs, media queries add larger */
+/* Mobile-first: base styles target mobile, media queries add larger */
 .container {
   width: 100%;
   padding-inline: var(--space-4);
+  margin-inline: auto;
 }
-@media (min-width: 480px)  { .container { max-width: 480px;  margin-inline: auto; } }
-@media (min-width: 768px)  { .container { max-width: 768px;  padding-inline: var(--space-6); } }
-@media (min-width: 1024px) { .container { max-width: 1024px; padding-inline: var(--space-8); } }
-@media (min-width: 1280px) { .container { max-width: 1280px; } }
-@media (min-width: 1536px) { .container { max-width: 1536px; } }
+@media (min-width: 768px)  { .container { width: 90%; max-width: 1400px; padding-inline: var(--space-6); } }
+@media (min-width: 1024px) { .container { padding-inline: var(--space-8); } }
 ```
 
 
@@ -20485,6 +20473,15 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
   --color-warning:     #e0af68;
   --color-error:       #f7768e;
   --color-info:        #7dcfff;
+  /* Status banner/tint pairs (background + readable text) */
+  --color-success-bg:  #26301f;
+  --color-success-text:#9ece6a;
+  --color-warning-bg:  #33291a;
+  --color-warning-text:#e0af68;
+  --color-error-bg:    #362430;
+  --color-error-text:  #f7768e;
+  --color-info-bg:     #1e2a3a;
+  --color-info-text:   #7dcfff;
   --color-surface:     #24283b;
   --color-surface-alt: #1f2335;
   --color-border:      #414868;
@@ -20582,6 +20579,15 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
   --color-warning:     #8c6c3e;
   --color-error:       #c64343;
   --color-info:        #007197;
+  /* Status banner/tint pairs (background + readable text) */
+  --color-success-bg:  #e6eedb;
+  --color-success-text:#587539;
+  --color-warning-bg:  #f3e9d4;
+  --color-warning-text:#8c6c3e;
+  --color-error-bg:    #f7dcdc;
+  --color-error-text:  #c64343;
+  --color-info-bg:     #d8ecf3;
+  --color-info-text:   #007197;
   --color-surface:     #f5f5f5;
   --color-surface-alt: #e9e9ec;
   --color-border:      #c0caf5;
@@ -20739,7 +20745,8 @@ modal.addEventListener('click', e => { if (e.target === modal) modal.close(); })
 ```
 
 ```javascript
-function showToast(message, type = 'info', duration = 4000) {
+// Auto-dismiss defaults: success/info 3s, warning 5s, error never (duration 0 = manual dismiss)
+function showToast(message, type = 'info', duration = 3000) {
   const container = document.querySelector('.toast-container');
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
@@ -20747,10 +20754,12 @@ function showToast(message, type = 'info', duration = 4000) {
   toast.setAttribute('role', 'alert');
   container.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add('toast-visible'));
-  setTimeout(() => {
-    toast.classList.remove('toast-visible');
-    toast.addEventListener('transitionend', () => toast.remove(), { once: true });
-  }, duration);
+  if (duration > 0) {
+    setTimeout(() => {
+      toast.classList.remove('toast-visible');
+      toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+    }, duration);
+  }
 }
 ```
 
@@ -20848,6 +20857,7 @@ messages:
     <span class="site-banner-icon" aria-hidden="true">⚠</span>
     <span class="site-banner-text">Scheduled maintenance: 2026-07-06 02:00–04:00 UTC</span>
     <form method="post" action="/announcements/dismiss">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="id" value="maintenance-2025-01">
       <input type="hidden" name="return_to" value="{{ current_path }}">
       <button type="submit" class="site-banner-close" aria-label="Dismiss announcement">&times;</button>
@@ -21228,7 +21238,7 @@ The operator token is never stored in the browser — not in localStorage and no
 
 ### Client-Side Preferences
 
-This helper is for pure client-only state the server must never receive automatically. Server-relevant preferences (theme, language, consent, announcement dismissals) are cookies — the server reads them to render the correct page (see "Client-Side Preferences" in PART 32).
+This helper is for pure client-only state the server must never receive automatically. Server-relevant preferences (theme, language, consent, announcement dismissals) are cookies — the server reads them to render the correct page (see the "Client-Side Preferences" storage table in PART 0).
 
 ```javascript
 const prefs = {
@@ -21459,7 +21469,7 @@ Enable only for `/api/` routes. Never enable for HTML page routes.
 use tower_http::cors::{CorsLayer, Any};
 
 let cors = CorsLayer::new()
-    .allow_origin(cfg.server.allowed_origins.iter().filter_map(|o| o.parse().ok()).collect::<Vec<_>>())
+    .allow_origin(cfg.server.cors.allowed_origins.iter().filter_map(|o| o.parse().ok()).collect::<Vec<_>>())
     .allow_methods([
         axum::http::Method::GET,
         axum::http::Method::POST,
@@ -21508,7 +21518,7 @@ server:
 
 The effective CORS allow-list is resolved from these sources in order; the request `Origin` is matched against the combined list:
 
-1. **Explicit config** — origins listed in `server.allowed_origins`. `""` disables CORS entirely and stops resolution.
+1. **Explicit config** — origins listed in `server.cors.allowed_origins`. A single `""` entry disables CORS entirely and stops resolution.
 2. **DOMAIN env entries** — every hostname from the `DOMAIN` environment variable is added as an `https://` origin.
 3. **Reverse-proxy-learned hosts** — hostnames observed via `X-Forwarded-Host` from trusted proxies only (gated on `trusted_proxies` — see PART 12 → "Trusted Proxies") are appended at runtime.
 4. **Default** — if no source produced a list, fall back to `*` (credentials NOT allowed).
@@ -21550,19 +21560,61 @@ async fn csrf_middleware(
             .and_then(|v| v.to_str().ok())
             .map(|v| v.starts_with("Bearer "))
             .unwrap_or(false);
-        if !is_bearer {
+        // Paths listed in server.csrf.exempt_paths bypass CSRF
+        let exempt = config::csrf_exempt_paths()
+            .iter()
+            .any(|p| request.uri().path() == p);
+        if !is_bearer && !exempt {
             let cookie_token = cookies.get("csrf_token").map(|c| c.value().to_string());
+            // Prefer the X-CSRF-Token header (AJAX requests)
             let header_token = request
                 .headers()
                 .get("X-CSRF-Token")
-                .and_then(|v| v.to_str().ok());
-            match (cookie_token, header_token) {
-                (Some(c), Some(h)) if constant_time_eq(c.as_bytes(), h.as_bytes()) => {}
-                _ => return Err(axum::http::StatusCode::FORBIDDEN),
-            }
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            // Fall back to the csrf_token form field (no-JS form posts)
+            let (request, submitted) = match header_token {
+                Some(t) => (request, Some(t)),
+                None => extract_form_csrf_token(request).await,
+            };
+            return match (cookie_token, submitted) {
+                (Some(c), Some(s)) if constant_time_eq(c.as_bytes(), s.as_bytes()) => {
+                    Ok(next.run(request).await)
+                }
+                _ => Err(axum::http::StatusCode::FORBIDDEN),
+            };
         }
     }
     Ok(next.run(request).await)
+}
+
+// extract_form_csrf_token buffers a urlencoded form body, reads csrf_token,
+// and rebuilds the request so downstream extractors still see the body
+async fn extract_form_csrf_token(
+    request: axum::extract::Request,
+) -> (axum::extract::Request, Option<String>) {
+    let is_form = request
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(|ct| ct.starts_with("application/x-www-form-urlencoded"))
+        .unwrap_or(false);
+    if !is_form {
+        return (request, None);
+    }
+    let (parts, body) = request.into_parts();
+    let bytes = match axum::body::to_bytes(body, 64 * 1024).await {
+        Ok(b) => b,
+        Err(_) => {
+            let rebuilt = axum::extract::Request::from_parts(parts, axum::body::Body::empty());
+            return (rebuilt, None);
+        }
+    };
+    let token = url::form_urlencoded::parse(&bytes)
+        .find(|(k, _)| k == "csrf_token")
+        .map(|(_, v)| v.into_owned());
+    let rebuilt = axum::extract::Request::from_parts(parts, axum::body::Body::from(bytes));
+    (rebuilt, token)
 }
 ```
 
@@ -21938,18 +21990,27 @@ async fn sitemap_handler(State(state): State<AppState>) -> impl axum::response::
 ```yaml
 server:
   branding:
-    name: "My App"
-    tagline: "One sentence describing the app"
+    # Display name (e.g., "Jokes API")
+    title: "{project_name}"
+    # Short slogan (e.g., "The best jokes API")
+    tagline: ""
+    # Longer description for SEO/about
+    description: ""
     # empty = use embedded default
-    logo_url: ""
+    favicon: ""
     # empty = use embedded default
-    favicon_url: ""
-    primary_color: "#7aa2f7"
-    og_image_url: ""
-    # plain text or sanitized HTML
-    footer_text: ""
-    # raw HTML (sanitized server-side)
-    footer_custom_html: ""
+    logo: ""
+
+  seo:
+    # Project-specific - define per app
+    # e.g., ["jokes", "api", "humor", "free api"]
+    keywords: []
+    # Author/organization name
+    author: ""
+    # OpenGraph image URL for social sharing
+    og_image: ""
+    # Twitter @handle for cards
+    twitter_handle: ""
 ```
 
 ---
@@ -22059,11 +22120,19 @@ match fetch_remote_image(logo_url, &cfg).await {
 
 ## Footer Customization
 
-The footer supports three modes (in priority order):
+### Configuration
 
-1. **Custom HTML** (`footer_custom_html`) — arbitrary sanitized HTML; replaces all other footer content.
-2. **Footer text** (`footer_text`) — plain text appended below the standard links.
-3. **Default** — standard link row (About · Privacy · Contact · Help) with optional Tor link.
+**Note:** Analytics tracking → `server.tracking` (PART 12). Privacy/consent → `server.privacy` (PART 12).
+
+```yaml
+web:
+  footer:
+    # Custom branding HTML above the Application Footer
+    # - Not set or "": Use default branding (built-in)
+    # - " " (space): Disable branding, show only Application Footer
+    # - Custom HTML: Use your own branding (SANITIZED - no scripts)
+    custom_html: ""
+```
 
 ### SanitizeFooterHTML
 
@@ -22136,49 +22205,45 @@ pub fn validate_footer_html(html: &str) -> Result<String> {
 
 | Variable | Type | Description |
 |---|---|---|
-| `footer_custom_html` | `String` | Pre-sanitized HTML; if non-empty, replaces all other footer content |
-| `footer_text` | `String` | Plain text appended below the standard links |
+| `footer_custom_html` | `String` | Pre-sanitized custom branding HTML rendered above the Application Footer (`web.footer.custom_html`) |
 | `tor_enabled` | `bool` | Tor is configured |
 | `tor_running` | `bool` | Tor process is active |
 | `tor_address` | `String` | `.onion` hostname |
 | `app_name` | `String` | Application name |
 | `app_version` | `String` | Semver string |
 
-### Default Application Footer Template
+### Default Application Footer (Always Shown)
 
 ```html
 <footer class="footer">
+  {# Custom branding HTML (sanitized) rendered above the Application Footer #}
   {% if footer_custom_html %}
     {{ footer_custom_html | safe }}
-  {% else %}
-    {% if tor_enabled and tor_running %}
-      <p class="footer-onion">
-        <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
-        <code class="onion-address">{{ onion_address }}</code>
-        <button type="button" class="copy-btn" data-copy="{{ onion_address }}" aria-live="polite" aria-label="Copy onion address">📋</button>
-      </p>
-    {% endif %}
-    <p class="footer-links">
-      <a href="/server/about">About</a>
-      <span aria-hidden="true">•</span>
-      <a href="/server/privacy">Privacy</a>
-      <span aria-hidden="true">•</span>
-      <a href="/server/contact">Contact</a>
-      <span aria-hidden="true">•</span>
-      <a href="/server/help">Help</a>
-    </p>
-    {% if footer_text %}
-      <p class="footer-text">{{ footer_text }}</p>
-    {% endif %}
-    <p class="footer-meta">
-      <a href="{PLATFORM_REPO_URL}" target="_blank">Made with</a> ❤️
-      <span aria-hidden="true">•</span>
-      <span>{{ app_version }}</span>
-    </p>
-    <p class="footer-build">
-      <a href="/server/healthz">Last update: {{ build_datetime }}</a>
+  {% endif %}
+  {% if tor_enabled and tor_running %}
+    <p class="footer-onion">
+      <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
+      <code class="onion-address">{{ tor_address }}</code>
+      <button type="button" class="copy-btn" data-copy="{{ tor_address }}" aria-live="polite" aria-label="Copy onion address">📋</button>
     </p>
   {% endif %}
+  <p class="footer-links">
+    <a href="/server/about">About</a>
+    <span aria-hidden="true">•</span>
+    <a href="/server/privacy">Privacy</a>
+    <span aria-hidden="true">•</span>
+    <a href="/server/contact">Contact</a>
+    <span aria-hidden="true">•</span>
+    <a href="/server/help">Help</a>
+  </p>
+  <p class="footer-meta">
+    <a href="{PLATFORM_REPO_URL}" target="_blank">Made with</a> ❤️
+    <span aria-hidden="true">•</span>
+    <span>{{ app_version }}</span>
+  </p>
+  <p class="footer-build">
+    <a href="/server/healthz">Last update: {{ build_datetime }}</a>
+  </p>
 </footer>
 ```
 
@@ -22276,6 +22341,7 @@ A request carrying `Sec-GPC: 1` is still handled by the compliance layer (see "P
 <div id="consent-banner" class="consent-banner" role="dialog"
      aria-label="Cookie preferences" aria-modal="false">
   <form method="post" action="/consent" class="consent-banner-inner">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="return_to" value="{{ current_path }}">
     <div class="consent-text">
       <h2 class="consent-title">Cookie Preferences</h2>
@@ -22496,19 +22562,24 @@ Displays the Terms of Service. Content is loaded from configuration or a markdow
 ```yaml
 server:
   branding:
-    name: "My App"
-    tagline: "One sentence describing the app"
-    logo_url: ""
-    favicon_url: ""
-    primary_color: "#7aa2f7"
-    og_image_url: ""
-    footer_text: ""
-    footer_custom_html: ""
+    title: "{project_name}"
+    tagline: ""
+    description: ""
+    favicon: ""
+    logo: ""
+  seo:
+    keywords: []
+    author: ""
+    og_image: ""
+    twitter_handle: ""
   tracking:
-    # "plausible" | "umami" | "fathom" | ""
-    tracking_type: ""
-    tracking_url: ""
-    tracking_id: ""
+    # Analytics type: google, matomo, piwik, owa, fathom, plausible, umami, simple, cloudflare
+    # Empty or "none" = disabled
+    type: ""
+    # Tracking/Site ID (format depends on type)
+    id: ""
+    # Self-hosted URL (required for: matomo, piwik, owa, umami)
+    url: ""
   operator:
     name: ""
     url: ""
@@ -22517,6 +22588,11 @@ server:
     allowed_origins: []
     allow_credentials: true
     max_age: 86400
+
+web:
+  footer:
+    # Custom branding HTML above the Application Footer (sanitized)
+    custom_html: ""
 
 privacy:
   data:
@@ -22930,7 +23006,7 @@ Next run: {next_run}
 | `{error}` | Error message |
 | `{next_run}` | Next scheduled run |
 
-**Suppression:** `scheduler_error` fires only for tasks that have no dedicated failure event of their own. It is suppressed when a subsystem emits a more specific failure notification for the same execution: `backup_failed` suppresses it for backup tasks; `ssl_renewal_failed` suppresses it for SSL renewal tasks. Tasks with no dedicated failure event (`session_cleanup`, `token_cleanup`, `log_rotation`, `update_check`) still fire `scheduler_error` normally.
+**Suppression:** `scheduler_error` fires only for tasks that have no dedicated failure event of their own. It is suppressed when a subsystem emits a more specific failure notification for the same execution: `backup_failed` suppresses it for backup tasks; `ssl_renewal_failed` suppresses it for SSL renewal tasks. Tasks with no dedicated failure event (`token_cleanup`, `log_rotation`, `update_check`) still fire `scheduler_error` normally.
 
 ## Email Template Configuration
 
@@ -23463,7 +23539,6 @@ The scheduler status is available via the server status API. Task execution can 
 │  ○ Backup Hourly      Hourly          -                  -           ○     │
 │  ✓ SSL Renewal        03:00 daily     Today 03:00 (1s)   Tomorrow    ✓     │
 │  ✓ GeoIP Update       03:00 Sunday    Jan 12 03:00 (45s) Jan 19      ✓     │
-│  ✓ Session Cleanup    Every 15m       14:15 (0.1s)       14:30       ✓     │
 │  ✓ Token Cleanup      Every 15m       14:15 (0.1s)       14:30       ✓     │
 │  ✓ Log Rotation       00:00 daily     Today 00:00 (2s)   Tomorrow    ✓     │
 │  ✓ Health Check       Every 5m        14:25 (0.1s)       14:30       ✓     │
@@ -23676,9 +23751,8 @@ All databases from [sapics/ip-location-db](https://github.com/sapics/ip-location
 | Element | Config Key | Description |
 |---------|------------|-------------|
 | Enable GeoIP | `geoip.enabled` | Turn GeoIP on/off |
-| Country mode | `geoip.country_mode` | `none`, `deny` (blocklist), `allow` (allowlist-only) |
-| Deny countries | `geoip.deny_countries` | ISO 3166-1 alpha-2 codes to block (when mode=deny) |
-| Allow countries | `geoip.allow_countries` | ISO 3166-1 alpha-2 codes to allow exclusively (when mode=allow) |
+| Deny countries | `geoip.deny_countries` | ISO 3166-1 alpha-2 codes to block (blocklist mode when set) |
+| Allow countries | `geoip.allow_countries` | ISO 3166-1 alpha-2 codes to allow exclusively (allowlist mode when set; wins if both set) |
 | ASN database | `geoip.databases.asn` | Enable ASN lookups |
 | Country database | `geoip.databases.country` | Enable country lookups |
 | City database | `geoip.databases.city` | Enable city lookups |
@@ -24360,7 +24434,9 @@ pub fn register_metrics(registry: &Registry) -> anyhow::Result<()> {
 }
 
 pub fn init_metrics_app_info(version: &str, commit: &str, build_date: &str) {
-    let rust_version = env!("CARGO_PKG_RUST_VERSION");
+    // RUSTC_VERSION is the toolchain version (`rustc --version`) captured
+    // at compile time by build.rs via `println!("cargo:rustc-env=RUSTC_VERSION={...}")`
+    let rust_version = env!("RUSTC_VERSION");
     if let Some(info) = APP_INFO.get() {
         info.with_label_values(&[version, commit, build_date, rust_version]).set(1.0);
     }
@@ -24378,7 +24454,7 @@ pub fn init_metrics_app_info(version: &str, commit: &str, build_date: &str) {
 ### Metrics Middleware
 
 ```rust
-// src/middleware/metrics.rs
+// src/middlewares/metrics.rs
 use axum::{
     body::Body,
     extract::State,
@@ -25132,7 +25208,7 @@ When `server.compliance.enabled: true`:
 # Prompts for password
 ```
 
-**Note:** The `--password` flag is required if encryption is enabled.
+**Note:** When encryption is enabled, the CLI prompts interactively for the password — there is no `--password` flag.
 
 **Warning Shown if Encryption Not Enabled:**
 
@@ -25449,7 +25525,7 @@ on a Sunday counts as daily + weekly + monthly + yearly - uses highest priority)
 |-----------|--------------|
 | Database empty (first-run) | ✅ Allowed (nothing to protect) |
 | Running as root | ✅ Allowed (with confirmation) |
-| Running as service user | 🔐 Requires operator password |
+| Running as service user | 🔐 Requires server token (`server.token`) |
 | Random user | ❌ Denied |
 
 ### Restore Password Handling
@@ -25765,6 +25841,8 @@ use serde::{Deserialize, Serialize};
 pub struct Release {
     pub tag_name: String,
     pub prerelease: bool,
+    // RFC 3339 timestamp — lexicographic order equals chronological order
+    pub published_at: String,
     pub assets: Vec<Asset>,
 }
 
@@ -25809,15 +25887,19 @@ pub async fn check_for_update(current_version: &str, branch: &str) -> Result<Opt
         return Ok(Some(release));
     }
 
-    // For beta/daily, filter releases
+    // For beta/daily, filter releases and pick the newest by published_at
+    // (channels are cumulative — see Channel Semantics)
     let releases: Vec<Release> = resp.json().await?;
 
-    for r in releases {
-        if matches_branch(&r, branch) && r.tag_name != current_version {
-            return Ok(Some(r));
-        }
+    let newest = releases
+        .into_iter()
+        .filter(|r| matches_branch(r, branch))
+        .max_by(|a, b| a.published_at.cmp(&b.published_at));
+
+    match newest {
+        Some(r) if r.tag_name != current_version => Ok(Some(r)),
+        _ => Ok(None),
     }
-    Ok(None)
 }
 
 // do_update downloads and installs the update
@@ -25840,6 +25922,25 @@ pub async fn do_update(release: &Release) -> Result<()> {
         .map_err(|e| anyhow!("failed to download: {}", e))?;
     std::fs::write(&tmp_path, &bytes)
         .map_err(|e| anyhow!("failed to write temp file: {}", e))?;
+
+    // Verify SHA256 checksum against the release's checksum asset (MANDATORY)
+    let checksum_url = release
+        .assets
+        .iter()
+        .find(|a| a.name == format!("{}.sha256", asset_name))
+        .map(|a| &a.browser_download_url)
+        .ok_or_else(|| anyhow!("no checksum asset found for current platform"))?;
+    let checksum_body = client.get(checksum_url).send().await?.text().await
+        .map_err(|e| anyhow!("failed to download checksum: {}", e))?;
+    // Checksum file format: "{hash}  {filename}" — take the first field
+    let expected_hash = checksum_body
+        .split_whitespace()
+        .next()
+        .ok_or_else(|| anyhow!("empty checksum file"))?;
+    verify_checksum(
+        tmp_path.to_str().expect("invariant: path is valid UTF-8"),
+        expected_hash,
+    )?;
 
     // Make executable (Unix)
     #[cfg(unix)]
@@ -25875,14 +25976,20 @@ fn get_binary_name() -> String {
     name
 }
 
+// matches_branch implements cumulative channels: a less-stable channel
+// also considers every release from the more-stable channels
 fn matches_branch(r: &Release, branch: &str) -> bool {
+    // Stable releases are full (non-prerelease) releases
+    let is_stable = !r.prerelease;
+    // Beta pre-releases carry a -beta suffix
+    let is_beta = r.tag_name.ends_with("-beta");
+    // Daily builds are timestamps: YYYYMMDDHHMMSS
+    let is_daily = r.tag_name.len() == 14 && !r.tag_name.contains('.');
+
     match branch {
-        "beta" => r.tag_name.ends_with("-beta"),
-        "daily" => {
-            // Daily builds are timestamps: YYYYMMDDHHMMSS
-            r.tag_name.len() == 14 && !r.tag_name.contains('.')
-        }
-        _ => !r.prerelease,
+        "beta" => is_stable || is_beta,
+        "daily" => is_stable || is_beta || is_daily,
+        _ => is_stable,
     }
 }
 ```
@@ -26141,7 +26248,7 @@ $ {project_name} --maintenance --help
 Maintenance commands:
 
 backup [file]                         - Create backup of all data
-                                        Default: {backup_dir}/{project_name}-{timestamp}.tar.gz
+                                        Default: {backup_dir}/{project_name}_backup_YYYY-MM-DD_HHMMSS.tar.gz
 
 restore <file>                        - Restore from backup file
                                         Stops server, restores data, restarts server
@@ -26153,7 +26260,7 @@ update [cmd]                          - Manage updates
 
 mode <mode>                           - Set application mode
   production                          - Normal operation (default)
-  development                         - Debug logging, dev endpoints
+  development                         - Dev-friendly defaults (debug features require --debug)
 
 setup                                 - Reset server configuration (first-run or root only)
 
@@ -26233,7 +26340,7 @@ Current:
 | UID/GID | **Must match** - same value for both UID and GID |
 | UID/GID Range | **200-899** (safe system range, avoids well-known service IDs) |
 | Shell | `/sbin/nologin` or `/usr/sbin/nologin` |
-| Home | Config directory (`/etc/{project_org}/{internal_name}`) or data directory (`/var/lib/{project_org}/{internal_name}`) |
+| Home | Config directory (`/etc/{internal_org}/{internal_name}`) or data directory (`/var/lib/{internal_org}/{internal_name}`) |
 | Type | System user (no password, no login) |
 | Gecos | `{internal_name} service account` |
 
@@ -26242,13 +26349,13 @@ Current:
 **The UID and GID MUST be the same value.** Find an unused ID where both UID and GID are available AND not reserved by well-known services:
 
 ```
-1. Start at 999 (top of system range)
+1. Start at 899 (top of the safe 200-899 range)
 2. Check if ID is in reserved list → skip
 3. Check if UID is unused (not in /etc/passwd)
 4. Check if GID is unused (not in /etc/group)
 5. If both available AND not reserved → use this value for both UID and GID
 6. If either taken OR reserved → decrement and repeat
-7. Stop at 100 (bottom of system range)
+7. Stop at 200 (bottom of the safe range)
 8. If no ID found → error (system has no available IDs)
 ```
 
@@ -26348,15 +26455,13 @@ groupadd --system --gid {id} {internal_name}
 
 # Create user with matching UID, same primary group
 useradd --system --uid {id} --gid {id} \
-  --home-dir /etc/{project_org}/{internal_name} \
+  --home-dir /etc/{internal_org}/{internal_name} \
   --shell /sbin/nologin \
   --comment "{internal_name} service account" \
   {internal_name}
 ```
 
 **Default rule:** create and use a dedicated service user/group.
-
-**Exception:** skip dedicated user creation only when the project is explicitly approved to run permanently as root/Administrator in IDEA.md.
 
 **Exception:** skip dedicated user creation only when the project is explicitly approved to run permanently as root/Administrator in IDEA.md.
 
@@ -26403,7 +26508,7 @@ dscl . -create /Users/{internal_name} UniqueID {id}
 dscl . -create /Users/{internal_name} PrimaryGroupID {id}
 dscl . -create /Users/{internal_name} UserShell /usr/bin/false
 dscl . -create /Users/{internal_name} RealName "{internal_name} service account"
-dscl . -create /Users/{internal_name} NFSHomeDirectory /usr/local/var/{project_org}/{internal_name}
+dscl . -create /Users/{internal_name} NFSHomeDirectory /usr/local/var/{internal_org}/{internal_name}
 dscl . -create /Users/{internal_name} Password "*"
 
 # Hide user from login window
@@ -26433,10 +26538,10 @@ dscl . -create /Users/{internal_name} IsHidden 1
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/var/log/{project_org}/{internal_name}/stdout.log</string>
+    <string>/var/log/{internal_org}/{internal_name}/stdout.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/var/log/{project_org}/{internal_name}/stderr.log</string>
+    <string>/var/log/{internal_org}/{internal_name}/stderr.log</string>
 </dict>
 </plist>
 ```
@@ -26446,9 +26551,9 @@ dscl . -create /Users/{internal_name} IsHidden 1
 | Directory | Path | Purpose |
 |-----------|------|---------|
 | Binary | `/usr/local/bin/{project_name}` | Executable |
-| Config | `/usr/local/etc/{project_org}/{internal_name}/` | Configuration files |
-| Data | `/usr/local/var/{project_org}/{internal_name}/` | Application data |
-| Logs | `/usr/local/var/log/{project_org}/{internal_name}/` | Log files |
+| Config | `/usr/local/etc/{internal_org}/{internal_name}/` | Configuration files |
+| Data | `/usr/local/var/{internal_org}/{internal_name}/` | Application data |
+| Logs | `/usr/local/var/log/{internal_org}/{internal_name}/` | Log files |
 | launchd plist | `/Library/LaunchDaemons/{plist_name}.plist` | Service definition |
 
 **Rust Implementation (macOS):**
@@ -26513,7 +26618,7 @@ fn create_macos_service_user(name: &str, id: u32, home_dir: &str) -> anyhow::Res
 # Create user and group with matching ID
 pw groupadd -n {internal_name} -g {id}
 pw useradd -n {internal_name} -u {id} -g {id} \
-  -d /var/lib/{project_org}/{internal_name} \
+  -d /var/lib/{internal_org}/{internal_name} \
   -s /usr/sbin/nologin \
   -c "{internal_name} service account"
 ```
@@ -26535,33 +26640,33 @@ pw useradd -n {internal_name} -u {id} -g {id} \
 
 Virtual Service Accounts are automatically managed by Windows, require no password management, and have minimal privileges. They are created automatically when the service is installed.
 
-**Service Account Format:** `NT SERVICE\{project_name}`
+**Service Account Format:** `NT SERVICE\{internal_name}` — the VSA name derives from the installed service name, which is always `{internal_name}` so config/data paths stay stable across binary renames
 
 ```powershell
 # Create service with Virtual Service Account (automatic)
-New-Service -Name "{project_name}" `
-  -BinaryPathName "C:\Program Files\{project_org}\{internal_name}\{project_name}.exe" `
+New-Service -Name "{internal_name}" `
+  -BinaryPathName "C:\Program Files\{internal_org}\{internal_name}\{project_name}.exe" `
   -DisplayName "{project_name}" `
   -Description "{project_name} service" `
   -StartupType Automatic
 
-# Service automatically runs as NT SERVICE\{project_name}
+# Service automatically runs as NT SERVICE\{internal_name}
 # No user creation needed - Windows manages it
 ```
 
 **Directory Permissions:**
 ```powershell
 # Grant Virtual Service Account access to config/data directories
-$acl = Get-Acl "C:\ProgramData\{project_org}\{internal_name}"
+$acl = Get-Acl "C:\ProgramData\{internal_org}\{internal_name}"
 $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
-    "NT SERVICE\{project_name}",
+    "NT SERVICE\{internal_name}",
     "FullControl",
     "ContainerInherit,ObjectInherit",
     "None",
     "Allow"
 )
 $acl.SetAccessRule($rule)
-Set-Acl "C:\ProgramData\{project_org}\{internal_name}" $acl
+Set-Acl "C:\ProgramData\{internal_org}\{internal_name}" $acl
 ```
 
 **Rust Implementation (Windows):**
@@ -26584,7 +26689,8 @@ fn install_windows_service() -> anyhow::Result<()> {
     // Create service - runs as Virtual Service Account by default
     // when service_start_name is None or "NT SERVICE\{name}"
     let service_info = ServiceInfo {
-        name: std::ffi::OsString::from("{project_name}"),
+        // Service name (and thus the VSA, NT SERVICE\{internal_name}) uses {internal_name}
+        name: std::ffi::OsString::from("{internal_name}"),
         display_name: std::ffi::OsString::from("{project_name}"),
         service_type: ServiceType::OWN_PROCESS,
         start_type: ServiceStartType::AutoStart,
@@ -26606,17 +26712,17 @@ fn install_windows_service() -> anyhow::Result<()> {
 
 | Directory | Path | Purpose |
 |-----------|------|---------|
-| Binary | `C:\Program Files\{project_org}\{internal_name}\` | Executable |
-| Config | `C:\ProgramData\{project_org}\{internal_name}\config\` | Configuration files |
-| Data | `C:\ProgramData\{project_org}\{internal_name}\data\` | Application data |
-| Logs | `C:\ProgramData\{project_org}\{internal_name}\logs\` | Log files |
+| Binary | `C:\Program Files\{internal_org}\{internal_name}\` | Executable |
+| Config | `C:\ProgramData\{internal_org}\{internal_name}\config\` | Configuration files |
+| Data | `C:\ProgramData\{internal_org}\{internal_name}\data\` | Application data |
+| Logs | `C:\ProgramData\{internal_org}\{internal_name}\logs\` | Log files |
 
 ### Home Directory Selection
 
 | Directory | Use When |
 |-----------|----------|
-| Config dir (`/etc/{project_org}/{internal_name}`) | Default - user needs access to config files |
-| Data dir (`/var/lib/{project_org}/{internal_name}`) | When data dir contains user-writable content |
+| Config dir (`/etc/{internal_org}/{internal_name}`) | Default - user needs access to config files |
+| Data dir (`/var/lib/{internal_org}/{internal_name}`) | When data dir contains user-writable content |
 
 **Note:** Home directory must exist before user creation. Create directories first, then user, then set ownership.
 
@@ -26673,10 +26779,10 @@ StandardError=journal
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
-ReadWritePaths=/etc/{project_org}/{internal_name}
-ReadWritePaths=/var/lib/{project_org}/{internal_name}
-ReadWritePaths=/var/cache/{project_org}/{internal_name}
-ReadWritePaths=/var/log/{project_org}/{internal_name}
+ReadWritePaths=/etc/{internal_org}/{internal_name}
+ReadWritePaths=/var/lib/{internal_org}/{internal_name}
+ReadWritePaths=/var/cache/{internal_org}/{internal_name}
+ReadWritePaths=/var/log/{internal_org}/{internal_name}
 
 [Install]
 WantedBy=multi-user.target
@@ -26697,10 +26803,10 @@ description="{app_name}"
 command="/usr/local/bin/{project_name}"
 command_args=""
 command_user="{internal_name}:{internal_name}"
-pidfile="/var/run/{project_org}/{internal_name}.pid"
+pidfile="/var/run/{internal_org}/{internal_name}.pid"
 command_background=true
-output_log="/var/log/{project_org}/{internal_name}/server.log"
-error_log="/var/log/{project_org}/{internal_name}/error.log"
+output_log="/var/log/{internal_org}/{internal_name}/server.log"
+error_log="/var/log/{internal_org}/{internal_name}/error.log"
 
 depend() {
     need net
@@ -26709,8 +26815,8 @@ depend() {
 }
 
 start_pre() {
-    checkpath -d -m 0755 -o {internal_name}:{internal_name} /var/run/{project_org}
-    checkpath -d -m 0755 -o {internal_name}:{internal_name} /var/log/{project_org}/{internal_name}
+    checkpath -d -m 0755 -o {internal_name}:{internal_name} /var/run/{internal_org}
+    checkpath -d -m 0755 -o {internal_name}:{internal_name} /var/log/{internal_org}/{internal_name}
 }
 ```
 
@@ -26750,8 +26856,8 @@ sudo rc-update del {internal_name} default
 NAME={internal_name}
 DAEMON=/usr/local/bin/{project_name}
 DAEMON_USER={internal_name}
-PIDFILE=/var/run/{project_org}/{internal_name}.pid
-LOGFILE=/var/log/{project_org}/{internal_name}/server.log
+PIDFILE=/var/run/{internal_org}/{internal_name}.pid
+LOGFILE=/var/log/{internal_org}/{internal_name}/server.log
 
 case "$1" in
     start)
@@ -26811,10 +26917,10 @@ sudo service {internal_name} start
 
 ### runit (Linux)
 
-**Installation path:** `/etc/sv/{project_name}/`
+**Installation path:** `/etc/sv/{internal_name}/`
 
 ```
-/etc/sv/{project_name}/
+/etc/sv/{internal_name}/
 ├── run           # Main service script
 ├── log/
 │   └── run       # Logging script
@@ -26830,7 +26936,7 @@ exec /usr/local/bin/{project_name} 2>&1
 **log/run script:**
 ```bash
 #!/bin/sh
-exec svlogd -tt /var/log/{project_org}/{internal_name}
+exec svlogd -tt /var/log/{internal_org}/{internal_name}
 ```
 
 ### rc.d (FreeBSD)
@@ -26840,14 +26946,15 @@ exec svlogd -tt /var/log/{project_org}/{internal_name}
 ```bash
 #!/bin/sh
 
-# PROVIDE: {project_name}
+# PROVIDE: {internal_name}
 # REQUIRE: NETWORKING
 # KEYWORD: shutdown
 
 . /etc/rc.subr
 
-name="{project_name}"
-rcvar="{project_name}_enable"
+# Service identity comes from {internal_name} so config_dir/data_dir paths stay stable across binary renames
+name="{internal_name}"
+rcvar="{internal_name}_enable"
 command="/usr/local/bin/{project_name}"
 
 load_rc_config $name
@@ -26874,9 +26981,9 @@ run_rc_command "$1"
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/var/log/{project_org}/{internal_name}/stdout.log</string>
+    <string>/var/log/{internal_org}/{internal_name}/stdout.log</string>
     <key>StandardErrorPath</key>
-    <string>/var/log/{project_org}/{internal_name}/stderr.log</string>
+    <string>/var/log/{internal_org}/{internal_name}/stderr.log</string>
 </dict>
 </plist>
 ```
@@ -26982,7 +27089,7 @@ fn service_main(_arguments: Vec<std::ffi::OsString>) {
 - If not present, CLI/Agent users must always specify `--server` flag
 - Sources checked in order:
   1. File: `site.txt` in project root
-  2. Environment variable: `OFFICIALSITE=https://example.com`
+  2. Environment variable: `OFFICIAL_SITE=https://example.com`
   3. CI/CD secrets (repository secrets)
   4. Empty (self-hosted projects)
 
@@ -27126,33 +27233,30 @@ binaries/
 ## Makefile Implementation
 
 ```makefile
-# Infer PROJECTNAME and PROJECTORG from git remote or directory path (NEVER hardcode)
-PROJECTNAME := $(shell git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)(\.git)?$$|\1|' || basename "$$(pwd)")
-PROJECTORG := $(shell git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+(\.git)?$$|\1|' || basename "$$(dirname "$$(pwd)")")
+# Infer PROJECT_NAME and PROJECT_ORG from git remote or directory path (NEVER hardcode)
+PROJECT_NAME := $(shell git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)(\.git)?$$|\1|' || basename "$$(pwd)")
+PROJECT_ORG := $(shell git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+(\.git)?$$|\1|' || basename "$$(dirname "$$(pwd)")")
 
 # Version precedence: release.txt > env/default fallback
 VERSION ?= $(shell cat release.txt 2>/dev/null || echo "devel")
 
 # Build info - ISO 8601 UTC
 # Format: "2025-12-04T13:05:13Z"
-BUILD_DATE := $(shell date -u +"%%Y-%%m-%%dT%%H:%%M:%%SZ")
+BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 COMMIT_ID := $(shell git rev-parse --short HEAD 2>/dev/null || echo "N/A")
 # COMMIT_ID used directly - no VCS_REF alias
 
 # Official site URL (OPTIONAL - never guess or assume)
 # Sources (in order of precedence):
 #   1. File: site.txt in project root (single line, URL only)
-#   2. Environment variable: OFFICIALSITE=https://example.com
+#   2. Environment variable: OFFICIAL_SITE=https://example.com
 #   3. Empty (self-hosted projects - users must use --server flag)
 # NEVER infer from project name, domain, or any other source
-OFFICIALSITE := $(shell [ -f site.txt ] && cat site.txt || echo "${OFFICIALSITE:-}")
+OFFICIAL_SITE := $(shell [ -f site.txt ] && cat site.txt || echo "${OFFICIAL_SITE:-}")
 
-# Linker flags to embed build info
-LDFLAGS := \
-	--version=$(VERSION) \
-	--commit-id=$(COMMIT_ID) \
-	--build-date=$(BUILD_DATE) \
-	--official-site=$(OFFICIALSITE)
+# Build info is passed into the build container as env vars (VERSION, COMMIT_ID,
+# BUILD_DATE, OFFICIAL_SITE via RUST_DOCKER -e flags) — build.rs maps them to the
+# APP_* rustc-env values that option_env!() reads (see Embedded Build Info)
 
 # Directories
 BINDIR := binaries
@@ -27164,19 +27268,19 @@ RELDIR := releases
 CARGO_CACHE   ?= $(HOME)/.cargo
 RUSTUP_CACHE  ?= $(HOME)/.rustup
 SCCACHE_CACHE ?= $(HOME)/.cache/sccache
-CARGO_TARGET  ?= $(HOME)/.cache/cargo-target/$(PROJECTNAME)
+CARGO_TARGET  ?= $(HOME)/.cache/cargo-target/$(PROJECT_NAME)
 
-# Build targets
-PLATFORMS ?= linux/amd64,linux/arm64
+# Build targets — space-separated so the shell for-loops split correctly (all 8 platforms)
+PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64 freebsd/amd64 freebsd/arm64
 
 # Resource limits — overrideable; prevents any single container from starving concurrent agent builds
 DOCKER_MEM  ?= 4g
 DOCKER_CPUS ?= 2
 
 # Docker - Set REGISTRY based on your platform (ghcr.io, registry.gitlab.com, git.example.com)
-REGISTRY ?= ghcr.io/$(PROJECTORG)/$(PROJECTNAME)
+REGISTRY ?= ghcr.io/$(PROJECT_ORG)/$(PROJECT_NAME)
 RUST_DOCKER := docker run --rm \
-	--name $(PROJECTNAME)-$$(tr -dc 'a-z0-9' </dev/urandom | head -c8) \
+	--name $(PROJECT_NAME)-$$(tr -dc 'a-z0-9' </dev/urandom | head -c8) \
 	--memory=$(DOCKER_MEM) --cpus=$(DOCKER_CPUS) \
 	-v $(PWD):/app \
 	-v $(CARGO_CACHE):/usr/local/share/cargo \
@@ -27187,7 +27291,7 @@ RUST_DOCKER := docker run --rm \
 	-e VERSION="$(VERSION)" \
 	-e COMMIT_ID="$(COMMIT_ID)" \
 	-e BUILD_DATE="$(BUILD_DATE)" \
-	-e OFFICIALSITE="$(OFFICIALSITE)" \
+	-e OFFICIAL_SITE="$(OFFICIAL_SITE)" \
 	casjaysdev/rust:latest
 
 .PHONY: build local release docker test dev clean
@@ -27205,17 +27309,27 @@ build: clean
 
 	# Build for local OS/ARCH
 	@echo "Building local binary..."
-	@$(RUST_DOCKER) sh -c "cargo build --release && cp target/release/$(PROJECTNAME) $(BINDIR)/$(PROJECTNAME)"
+	@$(RUST_DOCKER) sh -c "cargo build --release && cp target/release/$(PROJECT_NAME) $(BINDIR)/$(PROJECT_NAME)"
 
 	# Build server for all platforms
 	@for platform in $(PLATFORMS); do \
 		OS=$${platform%/*}; \
 		ARCH=$${platform#*/}; \
-		[ "$$ARCH" = "amd64" ] && TARGET="x86_64-unknown-linux-musl" || TARGET="aarch64-unknown-linux-musl"; \
-		OUTPUT=$(BINDIR)/$(PROJECTNAME)-$$OS-$$ARCH; \
-		[ "$$OS" = "windows" ] && OUTPUT=$$OUTPUT.exe; \
+		case "$$OS/$$ARCH" in \
+			linux/amd64) TARGET="x86_64-unknown-linux-musl" ;; \
+			linux/arm64) TARGET="aarch64-unknown-linux-musl" ;; \
+			darwin/amd64) TARGET="x86_64-apple-darwin" ;; \
+			darwin/arm64) TARGET="aarch64-apple-darwin" ;; \
+			windows/amd64) TARGET="x86_64-pc-windows-gnu" ;; \
+			windows/arm64) TARGET="aarch64-pc-windows-gnullvm" ;; \
+			freebsd/amd64) TARGET="x86_64-unknown-freebsd" ;; \
+			freebsd/arm64) TARGET="aarch64-unknown-freebsd" ;; \
+			*) echo "Unknown platform: $$platform" && exit 1 ;; \
+		esac; \
+		EXT=""; [ "$$OS" = "windows" ] && EXT=".exe"; \
+		OUTPUT=$(BINDIR)/$(PROJECT_NAME)-$$OS-$$ARCH$$EXT; \
 		echo "Building server $$OS/$$ARCH..."; \
-		$(RUST_DOCKER) sh -c "cargo build --release --target $$TARGET && cp target/$$TARGET/release/$(PROJECTNAME) $$OUTPUT" || exit 1; \
+		$(RUST_DOCKER) sh -c "cross build --release --target $$TARGET && cp target/$$TARGET/release/$(PROJECT_NAME)$$EXT $$OUTPUT" || exit 1; \
 	done
 
 	# Build CLI for all platforms (if exists)
@@ -27223,11 +27337,21 @@ build: clean
 		for platform in $(PLATFORMS); do \
 			OS=$${platform%/*}; \
 			ARCH=$${platform#*/}; \
-			[ "$$ARCH" = "amd64" ] && TARGET="x86_64-unknown-linux-musl" || TARGET="aarch64-unknown-linux-musl"; \
-			OUTPUT=$(BINDIR)/$(PROJECTNAME)-cli-$$OS-$$ARCH; \
-			[ "$$OS" = "windows" ] && OUTPUT=$$OUTPUT.exe; \
+			case "$$OS/$$ARCH" in \
+				linux/amd64) TARGET="x86_64-unknown-linux-musl" ;; \
+				linux/arm64) TARGET="aarch64-unknown-linux-musl" ;; \
+				darwin/amd64) TARGET="x86_64-apple-darwin" ;; \
+				darwin/arm64) TARGET="aarch64-apple-darwin" ;; \
+				windows/amd64) TARGET="x86_64-pc-windows-gnu" ;; \
+				windows/arm64) TARGET="aarch64-pc-windows-gnullvm" ;; \
+				freebsd/amd64) TARGET="x86_64-unknown-freebsd" ;; \
+				freebsd/arm64) TARGET="aarch64-unknown-freebsd" ;; \
+				*) echo "Unknown platform: $$platform" && exit 1 ;; \
+			esac; \
+			EXT=""; [ "$$OS" = "windows" ] && EXT=".exe"; \
+			OUTPUT=$(BINDIR)/$(PROJECT_NAME)-cli-$$OS-$$ARCH$$EXT; \
 			echo "Building CLI $$OS/$$ARCH..."; \
-			$(RUST_DOCKER) sh -c "cargo build --release --target $$TARGET && cp target/$$TARGET/release/$(PROJECTNAME)-cli $$OUTPUT" || exit 1; \
+			$(RUST_DOCKER) sh -c "cross build --release --target $$TARGET && cp target/$$TARGET/release/$(PROJECT_NAME)-cli$$EXT $$OUTPUT" || exit 1; \
 		done; \
 	fi
 
@@ -27246,13 +27370,13 @@ local: clean
 	@$(RUST_DOCKER) cargo fetch
 
 	# Build server binary
-	@echo "Building $(PROJECTNAME)..."
-	@$(RUST_DOCKER) sh -c "cargo build --release && cp target/release/$(PROJECTNAME) $(BINDIR)/$(PROJECTNAME)"
+	@echo "Building $(PROJECT_NAME)..."
+	@$(RUST_DOCKER) sh -c "cargo build --release && cp target/release/$(PROJECT_NAME) $(BINDIR)/$(PROJECT_NAME)"
 
 	# Build CLI binary (if exists)
 	@if [ -d "src/client" ]; then \
-		echo "Building $(PROJECTNAME)-cli..."; \
-		$(RUST_DOCKER) sh -c "cargo build --release && cp target/release/$(PROJECTNAME)-cli $(BINDIR)/$(PROJECTNAME)-cli"; \
+		echo "Building $(PROJECT_NAME)-cli..."; \
+		$(RUST_DOCKER) sh -c "cargo build --release && cp target/release/$(PROJECT_NAME)-cli $(BINDIR)/$(PROJECT_NAME)-cli"; \
 	fi
 
 
@@ -27269,7 +27393,7 @@ release: build
 	@echo "$(VERSION)" > $(RELDIR)/version.txt
 
 	# Copy binaries to releases (strip if needed)
-	@for f in $(BINDIR)/$(PROJECTNAME)-*; do \
+	@for f in $(BINDIR)/$(PROJECT_NAME)-*; do \
 		[ -f "$$f" ] || continue; \
 		strip "$$f" 2>/dev/null || true; \
 		cp "$$f" $(RELDIR)/; \
@@ -27278,16 +27402,16 @@ release: build
 	# Create source archive (exclude VCS and build artifacts)
 	@tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
 		--exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
-		-czf $(RELDIR)/$(PROJECTNAME)-$(VERSION)-source.tar.gz .
+		-czf $(RELDIR)/$(PROJECT_NAME)-$(VERSION)-source.tar.gz .
 
-	# Delete existing release/tag if exists
-	@gh release delete $(VERSION) --yes 2>/dev/null || true
-	@git tag -d $(VERSION) 2>/dev/null || true
-	@git push origin :refs/tags/$(VERSION) 2>/dev/null || true
+	# Delete existing release/tag if exists (tags always carry the v prefix: v1.2.3)
+	@gh release delete v$(VERSION) --yes 2>/dev/null || true
+	@git tag -d v$(VERSION) 2>/dev/null || true
+	@git push origin :refs/tags/v$(VERSION) 2>/dev/null || true
 
-	# Create new release (stable)
-	@gh release create $(VERSION) $(RELDIR)/* \
-		--title "$(PROJECTNAME) $(VERSION)" \
+	# Create new release (stable) — v-prefixed tag matches the v* triggers in release.yml/docker.yml
+	@gh release create v$(VERSION) $(RELDIR)/* \
+		--title "$(PROJECT_NAME) $(VERSION)" \
 		--notes "Release $(VERSION)" \
 		--latest
 
@@ -27305,8 +27429,8 @@ docker:
 	@docker buildx version > /dev/null 2>&1 || (echo "docker buildx required" && exit 1)
 
 	# Create/use builder
-	@docker buildx create --name $(PROJECTNAME)-builder --use 2>/dev/null || \
-		docker buildx use $(PROJECTNAME)-builder
+	@docker buildx create --name $(PROJECT_NAME)-builder --use 2>/dev/null || \
+		docker buildx use $(PROJECT_NAME)-builder
 
 	# Build multi-arch locally (no push — pushing is CI/CD's responsibility)
 	@docker buildx build \
@@ -27327,8 +27451,8 @@ docker:
 test:
 	@echo "Running tests with coverage..."
 	@$(RUST_DOCKER) sh -c " \
-		mkdir -p \"\$${TMPDIR:-/tmp}/$(PROJECTORG)\" && \
-		COVDIR=\$$(mktemp -d \"\$${TMPDIR:-/tmp}/$(PROJECTORG)/$(PROJECTNAME)-XXXXXX\") && \
+		mkdir -p \"\$${TMPDIR:-/tmp}/$(PROJECT_ORG)\" && \
+		COVDIR=\$$(mktemp -d \"\$${TMPDIR:-/tmp}/$(PROJECT_ORG)/$(PROJECT_NAME)-XXXXXX\") && \
 		cargo fmt --check 2>&1 | tee \$$COVDIR/fmt.out && \
 		cargo clippy -- -D warnings 2>&1 | tee \$$COVDIR/clippy.out && \
 		cargo test --lib --no-fail-fast 2>&1 | tee \$$COVDIR/test.out && \
@@ -27352,16 +27476,16 @@ test:
 # Builds server + CLI (if they exist)
 dev:
 	@$(RUST_DOCKER) cargo fetch
-	@mkdir -p "$${TMPDIR:-/tmp}/$(PROJECTORG)" && \
-		BUILD_DIR=$$(mktemp -d "$${TMPDIR:-/tmp}/$(PROJECTORG)/$(PROJECTNAME)-XXXXXX") && \
+	@mkdir -p "$${TMPDIR:-/tmp}/$(PROJECT_ORG)" && \
+		BUILD_DIR=$$(mktemp -d "$${TMPDIR:-/tmp}/$(PROJECT_ORG)/$(PROJECT_NAME)-XXXXXX") && \
 		echo "Quick dev build to $$BUILD_DIR..." && \
-		$(RUST_DOCKER) sh -c "cargo build && cp target/debug/$(PROJECTNAME) $$BUILD_DIR/$(PROJECTNAME)" && \
-		echo "Built: $$BUILD_DIR/$(PROJECTNAME)" && \
+		$(RUST_DOCKER) sh -c "cargo build && cp target/debug/$(PROJECT_NAME) $$BUILD_DIR/$(PROJECT_NAME)" && \
+		echo "Built: $$BUILD_DIR/$(PROJECT_NAME)" && \
 		if [ -d "src/client" ]; then \
-			$(RUST_DOCKER) sh -c "cargo build && cp target/debug/$(PROJECTNAME)-cli $$BUILD_DIR/$(PROJECTNAME)-cli" && \
-			echo "Built: $$BUILD_DIR/$(PROJECTNAME)-cli"; \
+			$(RUST_DOCKER) sh -c "cargo build && cp target/debug/$(PROJECT_NAME)-cli $$BUILD_DIR/$(PROJECT_NAME)-cli" && \
+			echo "Built: $$BUILD_DIR/$(PROJECT_NAME)-cli"; \
 		fi && \
-		echo "Test:  docker run --rm --name $(PROJECTNAME)-test -v $$BUILD_DIR:/app alpine:latest /app/$(PROJECTNAME) --help"
+		echo "Test:  docker run --rm --name $(PROJECT_NAME)-test -v $$BUILD_DIR:/app alpine:latest /app/$(PROJECT_NAME) --help"
 
 # =============================================================================
 # CLEAN - Remove build artifacts
@@ -27384,12 +27508,33 @@ Every binary MUST have these values embedded at build time:
 **Rust code requirement** (in `src/main.rs` or `src/version.rs`):
 
 ```rust
-// Build info - set via environment variables at build time (e.g., build.rs or env! macro)
+// Build info - set via build.rs, which maps VERSION/COMMIT_ID/BUILD_DATE/OFFICIAL_SITE to APP_*
 pub const VERSION: &str = option_env!("APP_VERSION").unwrap_or("devel");
 pub const COMMIT_ID: &str = option_env!("APP_COMMIT_ID").unwrap_or("N/A");
 pub const BUILD_DATE: &str = option_env!("APP_BUILD_DATE").unwrap_or("N/A");
 pub const OFFICIAL_SITE: &str = option_env!("APP_OFFICIAL_SITE").unwrap_or("");
 // OFFICIAL_SITE empty = users must use --server flag
+```
+
+**Required `build.rs`** (project root) — the Makefile's `RUST_DOCKER` wrapper and the Dockerfile's builder-stage `ARG`s expose `VERSION`, `COMMIT_ID`, `BUILD_DATE`, and `OFFICIAL_SITE` to `cargo build`; `build.rs` maps them to the `APP_*` variables `option_env!()` reads:
+
+```rust
+// build.rs — map build-system env vars to the APP_* rustc-env vars read by option_env!()
+fn main() {
+    let mappings = [
+        ("VERSION", "APP_VERSION"),
+        ("COMMIT_ID", "APP_COMMIT_ID"),
+        ("BUILD_DATE", "APP_BUILD_DATE"),
+        ("OFFICIAL_SITE", "APP_OFFICIAL_SITE"),
+    ];
+    for (src, dst) in mappings {
+        // Rebuild when a build-info env var changes
+        println!("cargo:rerun-if-env-changed={src}");
+        if let Ok(val) = std::env::var(src) {
+            println!("cargo:rustc-env={dst}={val}");
+        }
+    }
+}
 ```
 
 **Build date format:** Uses build system timezone or `TZ` env var.
@@ -27443,7 +27588,7 @@ All Docker builds use persistent Rust crate caching to avoid re-downloading depe
 2. Multi-stage Dockerfile handles Rust compilation (no pre-built binaries)
 3. Context is project root, Dockerfile at `docker/Dockerfile`
 4. Builds for `linux/amd64` and `linux/arm64`
-5. Pushes to `$REGISTRY:{version}` and `:latest`
+5. Tags `$REGISTRY:{version}` and `:latest` locally — no push; pushing is CI/CD's responsibility
 6. Passes VERSION, BUILD_DATE, COMMIT_ID as build args
 7. Layer caching: Rust crates cached in builder stage
 
@@ -27451,7 +27596,7 @@ All Docker builds use persistent Rust crate caching to avoid re-downloading depe
 
 1. Downloads Rust crates (cached)
 2. Runs tests inside Docker container (`casjaysdev/rust:latest`)
-3. Mounts project directory to `/build`
+3. Mounts project directory to `/app` (`-v $PWD:/app -w /app`)
 4. Runs `cargo test`
 5. Tests all crates
 6. Container removed after completion (`--rm`)
@@ -27463,7 +27608,7 @@ All Docker builds use persistent Rust crate caching to avoid re-downloading depe
 3. No release optimizations (debug build, version info not embedded)
 4. Outputs to `{tempdir}/{project_org}/{internal_name}-XXXXXX/` (isolated, org-identifiable)
 5. Uses Docker (`casjaysdev/rust:latest`) - keeps local machine clean
-6. Easy cleanup: `rm -rf "${TMPDIR:-/tmp}"/${PROJECT_ORG}.*/` or auto-deleted on reboot
+6. Easy cleanup: `rm -rf "${TMPDIR:-/tmp}/${PROJECT_ORG}/"` or auto-deleted on reboot
 
 ### `make local`
 
@@ -27760,14 +27905,14 @@ docker/
 | **Build type** | **Multi-stage** (builder + runtime) |
 | Builder stage | `casjaysdev/rust:latest` |
 | Runtime stage | `alpine:latest` |
-| Meta labels | All OCI labels (see below) |
+| Meta labels | None in the Dockerfile — CI applies OCI labels/annotations at build time (see below) |
 | Required packages | git, curl, bash, tini, tor |
 | Tor handling | Installed but **binary controls** (see PART 31) |
 | Binary location | `/usr/local/bin/{project_name}` |
 | Entrypoint script | `/usr/local/bin/entrypoint.sh` |
 | Init system | **tini** |
 | Internal port | **80** |
-| **ENV MODE** | **development** (allows localhost, .local, .test, etc.) |
+| **ENV MODE** | **not set** — binary defaults to production; compose files set `MODE` explicitly (`production` / `development`) |
 
 ### Container Paths
 
@@ -27878,13 +28023,14 @@ All Dockerfiles MUST include these labels:
 
 ### Multi-Arch Image Annotations
 
-**All image metadata is applied as OCI annotations — no LABEL blocks in the Dockerfile.**
+**All image metadata is applied at build time by CI — no LABEL blocks in the Dockerfile.**
 
-Container registries (GHCR, Docker Hub, etc.) read metadata from the manifest index for multi-arch images, not from individual image configs. `LABEL` applies only to per-platform image layers and is not visible on multiarch pulls. Only annotations are used.
+The Dockerfile stays clean: never add `LABEL` instructions. CI applies OCI labels via the workflow `labels:` key (or `--label` flags on `docker buildx build`) and additionally sets manifest annotations. Container registries (GHCR, Docker Hub, etc.) read metadata from the manifest index for multi-arch images, not from individual image configs — labels apply only to per-platform image layers, so annotations are also required for multiarch registry display.
 
 | Where | How | What For |
 |-------|-----|----------|
-| Workflow `annotations:` | Manifest index | All image metadata — registry display, multiarch |
+| Workflow `labels:` / `--label` flags | Per-platform image config | OCI labels on each image (docker inspect, tooling) |
+| Workflow `annotations:` | Manifest index | Registry display for multiarch pulls |
 
 **Apply annotations via `docker/metadata-action` in GitHub Actions:**
 
@@ -27901,7 +28047,7 @@ Container registries (GHCR, Docker Hub, etc.) read metadata from the manifest in
 - uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
   with:
     annotations: ${{ steps.meta.outputs.annotations }}
-    labels: ""
+    labels: ${{ steps.meta.outputs.labels }}
     provenance: false
     tags: ${{ steps.meta.outputs.tags }}
 ```
@@ -27917,7 +28063,7 @@ See dockerfile_conventions.md → OCI Annotations for the complete list of requi
 | **Non-root runtime user** | Runtime stage MUST create and switch to a non-root user. Alpine: `RUN addgroup -S app && adduser -S -G app app` then `USER app`. Debian/Ubuntu: `RUN groupadd -r app && useradd -r -g app app` then `USER app`. Exception: only if the app must bind a privileged port (<1024 — and even then prefer `setcap cap_net_bind_service`), or must manage system services. Document any exception in `IDEA.md`. |
 | **STOPSIGNAL** | Use `SIGRTMIN+3` for proper shutdown |
 | **ENTRYPOINT format** | `[ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]` |
-| **HEALTHCHECK timing** | Start: 10m, Interval: 5m, Timeout: 15s |
+| **HEALTHCHECK timing** | Image default: Start 10m, Interval 5m, Timeout 15s (conservative fallback for plain `docker run`); compose files override with tighter timings (Start 90s, Interval 10s, Timeout 5s) — the compose values are authoritative for deployments |
 | **Customization** | ALL customization via entrypoint.sh |
 | **entrypoint.sh tail** | Must end with `exec "$@"` (or `exec <binary> ... "$@"`) so the application replaces the shell as PID 1 and receives signals directly — without `exec`, tini/Docker signals are delivered to bash, not the app, and graceful shutdown breaks |
 
@@ -27941,15 +28087,18 @@ ARG COMMIT_ID
 
 WORKDIR /app
 
-# Copy Cargo.toml first for layer caching
+# Copy manifests first for layer caching
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo 'fn main() {}' > src/main.rs && cargo build --release && rm -f target/release/deps/{project_name}*
 
-# Copy source and build
+# Create a stub src/main.rs so cargo can resolve deps without full source
+RUN mkdir src && echo 'fn main() {}' > src/main.rs && \
+    cargo fetch --locked
+
+# Copy full source and build
 COPY . .
-RUN cargo build --release \
-    --target $([ "$TARGETARCH" = "arm64" ] && echo "aarch64-unknown-linux-musl" || echo "x86_64-unknown-linux-musl") \
-    && cp target/*/release/{project_name} /app/binary/{project_name}
+RUN cargo build --release --locked \
+    --target "$([ "$TARGETARCH" = "arm64" ] && echo "aarch64-unknown-linux-musl" || echo "x86_64-unknown-linux-musl")" && \
+    cp target/*/release/{project_name} /app/binary/{project_name}
 
 # =============================================================================
 # Runtime Stage - Minimal Alpine image
@@ -27997,8 +28146,8 @@ RUN chmod 755 /usr/local/bin/*
 # Set environment
 # Note: Tor available (binary installed) but server binary controls Tor startup (see PART 31)
 # DATABASE_DIR: SQLite location (binary auto-detects container, but explicit is clearer)
-ENV MODE=development \
-    TZ=America/New_York \
+# MODE is never baked into the image — binary defaults to production; compose sets MODE explicitly
+ENV TZ=America/New_York \
     DATABASE_DIR=/data/db/sqlite
 
 # Expose internal port (always 80)
@@ -28007,7 +28156,8 @@ EXPOSE 80
 # Stop signal for graceful shutdown
 STOPSIGNAL SIGRTMIN+3
 
-# Health check (long start period for services that need initialization)
+# Health check — conservative image-level fallback for plain `docker run`;
+# compose files override with tighter production timings (90s/10s/5s), which are authoritative
 HEALTHCHECK --start-period=10m --interval=5m --timeout=15s --retries=3 \
     CMD /usr/local/bin/{project_name} --status || exit 1
 
@@ -28876,14 +29026,14 @@ All workflows MUST set these environment variables:
 #   echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 #   echo "BUILD_DATE=$(date +"%a %b %d, %Y at %H:%M:%S %Z")" >> $GITHUB_ENV
 # Then pass to build step via environment variables consumed by build.rs or main.rs:
-#   VERSION, COMMIT_ID, BUILD_DATE, OFFICIALSITE
+#   VERSION, COMMIT_ID, BUILD_DATE, OFFICIAL_SITE
 ```
 
 ## CI Workflow (GitHub Actions)
 
 **File:** `.github/workflows/ci.yml`
 
-Runs on push and pull requests; security jobs (`secret-scan`, `workflow-policy`, `vuln-scan`, `image-scan`) also run on the weekly schedule. All jobs run inside `container: image: casjaysdev/rust:latest` — never installs tools inline. No `ensure-build-image` gate, no `build-toolchain.yml`.
+Runs on push and pull requests; security jobs (`secret-scan`, `workflow-policy`, `vuln-scan`, `image-scan`) also run on the weekly schedule. All toolchain jobs run inside `container: image: casjaysdev/rust:latest` — never installs tools inline (scanner jobs use their pinned actions directly on the runner). No `ensure-build-image` gate, no `build-toolchain.yml`.
 
 ```yaml
 name: CI
@@ -28893,6 +29043,9 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  schedule:
+    # Weekly security run (Monday 06:00 UTC) — only security jobs run on schedule
+    - cron: '0 6 * * 1'
 
 permissions:
   contents: read
@@ -28903,6 +29056,7 @@ concurrency:
 
 jobs:
   lint:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     container:
       image: casjaysdev/rust:latest
@@ -28910,7 +29064,37 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - run: cargo clippy -- -D warnings
 
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          # Full history — truffleHog scans the commit range
+          fetch-depth: 0
+      - name: Scan for secrets (truffleHog)
+        uses: trufflesecurity/trufflehog@27b0417c16317ca9a472a9a8092acce143b49c55  # v3.95.9
+        with:
+          # Use before/after — never default_branch (resolves to HEAD after push and skips the scan)
+          base: ${{ github.event.before }}
+          head: ${{ github.event.after }}
+          extra_args: --results=verified,unknown
+
+  workflow-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - name: Enforce SHA-pinned third-party actions
+        run: |
+          # Every third-party action must be pinned to a full 40-char commit SHA
+          BAD=$(grep -rEn 'uses:\s*[^ ]+@' .github/workflows/ | grep -Ev '@[0-9a-f]{40}' || true)
+          if [ -n "$BAD" ]; then
+            echo "::error::unpinned actions found:"
+            echo "$BAD"
+            exit 1
+          fi
+
   test:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     container:
       image: casjaysdev/rust:latest
@@ -28938,6 +29122,7 @@ jobs:
           fi
 
   build:
+    if: github.event_name != 'schedule'
     needs: [lint, test]
     runs-on: ubuntu-latest
     container:
@@ -28946,13 +29131,28 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - run: cargo build --release
 
-  vuln-check:
+  vuln-scan:
     runs-on: ubuntu-latest
     container:
       image: casjaysdev/rust:latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - run: cargo audit
+
+  image-scan:
+    # Only when the project ships a Docker image
+    if: hashFiles('docker/Dockerfile') != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - name: Build image for scanning
+        run: docker build -t local/scan-target:ci -f docker/Dockerfile .
+      - name: Scan image (Trivy)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          image-ref: local/scan-target:ci
+          exit-code: '1'
+          severity: CRITICAL,HIGH
 ```
 
 > **Note:** Security jobs (`secret-scan`, `workflow-policy`, `vuln-scan`, `image-scan`) are defined within `ci.yml`. They run on push, PR, and weekly schedule (`cron: '0 6 * * 1'`). Add `if: github.event_name != 'schedule'` to build/test/coverage/artifact jobs to skip non-security work on scheduled runs. Secret scanning is mandatory on every public repo via truffleHog (Apache-2.0). Use `github.event.before` / `github.event.after` for the scan range — never `default_branch`, which after a push resolves to the same commit as HEAD and silently skips the scan.
@@ -28978,7 +29178,7 @@ permissions:
   contents: write
 
 env:
-  PROJECTNAME: {project_name}
+  PROJECT_NAME: {project_name}
 
 jobs:
   build:
@@ -29027,12 +29227,12 @@ jobs:
           fi
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
           echo "BUILD_DATE=$(date +"%a %b %d, %Y at %H:%M:%S %Z")" >> $GITHUB_ENV
-          # OFFICIALSITE (optional): site.txt wins; otherwise use repository secrets or leave empty
+          # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
           # Never guess or assume - must be explicitly defined by user
           if [ -f site.txt ]; then
-            echo "OFFICIALSITE=$(cat site.txt)" >> $GITHUB_ENV
+            echo "OFFICIAL_SITE=$(cat site.txt)" >> $GITHUB_ENV
           else
-            echo "OFFICIALSITE=${{ secrets.OFFICIALSITE }}" >> $GITHUB_ENV
+            echo "OFFICIAL_SITE=${{ secrets.OFFICIAL_SITE }}" >> $GITHUB_ENV
           fi
 
       - name: Build server
@@ -29040,11 +29240,11 @@ jobs:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
           BUILD_DATE: ${{ env.BUILD_DATE }}
-          OFFICIALSITE: ${{ env.OFFICIALSITE }}
+          OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cross build --release --target ${{ matrix.target }}
-          cp target/${{ matrix.target }}/release/${{ env.PROJECTNAME }}${{ matrix.ext }} \
-            ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}${{ matrix.ext }} \
+            ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       # CLI build - only if src/client/ directory exists
       - name: Build CLI
@@ -29053,26 +29253,26 @@ jobs:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
           BUILD_DATE: ${{ env.BUILD_DATE }}
-          OFFICIALSITE: ${{ env.OFFICIALSITE }}
+          OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECTNAME }}-cli
-          cp target/${{ matrix.target }}/release/${{ env.PROJECTNAME }}-cli${{ matrix.ext }} \
-            ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
+          cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-cli${{ matrix.ext }} \
+            ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/') != ''
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
 
   release:
@@ -29112,7 +29312,7 @@ jobs:
         run: |
           tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
-            -czf binaries/${{ env.PROJECTNAME }}-${{ env.VERSION }}-source.tar.gz .
+            -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
       - name: Create Release
         # v3.0.1
@@ -29144,7 +29344,7 @@ permissions:
   contents: write
 
 env:
-  PROJECTNAME: {project_name}
+  PROJECT_NAME: {project_name}
 
 jobs:
   build:
@@ -29193,12 +29393,12 @@ jobs:
           fi
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
           echo "BUILD_DATE=$(date +"%a %b %d, %Y at %H:%M:%S %Z")" >> $GITHUB_ENV
-          # OFFICIALSITE (optional): site.txt wins; otherwise use repository secrets or leave empty
+          # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
           # Never guess or assume - must be explicitly defined by user
           if [ -f site.txt ]; then
-            echo "OFFICIALSITE=$(cat site.txt)" >> $GITHUB_ENV
+            echo "OFFICIAL_SITE=$(cat site.txt)" >> $GITHUB_ENV
           else
-            echo "OFFICIALSITE=${{ secrets.OFFICIALSITE }}" >> $GITHUB_ENV
+            echo "OFFICIAL_SITE=${{ secrets.OFFICIAL_SITE }}" >> $GITHUB_ENV
           fi
 
       - name: Build server
@@ -29206,11 +29406,11 @@ jobs:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
           BUILD_DATE: ${{ env.BUILD_DATE }}
-          OFFICIALSITE: ${{ env.OFFICIALSITE }}
+          OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cross build --release --target ${{ matrix.target }}
-          cp target/${{ matrix.target }}/release/${{ env.PROJECTNAME }}${{ matrix.ext }} \
-            ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}${{ matrix.ext }} \
+            ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       # CLI build - only if src/client/ directory exists
       - name: Build CLI
@@ -29219,26 +29419,26 @@ jobs:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
           BUILD_DATE: ${{ env.BUILD_DATE }}
-          OFFICIALSITE: ${{ env.OFFICIALSITE }}
+          OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECTNAME }}-cli
-          cp target/${{ matrix.target }}/release/${{ env.PROJECTNAME }}-cli${{ matrix.ext }} \
-            ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
+          cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-cli${{ matrix.ext }} \
+            ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/') != ''
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
 
   release:
@@ -29303,7 +29503,7 @@ permissions:
   contents: write
 
 env:
-  PROJECTNAME: {project_name}
+  PROJECT_NAME: {project_name}
 
 jobs:
   build:
@@ -29352,12 +29552,12 @@ jobs:
           fi
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
           echo "BUILD_DATE=$(date +"%a %b %d, %Y at %H:%M:%S %Z")" >> $GITHUB_ENV
-          # OFFICIALSITE (optional): site.txt wins; otherwise use repository secrets or leave empty
+          # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
           # Never guess or assume - must be explicitly defined by user
           if [ -f site.txt ]; then
-            echo "OFFICIALSITE=$(cat site.txt)" >> $GITHUB_ENV
+            echo "OFFICIAL_SITE=$(cat site.txt)" >> $GITHUB_ENV
           else
-            echo "OFFICIALSITE=${{ secrets.OFFICIALSITE }}" >> $GITHUB_ENV
+            echo "OFFICIAL_SITE=${{ secrets.OFFICIAL_SITE }}" >> $GITHUB_ENV
           fi
 
       - name: Build server
@@ -29365,11 +29565,11 @@ jobs:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
           BUILD_DATE: ${{ env.BUILD_DATE }}
-          OFFICIALSITE: ${{ env.OFFICIALSITE }}
+          OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cross build --release --target ${{ matrix.target }}
-          cp target/${{ matrix.target }}/release/${{ env.PROJECTNAME }}${{ matrix.ext }} \
-            ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}${{ matrix.ext }} \
+            ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       # CLI build - only if src/client/ directory exists
       - name: Build CLI
@@ -29378,26 +29578,26 @@ jobs:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
           BUILD_DATE: ${{ env.BUILD_DATE }}
-          OFFICIALSITE: ${{ env.OFFICIALSITE }}
+          OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECTNAME }}-cli
-          cp target/${{ matrix.target }}/release/${{ env.PROJECTNAME }}-cli${{ matrix.ext }} \
-            ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
+          cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-cli${{ matrix.ext }} \
+            ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/') != ''
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
 
   release:
@@ -29458,9 +29658,11 @@ jobs:
 
 | Trigger | Tags |
 |---------|------|
-| **Any push** (all branches) | `devel`, `{commit_id}` |
-| Push to beta branch | `devel`, `beta`, `{commit_id}` |
+| **Any push** (all branches) | `{commit_id}` |
+| Push to beta branch | `beta`, `{commit_id}` |
 | Version tag (`v*`, `*.*.*`) | `{version}`, `latest`, `YYMM` |
+
+> **Note:** CI never tags `:devel` — that tag is reserved for the `docker/Dockerfile.dev` debug image, which is built locally (see the compose Build Commands), never by CI.
 
 **Notes:**
 - `{commit_id}` = short SHA (7 characters) from `git rev-parse --short HEAD`
@@ -29487,7 +29689,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/devel' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/beta' }}
 
 env:
-  PROJECTNAME: {project_name}
+  PROJECT_NAME: {project_name}
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
@@ -29514,14 +29716,14 @@ jobs:
         uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ gitea.actor }}
-          password: ${{ secrets.GITEA_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set build info
         run: |
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
           echo "YYMM=$(date +"%y%m")" >> $GITHUB_ENV
-          if [[ "${{ gitea.ref }}" == refs/tags/* ]]; then
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF#refs/tags/}"
             echo "VERSION=${VERSION#v}" >> $GITHUB_ENV
             echo "IS_TAG=true" >> $GITHUB_ENV
@@ -29541,8 +29743,7 @@ jobs:
             TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
             TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.YYMM }}"
           else
-            TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:devel"
-            if [[ "${{ gitea.ref }}" == refs/heads/beta ]]; then
+            if [[ "${{ github.ref }}" == refs/heads/beta ]]; then
               TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:beta"
             fi
           fi
@@ -29566,28 +29767,28 @@ jobs:
           labels: |
             org.opencontainers.image.vendor={project_org}
             org.opencontainers.image.authors={project_org}
-            org.opencontainers.image.title=${{ env.PROJECTNAME }}
-            org.opencontainers.image.base.name=${{ env.PROJECTNAME }}
-            org.opencontainers.image.description=${{ env.PROJECTNAME }} - standard image (alpine)
+            org.opencontainers.image.title=${{ env.PROJECT_NAME }}
+            org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
+            org.opencontainers.image.description=${{ env.PROJECT_NAME }} - standard image (alpine)
             org.opencontainers.image.version=${{ env.VERSION }}
             org.opencontainers.image.created=${{ env.BUILD_DATE }}
             org.opencontainers.image.revision=${{ env.COMMIT_ID }}
-            org.opencontainers.image.url=${{ gitea.server_url }}/${{ gitea.repository }}
-            org.opencontainers.image.source=${{ gitea.server_url }}/${{ gitea.repository }}
-            org.opencontainers.image.documentation=${{ gitea.server_url }}/${{ gitea.repository }}
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.licenses=MIT
           annotations: |
             manifest:org.opencontainers.image.vendor={project_org}
             manifest:org.opencontainers.image.authors={project_org}
-            manifest:org.opencontainers.image.title=${{ env.PROJECTNAME }}
-            manifest:org.opencontainers.image.base.name=${{ env.PROJECTNAME }}
-            manifest:org.opencontainers.image.description=${{ env.PROJECTNAME }} - standard image (alpine)
+            manifest:org.opencontainers.image.title=${{ env.PROJECT_NAME }}
+            manifest:org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
+            manifest:org.opencontainers.image.description=${{ env.PROJECT_NAME }} - standard image (alpine)
             manifest:org.opencontainers.image.version=${{ env.VERSION }}
             manifest:org.opencontainers.image.created=${{ env.BUILD_DATE }}
             manifest:org.opencontainers.image.revision=${{ env.COMMIT_ID }}
-            manifest:org.opencontainers.image.url=${{ gitea.server_url }}/${{ gitea.repository }}
-            manifest:org.opencontainers.image.source=${{ gitea.server_url }}/${{ gitea.repository }}
-            manifest:org.opencontainers.image.documentation=${{ gitea.server_url }}/${{ gitea.repository }}
+            manifest:org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
+            manifest:org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            manifest:org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
             manifest:org.opencontainers.image.licenses=MIT
 
 ```
@@ -29598,7 +29799,7 @@ jobs:
 |----------|-----------|
 | Latest stable | `{name}:latest` |
 | Specific version | `{name}:1.2.3` |
-| Development | `{name}:devel` |
+| Development (local `Dockerfile.dev` build, never CI) | `{name}:devel` |
 | Beta | `{name}:beta` |
 | Commit | `{name}:abc1234` |
 
@@ -29623,7 +29824,7 @@ Key differences from GitHub Actions:
 - Registry: Auto-detected from server URL (works with self-hosted)
 - Some GitHub-specific variables have Gitea/Forgejo equivalents (see mapping table below)
 
-## Self-Hosted Configuration (GitHub Actions)
+## Self-Hosted Configuration (Gitea/Forgejo Actions)
 
 **Gitea:**
 
@@ -29677,7 +29878,7 @@ permissions:
   contents: write
 
 env:
-  PROJECTNAME: {project_name}
+  PROJECT_NAME: {project_name}
 
 jobs:
   build:
@@ -29726,12 +29927,12 @@ jobs:
           fi
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITEA_ENV
           echo "BUILD_DATE=$(date +"%a %b %d, %Y at %H:%M:%S %Z")" >> $GITEA_ENV
-          # OFFICIALSITE (optional): site.txt wins; otherwise use repository secrets or leave empty
+          # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
           # Never guess or assume - must be explicitly defined by user
           if [ -f site.txt ]; then
-            echo "OFFICIALSITE=$(cat site.txt)" >> $GITEA_ENV
+            echo "OFFICIAL_SITE=$(cat site.txt)" >> $GITEA_ENV
           else
-            echo "OFFICIALSITE=${{ secrets.OFFICIALSITE }}" >> $GITEA_ENV
+            echo "OFFICIAL_SITE=${{ secrets.OFFICIAL_SITE }}" >> $GITEA_ENV
           fi
 
       - name: Build server
@@ -29739,11 +29940,11 @@ jobs:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
           BUILD_DATE: ${{ env.BUILD_DATE }}
-          OFFICIALSITE: ${{ env.OFFICIALSITE }}
+          OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cross build --release --target ${{ matrix.target }}
-          cp target/${{ matrix.target }}/release/${{ env.PROJECTNAME }}${{ matrix.ext }} \
-            ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}${{ matrix.ext }} \
+            ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       # CLI build - only if src/client/ directory exists
       - name: Build CLI
@@ -29752,26 +29953,26 @@ jobs:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
           BUILD_DATE: ${{ env.BUILD_DATE }}
-          OFFICIALSITE: ${{ env.OFFICIALSITE }}
+          OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECTNAME }}-cli
-          cp target/${{ matrix.target }}/release/${{ env.PROJECTNAME }}-cli${{ matrix.ext }} \
-            ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
+          cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-cli${{ matrix.ext }} \
+            ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/') != ''
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
 
   release:
@@ -29811,7 +30012,7 @@ jobs:
         run: |
           tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
-            -czf binaries/${{ env.PROJECTNAME }}-${{ env.VERSION }}-source.tar.gz .
+            -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
       - name: Create Release
         # v3.0.1
@@ -29843,7 +30044,7 @@ permissions:
   contents: write
 
 env:
-  PROJECTNAME: {project_name}
+  PROJECT_NAME: {project_name}
 
 jobs:
   build:
@@ -29859,6 +30060,26 @@ jobs:
           - target: aarch64-unknown-linux-musl
             os: linux
             arch: arm64
+          - target: x86_64-apple-darwin
+            os: darwin
+            arch: amd64
+          - target: aarch64-apple-darwin
+            os: darwin
+            arch: arm64
+          - target: x86_64-pc-windows-gnu
+            os: windows
+            arch: amd64
+            ext: .exe
+          - target: aarch64-pc-windows-gnullvm
+            os: windows
+            arch: arm64
+            ext: .exe
+          - target: x86_64-unknown-freebsd
+            os: freebsd
+            arch: amd64
+          - target: aarch64-unknown-freebsd
+            os: freebsd
+            arch: arm64
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -29872,12 +30093,12 @@ jobs:
           fi
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITEA_ENV
           echo "BUILD_DATE=$(date +"%a %b %d, %Y at %H:%M:%S %Z")" >> $GITEA_ENV
-          # OFFICIALSITE (optional): site.txt wins; otherwise use repository secrets or leave empty
+          # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
           # Never guess or assume - must be explicitly defined by user
           if [ -f site.txt ]; then
-            echo "OFFICIALSITE=$(cat site.txt)" >> $GITEA_ENV
+            echo "OFFICIAL_SITE=$(cat site.txt)" >> $GITEA_ENV
           else
-            echo "OFFICIALSITE=${{ secrets.OFFICIALSITE }}" >> $GITEA_ENV
+            echo "OFFICIAL_SITE=${{ secrets.OFFICIAL_SITE }}" >> $GITEA_ENV
           fi
 
       - name: Build server
@@ -29885,11 +30106,11 @@ jobs:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
           BUILD_DATE: ${{ env.BUILD_DATE }}
-          OFFICIALSITE: ${{ env.OFFICIALSITE }}
+          OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cross build --release --target ${{ matrix.target }}
-          cp target/${{ matrix.target }}/release/${{ env.PROJECTNAME }}${{ matrix.ext }} \
-            ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}${{ matrix.ext }} \
+            ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       # CLI build - only if src/client/ directory exists
       - name: Build CLI
@@ -29898,26 +30119,26 @@ jobs:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
           BUILD_DATE: ${{ env.BUILD_DATE }}
-          OFFICIALSITE: ${{ env.OFFICIALSITE }}
+          OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECTNAME }}-cli
-          cp target/${{ matrix.target }}/release/${{ env.PROJECTNAME }}-cli${{ matrix.ext }} \
-            ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
+          cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-cli${{ matrix.ext }} \
+            ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/') != ''
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
 
   release:
@@ -29982,7 +30203,7 @@ permissions:
   contents: write
 
 env:
-  PROJECTNAME: {project_name}
+  PROJECT_NAME: {project_name}
 
 jobs:
   build:
@@ -30031,12 +30252,12 @@ jobs:
           fi
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITEA_ENV
           echo "BUILD_DATE=$(date +"%a %b %d, %Y at %H:%M:%S %Z")" >> $GITEA_ENV
-          # OFFICIALSITE (optional): site.txt wins; otherwise use repository secrets or leave empty
+          # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
           # Never guess or assume - must be explicitly defined by user
           if [ -f site.txt ]; then
-            echo "OFFICIALSITE=$(cat site.txt)" >> $GITEA_ENV
+            echo "OFFICIAL_SITE=$(cat site.txt)" >> $GITEA_ENV
           else
-            echo "OFFICIALSITE=${{ secrets.OFFICIALSITE }}" >> $GITEA_ENV
+            echo "OFFICIAL_SITE=${{ secrets.OFFICIAL_SITE }}" >> $GITEA_ENV
           fi
 
       - name: Build server
@@ -30044,11 +30265,11 @@ jobs:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
           BUILD_DATE: ${{ env.BUILD_DATE }}
-          OFFICIALSITE: ${{ env.OFFICIALSITE }}
+          OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cross build --release --target ${{ matrix.target }}
-          cp target/${{ matrix.target }}/release/${{ env.PROJECTNAME }}${{ matrix.ext }} \
-            ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}${{ matrix.ext }} \
+            ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       # CLI build - only if src/client/ directory exists
       - name: Build CLI
@@ -30057,26 +30278,26 @@ jobs:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
           BUILD_DATE: ${{ env.BUILD_DATE }}
-          OFFICIALSITE: ${{ env.OFFICIALSITE }}
+          OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECTNAME }}-cli
-          cp target/${{ matrix.target }}/release/${{ env.PROJECTNAME }}-cli${{ matrix.ext }} \
-            ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
+          cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-cli${{ matrix.ext }} \
+            ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ env.PROJECTNAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/') != ''
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ env.PROJECTNAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
 
   release:
@@ -30146,7 +30367,7 @@ concurrency:
   cancel-in-progress: ${{ gitea.ref == 'refs/heads/main' || gitea.ref == 'refs/heads/master' || gitea.ref == 'refs/heads/devel' || gitea.ref == 'refs/heads/dev' || gitea.ref == 'refs/heads/beta' }}
 
 env:
-  PROJECTNAME: {project_name}
+  PROJECT_NAME: {project_name}
   # Registry auto-detected from Gitea instance (works with self-hosted)
   # Format: {gitea-server}/owner/repo -> extracts server for registry
   IMAGE_NAME: ${{ gitea.repository }}
@@ -30159,7 +30380,6 @@ jobs:
       packages: write
 
     steps:
-```
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Set up QEMU
@@ -30210,10 +30430,7 @@ jobs:
             TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
             TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.YYMM }}"
           else
-            # All pushes get devel tag
-            TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:devel"
-
-            # Beta branch also gets beta tag
+            # Beta branch also gets beta tag; :devel is never tagged by CI (local Dockerfile.dev build only)
             if [[ "${{ gitea.ref }}" == refs/heads/beta ]]; then
               TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:beta"
             fi
@@ -30237,9 +30454,9 @@ jobs:
           labels: |
             org.opencontainers.image.vendor={project_org}
             org.opencontainers.image.authors={project_org}
-            org.opencontainers.image.title=${{ env.PROJECTNAME }}
-            org.opencontainers.image.base.name=${{ env.PROJECTNAME }}
-            org.opencontainers.image.description=${{ env.PROJECTNAME }} - standard image (alpine)
+            org.opencontainers.image.title=${{ env.PROJECT_NAME }}
+            org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
+            org.opencontainers.image.description=${{ env.PROJECT_NAME }} - standard image (alpine)
             org.opencontainers.image.version=${{ env.VERSION }}
             org.opencontainers.image.created=${{ env.BUILD_DATE }}
             org.opencontainers.image.revision=${{ env.COMMIT_ID }}
@@ -30250,9 +30467,9 @@ jobs:
           annotations: |
             manifest:org.opencontainers.image.vendor={project_org}
             manifest:org.opencontainers.image.authors={project_org}
-            manifest:org.opencontainers.image.title=${{ env.PROJECTNAME }}
-            manifest:org.opencontainers.image.base.name=${{ env.PROJECTNAME }}
-            manifest:org.opencontainers.image.description=${{ env.PROJECTNAME }} - standard image (alpine)
+            manifest:org.opencontainers.image.title=${{ env.PROJECT_NAME }}
+            manifest:org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
+            manifest:org.opencontainers.image.description=${{ env.PROJECT_NAME }} - standard image (alpine)
             manifest:org.opencontainers.image.version=${{ env.VERSION }}
             manifest:org.opencontainers.image.created=${{ env.BUILD_DATE }}
             manifest:org.opencontainers.image.revision=${{ env.COMMIT_ID }}
@@ -30295,7 +30512,7 @@ jobs:
 
 GitLab CI uses a single `.gitlab-ci.yml` file in the repository root with stages instead of separate workflow files.
 
-## Self-Hosted Configuration (Gitea/Forgejo Actions)
+## Self-Hosted Configuration (GitLab CI)
 
 | Setting | Value |
 |---------|-------|
@@ -30327,8 +30544,8 @@ All `$CI_*` variables are auto-populated by GitLab (works with self-hosted).
 # Equivalent to GitHub Actions: release.yml, beta.yml, daily.yml, docker.yml
 
 variables:
-  PROJECTNAME: "{project_name}"
-  PROJECTORG: "{project_org}"
+  PROJECT_NAME: "{project_name}"
+  PROJECT_ORG: "{project_org}"
   # Rust CI defaults to casjaysdev/rust:latest — a docker/Dockerfile.build only for a genuine custom need, and then FROM casjaysdev/rust:latest.
   BUILD_IMAGE: "casjaysdev/rust:latest"
 
@@ -30351,13 +30568,13 @@ stages:
     - export VERSION="${CI_COMMIT_TAG#v}"
     - export COMMIT_ID="${CI_COMMIT_SHORT_SHA}"
     - export BUILD_DATE="$(date +"%a %b %d, %Y at %H:%M:%S %Z")"
-    # OFFICIALSITE (optional): site.txt wins; otherwise use CI/CD Variables or leave empty
+    # OFFICIAL_SITE (optional): site.txt wins; otherwise use CI/CD Variables or leave empty
     # Never guess or assume - must be explicitly defined by user
     - |
       if [ -f site.txt ]; then
-        export OFFICIALSITE="$(cat site.txt)"
+        export OFFICIAL_SITE="$(cat site.txt)"
       else
-        export OFFICIALSITE="${OFFICIALSITE:-}"
+        export OFFICIAL_SITE="${OFFICIAL_SITE:-}"
       fi
 
 # =============================================================================
@@ -30484,7 +30701,11 @@ test:
   <<: *rust-build
   stage: test
   script:
-    - make test
+    # Explicit commands — CI never uses Makefile targets
+    - cargo test --release
+    - mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
+    - export COVDIR="$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")"
+    - cargo tarpaulin --out Xml --output-dir "$COVDIR"
   rules:
     - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+/
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
@@ -30640,10 +30861,10 @@ docker:build:
         TAGS="-t $CI_REGISTRY_IMAGE:$VERSION -t $CI_REGISTRY_IMAGE:latest -t $CI_REGISTRY_IMAGE:$YYMM -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
       elif [ "$CI_COMMIT_BRANCH" = "beta" ]; then
         VERSION="beta-$CI_COMMIT_SHORT_SHA"
-        TAGS="-t $CI_REGISTRY_IMAGE:beta -t $CI_REGISTRY_IMAGE:devel -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+        TAGS="-t $CI_REGISTRY_IMAGE:beta -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
       else
-        VERSION="devel-$CI_COMMIT_SHORT_SHA"
-        TAGS="-t $CI_REGISTRY_IMAGE:devel -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+        VERSION="$CI_COMMIT_SHORT_SHA"
+        TAGS="-t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
       fi
       BUILD_DATE="$(date -Iseconds)"
     - |
@@ -30769,8 +30990,8 @@ pipeline {
     }
 
     environment {
-        PROJECTNAME = '{project_name}'
-        PROJECTORG = '{project_org}'
+        PROJECT_NAME = '{project_name}'
+        PROJECT_ORG = '{project_org}'
         BINDIR = 'binaries'
         RELDIR = 'releases'
         // Rust cache bind-mounted from host: CARGO_CACHE (.cargo), RUSTUP_CACHE (.rustup), SCCACHE_CACHE (sccache), CARGO_TARGET (target dir, scoped per project)
@@ -30829,9 +31050,9 @@ pipeline {
                     }
                     env.COMMIT_ID = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                     env.BUILD_DATE = sh(script: 'date +"%a %b %d, %Y at %H:%M:%S %Z"', returnStdout: true).trim()
-                    // OFFICIALSITE (optional): site.txt wins; otherwise use Jenkins credentials or leave empty
+                    // OFFICIAL_SITE (optional): site.txt wins; otherwise use Jenkins credentials or leave empty
                     // Never guess or assume - must be explicitly defined by user
-                    env.OFFICIALSITE = sh(script: '[ -f site.txt ] && cat site.txt || echo "${OFFICIALSITE:-}"', returnStdout: true).trim()
+                    env.OFFICIAL_SITE = sh(script: '[ -f site.txt ] && cat site.txt || echo "${OFFICIAL_SITE:-}"', returnStdout: true).trim()
                     env.HAS_CLI = sh(script: '[ -d src/client ] && echo true || echo false', returnStdout: true).trim()
                 }
                 sh 'mkdir -p ${BINDIR} ${RELDIR}'
@@ -31239,12 +31460,9 @@ pipeline {
                         tags += " -t ${REGISTRY}:latest"
                         tags += " -t ${REGISTRY}:${yymm}"
                     } else if (env.BUILD_TYPE == 'beta') {
-                        // Beta branch - beta, devel
+                        // Beta branch - beta tag; all builds already carry the commit-id tag.
+                        // :devel is never tagged by CI (local Dockerfile.dev build only)
                         tags += " -t ${REGISTRY}:beta"
-                        tags += " -t ${REGISTRY}:devel"
-                    } else {
-                        // All other branches - devel only
-                        tags += " -t ${REGISTRY}:devel"
                     }
 
                     // Login to container registry
@@ -31372,7 +31590,7 @@ REGISTRY = "ghcr.io/${PROJECT_ORG}/${PROJECT_NAME}"
 
 Before proceeding, confirm you understand:
 - [ ] Docker uses tini as init, Alpine base
-- [ ] Makefile has exactly 4 targets: build, release, docker, test
+- [ ] Makefile has exactly 6 core targets: dev, local, build, test, release, docker
 - [ ] Binary naming: NEVER include -musl suffix
 - [ ] All 8 platform builds required (4 OS x 2 arch)
 - [ ] CLI builds (if src/client/ exists): 8 additional binaries with `-cli` suffix
@@ -31491,7 +31709,7 @@ Config files are NEVER in the repository. They are generated at RUNTIME:
 | File | Location | Created When |
 |------|----------|--------------|
 | `server.yml` | `{config_dir}/server.yml` (see PART 4) | Server first run |
-| `cli.yml` | `~/.config/{project_org}/{internal_name}/cli.yml` | CLI first run |
+| `cli.yml` | `~/.config/{internal_org}/{internal_name}/cli.yml` | CLI first run |
 | Tor config | `{config_dir}/tor/torrc` (see PART 31) | When Tor enabled |
 | Tor data | `{data_dir}/tor/` (see PART 31) | When Tor enabled |
 
@@ -32283,8 +32501,8 @@ fi
 set -eo pipefail
 
 # Detect project info
-PROJECTNAME=$(basename "$PWD")
-PROJECTORG=$(basename "$(dirname "$PWD")")
+PROJECT_NAME=$(basename "$PWD")
+PROJECT_ORG=$(basename "$(dirname "$PWD")")
 
 # Create temp directory for build
 mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
@@ -32393,7 +32611,7 @@ docker run --rm \
 
     echo '=== Open API Smoke Test ==='
     # No auth required — all endpoints are publicly accessible
-    curl -q -LSsf http://localhost:64580/server/healthz | grep -q '"ok":true' \
+    curl -q -LSsf http://localhost:64580/server/healthz | grep -q '"status"' \
         && echo '✓ Health endpoint works' \
         || echo '✗ FAILED: Health endpoint'
 
@@ -32463,8 +32681,8 @@ if ! command -v incus &>/dev/null; then
 fi
 
 # Detect project info
-PROJECTNAME=$(basename "$PWD")
-PROJECTORG=$(basename "$(dirname "$PWD")")
+PROJECT_NAME=$(basename "$PWD")
+PROJECT_ORG=$(basename "$(dirname "$PWD")")
 CONTAINER_NAME="test-${PROJECT_NAME}-$$"
 
 # Incus image - use latest Debian stable (update when new stable releases)
@@ -32526,7 +32744,7 @@ fi
 
 
 # Ensure curl is available for testing
-incus exec "$CONTAINER_NAME" -- bash -c "command -v curl || apt-get update && apt-get install -y curl" >/dev/null 2>&1
+incus exec "$CONTAINER_NAME" -- bash -c "command -v curl || { apt-get update && apt-get install -y curl; }" >/dev/null 2>&1
 
 echo "Running tests in Incus..."
 incus exec "$CONTAINER_NAME" -- bash -c "
@@ -32597,7 +32815,7 @@ incus exec "$CONTAINER_NAME" -- bash -c "
 
     echo '=== Open API Smoke Test ==='
     # No auth required — all endpoints are publicly accessible
-    curl -q -LSsf http://localhost:80/server/healthz | grep -q '"ok":true' \
+    curl -q -LSsf http://localhost:80/server/healthz | grep -q '"status"' \
         && echo '✓ Health endpoint works' \
         || echo '✗ FAILED: Health endpoint'
 
@@ -32742,7 +32960,7 @@ sleep 3
 
 # 1. Health check
 echo "Testing health endpoint..."
-curl -q -LSsf http://localhost:64580/server/healthz | grep -q '"ok":true' \
+curl -q -LSsf http://localhost:64580/server/healthz | grep -q '"status"' \
     && echo '✓ Health endpoint works' \
     || { echo '✗ FAILED: Health endpoint'; kill $SERVER_PID; exit 1; }
 
@@ -32990,7 +33208,7 @@ incus launch images:debian/trixie test-{project_name}
 
 # Push binary and test data
 incus file push binaries/{project_name} test-{project_name}/usr/local/bin/
-incus exec test-{project_name} -- mkdir -p /etc/{project_org}/{internal_name} /var/lib/{project_org}/{internal_name}
+incus exec test-{project_name} -- mkdir -p /etc/{internal_org}/{internal_name} /var/lib/{internal_org}/{internal_name}
 
 # Test
 incus exec test-{project_name} -- {project_name} --help
@@ -33713,7 +33931,7 @@ chmod +x {project_name}-linux-amd64
 ## Systemd Service
 
 ```bash
-sudo ./{project_name} --service install
+sudo ./{project_name} --service --install
 # operator action on target host — not an AI-executed command during development
 sudo systemctl start {project_name}
 # operator action on target host — not an AI-executed command during development
@@ -34367,7 +34585,6 @@ pub struct LocaleFS;
     "account_locked": "Cuenta bloqueada",
     "method_not_allowed": "Método no permitido",
     "conflict": "El recurso ya existe",
-    "rate_limited": "Demasiadas solicitudes",
     "server_error": "Error interno del servidor",
     "maintenance_mode": "Servicio no disponible"
   },
@@ -34538,7 +34755,7 @@ pub struct LocaleFS;
     "graceful_shutdown": "Apagado graceful completado",
     "shutdown_error": "Error de apagado del servidor HTTP: {error}",
     "windows_daemon_warning": "Advertencia: --daemon no es compatible en Windows",
-    "windows_service_hint": "Use --service install && --service start para Servicio de Windows",
+    "windows_service_hint": "Use --service --install && --service start para Servicio de Windows",
     "error_create_dir": "Error al crear directorio {path}: {error}",
     "error_not_writable": "El directorio {path} no es escribible: {error}",
     "error_reserved_path": "'{path}' es una ruta reservada",
@@ -35308,13 +35525,13 @@ mod tests {
 - SOCKS proxy / browsing through Tor (client-side)
 - Tor relay or exit node functionality
 
-Tor integration uses **external Tor binary** via the `bine` crate. This maintains static binary compatibility while providing full Tor hidden service functionality.
+Tor integration drives the **external Tor binary** directly — the server generates a torrc, spawns and manages the tor process, and reads the hostname file. No Tor library crate is used; this maintains static binary compatibility while providing full Tor hidden service functionality.
 
 **Key Architecture Points:**
 - **Server binary owns Tor** - starts, stops, and manages Tor process lifecycle
 - **Hidden service maps to server port** - `.onion:80` → `localhost:{server_port}`
 - **Server enforces permissions** - creates all dirs/files with correct owner/group/perms
-- **HiddenServiceVersion 3** - v3 onion addresses (56 characters, ed25519) via ADD_ONION
+- **HiddenServiceVersion 3** - v3 onion addresses (56 characters, ed25519) via torrc `HiddenServiceDir`
 - **Localhost auto control port** - Tor control uses `127.0.0.1:auto` on all OSes
 - **SafeLogging enabled** - Scrubs sensitive info from Tor logs
 
@@ -35374,7 +35591,7 @@ server:
 
 **CRITICAL: Port Requirements**
 - **NEVER use default Tor ports** (9050, 9051, etc.)
-- **Use `ControlPort 127.0.0.1:auto` on all OSes** for the current bine-based integration
+- **Use `ControlPort 127.0.0.1:auto` on all OSes** - the server reads the chosen port from `ControlPortWriteToFile`
 - **Never hardcode a control port** - let Tor choose a free localhost port at runtime
 - Server's Tor instance is completely isolated from any system Tor
 
@@ -35444,7 +35661,7 @@ impl Service {
         let use_tor = should_use_tor(&self.config);
 
         // Get appropriate HTTP client (TorManager.get_http_client handles routing)
-        let client = self.tor_manager.get_http_client(use_tor);
+        let client = self.tor_manager.get_http_client(use_tor).await;
 
         let resp = client.get(url).send().await?;
         Ok(resp.bytes().await?.to_vec())
@@ -35505,7 +35722,7 @@ When `use_network` is enabled, the torrc includes `SocksPort auto` for outbound 
 
 ### All Platforms
 - **Control connection**: TCP `127.0.0.1:auto`
-- **Hidden service target**: Server's HTTP port via localhost (bine handles via ADD_ONION)
+- **Hidden service target**: Server's HTTP port via localhost (torrc `HiddenServicePort` mapping)
 - **No fixed control ports** - Tor picks a free localhost port at startup
 
 | Feature | All OSes |
@@ -35549,8 +35766,8 @@ This prevents conflicts with any existing Tor installation on the system.
    ├─ SocksPort: auto (if outbound enabled) or 0 (hidden service only)
    ├─ Completely isolated from system Tor
    ├─ Wait for bootstrap completion
-   ├─ Create hidden service via ADD_ONION
-   └─ Initialize Dialer (if outbound enabled)
+   ├─ Read .onion hostname from `{data_dir}/tor/site/hostname`
+   └─ Discover runtime SOCKS listener via control port (if outbound enabled)
 
 5. On application shutdown:
    └─ Terminate the dedicated Tor process
@@ -35644,7 +35861,7 @@ This prevents conflicts with any existing Tor installation on the system.
 
 ### Library
 
-Use the `bine` crate (static binary compatible):
+No Tor library crate is used. The server drives the external `tor` binary directly with `tokio::process` (static binary compatible):
 
 ```rust
 use std::path::PathBuf;
@@ -35655,15 +35872,14 @@ use anyhow::anyhow;
 // TorService manages the Tor hidden service and outbound connections.
 // Server binary fully owns and controls the Tor process lifecycle.
 pub struct TorService {
-    tor: bine::Tor,
-    // .onion address (without .onion suffix)
+    // Managed external tor process (killed on drop)
+    child: tokio::process::Child,
+    // .onion address (without .onion suffix), read from the hostname file
     service_id: String,
-    // ED25519 private key for persistent address
-    key: Option<Vec<u8>>,
     // Server's HTTP port that hidden service forwards to
     server_port: u16,
-    // For outbound Tor connections (None if disabled)
-    dialer: Option<bine::Dialer>,
+    // SOCKS listener address for outbound Tor connections (None if disabled)
+    socks_addr: Option<String>,
 }
 
 // TorConfig holds Tor-related configuration from server config
@@ -35745,10 +35961,10 @@ pub async fn start_dedicated_tor(server_port: u16, cfg: &TorConfig) -> anyhow::R
     // Paths
     let torrc_path = config_dir.join("tor").join("torrc");
     let tor_data_dir = data_dir.join("tor");
-    let key_path = data_dir.join("tor").join("site").join("hs_ed25519_secret_key");
+    let hostname_path = tor_data_dir.join("site").join("hostname");
 
-    // Generate torrc content from config
-    let torrc_content = get_tor_config(cfg);
+    // Generate torrc content from config (includes HiddenServiceDir/HiddenServicePort)
+    let torrc_content = get_tor_config(cfg, server_port);
 
     // Create torrc only if it doesn't exist (persistent)
     // torrc is preserved across restarts - only operator-edited server.yml can update it
@@ -35759,79 +35975,125 @@ pub async fn start_dedicated_tor(server_port: u16, cfg: &TorConfig) -> anyhow::R
         tracing::info!("Using existing torrc at {:?}", torrc_path);
     }
 
-    // Build StartConf
-    let mut conf = bine::StartConf::new();
-    // Use our custom torrc from config directory
-    conf.torrc_file = Some(torrc_path.clone());
-    // Runtime data directory - isolated from system Tor
-    conf.data_dir = Some(tor_data_dir.clone());
-    // Let torrc control SocksPort (auto if outbound enabled, 0 if not)
-    conf.no_auto_socks_port = true;
-
-    // Use custom Tor binary path if specified in config
-    if !cfg.binary.is_empty() {
-        conf.exe_path = Some(PathBuf::from(&cfg.binary));
-    }
+    // Resolve Tor binary: config override or auto-detect on PATH
+    let tor_binary = if cfg.binary.is_empty() {
+        which_tor().ok_or_else(|| anyhow!("tor binary not found on PATH"))?
+    } else {
+        PathBuf::from(&cfg.binary)
+    };
 
     // Start OUR OWN Tor process - completely separate from system Tor
     // Server starts → Tor starts; Server stops → Tor stops
-    let t = bine::Tor::start(conf).await
+    let child = tokio::process::Command::new(&tor_binary)
+        .arg("-f")
+        .arg(&torrc_path)
+        .arg("--DataDirectory")
+        .arg(&tor_data_dir)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
         .map_err(|e| anyhow!("failed to start dedicated tor: {}", e))?;
 
-    // Wait for Tor to bootstrap (connect to network)
-    // Use bootstrap timeout from config (default 180 seconds = 3 minutes)
+    // Wait for bootstrap: Tor writes the hostname file once the hidden
+    // service descriptor is set up (bootstrap timeout from config, default 3m)
     let bootstrap_timeout = std::time::Duration::from_secs(cfg.bootstrap_timeout as u64);
-    tokio::time::timeout(bootstrap_timeout, t.enable_network())
+    let service_id = tokio::time::timeout(bootstrap_timeout, wait_for_hostname(&hostname_path))
         .await
-        .map_err(|_| anyhow!("tor bootstrap timeout"))?
-        .map_err(|e| anyhow!("failed to enable tor network: {}", e))?;
-
-    // Load or generate ED25519 key for persistent .onion address
-    let existing_key = if key_path.exists() {
-        tokio::fs::read(&key_path).await.ok()
-    } else {
-        None
-    };
-
-    // Create hidden service via ADD_ONION control command
-    // This forwards .onion:{virtual_port} → 127.0.0.1:server_port (existing HTTP server)
-    let port_mapping = format!("{}=127.0.0.1:{}", cfg.virtual_port, server_port);
-    let resp = t.control().add_onion(&port_mapping, existing_key.as_deref()).await
-        .map_err(|e| anyhow!("failed to create onion service: {}", e))?;
-
-    // Save key for persistent address (if newly generated)
-    if existing_key.is_none() {
-        if let Some(key_bytes) = &resp.key {
-            if let Err(e) = save_onion_key(&key_path, key_bytes).await {
-                tracing::warn!("failed to save onion key: {}", e);
-            }
-        }
-    }
+        .map_err(|_| anyhow!("tor bootstrap timeout"))??;
 
     let mut svc = TorService {
-        tor: t,
-        service_id: resp.service_id.clone(),
-        key: existing_key,
+        child,
+        service_id: service_id.clone(),
         server_port,
-        dialer: None,
+        socks_addr: None,
     };
 
-    // Initialize outbound dialer if enabled (server-wide or user preference allowed)
+    // Discover the runtime SOCKS listener if outbound is enabled
     if cfg.use_network {
-        match svc.tor.dialer().await {
-            Ok(dialer) => {
-                svc.dialer = Some(dialer);
+        match query_socks_addr(&tor_data_dir).await {
+            Ok(addr) => {
+                svc.socks_addr = Some(addr);
                 tracing::info!("Tor outbound connections enabled");
             }
             Err(e) => {
-                tracing::warn!("failed to create Tor dialer: {}", e);
+                tracing::warn!("failed to discover Tor SOCKS listener: {}", e);
                 // Continue without outbound - hidden service still works
             }
         }
     }
 
-    tracing::info!("Tor hidden service started: {}.onion:{} → 127.0.0.1:{}", resp.service_id, cfg.virtual_port, server_port);
+    tracing::info!("Tor hidden service started: {}.onion:{} → 127.0.0.1:{}", service_id, cfg.virtual_port, server_port);
     Ok(svc)
+}
+
+// which_tor searches PATH for the tor binary (auto-detection)
+fn which_tor() -> Option<PathBuf> {
+    let exe = if cfg!(windows) { "tor.exe" } else { "tor" };
+    std::env::var_os("PATH").and_then(|paths| {
+        std::env::split_paths(&paths)
+            .map(|dir| dir.join(exe))
+            .find(|p| p.is_file())
+    })
+}
+
+// wait_for_hostname polls until Tor writes the hidden service hostname file
+async fn wait_for_hostname(path: &std::path::Path) -> anyhow::Result<String> {
+    loop {
+        if let Ok(contents) = tokio::fs::read_to_string(path).await {
+            if let Some(id) = contents.trim().strip_suffix(".onion") {
+                return Ok(id.to_string());
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+}
+
+// query_socks_addr reads the control port file (ControlPortWriteToFile),
+// authenticates with the control cookie, and asks Tor for the runtime
+// SOCKS listener address via GETINFO net/listeners/socks
+async fn query_socks_addr(tor_data_dir: &std::path::Path) -> anyhow::Result<String> {
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+    // Control port file content: "PORT=127.0.0.1:{port}\n"
+    let port_line = tokio::fs::read_to_string(tor_data_dir.join("control_port")).await?;
+    let control_addr = port_line
+        .trim()
+        .strip_prefix("PORT=")
+        .ok_or_else(|| anyhow!("unexpected control port file format"))?
+        .to_string();
+
+    // Cookie authentication (CookieAuthentication 1 in torrc)
+    let cookie = tokio::fs::read(tor_data_dir.join("control_auth_cookie")).await?;
+    let cookie_hex: String = cookie.iter().map(|b| format!("{:02x}", b)).collect();
+
+    let stream = tokio::net::TcpStream::connect(&control_addr).await?;
+    let (read_half, mut write_half) = stream.into_split();
+    let mut reader = BufReader::new(read_half).lines();
+
+    write_half.write_all(format!("AUTHENTICATE {}\r\n", cookie_hex).as_bytes()).await?;
+    let line = reader.next_line().await?.unwrap_or_default();
+    if !line.starts_with("250") {
+        return Err(anyhow!("control auth failed: {}", line));
+    }
+
+    write_half.write_all(b"GETINFO net/listeners/socks\r\n").await?;
+    // Reply: 250-net/listeners/socks="127.0.0.1:{port}"
+    let mut socks_addr = String::new();
+    while let Some(line) = reader.next_line().await? {
+        if let Some(value) = line.strip_prefix("250-net/listeners/socks=") {
+            socks_addr = value.trim_matches('"').to_string();
+        }
+        if line.starts_with("250 ") {
+            break;
+        }
+    }
+    write_half.write_all(b"QUIT\r\n").await?;
+
+    if socks_addr.is_empty() {
+        return Err(anyhow!("tor reported no SOCKS listener"));
+    }
+    Ok(socks_addr)
 }
 
 impl TorService {
@@ -35842,13 +36104,13 @@ impl TorService {
 
     // outbound_enabled returns true if Tor outbound connections are available
     pub fn outbound_enabled(&self) -> bool {
-        self.dialer.is_some()
+        self.socks_addr.is_some()
     }
 
     // get_http_client returns an HTTP client, optionally routed through Tor
     // use_tor: true = route through Tor SOCKS5 proxy, false = direct connection
     pub fn get_http_client(&self, use_tor: bool) -> reqwest::Client {
-        if !use_tor || self.dialer.is_none() {
+        if !use_tor || self.socks_addr.is_none() {
             // Direct connection
             return reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
@@ -35856,36 +36118,22 @@ impl TorService {
                 .expect("invariant: default HTTP client config is always valid");
         }
 
-        // Route through Tor network
+        // Route through Tor network (socks5h = DNS resolution through Tor)
+        let socks_url = format!(
+            "socks5h://{}",
+            self.socks_addr.as_ref().expect("invariant: socks_addr set before client build")
+        );
         reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
-            .proxy(reqwest::Proxy::all(
-                self.dialer.as_ref().expect("invariant: dialer set before client build").socks5_addr()
-            ).expect("invariant: valid SOCKS5 proxy URL"))
+            .proxy(reqwest::Proxy::all(&socks_url).expect("invariant: valid SOCKS5 proxy URL"))
             .build()
             .expect("invariant: Tor client config is always valid")
     }
 
     // close shuts down the Tor process
-    pub async fn close(self) -> anyhow::Result<()> {
-        self.tor.close().await.map_err(|e| anyhow!("{}", e))
+    pub async fn close(mut self) -> anyhow::Result<()> {
+        self.child.kill().await.map_err(|e| anyhow!("{}", e))
     }
-}
-
-// save_onion_key saves the ED25519 private key for persistent .onion address
-async fn save_onion_key(path: &std::path::Path, key: &[u8]) -> anyhow::Result<()> {
-    // Ensure directory exists
-    if let Some(parent) = path.parent() {
-        tokio::fs::create_dir_all(parent).await?;
-    }
-    // Write key with restricted permissions
-    tokio::fs::write(path, key).await?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        tokio::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).await?;
-    }
-    Ok(())
 }
 ```
 
@@ -35910,7 +36158,7 @@ async fn save_onion_key(path: &std::path::Path, key: &[u8]) -> anyhow::Result<()
 │ Tor Network                                                         │
 │ xyz...abc.onion:80                                                  │
 └─────────────┬───────────────────────────────────────────────────────┘
-              │ forwards to (via ADD_ONION)
+              │ forwards to (via HiddenServicePort)
               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ Server's Tor Process (owned by server binary)                      │
@@ -35924,7 +36172,7 @@ async fn save_onion_key(path: &std::path::Path, key: &[u8]) -> anyhow::Result<()
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-- **bine uses `control.add_onion()`** with port mapping: `80 → 127.0.0.1:{server_port}`
+- **torrc `HiddenServicePort`** declares the port mapping: `80 → 127.0.0.1:{server_port}`
 - **Tor forwards to server's existing HTTP port** - no new listener created
 - **Same on ALL platforms** - control uses the same localhost auto-port model
 - **Server port is NOT a Tor port** - it's the server's normal HTTP listener
@@ -35939,7 +36187,7 @@ async fn save_onion_key(path: &std::path::Path, key: &[u8]) -> anyhow::Result<()
 ### Tor Configuration Optimizations
 
 **Hidden Service → Server Port Mapping:**
-- **Uses `control.add_onion()`** - NOT torrc-based HiddenServiceDir
+- **Uses torrc `HiddenServiceDir` + `HiddenServicePort`** - Tor creates and persists the keys
 - Hidden service forwards `.onion:80` → `127.0.0.1:{server_port}` (server's existing HTTP port)
 - Port mapping specified via port key-val: virtual port 80 → target `127.0.0.1:{server_port}`
 - Tor connects to server's existing HTTP listener - no new ports opened
@@ -35947,16 +36195,18 @@ async fn save_onion_key(path: &std::path::Path, key: &[u8]) -> anyhow::Result<()
 ```rust
 // get_tor_config generates torrc content from TorConfig settings
 //
-// NOTE: Hidden service is created via control.add_onion(), NOT torrc
-// The torrc only configures Tor daemon settings, not the hidden service itself
+// NOTE: Hidden service is declared in torrc via HiddenServiceDir/HiddenServicePort
+// Tor creates the keys and hostname file under {data_dir}/tor/site/
 //
-// PORT DETECTION: All ports use runtime detection via "auto" - never saved/hardcoded
+// PORT DETECTION: SOCKS and control ports use runtime detection via "auto" - never saved/hardcoded
 // - SocksPort auto: Tor picks available high port at startup
 // - ControlPort 127.0.0.1:auto: Tor picks available high port on all OSes
-// - bine reads actual port from control connection after Tor starts
+// - Server reads the chosen control port from ControlPortWriteToFile, then
+//   queries the SOCKS listener via GETINFO net/listeners/socks
 //
 // NEVER uses default Tor ports (9050, 9051) - uses localhost auto ports
-pub fn get_tor_config(cfg: &TorConfig) -> String {
+pub fn get_tor_config(cfg: &TorConfig, server_port: u16) -> String {
+    let tor_data_dir = paths::get_data_dir().join("tor");
     // All OSes use the same localhost auto-port control connection.
     // "auto" = Tor picks an available high port at runtime (never saved)
     let control_config = "ControlPort 127.0.0.1:auto";
@@ -35991,8 +36241,8 @@ pub fn get_tor_config(cfg: &TorConfig) -> String {
     format!(r#"
 # ============================================================
 # Tor Configuration - Generated by server binary
-# This file is PERSISTENT - manual edits are preserved
-# Manual edits may be overwritten when config is saved via operator
+# This file is PERSISTENT - it is not regenerated on normal restarts
+# It IS regenerated when the operator saves Tor config changes - manual edits are lost then
 # ============================================================
 
 # SOCKS port for outbound connections (0 = disabled, auto = runtime port)
@@ -36002,6 +36252,14 @@ pub fn get_tor_config(cfg: &TorConfig) -> String {
 # Control connection
 # NEVER uses default port 9051 - uses runtime localhost port on all OSes
 {}
+ControlPortWriteToFile {}/control_port
+CookieAuthentication 1
+
+# Hidden service (v3) - forwards .onion:{} → server's HTTP port
+HiddenServiceDir {}/site
+HiddenServicePort {} 127.0.0.1:{}
+HiddenServiceVersion 3
+HiddenServiceNumIntroductionPoints {}
 
 # Security Hardening
 SafeLogging {}
@@ -36020,7 +36278,7 @@ ExitPolicy reject *:*
 ORPort 0
 DirPort 0
 
-# Hidden service optimizations (actual HS created via ADD_ONION)
+# Hidden service optimizations
 HiddenServiceSingleHopMode 0
 
 # Faster startup
@@ -36029,7 +36287,7 @@ FetchDirInfoExtraEarly 1
 
 # Reduce memory usage
 DisableDebuggerAttachment 1
-"#, socks_config, control_config, safe_logging, cfg.bandwidth_rate, cfg.bandwidth_burst, accounting_config)
+"#, socks_config, control_config, tor_data_dir.display(), cfg.virtual_port, tor_data_dir.display(), cfg.virtual_port, server_port, cfg.num_intro_points, safe_logging, cfg.bandwidth_rate, cfg.bandwidth_burst, accounting_config)
 }
 ```
 
@@ -36048,27 +36306,20 @@ DisableDebuggerAttachment 1
 
 **Runtime Port Detection:**
 - Ports are NEVER hardcoded or saved - always detected at runtime
-- `SocksPort auto` → Tor picks available high port, bine reads it after startup
+- `SocksPort auto` → Tor picks available high port, server queries it via the control port after startup
 - `ControlPort 127.0.0.1:auto` → Tor picks available high port on localhost
 
-**Hidden Service Settings (via `control.add_onion()`, not torrc):**
+**Hidden Service Settings (declared in torrc):**
 
-The hidden service is created using bine's `control.add_onion()` method, which sends the ADD_ONION command to Tor:
+The hidden service is declared in the generated torrc; Tor creates and persists everything under `HiddenServiceDir`:
 
 | Setting | How Applied | Description |
 |---------|-------------|-------------|
-| Version 3 | `KeyAlgoED25519V3` | v3 onion (56 chars, ed25519) |
-| Target port | `"80=127.0.0.1:{port}"` | Forwards to server's HTTP port |
-| Virtual port | Key in port mapping (e.g., "80") | `.onion` port users connect to |
-| Key persistence | `{data_dir}/tor/site/hs_ed25519_secret_key` | Server saves/loads key for persistent address |
-
-**Required bine imports:**
-```rust
-// add_onion, key handling
-use bine::control;
-// Tor, StartConf
-use bine::tor;
-```
+| Version 3 | `HiddenServiceVersion 3` | v3 onion (56 chars, ed25519) |
+| Target port | `HiddenServicePort 80 127.0.0.1:{port}` | Forwards to server's HTTP port |
+| Virtual port | First value of `HiddenServicePort` (e.g., `80`) | `.onion` port users connect to |
+| Key persistence | `{data_dir}/tor/site/hs_ed25519_secret_key` | Tor creates/loads key for persistent address |
+| Hostname | `{data_dir}/tor/site/hostname` | Tor writes the .onion address; server reads it |
 
 ### Tor Process Lifecycle
 
@@ -36164,7 +36415,7 @@ impl TorManager {
         // Regenerate torrc with new settings (overwrite existing)
         let config_dir = paths::get_config_dir();
         let torrc_path = config_dir.join("tor").join("torrc");
-        let torrc_content = get_tor_config(&config);
+        let torrc_content = get_tor_config(&config, self.server_port);
 
         update_torrc(&torrc_path, torrc_content.as_bytes()).await
             .map_err(|e| anyhow!("failed to update torrc: {}", e))?;
@@ -36190,7 +36441,7 @@ impl TorManager {
                 .map_err(|e| anyhow!("failed to remove old keys: {}", e))?;
         }
 
-        // Start Tor - new keys will be generated by control.add_onion
+        // Start Tor - new keys will be generated by Tor in HiddenServiceDir
         self.start_locked(&mut svc).await?;
 
         Ok(svc.as_ref().expect("invariant: svc populated by start_locked").onion_address())
@@ -36332,7 +36583,7 @@ No impact on binary size - Tor is external. Application binary remains small and
 | Tor config directory | `{config_dir}/tor/` | Server creates with 0700 |
 | Tor config file | `{config_dir}/tor/torrc` | Server generates with 0600 |
 | Tor data directory | `{data_dir}/tor/` | Server creates with 0700 |
-| Control socket | `{data_dir}/tor/control.sock` | Unix/macOS/BSD only |
+| Control connection | TCP `127.0.0.1:auto` (runtime port, no file) | All platforms |
 | Hidden service keys | `{data_dir}/tor/site/` | Server creates with 0700 |
 | Tor process PID | `{data_dir}/tor/tor.pid` | |
 | Tor log file | `{log_dir}/tor.log` | |
@@ -36342,10 +36593,10 @@ No impact on binary size - Tor is external. Application binary remains small and
 | Environment | {config_dir} | {data_dir} | {log_dir} |
 |-------------|--------------|------------|-----------|
 | Docker | `/config/{project_name}/` | `/data/{project_name}/` | `/data/log/{project_name}/` |
-| Linux root | `/etc/{project_org}/{internal_name}/` | `/var/lib/{project_org}/{internal_name}/` | `/var/log/{project_org}/{internal_name}/` |
-| Linux user | `~/.config/{project_org}/{internal_name}/` | `~/.local/share/{project_org}/{internal_name}/` | `~/.local/log/{project_org}/{internal_name}/` |
-| macOS | `~/Library/Application Support/{project_org}/{internal_name}/` | Same as config | `~/Library/Logs/{project_org}/{internal_name}/` |
-| Windows | `%AppData%\{project_org}\{internal_name}\` | Same as config | `%AppData%\{project_org}\{internal_name}\log\` |
+| Linux root | `/etc/{internal_org}/{internal_name}/` | `/var/lib/{internal_org}/{internal_name}/` | `/var/log/{internal_org}/{internal_name}/` |
+| Linux user | `~/.config/{internal_org}/{internal_name}/` | `~/.local/share/{internal_org}/{internal_name}/` | `~/.local/log/{internal_org}/{internal_name}/` |
+| macOS | `~/Library/Application Support/{internal_org}/{internal_name}/` | Same as config | `~/Library/Logs/{internal_org}/{internal_name}/` |
+| Windows | `%AppData%\{internal_org}\{internal_name}\` | Same as config | `%AppData%\{internal_org}\{internal_name}\log\` |
 
 **Tor directories are ALWAYS `{config_dir}/tor/`, `{data_dir}/tor/`, `{log_dir}/tor.log` - never hardcoded paths.**
 
@@ -36489,7 +36740,7 @@ pub async fn ensure_tor_file(path: &std::path::Path, content: &[u8]) -> anyhow::
 | Config dir | `{config_dir}/tor/` | `0700` | app user | Server creates/enforces |
 | torrc | `{config_dir}/tor/torrc` | `0600` | app user | Server generates |
 | Data dir | `{data_dir}/tor/` | `0700` | app user | Server creates/enforces |
-| Control socket | `{data_dir}/tor/control.sock` | `0600` | app user | Unix only |
+| Control port file | `{data_dir}/tor/control_port` | `0600` | app user | Tor writes chosen port |
 | Site dir | `{data_dir}/tor/site/` | `0700` | app user | Server creates/enforces |
 | Private key | `{data_dir}/tor/site/hs_ed25519_secret_key` | `0600` | app user | Tor creates |
 | Public key | `{data_dir}/tor/site/hs_ed25519_public_key` | `0600` | app user | Tor creates |
@@ -36569,8 +36820,8 @@ When a project includes a client, it provides a terminal-based interface for int
 | Default binary name | `{project_name}-cli` |
 | Versioning | Same as main application |
 | Build | Part of same Makefile (`make build` produces both binaries) |
-| Config location (Unix) | `~/.config/{project_org}/{internal_name}/cli.yml` |
-| Config location (Windows) | `%APPDATA%\{project_org}\{internal_name}\cli.yml` |
+| Config location (Unix) | `~/.config/{internal_org}/{internal_name}/cli.yml` |
+| Config location (Windows) | `%APPDATA%\{internal_org}\{internal_name}\cli.yml` |
 
 ## Binary Naming Rules
 
@@ -36597,7 +36848,7 @@ let user_agent = format!("{}-cli/{}", PROJECT_NAME, version);
 
 ## CLI Open API Access
 
-**The server is an open API — no authentication required. The CLI connects to the server URL and calls endpoints directly.**
+**The server is an open API — no authentication is required to use public endpoints. The CLI connects to the server URL and calls endpoints directly. Tokens exist for OWNERSHIP: creating an object may return a token, and a valid token (via `--token`, `{PROJECT_NAME}_TOKEN`, or `auth.token` in cli.yml) authorizes edit/delete of the objects it owns. Operator actions additionally require the operator token (`server.token`). See the Authentication section below.**
 
 | Flag | Description |
 |------|-------------|
@@ -36606,7 +36857,7 @@ let user_agent = format!("{}-cli/{}", PROJECT_NAME, version);
 **Server sources (priority order):**
 1. `--server` flag (explicit)
 2. Environment variable: `{PROJECT_NAME}_SERVER`
-3. Config file: `cli.yml` → `server: https://...`
+3. Config file: `cli.yml` → `server.primary: https://...`
 4. Compiled default (if IDEA.md specifies one)
 
 **Usage:**
@@ -36617,12 +36868,12 @@ let user_agent = format!("{}-cli/{}", PROJECT_NAME, version);
 
 ## CLI Config File Permissions
 
-**`cli.yml` contains server connection config. Create with standard permissions:**
+**`cli.yml` contains server connection config and may hold an API token (`auth.token`). Create with user-only permissions:**
 
 | Path | Required perms |
 |------|----------------|
-| `~/.config/{project_org}/{internal_name}/cli.yml` (Unix) | `0644` |
-| `%APPDATA%\{project_org}\{internal_name}\cli.yml` (Windows) | Default ACL |
+| `~/.config/{internal_org}/{internal_name}/cli.yml` (Unix) | `0600` |
+| `%APPDATA%\{internal_org}\{internal_name}\cli.yml` (Windows) | Default ACL |
 
 ## CLI Auto-Update (Same Pattern as Server Self-Update)
 
@@ -36867,7 +37118,7 @@ let env = display::detect_display_env();
 if env.is_auto_detect_display_mode_gui() {
     // Launch native GUI
 } else if env.is_auto_detect_display_mode_tui() {
-    // Launch bubbletea TUI
+    // Launch ratatui TUI
 } else if env.is_auto_detect_display_mode_cli() {
     // Text output with colors
 } else {
@@ -36880,7 +37131,7 @@ if env.is_auto_detect_display_mode_gui() {
 | DisplayMode | Priority | When Auto-Detected | CLI Binary Behavior |
 |-------------|----------|-------------------|---------------------|
 | **DisplayModeGUI** | 1 | Native display, no remote | Launch native GUI (GTK/Cocoa/Win32) |
-| **DisplayModeTUI** | 2 | Interactive terminal | Launch bubbletea TUI |
+| **DisplayModeTUI** | 2 | Interactive terminal | Launch ratatui TUI |
 | **DisplayModeCLI** | 3 | Command provided or piped | Text output with colors |
 | **DisplayModeHeadless** | 4 | No display, no TTY | Error (CLI requires interaction) |
 
@@ -36952,7 +37203,7 @@ Why CLI needs a setup wizard:
 
 | Requirement | GUI | TUI |
 |-------------|-----|-----|
-| **Professional UI/UX** | Native look (GTK/Cocoa/Win32) | Clean bubbletea interface |
+| **Professional UI/UX** | Native look (GTK/Cocoa/Win32) | Clean ratatui interface |
 | **Full server functionality** | 100% feature coverage | 100% feature coverage |
 | **Keyboard navigation** | Tab, Enter, Escape | Full keyboard support |
 | **Real-time validation** | Input validation | Input validation |
@@ -37078,7 +37329,7 @@ fn select_setup_mode() -> SetupMode {
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**TUI Setup Wizard (Terminal - Bubbletea):**
+**TUI Setup Wizard (Terminal - ratatui):**
 
 ```
 ╔══════════════════════════════════════════════════════════════════════╗
@@ -37145,7 +37396,7 @@ use anyhow::Result;
 pub async fn run_setup_wizard() -> Result<()> {
     let cfg = config::load_cli_config();
     if let Ok(cfg) = cfg {
-        if !cfg.server.is_empty() {
+        if !cfg.server.primary.is_empty() {
             // Config exists with server - skip wizard
             return Ok(());
         }
@@ -37160,7 +37411,10 @@ pub async fn run_setup_wizard() -> Result<()> {
 
     // Save configuration
     config::save_cli_config(&config::CLIConfig {
-        server: result.server_url,
+        server: config::ServerConfig {
+            primary: result.server_url,
+            ..Default::default()
+        },
         // ... other settings from wizard
     })
 }
@@ -37168,7 +37422,7 @@ pub async fn run_setup_wizard() -> Result<()> {
 // Called at CLI startup only
 pub async fn ensure_configured() -> Result<()> {
     let cfg = config::load_cli_config().ok();
-    if cfg.as_ref().map_or(true, |c| c.server.is_empty()) {
+    if cfg.as_ref().map_or(true, |c| c.server.primary.is_empty()) {
         return run_setup_wizard().await;
     }
     Ok(())
@@ -37858,23 +38112,23 @@ The client uses the same user directory structure as the server in user mode. Th
 
 | Directory | Path | Purpose |
 |-----------|------|---------|
-| Config | `~/.config/{project_org}/{internal_name}/` | Configuration files |
-| Config File | `~/.config/{project_org}/{internal_name}/cli.yml` | CLI configuration |
-| Data | `~/.local/share/{project_org}/{internal_name}/` | Persistent data |
-| Cache | `~/.cache/{project_org}/{internal_name}/` | Temporary/cached data |
-| Logs | `~/.local/log/{project_org}/{internal_name}/` | Log files |
-| Log File | `~/.local/log/{project_org}/{internal_name}/cli.log` | CLI log output |
+| Config | `~/.config/{internal_org}/{internal_name}/` | Configuration files |
+| Config File | `~/.config/{internal_org}/{internal_name}/cli.yml` | CLI configuration |
+| Data | `~/.local/share/{internal_org}/{internal_name}/` | Persistent data |
+| Cache | `~/.cache/{internal_org}/{internal_name}/` | Temporary/cached data |
+| Logs | `~/.local/log/{internal_org}/{internal_name}/` | Log files |
+| Log File | `~/.local/log/{internal_org}/{internal_name}/cli.log` | CLI log output |
 
 #### Windows
 
 | Directory | Path | Purpose |
 |-----------|------|---------|
-| Config | `%APPDATA%\{project_org}\{internal_name}\` | Configuration files |
-| Config File | `%APPDATA%\{project_org}\{internal_name}\cli.yml` | CLI configuration |
-| Data | `%LOCALAPPDATA%\{project_org}\{internal_name}\data\` | Persistent data |
-| Cache | `%LOCALAPPDATA%\{project_org}\{internal_name}\cache\` | Temporary/cached data |
-| Logs | `%LOCALAPPDATA%\{project_org}\{internal_name}\log\` | Log files |
-| Log File | `%LOCALAPPDATA%\{project_org}\{internal_name}\log\cli.log` | CLI log output |
+| Config | `%APPDATA%\{internal_org}\{internal_name}\` | Configuration files |
+| Config File | `%APPDATA%\{internal_org}\{internal_name}\cli.yml` | CLI configuration |
+| Data | `%LOCALAPPDATA%\{internal_org}\{internal_name}\data\` | Persistent data |
+| Cache | `%LOCALAPPDATA%\{internal_org}\{internal_name}\cache\` | Temporary/cached data |
+| Logs | `%LOCALAPPDATA%\{internal_org}\{internal_name}\log\` | Log files |
+| Log File | `%LOCALAPPDATA%\{internal_org}\{internal_name}\log\cli.log` | CLI log output |
 
 #### Directory Usage
 
@@ -37886,9 +38140,9 @@ The client uses the same user directory structure as the server in user mode. Th
 | Logs | `cli.log`, debug logs | Optional |
 
 **NEVER use OS system directories for CLI runtime state:**
-- `/etc/{project_org}/{internal_name}/` (Linux system config)
-- `/var/lib/{project_org}/{internal_name}/` (Linux system data)
-- `/var/log/{project_org}/{internal_name}/` (Linux system logs)
+- `/etc/{internal_org}/{internal_name}/` (Linux system config)
+- `/var/lib/{internal_org}/{internal_name}/` (Linux system data)
+- `/var/log/{internal_org}/{internal_name}/` (Linux system logs)
 - `C:\ProgramData\` (Windows system data)
 - Any other system-owned directory for CLI config/data/cache/logs
 
@@ -37900,10 +38154,10 @@ On every startup, the CLI MUST:
 
 1. **Ensure directories exist** (create if missing):
    ```
-   ├─ {config_dir}/           (~/.config/{project_org}/{internal_name}/)
-   ├─ {data_dir}/             (~/.local/share/{project_org}/{internal_name}/)
-   ├─ {cache_dir}/            (~/.cache/{project_org}/{internal_name}/)
-   └─ {log_dir}/              (~/.local/log/{project_org}/{internal_name}/)
+   ├─ {config_dir}/           (~/.config/{internal_org}/{internal_name}/)
+   ├─ {data_dir}/             (~/.local/share/{internal_org}/{internal_name}/)
+   ├─ {cache_dir}/            (~/.cache/{internal_org}/{internal_name}/)
+   └─ {log_dir}/              (~/.local/log/{internal_org}/{internal_name}/)
    ```
 
 2. **Set correct permissions** (user-only access):
@@ -38001,20 +38255,20 @@ pub fn ensure_file(path: &Path) -> Result<()> {
 
 use std::path::PathBuf;
 
-const PROJECT_ORG: &str = "{project_org}";
-const PROJECT_NAME: &str = "{project_name}";
+const INTERNAL_ORG: &str = "{internal_org}";
+const INTERNAL_NAME: &str = "{internal_name}";
 
 // config_dir returns the CLI config directory
 pub fn config_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
         let appdata = std::env::var("APPDATA").unwrap_or_default();
-        PathBuf::from(appdata).join(PROJECT_ORG).join(PROJECT_NAME)
+        PathBuf::from(appdata).join(INTERNAL_ORG).join(INTERNAL_NAME)
     }
     #[cfg(not(target_os = "windows"))]
     {
         let home = dirs::home_dir().unwrap_or_default();
-        home.join(".config").join(PROJECT_ORG).join(PROJECT_NAME)
+        home.join(".config").join(INTERNAL_ORG).join(INTERNAL_NAME)
     }
 }
 
@@ -38023,12 +38277,12 @@ pub fn data_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
         let localappdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
-        PathBuf::from(localappdata).join(PROJECT_ORG).join(PROJECT_NAME).join("data")
+        PathBuf::from(localappdata).join(INTERNAL_ORG).join(INTERNAL_NAME).join("data")
     }
     #[cfg(not(target_os = "windows"))]
     {
         let home = dirs::home_dir().unwrap_or_default();
-        home.join(".local").join("share").join(PROJECT_ORG).join(PROJECT_NAME)
+        home.join(".local").join("share").join(INTERNAL_ORG).join(INTERNAL_NAME)
     }
 }
 
@@ -38037,12 +38291,12 @@ pub fn cache_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
         let localappdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
-        PathBuf::from(localappdata).join(PROJECT_ORG).join(PROJECT_NAME).join("cache")
+        PathBuf::from(localappdata).join(INTERNAL_ORG).join(INTERNAL_NAME).join("cache")
     }
     #[cfg(not(target_os = "windows"))]
     {
         let home = dirs::home_dir().unwrap_or_default();
-        home.join(".cache").join(PROJECT_ORG).join(PROJECT_NAME)
+        home.join(".cache").join(INTERNAL_ORG).join(INTERNAL_NAME)
     }
 }
 
@@ -38051,12 +38305,12 @@ pub fn log_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
         let localappdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
-        PathBuf::from(localappdata).join(PROJECT_ORG).join(PROJECT_NAME).join("log")
+        PathBuf::from(localappdata).join(INTERNAL_ORG).join(INTERNAL_NAME).join("log")
     }
     #[cfg(not(target_os = "windows"))]
     {
         let home = dirs::home_dir().unwrap_or_default();
-        home.join(".local").join("log").join(PROJECT_ORG).join(PROJECT_NAME)
+        home.join(".local").join("log").join(INTERNAL_ORG).join(INTERNAL_NAME)
     }
 }
 
@@ -38160,8 +38414,8 @@ fn resolve_yaml_extension(path: &Path) -> PathBuf {
 {project_name}-cli --config ~/work/prod.yml list
 
 # Config profiles allow different servers/tokens without flags
-# dev.yml:   server: https://dev.example.com, token: dev-token
-# staging.yml: server: https://staging.example.com, token: staging-token
+# dev.yml:   server.primary: https://dev.example.com, auth.token: dev-token
+# staging.yml: server.primary: https://staging.example.com, auth.token: staging-token
 ```
 
 ### cli.yml Configuration
@@ -38169,7 +38423,7 @@ fn resolve_yaml_extension(path: &Path) -> PathBuf {
 **EVERYTHING must be configurable via cli.yml. Sane defaults match server where applicable.**
 
 ```yaml
-# ~/.config/{project_org}/{internal_name}/cli.yml
+# ~/.config/{internal_org}/{internal_name}/cli.yml
 # client configuration - ALL options with defaults
 
 # Server connection
@@ -38326,7 +38580,7 @@ To configure a server, run:
   {project_name}-cli --server https://your-server.example.com list
 
 This will save the server address for future commands.
-Or edit ~/.config/{project_org}/{internal_name}/cli.yml directly.
+Or edit ~/.config/{internal_org}/{internal_name}/cli.yml directly.
 ```
 
 **Projects with official site show default in help:**
@@ -38772,14 +39026,14 @@ Example commands (project-dependent):
 | Operator Token (`server.token`) | Server-wide operator actions (CLI only) |
 
 **Token Storage:**
-- Stored in `cli.yml` under `server.token`
+- Stored in `cli.yml` under `auth.token` (or `auth.token_file` to read from a file)
 - `--token` flag saves to cli.yml only if not already set (same as `--server`)
-- Environment variable: `{PROJECT_NAME}_CLI_TOKEN` (does NOT save to config)
+- Environment variable: `{PROJECT_NAME}_TOKEN` (does NOT save to config)
 
 **Priority (highest to lowest):**
 1. `--token` flag (saves only if config empty/invalid)
-2. `{PROJECT_NAME}_CLI_TOKEN` environment variable
-3. `server.token` in cli.yml
+2. `{PROJECT_NAME}_TOKEN` environment variable
+3. `auth.token` in cli.yml
 
 ## HTTP Client Identity
 
@@ -39570,7 +39824,7 @@ Error: cannot connect to server at https://{project_name}.example.com
 $ {project_name}-cli server status --token invalid
 Error: authentication failed
   Your API token is invalid or expired.
-  Update server.token in cli.yml or use --token flag.
+  Update auth.token in cli.yml or use --token flag.
 
 # Not found
 $ {project_name}-cli get abc123
@@ -40080,7 +40334,7 @@ cd "$TEMP_DIR" && docker compose up -d
 ```bash
 # Quick build → temp dir (no version info)
 make dev
-# Full build → binaries/ (with ldflags)
+# Full build → binaries/ (with --release flags)
 make build
 # Run tests in container
 make test
@@ -40139,7 +40393,7 @@ make docker
 - [ ] BSD paths: Same as Linux
 - [ ] Docker paths: `/config/`, `/data/`
 - [ ] Root vs user path detection works
-- [ ] All path functions use `{project_org}/{internal_name}` structure
+- [ ] All path functions use `{internal_org}/{internal_name}` structure
 
 **PART 5: Configuration**
 - [ ] Config file: `server.yml` (not .yaml, not .json)
@@ -40292,7 +40546,7 @@ make docker
 - [ ] Long strings have `word-break: break-all` CSS (IPv6, .onion, tokens, hashes)
 - [ ] Touch targets minimum 44x44px on mobile
 
-### Phase 6: Email & Scheduler (PARTS 17-18)
+### Phase 6: Email & Notifications (PART 17)
 
 **PART 17: Email & Notifications**
 - [ ] SMTP configuration in config file and API
@@ -40302,7 +40556,7 @@ make docker
 - [ ] Email queue with retry logic
 - [ ] Email logging (success/failure)
 
-### Phase 7: Features (PARTS 19-22)
+### Phase 7: Scheduler & Features (PARTS 18-21)
 
 **PART 18: Scheduler**
 - [ ] Built-in scheduler always running
@@ -40341,7 +40595,7 @@ make docker
 - [ ] **Daily incremental** `{project_name}-daily.tar.gz[.enc]` always valid
 - [ ] **Hourly incremental** `{project_name}-hourly.tar.gz[.enc]` (if enabled)
 
-### Phase 8: Maintenance (PARTS 23-26)
+### Phase 8: Maintenance (PARTS 22-25)
 
 **PART 22: Update Command**
 - [ ] `--update check` - Check for updates
@@ -40358,8 +40612,8 @@ make docker
 - [ ] Service operations require appropriate rights
 
 **PART 24: Service Support**
-- [ ] `--service install` - Install as service
-- [ ] `--service uninstall` - Remove service
+- [ ] `--service --install` - Install as service
+- [ ] `--service --uninstall` - Remove service
 - [ ] `--service start/stop/restart/reload`
 - [ ] Linux: systemd service file
 - [ ] macOS: launchd plist
@@ -40376,7 +40630,7 @@ make docker
 - [ ] Cross-compilation targets
 - [ ] Version injection at build time
 
-### Phase 9: Build & Deploy (PARTS 27-29)
+### Phase 9: Build & Deploy (PARTS 26-28)
 
 **PART 26: Docker**
 - [ ] Multi-stage Dockerfile
@@ -40411,7 +40665,7 @@ make docker
 - [ ] API testing included
 - [ ] Beta testing procedures documented
 
-### Phase 10: Documentation (PARTS 30-31)
+### Phase 10: Documentation & I18N (PARTS 29-30)
 
 **PART 29: ReadTheDocs Documentation**
 - [ ] docs/ directory for MkDocs only
@@ -40463,7 +40717,7 @@ make docker
 - [ ] Same version as server
 - [ ] CLI mode (standard commands)
 - [ ] TUI mode (interactive)
-- [ ] Config: `~/.config/{project_org}/{internal_name}/cli.yml`
+- [ ] Config: `~/.config/{internal_org}/{internal_name}/cli.yml`
 - [ ] Theme matching server (dark default)
 - [ ] Shell completions (bash, zsh, fish, powershell)
 - [ ] All server API operations accessible via CLI
@@ -41416,7 +41670,7 @@ When bootstrapping a new project from this specification:
 
 1. **Initialize Rust crate:**
    ```bash
-   cargo init github.com/{project_org}/{internal_name}
+   cargo init --name {internal_name}
    ```
 
 2. **Create src/main.rs** - Minimal entry point
@@ -41665,174 +41919,6 @@ When stuck:
 4. **Propose solutions** for human review
 
 **NEVER guess or assume** - always ask when uncertain.
-| `{fqdn}` | Fully qualified domain name | `api.example.com` |
-| `{baseurl}` | URL path prefix (auto-detected from reverse proxy) | `/`, `/myproject` |
-| `{api_version}` | API version prefix (default: `v1`) | `v1`, `v2` |
-
-**Directory placeholders (with platform-specific defaults):**
-
-**All on-disk paths use `{internal_name}` (frozen identity), not `{project_name}` (mutable).** A project rename never moves these directories.
-
-| Placeholder | Linux/BSD Default | macOS Default | Windows Default |
-|-------------|-------------------|---------------|-----------------|
-| `{config_dir}` | `/etc/{internal_org}/{internal_name}` | `/Library/Application Support/{internal_org}/{internal_name}` | `%PROGRAMDATA%\{internal_org}\{internal_name}` |
-| `{data_dir}` | `/var/lib/{internal_org}/{internal_name}` | `/Library/Application Support/{internal_org}/{internal_name}` | `%PROGRAMDATA%\{internal_org}\{internal_name}` |
-| `{db_dir}` | `{data_dir}/db/` | `{data_dir}/db/` | `{data_dir}\db\` |
-| `{log_dir}` | `/var/log/{internal_org}/{internal_name}` | `/Library/Logs/{internal_org}/{internal_name}` | `%PROGRAMDATA%\{internal_org}\{internal_name}\logs` |
-| `{cache_dir}` | `/var/cache/{internal_org}/{internal_name}` | `/Library/Caches/{internal_org}/{internal_name}` | `%PROGRAMDATA%\{internal_org}\{internal_name}\cache` |
-| `{backup_dir}` | `/mnt/Backups/{internal_org}/{internal_name}` | `/Library/Application Support/{internal_org}/{internal_name}/backups` | `%PROGRAMDATA%\{internal_org}\{internal_name}\backups` |
-| `{pid_file}` | `/var/run/{internal_org}/{internal_name}.pid` | `/var/run/{internal_org}/{internal_name}.pid` | N/A (Windows uses SCM) |
-
-**Note:** In Docker containers, `{db_dir}` is `/data/db/sqlite` (see Docker paths section).
-
-## Binary Terminology
-
-**Two binaries are built from a project. Both support renaming (affects help/docs, not directories/user/group):**
-
-| Term | Default Binary Name | Description |
-|------|---------------------|-------------|
-| **server** | `{project_name}` | The main application binary - runs as service/daemon, serves API/WebUI |
-| **client** | `{project_name}-cli` | Required companion binary - terminal interface with CLI/TUI/GUI modes |
-
-**Renaming behavior:**
-- Renaming a binary (e.g., `cp jokes myjokes`) changes user-visible output (help text, banners, User-Agent)
-- Renaming does NOT change: directories, system user/group, config file names, database paths
-- Binary detects its own name at runtime via `std::env::args().next()` or `std::env::current_exe()`
-
-## Core Terms
-
-**Note:** "Project", "App", and "Application" are used interchangeably throughout this document - they all refer to the complete codebase including all binaries (server, client), configuration, and functionality.
-
-| Term | Definition |
-|------|------------|
-| **Project / App / Application** | The complete codebase you are building - includes server and client binaries |
-| **App Instance** | A single running copy of a binary (one process) |
-| **System** | The operating system (Linux, macOS, Windows, FreeBSD) - NOT this application |
-
-## Server vs System Distinction (CRITICAL)
-
-**We are a SERVER, not a SYSTEM. System = the OS.**
-
-This distinction exists for clarity. When referring to OS-level resources that belong to or are used by our server application, use "server's system X" format:
-
-| Ambiguous | Clear | Meaning |
-|-----------|-------|---------|
-| "system user" | **server's system user** | The OS user account our server runs as |
-| "system group" | **server's system group** | The OS group our server belongs to |
-| "system service" | **server's system service** | The OS service definition (systemd/launchd/etc.) |
-| "logs directory" | **server's logs dir** | Where our server writes logs |
-| "data directory" | **server's data dir** | Where our server stores data |
-| "config directory" | **server's config dir** | Where our server reads config |
-
-## Deployment Model
-
-| Term | Definition |
-|------|------------|
-| **Single Instance** | This app runs as a single instance with a local SQLite database (or remote libsql/Turso). There is no cluster mode, no horizontal scaling, no node election. |
-
-## Extended Functionality Terms
-
-| Term | Definition |
-|------|------------|
-| **Rate Limiting** | Server protection against abuse/DDoS - NOT usage limits for monetization (we never do that) |
-| **Background Job** | Server-side scheduled or queued task (backup, sync, cleanup) - managed by internal scheduler, NOT cron |
-| **Canonical Terms Only** | New rules, docs, config, APIs, and UI MUST use the current canonical name only. Do NOT add legacy/compatibility aliases, duplicate terms, or migration wording unless the user explicitly asks for a migration feature. |
-
-## Account Types
-
-| Term | Definition |
-|------|------------|
-| **Server** | The running application instance — serves all public API and web routes |
-| **Operator** | Person who deploys and manages the server via CLI and `server.yml` config file |
-
-## Setup & First-Run Terms
-
-| Term | Definition |
-|------|------------|
-| **CLI Setup Wizard** | Built-in TUI/GUI wizard in CLI binary - prompts for server URL, tests connection, saves config (CLI is the ONLY binary with a built-in wizard) |
-
-**Key distinction:** Server is configured by editing `server.yml` directly. CLI has a built-in interactive wizard (TUI/GUI).
-
-## Other Terms
-
-| Term | Definition |
-|------|------------|
-| **TUI** | Terminal User Interface - interactive terminal app with menus/panels (client supports TUI mode) |
-| **Text Browsers** | INTERACTIVE browsers (lynx, w3m, links, elinks) that receive **no-JS HTML** and render it in text mode; NO JavaScript support - forms via POST, server-rendered only |
-| **HTTP Tools** | NON-INTERACTIVE tools (curl, wget, httpie) that receive pre-formatted text via HTML2TextConverter; they just dump output |
-| **WebUI** | Web User Interface - browser-based interface served by the server |
-| **SCM** | Windows Service Control Manager - manages Windows services (replaces PID files on Windows) |
-| **Hostname** | Short hostname (e.g., `web01`) - equivalent to `hostname -s` |
-| **Machine** | A named system - defaults to hostname, can be custom name |
-| **Local** | The system (OS) where the binary is currently running |
-| **Remote** | Context-dependent - generally means "not local" |
-| **~~Host~~** | **DO NOT USE** - ambiguous term, use FQDN, Hostname, or Machine instead |
-
-## Monitoring Endpoints
-
-**Two separate purposes. Do NOT confuse them.**
-
-| Purpose | Endpoints | Access | Format |
-|---------|-----------|--------|--------|
-| **Public server status/info** | `/server/healthz`, optional `/healthz`, `/api/{api_version}/server/healthz` | **PUBLIC** | HTML/JSON/text |
-| **Prometheus metrics** | `/metrics` | **INTERNAL** | Prometheus text exposition (everything) |
-
-**Endpoints:**
-
-| Endpoint | Description |
-|----------|-------------|
-| `/server/healthz` | Frontend route - content negotiation (HTML for browsers, JSON for API clients, text for CLI) |
-| `/healthz` | Optional root alias for `/server/healthz` when `server.healthz.root.enabled: true` |
-| `/api/{api_version}/server/healthz` | API route - JSON by default; text via standard API text rules |
-| `/metrics` | Prometheus - all metrics, internal only |
-
-**Optional root health alias:**
-
-```yaml
-server:
-  healthz:
-    root:
-      # When true, mount /healthz to the SAME handler as /server/healthz
-      enabled: false
-```
-
-- Default is `false`
-- This exists for integrations that require a root-level `/healthz`
-- When enabled, `/healthz` MUST be a direct handler mapping to `/server/healthz`
-- NEVER redirect `/healthz` → `/server/healthz`
-- `/server/healthz` remains the canonical documented route even when `/healthz` is enabled
-
-**Key differences:**
-
-| Aspect | Public Status (PART 13) | Prometheus Metrics (PART 20) |
-|--------|-------------------------|------------------------------|
-| **Endpoints** | `/server/healthz`, optional `/healthz`, `/api/{api_version}/server/healthz` | `/metrics` |
-| **Visibility** | Public internet | Internal network only |
-| **Authentication** | None | None (restrict by IP/network) |
-| **Data** | Public-safe status/info only | Everything (all telemetry) |
-| **Format** | HTML, JSON, text | Prometheus text exposition |
-| **Use case** | "Is the server running? What version?" | "How is it performing? Alert on this." |
-
-**What goes where:**
-
-| Data Type | Public Status | Prometheus | Why |
-|-----------|:-------------:|:----------:|-----|
-| Status (healthy/unhealthy) | ✓ | ✗ | Public info |
-| Version, uptime, build info | ✓ | ✓ | Safe to expose |
-| Tor address | ✓ | ✗ | Public feature info |
-| Request counts (total) | ✓ | ✓ | Aggregate is safe |
-| Request counts (by path/status) | ✗ | ✓ | Internal detail, high cardinality |
-| Request latency histograms | ✗ | ✓ | Performance telemetry |
-| Database connections | ✗ | ✓ | Internal infrastructure |
-| Cache hit/miss rates | ✗ | ✓ | Internal performance |
-| CPU/memory/disk usage | ✗ | ✓ | System telemetry |
-| Async tasks, allocator stats | ✗ | ✓ | Runtime internals |
-
-**NEVER:**
-- Expose `/metrics` publicly (firewall it, or use token auth)
-- Include metrics status in public healthz response
-- Use healthz stats for alerting (use Prometheus for that)
-- Duplicate detailed metrics in healthz (keep it simple)
 
 ---
 
@@ -41857,40 +41943,40 @@ server:
 
 | PART | Line | Topic | When to Read |
 |------|------|-------|--------------|
-| 0 | ~2369 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
-| 1 | ~4176 | Critical Rules | **ALWAYS READ FIRST** |
-| 2 | ~5440 | License & Attribution | License requirements |
-| 3 | ~5769 | Project Structure | Setting up new project, **CI/CD badge detection** |
-| 4 | ~6631 | OS-Specific Paths | Path handling |
-| 5 | ~6827 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
-| 6 | ~8564 | Application Modes | Mode handling, debug endpoints |
-| 7 | ~9063 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~9777 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
-| 9 | ~12669 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~13093 | Database | Database work |
-| 11 | ~13508 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
-| 12 | ~15554 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~16952 | Health & Versioning | Health endpoints |
-| 14 | ~17587 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~19296 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~20230 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~22600 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~23171 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~23597 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~23705 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~24989 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~25530 | Update Command | Update feature |
-| 23 | ~26002 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~26625 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~26949 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~27722 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~28812 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~31391 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~33137 | ReadTheDocs Documentation | Documentation |
-| 30 | ~33931 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~35295 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 32 | ~36553 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~39699 | IDEA.md Reference | **Examples only** - NEVER modify |
+| 0 | ~2354 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
+| 1 | ~4164 | Critical Rules | **ALWAYS READ FIRST** |
+| 2 | ~5428 | License & Attribution | License requirements |
+| 3 | ~5757 | Project Structure | Setting up new project, **CI/CD badge detection** |
+| 4 | ~6619 | OS-Specific Paths | Path handling |
+| 5 | ~6815 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
+| 6 | ~8569 | Application Modes | Mode handling, debug endpoints |
+| 7 | ~9071 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
+| 8 | ~9786 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
+| 9 | ~12673 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~13097 | Database | Database work |
+| 11 | ~13512 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
+| 12 | ~15526 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~16924 | Health & Versioning | Health endpoints |
+| 14 | ~17559 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~19277 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~20222 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~22676 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~23247 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~23672 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~23779 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~25065 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~25606 | Update Command | Update feature |
+| 23 | ~26109 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~26731 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~27056 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~27867 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~28962 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~31609 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~33355 | ReadTheDocs Documentation | Documentation |
+| 30 | ~34149 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~35512 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 32 | ~36804 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~39953 | IDEA.md Reference | **Examples only** - NEVER modify |
 | FINAL | — | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File
@@ -41928,20 +42014,20 @@ Example: If you're partway through PART 5 and it says "See PART 10", read PART 1
 
 | Task | Read These PARTs |
 |------|------------------|
-| **Migrating existing app** | 0, Migration sections, 1, 2, 6, 30 |
-| **New project/app setup** | 0, New Project Rules, 1, 2, 7, 30, 34 |
-| **CLI implementation** | 0, 1, 6, 8, 24 |
-| **API development** | 0, 1, 14, 18, 16 |
-| **Frontend/UI work** | 0, 1, 13, 17, 18 |
+| **Migrating existing app** | 0, Migration sections, 1, 2, 6, 26 |
+| **New project/app setup** | 0, New Project Rules, 1, 2, 3, 7, 26, 32 |
+| **CLI implementation** | 0, 1, 6, 8, 32 |
+| **API development** | 0, 1, 13, 14, 16 |
+| **Frontend/UI work** | 0, 1, 16, 30 |
 | **Database work** | 0, 1, 4, 10 |
-| **User/auth system** | 0, 1, 15, 11 |
-| **Docker/deployment** | 0, 1, 7, 30, 28 |
-| **Documentation** | 0, 1, 31 |
-| **Security features** | 0, 1, 11, 16 |
-| **Background tasks** | 0, 1, 20 |
-| **Email features** | 0, 1, 19 |
-| **Backup features** | 0, 1, 23 |
-| **Debugging/profiling** | 0, 1, 5 |
+| **User/auth system** | 0, 1, 11, 14 |
+| **Docker/deployment** | 0, 1, 7, 26, 27 |
+| **Documentation** | 0, 1, 29 |
+| **Security features** | 0, 1, 11, 15 |
+| **Background tasks** | 0, 1, 18 |
+| **Email features** | 0, 1, 17 |
+| **Backup features** | 0, 1, 21 |
+| **Debugging/profiling** | 0, 1, 5, 6 |
 
 ### Search Before Reading
 
