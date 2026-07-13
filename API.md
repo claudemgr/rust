@@ -40118,7 +40118,7 @@ make docker
 - [ ] Config file: `server.yml` (not .yaml, not .json)
 - [ ] Hierarchy: CLI flags > env vars > file > defaults
 - [ ] Environment prefix: `{PROJECT_NAME}_`
-- [ ] Boolean values: true/false, yes/no, 1/0, on/off all work
+- [ ] Boolean values: true/false, yes/no, 1/0, on/off, enable/disable all work
 - [ ] All config values have sane defaults
 - [ ] Unknown config keys are ERRORS, not ignored
 - [ ] Config validation on load
@@ -40126,10 +40126,10 @@ make docker
 
 **PART 6: Application Modes**
 - [ ] Production mode: Default, optimized, no debug
-- [ ] Development mode: Verbose logging, debug endpoints
-- [ ] Mode detection: env var, CLI flag, config file
-- [ ] Debug endpoints disabled in production
-- [ ] `/debug/*` endpoints only in development mode
+- [ ] Development mode: Verbose logging (does NOT enable debug endpoints)
+- [ ] Mode priority: `--mode` CLI flag > `MODE` env var > default production
+- [ ] Debug priority: `--debug` CLI flag > `DEBUG` env var (truthy) > default off
+- [ ] `/debug/*` endpoints enabled only by debug flag, never by mode
 
 ### Phase 2: Binary Core (PARTS 7-9)
 
@@ -40155,7 +40155,7 @@ make docker
 - [ ] `--address {addr}` - Listen address
 - [ ] `--port {port}` - Listen port
 - [ ] `--baseurl {path}` - URL path prefix (default: /)
-- [ ] `--mode {production|development}` - Application mode
+- [ ] `--mode {production|development}` - Application mode (aliases: prod, dev, devel)
 - [ ] `--status` - Show running status
 - [ ] `--daemon` - Daemonize (detach)
 - [ ] `--debug` - Enable debug mode
@@ -40772,6 +40772,9 @@ make docker
 - [ ] Environment variables for configuration
 - [ ] Single process per container
 - [ ] Stateless (data in volumes)
+- [ ] HTTP listener mapped `172.17.0.1:{64xxx}:80` (prod)
+- [ ] Raw protocol listeners mapped 1:1 to their standard port — never `64xxx`
+- [ ] No raw protocol routed through an HTTP proxy/vhost
 
 ---
 

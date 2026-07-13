@@ -2363,15 +2363,15 @@ server:
 | 27 | ~38912 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
 | 28 | ~40424 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
 | 29 | ~43647 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 30 | ~45640 | ReadTheDocs Documentation | Documentation |
-| 31 | ~46470 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
-| 32 | ~48545 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 33 | ~50205 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
-| 34 | ~55102 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
-| 35 | ~59269 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
-| 36 | ~59989 | Custom Domains | **OPTIONAL** - user/org branded domains |
-| 37 | ~61067 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | ~61298 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 30 | ~45638 | ReadTheDocs Documentation | Documentation |
+| 31 | ~46468 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
+| 32 | ~48543 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 33 | ~50203 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
+| 34 | ~55100 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
+| 35 | ~59267 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
+| 36 | ~59987 | Custom Domains | **OPTIONAL** - user/org branded domains |
+| 37 | ~61065 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~61296 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 **When Implementing OPTIONAL PARTs (34-36, Agent from 33):**
 1. Change PART title from `OPTIONAL` → `NON-NEGOTIABLE` in AI.md
@@ -45251,9 +45251,9 @@ wait $SERVER_PID 2>/dev/null || true
 echo '=== All admin authentication tests passed ==='
 ```
 
-### Debug Mode - ONLY for Manual Development
+### Debug Mode - Never an Auth Bypass
 
-**Debug mode auth bypass exists ONLY for quick manual testing during development:**
+**Debug mode NEVER bypasses authentication — not for manual development, not for anything. All auth and security checks remain fully enforced with debug on:**
 
 ```rust
 // In admin middleware
@@ -45262,14 +45262,12 @@ pub async fn admin_auth_middleware(
     request: Request,
     next: Next,
 ) -> Response {
-    // Debug mode: bypass authentication ONLY for manual dev work
-    // NEVER use this in automated tests!
-    if std::env::var("DEBUG").as_deref() == Ok("true") || state.config.is_debug() {
-        tracing::debug!("Admin auth bypassed (debug mode - manual dev only)");
-        return next.run(request).await;
+    // Debug mode adds verbose logging ONLY - auth is ALWAYS enforced
+    if state.config.is_debug() {
+        tracing::debug!("Admin auth check: {}", request.uri().path());
     }
 
-    // Normal: require valid admin session
+    // Always: require valid admin session
     let session = validate_admin_session(&request, &state).await;
     if session.is_none() {
         return Redirect::to(&format!("{}/login", state.config.admin_path))
@@ -45280,16 +45278,15 @@ pub async fn admin_auth_middleware(
 }
 ```
 
-**Debug bypass is for:**
-- ✓ Quick manual UI testing during development
-- ✓ Exploring admin panel while coding
-- ✓ Debugging admin routes interactively
+**For manual dev access, use real credentials:**
+- ✓ First-run setup token to create an admin account
+- ✓ A local dev admin account created via the setup flow
+- ✓ The normal login flow — it must work anyway
 
-**Debug bypass is NOT for:**
-- ✗ Automated test scripts
-- ✗ Beta testing
-- ✗ CI/CD pipelines
-- ✗ Verifying authentication works
+**Never acceptable, in any mode:**
+- ✗ Auth bypass flags, backdoors, or debug-gated skips
+- ✗ Hardcoded dev credentials in code
+- ✗ Bypassing auth in automated tests, beta testing, or CI/CD
 
 ### Admin Testing Rules
 
@@ -45300,7 +45297,7 @@ pub async fn admin_auth_middleware(
 | **Create test admin** | Create admin account via setup API |
 | **Test login flow** | Verify credentials, sessions, and access control |
 | **Test rejection** | Verify unauthenticated and invalid credentials are rejected |
-| **Debug mode** | ONLY for manual development, NEVER in automated tests |
+| **Debug mode** | Verbosity/diagnostics only — NEVER bypasses auth, in any mode |
 
 ### Container Images
 
@@ -61517,7 +61514,7 @@ make docker
 - [ ] Config file: `server.yml` (not .yaml, not .json)
 - [ ] Hierarchy: CLI flags > env vars > file > defaults
 - [ ] Environment prefix: `{PROJECT_NAME}_`
-- [ ] Boolean values: true/false, yes/no, 1/0, on/off all work
+- [ ] Boolean values: true/false, yes/no, 1/0, on/off, enable/disable all work
 - [ ] All config values have sane defaults
 - [ ] Unknown config keys are ERRORS, not ignored
 - [ ] Config validation on load
@@ -61525,10 +61522,10 @@ make docker
 
 **PART 6: Application Modes**
 - [ ] Production mode: Default, optimized, no debug
-- [ ] Development mode: Verbose logging, debug endpoints
-- [ ] Mode detection: env var, CLI flag, config file
-- [ ] Debug endpoints disabled in production
-- [ ] `/debug/` tokio-console only in development mode
+- [ ] Development mode: Verbose logging (does NOT enable debug endpoints)
+- [ ] Mode priority: `--mode` CLI flag > `MODE` env var > default production
+- [ ] Debug priority: `--debug` CLI flag > `DEBUG` env var (truthy) > default off
+- [ ] `/debug/` tokio-console enabled only by debug flag, never by mode
 
 ### Phase 2: Binary Core (PARTS 7-9)
 
@@ -61555,7 +61552,7 @@ make docker
 - [ ] `--address {addr}` - Listen address
 - [ ] `--port {port}` - Listen port
 - [ ] `--baseurl {path}` - URL path prefix (default: /)
-- [ ] `--mode {production|development}` - Application mode
+- [ ] `--mode {production|development}` - Application mode (aliases: prod, dev, devel)
 - [ ] `--status` - Show running status
 - [ ] `--daemon` - Daemonize (detach)
 - [ ] `--debug` - Enable debug mode
@@ -62262,6 +62259,9 @@ make docker
 - [ ] Environment variables for configuration
 - [ ] Single process per container
 - [ ] Stateless (data in volumes)
+- [ ] HTTP listener mapped `172.17.0.1:{64xxx}:80` (prod)
+- [ ] Raw protocol listeners mapped 1:1 to their standard port — never `64xxx`
+- [ ] No raw protocol routed through an HTTP proxy/vhost
 
 ---
 
