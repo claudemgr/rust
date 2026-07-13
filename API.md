@@ -8609,6 +8609,7 @@ Before proceeding, confirm you understand:
 | Shortcut | Mode |
 |----------|------|
 | `--mode dev` | development |
+| `--mode devel` | development |
 | `--mode development` | development |
 | `--mode prod` | production |
 | `--mode production` | production |
@@ -8945,7 +8946,7 @@ impl std::fmt::Display for AppMode {
 // set_app_mode sets the application mode
 pub fn set_app_mode(m: &str) {
     match m.to_lowercase().as_str() {
-        "dev" | "development" => CURRENT_MODE.store(DEVELOPMENT, Ordering::SeqCst),
+        "dev" | "devel" | "development" => CURRENT_MODE.store(DEVELOPMENT, Ordering::SeqCst),
         _ => CURRENT_MODE.store(PRODUCTION, Ordering::SeqCst),
     }
     update_profiling_settings();

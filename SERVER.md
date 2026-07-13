@@ -9258,6 +9258,7 @@ Before proceeding, confirm you understand:
 | Shortcut | Mode |
 |----------|------|
 | `--mode dev` | development |
+| `--mode devel` | development |
 | `--mode development` | development |
 | `--mode prod` | production |
 | `--mode production` | production |
@@ -9658,7 +9659,7 @@ impl std::fmt::Display for AppMode {
 /// Set application mode from a string value
 pub fn set_app_mode(m: &str) {
     let mode = match m.to_lowercase().as_str() {
-        "dev" | "development" => AppMode::Development,
+        "dev" | "devel" | "development" => AppMode::Development,
         _ => AppMode::Production,
     };
     CURRENT_MODE.store(mode as u8, Ordering::Relaxed);
