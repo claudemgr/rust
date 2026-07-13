@@ -2340,38 +2340,38 @@ server:
 | 4 | ~7032 | OS-Specific Paths | Path handling |
 | 5 | ~7228 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
 | 6 | ~9213 | Application Modes | Mode handling, debug endpoints |
-| 7 | ~9767 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~10448 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
-| 9 | ~13960 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~14397 | Database & Cluster | Database work |
-| 11 | ~15042 | Security & Logging | Security features, **Scoped Agent Tokens**, **Context Detection** |
-| 12 | ~18062 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~19668 | Health & Versioning | Health endpoints |
-| 14 | ~20472 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~22280 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~23251 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~29733 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
-| 18 | ~32246 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 19 | ~33580 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 20 | ~34079 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 21 | ~34178 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 22 | ~35543 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
-| 23 | ~36306 | Update Command | Update feature |
-| 24 | ~36801 | Privilege Escalation & Service | Service/privilege work |
-| 25 | ~37716 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 26 | ~38073 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 27 | ~38912 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 28 | ~40424 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 29 | ~43647 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 30 | ~45638 | ReadTheDocs Documentation | Documentation |
-| 31 | ~46468 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
-| 32 | ~48543 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 33 | ~50203 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
-| 34 | ~55100 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
-| 35 | ~59267 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
-| 36 | ~59987 | Custom Domains | **OPTIONAL** - user/org branded domains |
-| 37 | ~61065 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | ~61296 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 7 | ~9777 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
+| 8 | ~10458 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
+| 9 | ~13970 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~14407 | Database & Cluster | Database work |
+| 11 | ~15052 | Security & Logging | Security features, **Scoped Agent Tokens**, **Context Detection** |
+| 12 | ~18072 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~19678 | Health & Versioning | Health endpoints |
+| 14 | ~20482 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~22290 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~23261 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~29743 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
+| 18 | ~32256 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 19 | ~33590 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 20 | ~34089 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 21 | ~34188 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 22 | ~35553 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
+| 23 | ~36316 | Update Command | Update feature |
+| 24 | ~36811 | Privilege Escalation & Service | Service/privilege work |
+| 25 | ~37726 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 26 | ~38083 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 27 | ~38922 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 28 | ~40434 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 29 | ~43657 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 30 | ~45648 | ReadTheDocs Documentation | Documentation |
+| 31 | ~46478 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
+| 32 | ~48553 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 33 | ~50213 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
+| 34 | ~55110 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
+| 35 | ~59277 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
+| 36 | ~59997 | Custom Domains | **OPTIONAL** - user/org branded domains |
+| 37 | ~61075 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~61306 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 **When Implementing OPTIONAL PARTs (34-36, Agent from 33):**
 1. Change PART title from `OPTIONAL` → `NON-NEGOTIABLE` in AI.md
@@ -9222,9 +9222,12 @@ Before proceeding, confirm you understand:
 **Debug:**
 1. `--debug` CLI flag (highest priority)
 2. `DEBUG` environment variable (truthy values)
-3. Default: `false`
+3. `--mode debug` / `MODE=debug` alias
+4. Default: `false`
 
-## Three Operational States
+**`debug` mode alias:** `--mode debug` / `MODE=debug` expands to mode `development` + debug `on`. An explicit `--debug` flag or `DEBUG` env var still wins — `MODE=debug DEBUG=false` runs development mode with debug off.
+
+## Four Operational States
 
 | State | Mode | Debug | Use Case |
 |-------|------|-------|----------|
@@ -9297,6 +9300,7 @@ Before proceeding, confirm you understand:
 | `--mode development` | development |
 | `--mode prod` | production |
 | `--mode production` | production |
+| `--mode debug` | development + debug on |
 
 ## Debug Endpoints (`--debug` / `DEBUG=true` Only)
 
@@ -9695,6 +9699,12 @@ impl std::fmt::Display for AppMode {
 pub fn set_app_mode(m: &str) {
     let mode = match m.to_lowercase().as_str() {
         "dev" | "devel" | "development" => AppMode::Development,
+        // Alias: development mode + debug on
+        // (an explicit --debug flag or DEBUG env var still wins)
+        "debug" => {
+            set_debug_enabled(true);
+            AppMode::Development
+        }
         _ => AppMode::Production,
     };
     CURRENT_MODE.store(mode as u8, Ordering::Relaxed);
@@ -61524,7 +61534,7 @@ make docker
 - [ ] Production mode: Default, optimized, no debug
 - [ ] Development mode: Verbose logging (does NOT enable debug endpoints)
 - [ ] Mode priority: `--mode` CLI flag > `MODE` env var > default production
-- [ ] Debug priority: `--debug` CLI flag > `DEBUG` env var (truthy) > default off
+- [ ] Debug priority: `--debug` CLI flag > `DEBUG` env var (truthy) > `MODE=debug` alias > default off
 - [ ] `/debug/` tokio-console enabled only by debug flag, never by mode
 
 ### Phase 2: Binary Core (PARTS 7-9)
@@ -61552,7 +61562,7 @@ make docker
 - [ ] `--address {addr}` - Listen address
 - [ ] `--port {port}` - Listen port
 - [ ] `--baseurl {path}` - URL path prefix (default: /)
-- [ ] `--mode {production|development}` - Application mode (aliases: prod, dev, devel)
+- [ ] `--mode {production|development}` - Application mode (aliases: prod, dev, devel; `debug` = development + debug on)
 - [ ] `--status` - Show running status
 - [ ] `--daemon` - Daemonize (detach)
 - [ ] `--debug` - Enable debug mode
