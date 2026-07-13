@@ -612,6 +612,41 @@ let cache_size = (avail_mem / 10)
 | **Local (dev)** | `0.0.0.0` | Random `64xxx` | `--address 0.0.0.0 --port 64580` |
 | **Local (prod)** | Specific IP | Random `64xxx` | `--address 192.168.1.100 --port 64580` |
 
+### Raw Protocol Ports (Non-HTTP Listeners)
+
+**The HTTP port rules above (internal 80, random `64xxx` external, reverse proxy in front) apply ONLY to HTTP(S) listeners. Raw TCP/UDP protocol listeners are exempt — remapping or HTTP-proxying them breaks the protocol.**
+
+| Rule | Description |
+|------|-------------|
+| **Standard port, 1:1 mapping** | Protocol listeners bind their IANA well-known port and Docker maps it 1:1 (`-p 25:25`) — NEVER a random `64xxx` remap |
+| **No HTTP reverse proxy** | Never route raw protocols through nginx/Caddy HTTP vhosts; the only acceptable middle layer is a transparent TCP/stream proxy (nginx `stream`, HAProxy `mode tcp`) |
+| **No HTTP middleware** | Raw listeners bypass the HTTP middleware chain entirely (no HTTP logging/security-header/rate-limit middleware); each protocol implements its own logging and abuse protection |
+| **TLS variants on their own ports** | Implicit-TLS listeners use their standard port (SMTPS 465, POP3S 995, IMAPS 993, NNTPS 563); STARTTLS stays on the plain port where the RFC defines it; certificates come from the same TLS config as HTTPS |
+| **Per-protocol config** | Each listener gets its own `{proto}.address`/`{proto}.port` config keys + `{PROTO}_PORT` env override, defaulting to the standard port |
+| **Independent enable/disable** | Every raw listener is individually toggleable in config, disabled by default unless it IS the project's core function; the HTTP admin/API listener keeps following the HTTP rules above |
+| **Custom raw services** | Projects exposing a non-IANA raw port (termbin-style netcat paste service, etc.) document the port in IDEA.md; once shipped that port is the published interface — treat it as frozen like `{internal_name}` |
+| **Privileged ports** | Binding <1024 inside the container is fine (container has the capability); bare-host deploys follow Privileged Port Binding (<1024) in PART 5 — service-install escalation with bind-then-drop |
+
+**Why remapping breaks raw protocols:**
+- SMTP: MX delivery always connects to port 25 — remap = no inbound mail
+- POP3/IMAP/NNTP: client autoconfig assumes 110/995, 143/993, 119/563
+- DNS: resolvers only query 53 — a random port is unreachable
+- termbin-type services: users pipe `nc host 9999` — the port IS the documented interface
+
+**Standard ports:**
+
+| Protocol | Plain | Implicit TLS | STARTTLS |
+|----------|-------|--------------|----------|
+| SMTP (MX) | 25 | — | 25 |
+| SMTP (submission) | 587 | 465 (SMTPS) | 587 |
+| POP3 | 110 | 995 (POP3S) | 110 |
+| IMAP | 143 | 993 (IMAPS) | 143 |
+| NNTP | 119 | 563 (NNTPS) | 119 |
+| DNS | 53 (tcp+udp) | 853 (DoT) | — |
+| FTP | 21 (+ passive range) | 990 (FTPS) | 21 |
+
+**Protocol behavior itself must be fully RFC-compliant — see RFC-Based Applications (CRITICAL - NON-NEGOTIABLE).**
+
 ## CI/CD Rules
 
 | Rule | Description |
@@ -2298,45 +2333,45 @@ server:
 
 | PART | Line | Topic | When to Read |
 |------|------|-------|--------------|
-| 0 | ~2431 | AI Assistant Rules | **AI Behavior Rules**, **Translation Rule** |
-| 1 | ~4283 | Critical Rules | Read before implementing features |
-| 2 | ~5610 | License & Attribution | License requirements |
-| 3 | ~5954 | Project Structure | Setting up new project, **CI/CD badge detection** |
-| 4 | ~6997 | OS-Specific Paths | Path handling |
-| 5 | ~7193 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
-| 6 | ~9178 | Application Modes | Mode handling, debug endpoints |
-| 7 | ~9732 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~10413 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
-| 9 | ~13925 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~14362 | Database & Cluster | Database work |
-| 11 | ~15007 | Security & Logging | Security features, **Scoped Agent Tokens**, **Context Detection** |
-| 12 | ~18027 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~19633 | Health & Versioning | Health endpoints |
-| 14 | ~20437 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~22245 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~23216 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~29698 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
-| 18 | ~32211 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 19 | ~33545 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 20 | ~34044 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 21 | ~34143 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 22 | ~35508 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
-| 23 | ~36271 | Update Command | Update feature |
-| 24 | ~36766 | Privilege Escalation & Service | Service/privilege work |
-| 25 | ~37681 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 26 | ~38038 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 27 | ~38877 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 28 | ~40389 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 29 | ~43612 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 30 | ~45605 | ReadTheDocs Documentation | Documentation |
-| 31 | ~46435 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
-| 32 | ~48510 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 33 | ~50170 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
-| 34 | ~55067 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
-| 35 | ~59234 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
-| 36 | ~59954 | Custom Domains | **OPTIONAL** - user/org branded domains |
-| 37 | ~61032 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | ~61263 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 0 | ~2466 | AI Assistant Rules | **AI Behavior Rules**, **Translation Rule** |
+| 1 | ~4318 | Critical Rules | Read before implementing features |
+| 2 | ~5645 | License & Attribution | License requirements |
+| 3 | ~5989 | Project Structure | Setting up new project, **CI/CD badge detection** |
+| 4 | ~7032 | OS-Specific Paths | Path handling |
+| 5 | ~7228 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
+| 6 | ~9213 | Application Modes | Mode handling, debug endpoints |
+| 7 | ~9767 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
+| 8 | ~10448 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
+| 9 | ~13960 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~14397 | Database & Cluster | Database work |
+| 11 | ~15042 | Security & Logging | Security features, **Scoped Agent Tokens**, **Context Detection** |
+| 12 | ~18062 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~19668 | Health & Versioning | Health endpoints |
+| 14 | ~20472 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~22280 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~23251 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~29733 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
+| 18 | ~32246 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 19 | ~33580 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 20 | ~34079 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 21 | ~34178 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 22 | ~35543 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
+| 23 | ~36306 | Update Command | Update feature |
+| 24 | ~36801 | Privilege Escalation & Service | Service/privilege work |
+| 25 | ~37716 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 26 | ~38073 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 27 | ~38912 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 28 | ~40424 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 29 | ~43647 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 30 | ~45640 | ReadTheDocs Documentation | Documentation |
+| 31 | ~46470 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
+| 32 | ~48545 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 33 | ~50205 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
+| 34 | ~55102 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
+| 35 | ~59269 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
+| 36 | ~59989 | Custom Domains | **OPTIONAL** - user/org branded domains |
+| 37 | ~61067 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~61298 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 **When Implementing OPTIONAL PARTs (34-36, Agent from 33):**
 1. Change PART title from `OPTIONAL` → `NON-NEGOTIABLE` in AI.md
