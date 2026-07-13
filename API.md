@@ -2252,28 +2252,28 @@ server:
 | 9 | ~12669 | Error Handling & Caching | Error/cache patterns |
 | 10 | ~13093 | Database | Database work |
 | 11 | ~13508 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
-| 12 | ~15536 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~16934 | Health & Versioning | Health endpoints |
-| 14 | ~17569 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~19278 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~20212 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~22582 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~23153 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~23579 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~23687 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~24971 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~25512 | Update Command | Update feature |
-| 23 | ~25984 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~26607 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~26931 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~27704 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~28794 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~31373 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~33119 | ReadTheDocs Documentation | Documentation |
-| 30 | ~33913 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~35277 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 32 | ~36535 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~39681 | IDEA.md Reference | **Examples only** - NEVER modify |
+| 12 | ~15554 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~16952 | Health & Versioning | Health endpoints |
+| 14 | ~17587 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~19296 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~20230 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~22600 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~23171 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~23597 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~23705 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~24989 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~25530 | Update Command | Update feature |
+| 23 | ~26002 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~26625 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~26949 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~27722 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~28812 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~31391 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~33137 | ReadTheDocs Documentation | Documentation |
+| 30 | ~33931 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~35295 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 32 | ~36553 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~39699 | IDEA.md Reference | **Examples only** - NEVER modify |
 | FINAL | — | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File
@@ -14617,6 +14617,21 @@ Syslog header: `<MMM DD HH:MM:SS> <hostname> <program>[<pid>]:` followed by the 
 
 ANSI/emojis belong on stdout/stderr (interactive console), never in files that ship to log aggregators.
 
+### Health-Check Log Suppression
+
+Successful health-check requests are excluded from `access.log` by default — a 10-second Docker healthcheck otherwise writes ~8,640 identical lines per day of pure noise.
+
+**Suppressed by default (successful 2xx responses only):**
+- `GET /api/{api_version}/server/healthz`
+- `GET /healthz` (root alias, when enabled)
+- The internal health request made by `{project_name} --status`
+
+**Never suppressed:**
+- Any non-2xx health-check response — failures always log to `access.log` and `error.log`
+- All health-check requests when debug is enabled
+
+**`--status` stays silent server-side:** it reports via exit code (0 healthy, 1 unhealthy) and its own stdout; a successful poll writes no server log entry.
+
 ### Log Format Details
 
 **Access Log Formats:**
@@ -14725,6 +14740,8 @@ server:
       custom: ""
       rotate: monthly
       keep: none
+      # Log successful health-check requests (failures always log)
+      log_health_checks: false
 
     server:
       filename: server.log
@@ -41852,28 +41869,28 @@ server:
 | 9 | ~12669 | Error Handling & Caching | Error/cache patterns |
 | 10 | ~13093 | Database | Database work |
 | 11 | ~13508 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
-| 12 | ~15536 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~16934 | Health & Versioning | Health endpoints |
-| 14 | ~17569 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~19278 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~20212 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~22582 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~23153 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~23579 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~23687 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~24971 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~25512 | Update Command | Update feature |
-| 23 | ~25984 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~26607 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~26931 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~27704 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~28794 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~31373 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~33119 | ReadTheDocs Documentation | Documentation |
-| 30 | ~33913 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~35277 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 32 | ~36535 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~39681 | IDEA.md Reference | **Examples only** - NEVER modify |
+| 12 | ~15554 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~16952 | Health & Versioning | Health endpoints |
+| 14 | ~17587 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~19296 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~20230 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~22600 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~23171 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~23597 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~23705 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~24989 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~25530 | Update Command | Update feature |
+| 23 | ~26002 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~26625 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~26949 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~27722 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~28812 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~31391 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~33137 | ReadTheDocs Documentation | Documentation |
+| 30 | ~33931 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~35295 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 32 | ~36553 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~39699 | IDEA.md Reference | **Examples only** - NEVER modify |
 | FINAL | — | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File

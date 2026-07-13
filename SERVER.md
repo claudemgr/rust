@@ -2345,33 +2345,33 @@ server:
 | 9 | ~13970 | Error Handling & Caching | Error/cache patterns |
 | 10 | ~14407 | Database & Cluster | Database work |
 | 11 | ~15052 | Security & Logging | Security features, **Scoped Agent Tokens**, **Context Detection** |
-| 12 | ~18072 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~19678 | Health & Versioning | Health endpoints |
-| 14 | ~20482 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~22290 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~23261 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~29743 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
-| 18 | ~32256 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 19 | ~33590 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 20 | ~34089 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 21 | ~34188 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 22 | ~35553 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
-| 23 | ~36316 | Update Command | Update feature |
-| 24 | ~36811 | Privilege Escalation & Service | Service/privilege work |
-| 25 | ~37726 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 26 | ~38083 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 27 | ~38922 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 28 | ~40434 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 29 | ~43657 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 30 | ~45648 | ReadTheDocs Documentation | Documentation |
-| 31 | ~46478 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
-| 32 | ~48553 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 33 | ~50213 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
-| 34 | ~55110 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
-| 35 | ~59277 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
-| 36 | ~59997 | Custom Domains | **OPTIONAL** - user/org branded domains |
-| 37 | ~61075 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | ~61306 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 12 | ~18090 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~19696 | Health & Versioning | Health endpoints |
+| 14 | ~20500 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~22308 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~23279 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~29761 | Admin Panel | Admin UI, **Server Admin**, **Scoped Agents API**, **Blocklists**, **Allowlist**, **GeoIP** |
+| 18 | ~32274 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 19 | ~33608 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 20 | ~34107 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 21 | ~34206 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 22 | ~35571 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
+| 23 | ~36334 | Update Command | Update feature |
+| 24 | ~36829 | Privilege Escalation & Service | Service/privilege work |
+| 25 | ~37744 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 26 | ~38101 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 27 | ~38940 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 28 | ~40452 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 29 | ~43675 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 30 | ~45666 | ReadTheDocs Documentation | Documentation |
+| 31 | ~46496 | I18N & A11Y | Internationalization, **Translation parity (all binaries)**, **--lang flag** |
+| 32 | ~48571 | Tor Hidden Service | Tor support, **binary controls Tor** |
+| 33 | ~50231 | Client & Agent | Client **REQUIRED**, Agent optional - CLI/TUI/GUI, **Scoped Agent Tokens**, **Smart Context**, **First-Run Wizard** |
+| 34 | ~55128 | Multi-User | **OPTIONAL** - Regular User accounts/registration, vanity URLs |
+| 35 | ~59295 | Organizations | **OPTIONAL** - multi-user orgs, vanity URLs |
+| 36 | ~60015 | Custom Domains | **OPTIONAL** - user/org branded domains |
+| 37 | ~61093 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~61324 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 **When Implementing OPTIONAL PARTs (34-36, Agent from 33):**
 1. Change PART title from `OPTIONAL` → `NON-NEGOTIABLE` in AI.md
@@ -16500,6 +16500,21 @@ All three coexist under the admin tree. The admin-panel UI groups them under a s
 | `security.log` | Security/auth events | `fail2ban` | `fail2ban`, `syslog`, `cef`, `json`, `text` |
 | `debug.log` | Debug (dev mode) | `text` | `text`, `json` |
 
+### Health-Check Log Suppression
+
+Successful health-check requests are excluded from `access.log` by default — a 10-second Docker healthcheck otherwise writes ~8,640 identical lines per day of pure noise.
+
+**Suppressed by default (successful 2xx responses only):**
+- `GET /api/{api_version}/server/healthz`
+- `GET /healthz` (root alias, when enabled)
+- The internal health request made by `{project_name} --status`
+
+**Never suppressed:**
+- Any non-2xx health-check response — failures always log to `access.log` and `error.log`
+- All health-check requests when debug is enabled
+
+**`--status` stays silent server-side:** it reports via exit code (0 healthy, 1 unhealthy) and its own stdout; a successful poll writes no server log entry.
+
 ### Log Format Details
 
 **Access Log Formats:**
@@ -16608,6 +16623,8 @@ server:
       custom: ""
       rotate: monthly
       keep: none
+      # Log successful health-check requests (failures always log)
+      log_health_checks: false
 
     server:
       filename: server.log
