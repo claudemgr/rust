@@ -30266,7 +30266,7 @@ All `$CI_*` variables are auto-populated by GitLab (works with self-hosted).
 variables:
   PROJECTNAME: "{project_name}"
   PROJECTORG: "{project_org}"
-  # Rust CI always uses casjaysdev/rust:latest — never create docker/Dockerfile.build or build-toolchain.yml for Rust.
+  # Rust CI defaults to casjaysdev/rust:latest — a docker/Dockerfile.build only for a genuine custom need, and then FROM casjaysdev/rust:latest.
   BUILD_IMAGE: "casjaysdev/rust:latest"
 
 stages:

@@ -722,7 +722,7 @@ Every project ships workflow files for all five CI/CD providers. Same gates, dif
 1. **Security-only workflows** (secret scan, SHA/digest policy, dependency audit) — no build dependency; safe to add anytime
 2. **`ci.yml` and `release.yml`** — add **last**, only after all code is complete, `make test` passes, and the lint gate is clean; these trigger a full build on push and will fail immediately if the code is not ready
 
-**Note:** There is NO `build-toolchain.yml` and NO `docker/Dockerfile.build` for Rust projects. The CI container is always `casjaysdev/rust:latest` used directly — never a custom build image.
+**Note:** By default there is no `build-toolchain.yml` and no `docker/Dockerfile.build` for Rust projects — the CI container is `casjaysdev/rust:latest` used directly. Exceptions: a build image declared in IDEA.md/AI.md wins; a genuine custom need allows a `Dockerfile.build`, and then it MUST be `FROM casjaysdev/rust:latest` (extend, never replace) with the standard `build-toolchain.yml` pattern.
 
 | Provider | Workflow location | Syntax |
 |----------|------------------|--------|
@@ -1101,7 +1101,7 @@ Quick reference: Accept `yes/no`, `true/false`, `1/0`, `on/off`, `enable/disable
 | `*.example.*`, `*.sample.*` | No example files (defaults in binary) |
 | `server.yml`, `cli.yml` | Config files are runtime-generated, never in repo |
 | `.env*` | No .env files |
-| `docker/Dockerfile.build` | Rust projects NEVER have a build toolchain image |
+| `docker/Dockerfile.build` | Default: none for Rust — genuine custom need only, and then `FROM casjaysdev/rust:latest` |
 
 ### NEVER Create These Directories
 
@@ -38894,7 +38894,7 @@ docker/
                 └── entrypoint.sh  # Container entrypoint (REQUIRED)
 ```
 
-**Note:** Rust projects do NOT have a `docker/Dockerfile.build` — CI uses `casjaysdev/rust:latest` directly as the container image. Never create `Dockerfile.build` or `build-toolchain.yml` for Rust projects.
+**Note:** Rust projects default to no `docker/Dockerfile.build` — CI uses `casjaysdev/rust:latest` directly as the container image. A `Dockerfile.build` is created only for a genuine custom need, and then it MUST be `FROM casjaysdev/rust:latest` (extend, never replace).
 
 **Build Context:**
 - Docker build context is project root (`.`)
@@ -40438,7 +40438,7 @@ networks:
 | `daily.yml` | Daily at 3am UTC + push to main/master | Daily builds |
 | `docker.yml` | Version tag, push to main/master/beta | Docker images |
 
-**Note:** There is no `build-toolchain.yml` for Rust projects. NEVER create `docker/Dockerfile.build` or `build-toolchain.yml` for Rust. CI jobs use `container: image: casjaysdev/rust:latest` directly — no `ensure-build-image` gate, no toolchain image build step.
+**Note:** By default Rust projects have no `build-toolchain.yml` or `docker/Dockerfile.build`. CI jobs use `container: image: casjaysdev/rust:latest` directly — no `ensure-build-image` gate, no toolchain image build step. A genuine custom need is the only exception, and then `Dockerfile.build` MUST be `FROM casjaysdev/rust:latest` with the standard toolchain workflow pattern.
 
 **Branch push auto-cancel policy:** Any workflow triggered by pushes to `main`, `master`, `devel`, `dev`, or `beta` MUST use workflow concurrency to cancel older in-progress runs for the same ref. This applies to branch-based CI (for example `beta.yml`, `daily.yml`, `docker.yml`, and any project-specific branch-push workflow).
 
@@ -40534,7 +40534,7 @@ jobs:
 
 ## Build Toolchain Workflow (GitHub Actions)
 
-> **Rust projects do not use a build-toolchain workflow.** The `casjaysdev/rust:latest` image is a standard maintained image. Never create `docker/Dockerfile.build` or `build-toolchain.yml` for Rust projects. The CI pattern uses `container: image: casjaysdev/rust:latest` directly in each job.
+> **Rust projects default to no build-toolchain workflow.** The `casjaysdev/rust:latest` image is a standard maintained image; the CI pattern uses `container: image: casjaysdev/rust:latest` directly in each job. A `docker/Dockerfile.build` + `build-toolchain.yml` is allowed only for a genuine custom need the image cannot satisfy, and then the build image MUST be `FROM casjaysdev/rust:latest` (extend, never replace).
 
 ## Release Workflow — Stable (GitHub Actions)
 
