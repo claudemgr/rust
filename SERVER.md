@@ -11607,7 +11607,7 @@ myapp is running (PID 12345)
 **Used for Docker/compose healthcheck:**
 ```yaml
 healthcheck:
-  test: /usr/local/bin/{project_name} --status
+  test: ["CMD", "/usr/local/bin/{project_name}", "--status"]
   interval: 10s
   timeout: 5s
   retries: 3
@@ -39248,7 +39248,7 @@ RUN chmod 755 /usr/local/bin/*
 # Set environment
 # Note: Tor available (binary installed) but server binary controls Tor startup (see PART 32)
 # DATABASE_DIR: SQLite location (binary auto-detects container, but explicit is clearer)
-# MODE is never baked into the image — binary defaults to production; compose sets MODE explicitly
+# MODE is never baked into the image — binary defaults to production; dev/test compose set MODE explicitly (production compose sets neither)
 ENV TZ=America/New_York \
     DATABASE_DIR=/data/db/sqlite
 
@@ -39409,8 +39409,9 @@ exec $APP_BIN $FLAGS "$@"
 | `restart:` | `always` |
 | `x-logging:` | Anchor for consistent logging (see below) |
 | Network | Custom `{project_name}` with `external: false` |
-| Environment variables | **Hardcode with sane defaults** (NEVER use .env files) |
-| **environment: MODE** | **production** (strict host validation) |
+| Environment variables | **Hardcode with sane defaults** (NEVER use .env files); always YAML map style (`KEY: value`), never list style (`- KEY=value`) |
+| **environment: MODE / DEBUG** | **NEVER set in production compose** — `docker-compose.dev.yml`/`docker-compose.test.yml` set them explicitly |
+| Cache service | `{project_name}-cache` (`valkey/valkey:alpine`) — always included in production and test compose; never in dev compose |
 
 ### Docker Compose Structure
 
@@ -39421,10 +39422,10 @@ exec $APP_BIN $FLAGS "$@"
 name: {project_name}
 
 x-logging: &default-logging
+  driver: json-file
   options:
     max-size: '5m'
     max-file: '1'
-  driver: json-file
 
 services:
   {project_name}:
@@ -39435,21 +39436,40 @@ services:
     pull_policy: always
     logging: *default-logging
     environment:
-      - MODE=production
-      - PORT=80
-      - DEBUG=false
-      - TZ=America/New_York
+      PORT: 80
+      TZ: America/New_York
+      CACHE_URL: valkey://{project_name}-cache:6379
     volumes:
       - './volumes/config:/config:z'
       - './volumes/data:/data:z'
     ports:
       - '172.17.0.1:64580:80'
     healthcheck:
-      test: /usr/local/bin/{project_name} --status
+      test: ["CMD", "/usr/local/bin/{project_name}", "--status"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 90s
+    depends_on:
+      {project_name}-cache:
+        condition: service_healthy
+    networks:
+      - {project_name}
+
+  {project_name}-cache:
+    image: valkey/valkey:alpine
+    container_name: {project_name}-cache
+    restart: always
+    pull_policy: always
+    logging: *default-logging
+    volumes:
+      - './volumes/data/db/valkey:/data:z'
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - {project_name}
 
@@ -39464,9 +39484,10 @@ networks:
 | Field | Value | Description |
 |-------|-------|-------------|
 | `name:` | `{project_name}` | Top-level compose project name |
-| `container_name:` | `{project_name}-app`, `{project_name}-db` | e.g., `jokes-app`, `jokes-db` |
+| `container_name:` | `{project_name}-app`, `{project_name}-db`, `{project_name}-cache` | e.g., `jokes-app`, `jokes-db`, `jokes-cache` |
 | Main service | `{project_name}` | Service name matches project name |
 | Database service | `{project_name}-db` | Database service name |
+| Cache service | `{project_name}-cache` | Valkey cache service name |
 | `hostname:` | `{project_name}` | Hardcoded — edit compose file to override |
 | `restart:` | `always` | Always restart on failure |
 | `pull_policy:` | `always` | Always pull latest image |
@@ -39479,13 +39500,13 @@ networks:
 
 ```yaml
 x-logging: &default-logging
+  # JSON format for parsing
+  driver: json-file
   options:
     # Max 5MB per log file
     max-size: '5m'
     # Keep only 1 log file
     max-file: '1'
-  # JSON format for parsing
-  driver: json-file
 ```
 
 **Every service MUST use the anchor:**
@@ -39504,10 +39525,10 @@ services:
 name: {project_name}
 
 x-logging: &default-logging
+  driver: json-file
   options:
     max-size: '5m'
     max-file: '1'
-  driver: json-file
 
 services:
   {project_name}:
@@ -39518,21 +39539,19 @@ services:
     pull_policy: always
     logging: *default-logging
     environment:
-      - MODE=production
-      - PORT=80
-      - DEBUG=false
-      - TZ=America/New_York
-      - DB_HOST={project_name}-db
-      - DB_NAME={project_name}
-      - DB_USER={project_name}
-      - CACHE_HOST={project_name}-cache
+      PORT: 80
+      TZ: America/New_York
+      DB_HOST: {project_name}-db
+      DB_NAME: {project_name}
+      DB_USER: {project_name}
+      CACHE_URL: valkey://{project_name}-cache:6379
     volumes:
       - './volumes/config:/config:z'
       - './volumes/data:/data:z'
     ports:
       - '172.17.0.1:64580:80'
     healthcheck:
-      test: /usr/local/bin/{project_name} --status
+      test: ["CMD", "/usr/local/bin/{project_name}", "--status"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -39552,13 +39571,13 @@ services:
     restart: always
     logging: *default-logging
     environment:
-      - POSTGRES_DB={project_name}
-      - POSTGRES_USER={project_name}
-      - POSTGRES_PASSWORD={project_name}
+      POSTGRES_DB: {project_name}
+      POSTGRES_USER: {project_name}
+      POSTGRES_PASSWORD: {project_name}
     volumes:
       - './volumes/data/db/postgres/{project_name}:/var/lib/postgresql/data:z'
     healthcheck:
-      test: pg_isready -U {project_name} -d {project_name}
+      test: ["CMD-SHELL", "pg_isready -U {project_name} -d {project_name}"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -39575,7 +39594,7 @@ services:
     volumes:
       - './volumes/data/db/valkey/{project_name}:/data:z'
     healthcheck:
-      test: valkey-cli ping || exit 1
+      test: ["CMD-SHELL", "valkey-cli ping || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -39641,10 +39660,10 @@ networks:
 name: {project_name}
 
 x-logging: &default-logging
+  driver: json-file
   options:
     max-size: '5m'
     max-file: '1'
-  driver: json-file
 
 services:
   {project_name}:
@@ -39655,17 +39674,15 @@ services:
     pull_policy: always
     logging: *default-logging
     environment:
-      - MODE=production
-      - PORT=80
-      - DEBUG=false
-      - TZ=America/New_York
+      PORT: 80
+      TZ: America/New_York
     volumes:
       - './volumes/config:/config:z'
       - './volumes/data:/data:z'
     ports:
       - '172.17.0.1:64580:80'
     healthcheck:
-      test: /usr/local/bin/{project_name} --status
+      test: ["CMD", "/usr/local/bin/{project_name}", "--status"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -39774,7 +39791,7 @@ RUN chmod +x /usr/local/bin/{project_name} /usr/local/bin/entrypoint.sh
 
 # Default environment
 # DATABASE_DIR: SQLite location (binary auto-detects container, but explicit is clearer)
-# MODE is never baked into the image — binary defaults to production; compose sets MODE explicitly
+# MODE is never baked into the image — binary defaults to production; dev/test compose set MODE explicitly (production compose sets neither)
 ENV PORT=80 \
     DEBUG=false \
     TZ=America/New_York \
@@ -40176,27 +40193,40 @@ Development mode with optional debug. Humans run this manually for local develop
 ```yaml
 name: {project_name}-dev
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '5m'
+    max-file: '1'
+
 services:
   {project_name}:
-    image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:latest
+    image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:devel
     pull_policy: always
     container_name: {project_name}-dev
+    hostname: {project_name}
     restart: always
+    logging: *default-logging
     environment:
       # Development: relaxed security, verbose logging, no caching
-      # Does NOT enable debug endpoints - uncomment DEBUG=true for that
-      - MODE=development
-      - TZ=America/New_York
-      # DEBUG: Uncomment to enable tokio-console, detailed request logging
-      # - DEBUG=true
+      DEBUG: true
+      MODE: development
+      PORT: 80
+      TZ: America/New_York
     ports:
-      # Development: accessible from all interfaces
+      # Development: accessible from all interfaces, never bound to 172.17.0.1
       - "64580:80"
     volumes:
       # TEMP DIR WORKFLOW: ./volumes/ resolves to $TEMP_DIR/volumes/
       # NEVER run from project directory - always use temp dir workflow
       - ./volumes/config:/config:z
       - ./volumes/data:/data:z
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/{project_name}", "--status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     networks:
       - {project_name}-dev
 
@@ -40226,24 +40256,33 @@ Production has NO debug options. Debug must be set via CLI if needed. Humans dep
 ```yaml
 name: {project_name}
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '5m'
+    max-file: '1'
+
 services:
   {project_name}:
     image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:latest
     pull_policy: always
     container_name: {project_name}-app
+    hostname: {project_name}
     restart: always
+    logging: *default-logging
     environment:
       # Production: strict security, minimal logging, caching enabled
-      # NO debug options - debug must be explicitly set via CLI if needed
-      - MODE=production
-      - TZ=America/New_York
+      # NO MODE/DEBUG vars - debug must be explicitly set via CLI if needed
+      PORT: 80
+      TZ: America/New_York
+      CACHE_URL: valkey://{project_name}-cache:6379
       # DOMAIN (optional - auto-detects from reverse proxy headers)
-      # - DOMAIN=myapp.com,www.myapp.com
+      # DOMAIN: myapp.com,www.myapp.com
       # SMTP (optional - autodetects if not set)
-      # - SMTP_HOST=smtp.example.com
-      # - SMTP_PORT=587
-      # - SMTP_USERNAME=user
-      # - SMTP_PASSWORD=pass
+      # SMTP_HOST: smtp.example.com
+      # SMTP_PORT: 587
+      # SMTP_USERNAME: user
+      # SMTP_PASSWORD: pass
     ports:
       # Production: bound to Docker bridge only (reverse proxy handles external)
       - "172.17.0.1:64580:80"
@@ -40252,6 +40291,32 @@ services:
       # NEVER run from project directory - always use temp dir workflow
       - ./volumes/config:/config:z
       - ./volumes/data:/data:z
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/{project_name}", "--status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    depends_on:
+      {project_name}-cache:
+        condition: service_healthy
+    networks:
+      - {project_name}
+
+  {project_name}-cache:
+    image: valkey/valkey:alpine
+    pull_policy: always
+    container_name: {project_name}-cache
+    restart: always
+    logging: *default-logging
+    volumes:
+      - ./volumes/data/db/valkey:/data:z
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - {project_name}
 
@@ -40274,31 +40339,68 @@ cd "$TEMP_DIR" && docker compose up -d
 
 **Location:** `docker/docker-compose.test.yml`
 
-**✅ FOR AI AND AUTOMATED TESTING - This is the ONLY docker-compose file AI may use.**
+**For automated testing.** AI's preferred interface is the project's `tests/` directory scripts, which wrap the temp-dir copy/run/cleanup sequence below — invoke those scripts rather than this file directly. Direct invocation (shown below) is a fallback only for projects where no `tests/` script exists yet.
 
 Debug enabled for test visibility. **MUST be copied to temp directory before use - NEVER run from project directory.**
 
 ```yaml
 name: {project_name}-test
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '5m'
+    max-file: '1'
+
 services:
   {project_name}:
     image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:latest
     pull_policy: always
     container_name: {project_name}-test
+    hostname: {project_name}
     restart: "no"
+    logging: *default-logging
     environment:
-      - MODE=development
-      - DEBUG=true
-      - TZ=America/New_York
+      DEBUG: true
+      MODE: development
+      PORT: 80
+      TZ: America/New_York
+      CACHE_URL: valkey://{project_name}-cache-test:6379
     ports:
-      - "64581:80"
+      - "172.17.0.1:64581:80"
     volumes:
       # CRITICAL: ./volumes/ must resolve to $TEMP_DIR/volumes/, NOT project directory
       # This file MUST be copied to a temp directory before running
       # AI: NEVER run this from the project directory
       - ./volumes/config:/config:z
       - ./volumes/data:/data:z
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/{project_name}", "--status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    depends_on:
+      {project_name}-cache-test:
+        condition: service_healthy
+    networks:
+      - {project_name}-test
+
+  {project_name}-cache-test:
+    image: valkey/valkey:alpine
+    pull_policy: always
+    container_name: {project_name}-cache-test
+    restart: "no"
+    logging: *default-logging
+    tmpfs:
+      # ephemeral - always clean state, no persistent volume
+      - /data
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - {project_name}-test
 
@@ -40308,7 +40410,7 @@ networks:
     external: false
 ```
 
-**AI/Automated Testing Workflow (REQUIRED):**
+**AI/Automated Testing Workflow (fallback if no `tests/` script exists yet):**
 ```bash
 mkdir -p "${TMPDIR:-/tmp}/{project_org}"
 TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/{project_org}/{internal_name}-XXXXXX")
@@ -40326,33 +40428,50 @@ rm -rf "$TEMP_DIR"
 ```yaml
 name: {project_name}
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '5m'
+    max-file: '1'
+
 services:
   {project_name}:
     image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:latest
     pull_policy: always
     container_name: {project_name}-app
+    hostname: {project_name}
     restart: always
+    logging: *default-logging
     depends_on:
       {project_name}-db:
         condition: service_healthy
+      {project_name}-cache:
+        condition: service_healthy
     environment:
       # Tor auto-enabled (tor binary installed in image)
-      - MODE=production
-      - TZ=America/New_York
+      PORT: 80
+      TZ: America/New_York
       # DOMAIN (optional - containers behind reverse proxy auto-detect from headers)
       # Only set if NOT behind reverse proxy, comma-separated list supported
-      # - DOMAIN=myapp.com,www.myapp.com,api.myapp.com
-      - DB_HOST={project_name}-db
-      - DB_PORT=5432
-      - DB_NAME={project_name}
-      - DB_USER={project_name}
-      - DB_PASSWORD={project_name}
+      # DOMAIN: myapp.com,www.myapp.com,api.myapp.com
+      DB_HOST: {project_name}-db
+      DB_PORT: 5432
+      DB_NAME: {project_name}
+      DB_USER: {project_name}
+      DB_PASSWORD: {project_name}
+      CACHE_URL: valkey://{project_name}-cache:6379
     ports:
       # Production: bound to Docker bridge only (reverse proxy handles external)
       - "172.17.0.1:64580:80"
     volumes:
       - ./volumes/config:/config:z
       - ./volumes/data:/data:z
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/{project_name}", "--status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     networks:
       - {project_name}
 
@@ -40361,15 +40480,33 @@ services:
     pull_policy: always
     container_name: {project_name}-db
     restart: always
+    logging: *default-logging
     environment:
-      - POSTGRES_DB={project_name}
-      - POSTGRES_USER={project_name}
-      - POSTGRES_PASSWORD={project_name}
-      - TZ=America/New_York
+      POSTGRES_DB: {project_name}
+      POSTGRES_USER: {project_name}
+      POSTGRES_PASSWORD: {project_name}
+      TZ: America/New_York
     volumes:
       - ./volumes/data/db/postgres/{project_name}:/var/lib/postgresql/data:z
     healthcheck:
-      test: pg_isready -U {project_name} -d {project_name}
+      test: ["CMD-SHELL", "pg_isready -U {project_name} -d {project_name}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - {project_name}
+
+  {project_name}-cache:
+    image: valkey/valkey:alpine
+    pull_policy: always
+    container_name: {project_name}-cache
+    restart: always
+    logging: *default-logging
+    volumes:
+      - ./volumes/data/db/valkey:/data:z
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -43813,9 +43950,9 @@ When a test or debug step requires `reboot`, `systemctl`, `iptables`, `mount`, p
 
 | File | Purpose | How AI Uses It |
 |------|---------|----------------|
-| `docker/docker-compose.test.yml` | Automated testing | Copy to temp dir, run from there |
+| `docker/docker-compose.test.yml` | Automated testing | Preferred: invoke the project's `tests/` scripts. Fallback (no `tests/` script yet): copy to temp dir, run from there |
 
-**AI testing workflow:**
+**AI testing workflow (fallback, when no `tests/` script exists yet):**
 ```bash
 # 1. Create temp directory (REQUIRED)
 mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
@@ -43849,7 +43986,7 @@ rm -rf "$TEMP_DIR"
 | Actor | docker-compose.yml | docker-compose.dev.yml | docker-compose.test.yml |
 |-------|-------------------|------------------------|------------------------|
 | **Human** | Production | Development | Testing |
-| **AI** | FORBIDDEN | FORBIDDEN | ONLY THIS (in temp dir) |
+| **AI** | FORBIDDEN | FORBIDDEN | `tests/` scripts preferred; direct (temp dir) as fallback |
 
 ## Config Files: Runtime-Generated Only
 
