@@ -784,11 +784,11 @@ docker/
 │   └── usr/local/bin/entrypoint.sh         # sets non-root UID/GID, prepares cache/target dirs; called by tini → entrypoint.sh → app
 ├── docker-compose.yml                      # production/human runtime — image: ghcr.io/{org}/{name}:latest
 ├── docker-compose.dev.yml                  # human development — image: ghcr.io/{org}/{name}:devel
-├── docker-compose.test.yml                 # automated testing (AI-usable) — builds from Dockerfile, ephemeral tmpfs, named bridge net
+├── docker-compose.test.yml                 # automated testing — builds from Dockerfile, valkey cache w/ ephemeral tmpfs, named bridge net; AI prefers tests/ scripts over running this directly
 └── README.md                               # how to build the image, run tests, run GUI with display forwarding
 ```
 
-All three compose files live under `docker/` (per `dockerfile_conventions.md` → "Docker Compose / File locations"). A top-level `docker-compose.yml` symlink or shim is allowed for ergonomics, but the source of truth lives under `docker/`. AI MUST only run `docker-compose.test.yml`; `docker-compose.yml` and `docker-compose.dev.yml` are human-only.
+All three compose files live under `docker/` (per `dockerfile_conventions.md` → "Docker Compose / File locations"). A top-level `docker-compose.yml` symlink or shim is allowed for ergonomics, but the source of truth lives under `docker/`. `docker-compose.yml` and `docker-compose.dev.yml` are human-only; AI's preferred interface for `docker-compose.test.yml` is the project's `tests/` scripts rather than a direct invocation.
 
 ### Toolchain Image
 
