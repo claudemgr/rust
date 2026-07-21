@@ -2223,7 +2223,7 @@ This distinction exists for clarity. When referring to OS-level resources that b
 | **Server Admin** | Administrative account for managing the application (NOT a privileged user) |
 | **Primary Admin** | A Server Admin - specifically the first one created during setup wizard (cannot be deleted, prevents lockout) |
 | **Additional Admin** | A Server Admin - added later by Primary Admin or other admins (can be deleted) |
-| **OIDC/LDAP Admin** | A Server Admin - authenticated via external identity provider instead of local password |
+| **OIDC/LDAP/SAML Admin** | A Server Admin - authenticated via external identity provider instead of local password |
 | **Regular User** | End-user account that uses the application's features (PART 34, optional) |
 
 **CRITICAL:** Server Admins and Regular Users are completely separate account types stored in different database tables. A Server Admin is NOT a "privileged user."
@@ -3148,8 +3148,8 @@ Getting code correct on the first try is much harder than iterating with feedbac
 | Business logic | IDEA.md | Features implemented match what IDEA.md defines |
 | Threat model / abuse model | IDEA.md → `## Business logic` | Trust boundaries, data sensitivity, abuse cases, and security exceptions are documented and code matches them |
 | Well-known namespace | PART 11 / web routes | `/.well-known/**` only serves documented allowlisted entries, unsupported entries 404, and optional entries exist only when the corresponding feature is defined |
-| External identity auth | PART 34 | OIDC and LDAP both exist, support multiple providers, expose the documented `/server/auth/*` and `/api/{api_version}/server/auth/*` routes, and are manageable from `/server/{admin_path}/config/security/auth/*` |
-| External username onboarding | PART 34 | New OIDC/LDAP-backed users/admins go through the documented first-login username confirmation flow, including prefill normalization and collision-safe numeric suggestions |
+| External identity auth | PART 34 | OIDC, LDAP, and SAML all exist, support multiple providers, expose the documented `/server/auth/*` and `/api/{api_version}/server/auth/*` routes, and are manageable from `/server/{admin_path}/config/security/auth/*` |
+| External username onboarding | PART 34 | New OIDC/LDAP/SAML-backed users/admins go through the documented first-login username confirmation flow, including prefill normalization and collision-safe numeric suggestions |
 | CLI interface | PART 8 | Flags, commands, help output match spec |
 | Client/agent scope | PART 33 | `src/client/` exists for all projects; `src/agent/` only when project needs it |
 | Untrusted content handling | PART 11, PART 16 | User-controlled files/markdown/HTML render as escaped text or sanitized markdown; dangerous types are not served executable on the app origin |
@@ -4268,8 +4268,8 @@ If blocked on current feature:
 □ Error responses match SPEC format
 □ `/.well-known/**` only serves the documented allowlisted entries and unknown entries return `404`
 □ Canonical `/.well-known/security.txt` is served; `/security.txt` is not required unless explicitly defined in `IDEA.md`
-□ If external auth is enabled, both OIDC and LDAP support multiple providers and are manageable from `/server/{admin_path}/config/security/auth/*`
-□ New OIDC/LDAP-backed users/admins follow the first-login username confirmation flow with normalized prefill and visible collision-safe numeric suggestions
+□ If external auth is enabled, OIDC, LDAP, and SAML support multiple providers and are manageable from `/server/{admin_path}/config/security/auth/*`
+□ New OIDC/LDAP/SAML-backed users/admins follow the first-login username confirmation flow with normalized prefill and visible collision-safe numeric suggestions
 ```
 
 ### Infrastructure
@@ -6664,7 +6664,15 @@ edition = "2021"
 | **OIDC** | `openidconnect` | OpenID Connect client |
 | **OAuth2** | `oauth2` | OAuth2 flows |
 | **LDAP** | `ldap3` | LDAP/Active Directory |
+| **SAML 2.0 (SP)** | `samael` (`xmlsec` feature) | SAML 2.0 Service Provider (Web Browser SSO + SLO). ⚠️ NOT pure Rust — the `xmlsec` feature links the `xmlsec1` C system library for XML-DSig signature verify/sign. See the exception note below. |
 | **Sessions** | `tower-sessions` | Cookie-based sessions |
+
+**⚠️ SAML system-dependency exception (samael + xmlsec1):**
+- `samael` is the only auth crate that breaks the "pure Rust / fully static musl" rule. Its `xmlsec` feature links the `xmlsec1` C library (plus `libxml2` and `openssl`/`libressl`) for XML digital-signature verification and signing, which SAML 2.0 assertions REQUIRE.
+- This is a deliberate, owner-approved departure from the pure-Rust default. Signature validation of SAML assertions cannot currently be done safely in pure Rust, so the C library is accepted here.
+- **Build toolchain:** the `casjaysdev/rust` image MUST have the xmlsec1 development headers added — Alpine/musl: `xmlsec-dev libxml2-dev openssl-dev pkgconfig`; Debian/glibc: `libxmlsec1-dev libxml2-dev libssl-dev pkg-config`. Gate this behind the SAML feature so non-SAML projects stay fully static (see PART 27: DOCKER).
+- **Runtime:** SAML-enabled builds are NOT fully static — the runtime image MUST also ship the matching shared libraries (Alpine: `xmlsec libxml2`). Projects that do not enable SAML remain fully static and require none of the above.
+- Put `samael` behind a Cargo feature (e.g. `saml`) so it is compiled out entirely unless SAML is enabled; the xmlsec1 dependency then only applies to builds that opt in.
 
 **Server Admin MFA (Recommended):**
 - TOTP and Passkeys are optional but STRONGLY recommended for Server Admins
@@ -6852,6 +6860,8 @@ libsql = "*"
 
 **Musl Static Build Rule:** All crates must compile cleanly with `--target x86_64-unknown-linux-musl`. If a crate requires dynamic linking or a system C library, find a pure Rust alternative or don't use it.
 
+**Documented exception — `samael` (SAML):** the only sanctioned break from this rule. When (and only when) the project enables the SAML feature, `samael`'s `xmlsec` feature links the `xmlsec1` C library for XML-DSig, so SAML-enabled builds are not fully static and the build/runtime images need xmlsec1 (see Authentication table above and PART 27: DOCKER). Keep it behind the `saml` Cargo feature so every non-SAML build stays pure Rust and fully static.
+
 ### Example Cargo.toml
 
 ```toml
@@ -6913,6 +6923,8 @@ openidconnect = "*"
 oauth2 = "*"
 # LDAP/AD
 ldap3 = "*"
+# SAML 2.0 Service Provider (behind the `saml` feature; xmlsec feature links xmlsec1 C lib — NOT static musl)
+samael = { version = "*", features = ["xmlsec"], optional = true }
 # Cookie sessions
 tower-sessions = "*"
 
@@ -6945,6 +6957,12 @@ anyhow = "*"
 # Logging / Tracing
 tracing = "*"
 tracing-subscriber = { version = "*", features = ["json", "env-filter"] }
+
+[features]
+# SAML pulls in samael + the xmlsec1 C system library; off by default so
+# non-SAML builds stay pure Rust and fully static on musl.
+default = []
+saml = ["dep:samael"]
 ```
 
 **Notes:**
@@ -12485,14 +12503,14 @@ CREATE TABLE IF NOT EXISTS admins (
     failed_attempts INTEGER NOT NULL DEFAULT 0,
     -- Account lockout timestamp
     locked_until INTEGER,
-    -- OIDC/LDAP sync fields (null for local accounts)
-    -- local, oidc:{provider}, ldap:{provider}
+    -- OIDC/LDAP/SAML sync fields (null for local accounts)
+    -- local, oidc:{provider}, ldap:{provider}, saml:{provider}
     source      TEXT NOT NULL DEFAULT 'local',
     -- Provider's user ID
     external_id TEXT,
     -- JSON array of group memberships
     groups      TEXT,
-    -- Last OIDC/LDAP sync timestamp
+    -- Last OIDC/LDAP/SAML sync timestamp
     last_sync   INTEGER
 );
 
@@ -12579,14 +12597,14 @@ CREATE TABLE IF NOT EXISTS users (
     failed_attempts INTEGER NOT NULL DEFAULT 0,
     -- Account lockout timestamp
     locked_until INTEGER,
-    -- OIDC/LDAP sync fields (null for local accounts)
-    -- local, oidc:{provider}, ldap:{provider}
+    -- OIDC/LDAP/SAML sync fields (null for local accounts)
+    -- local, oidc:{provider}, ldap:{provider}, saml:{provider}
     source      TEXT NOT NULL DEFAULT 'local',
     -- Provider's user ID
     external_id TEXT,
     -- JSON array of cached group memberships
     groups      TEXT,
-    -- Last successful OIDC/LDAP sync timestamp
+    -- Last successful OIDC/LDAP/SAML sync timestamp
     last_sync   INTEGER,
     -- JSON for app-specific data
     metadata    TEXT
@@ -16111,7 +16129,12 @@ pub fn extract_context_from_path(
 | `/server/auth/oidc/{provider}/callback` | GET | Complete OIDC browser login and apply user/admin mapping rules |
 | `/server/auth/ldap` | GET | LDAP provider chooser when one or more LDAP providers are enabled |
 | `/server/auth/ldap/{provider}` | GET/POST | LDAP login flow for the selected LDAP provider |
-| `/server/auth/external/username` | GET/POST | First-login username confirmation/selection step after successful OIDC/LDAP auth for new user/admin accounts |
+| `/server/auth/saml/{provider}` | GET | Start SAML login (SP-initiated AuthnRequest, redirect to IdP) |
+| `/server/auth/saml/{provider}/acs` | POST | Assertion Consumer Service — IdP posts the SAML response back here to complete login |
+| `/server/auth/saml/{provider}/metadata` | GET | SP metadata XML (public/enabled by default so IdP admins can configure the relying party) |
+| `/server/auth/saml/{provider}/slo` | GET | SP-initiated Single Logout (redirect to IdP with LogoutRequest) |
+| `/server/auth/saml/{provider}/slo/callback` | GET/POST | Single Logout endpoint — handles IdP-initiated LogoutRequest and the LogoutResponse to an SP-initiated logout |
+| `/server/auth/external/username` | GET/POST | First-login username confirmation/selection step after successful OIDC/LDAP/SAML auth for new user/admin accounts |
 
 **Additional routes if multi-user (PART 34):**
 
@@ -16811,7 +16834,7 @@ server:
 
 | Event | Description | Logged Data |
 |-------|-------------|-------------|
-| `user.registered` | New user registered | User ID, IP, registration method (form, OIDC, invite) |
+| `user.registered` | New user registered | User ID, IP, registration method (form, OIDC, SAML, invite) |
 | `user.login` | User logged in | User ID, IP, user agent, auth method |
 | `user.logout` | User logged out | User ID, session duration |
 | `user.login_failed` | Failed login attempt | IP, user agent, reason (NOT username/email) |
@@ -16896,12 +16919,31 @@ server:
 | `oidc.login` | User logged in via OIDC | User ID, provider name, IP |
 | `oidc.login_failed` | OIDC login failed | Provider name, IP, reason |
 | `oidc.user_created` | Auto-provisioned user via OIDC | User ID, provider name |
+| `oidc.logout` | User logged out of an OIDC-backed session | User ID, provider name, whether IdP RP-initiated logout was triggered |
 | `oidc.admin_granted` | Admin access via group mapping | User ID, provider name, group name |
 | `oidc.admin_revoked` | Admin access removed (group change) | User ID, provider name |
-| `ldap.login` | User logged in via LDAP | User ID, IP |
-| `ldap.login_failed` | LDAP login failed | IP, reason |
+| `oidc.token_refreshed` | Access token refreshed via refresh token | User ID, provider name |
+| `oidc.session_revoked` | Local sessions revoked because the provider was deleted/disabled | Provider name, session count, changed by |
+| `ldap.login` | User logged in via LDAP | User ID, provider name, IP |
+| `ldap.login_failed` | LDAP login failed | Provider name, IP, reason |
+| `ldap.user_created` | Auto-provisioned user via LDAP | User ID, provider name |
 | `ldap.admin_granted` | Admin access via group mapping | User ID, group DN |
 | `ldap.admin_revoked` | Admin access removed (group change) | User ID |
+| `ldap.bind_locked` | Per-identity bind-failure lockout triggered (password-spray defense) | Identity (masked), provider name, IP, failure count |
+
+### SAML Events
+
+| Event | Description | Logged Data |
+|-------|-------------|-------------|
+| `saml.login` | User logged in via SAML | User ID, provider name, IP |
+| `saml.login_failed` | SAML login failed (bad signature, expired assertion, audience mismatch, replayed assertion, etc.) | Provider name, IP, reason |
+| `saml.user_created` | Auto-provisioned user via SAML | User ID, provider name |
+| `saml.admin_granted` | Admin access via group/attribute mapping | User ID, provider name, group/attribute value |
+| `saml.admin_revoked` | Admin access removed (group/attribute change) | User ID, provider name |
+| `saml.slo_initiated` | Single Logout started (SP-initiated LogoutRequest sent, or IdP-initiated LogoutRequest received) | User ID, provider name, initiator (`sp` or `idp`) |
+| `saml.slo_completed` | Single Logout completed (local session ended and LogoutResponse exchanged) | User ID, provider name |
+| `saml.session_revoked` | Local sessions revoked because the provider was deleted/disabled | Provider name, session count, changed by |
+| `saml.sp_cert_rotated` | SP signing/encryption keypair rotated (auto-gen expiry or admin action) | Provider name, new cert fingerprint, expiry |
 
 ### Configuration Events
 
@@ -16919,6 +16961,9 @@ server:
 | `config.ldap_provider_added` | LDAP provider configured | Provider name, added by |
 | `config.ldap_provider_updated` | LDAP provider changed | Provider name, changed by |
 | `config.ldap_provider_removed` | LDAP provider removed | Provider name, removed by |
+| `config.saml_provider_added` | SAML provider configured | Provider name, added by |
+| `config.saml_provider_updated` | SAML provider changed | Provider name, changed by |
+| `config.saml_provider_removed` | SAML provider removed | Provider name, removed by |
 | `config.admin_groups_updated` | Admin group mapping changed | Old groups, new groups, changed by |
 
 ### Security Events
@@ -17770,6 +17815,13 @@ pub struct IpBlock {
 | `/api/{api_version}/server/{admin_path}/config/security/auth/ldap/providers/{provider}` | PATCH | Update one LDAP provider |
 | `/api/{api_version}/server/{admin_path}/config/security/auth/ldap/providers/{provider}` | DELETE | Remove one LDAP provider |
 | `/api/{api_version}/server/{admin_path}/config/security/auth/ldap/providers/{provider}/test` | POST | Test one LDAP provider |
+| `/api/{api_version}/server/{admin_path}/config/security/auth/saml/providers` | GET | List configured SAML providers |
+| `/api/{api_version}/server/{admin_path}/config/security/auth/saml/providers` | POST | Create SAML provider (auto-generates a self-signed SP keypair unless certs are supplied) |
+| `/api/{api_version}/server/{admin_path}/config/security/auth/saml/providers/{provider}` | GET | Get one SAML provider |
+| `/api/{api_version}/server/{admin_path}/config/security/auth/saml/providers/{provider}` | PATCH | Update one SAML provider |
+| `/api/{api_version}/server/{admin_path}/config/security/auth/saml/providers/{provider}` | DELETE | Remove one SAML provider (invalidates active sessions for that provider) |
+| `/api/{api_version}/server/{admin_path}/config/security/auth/saml/providers/{provider}/test` | POST | Test one SAML provider (fetch/parse IdP metadata, validate SP cert, dry-run AuthnRequest) |
+| `/api/{api_version}/server/{admin_path}/config/security/auth/saml/providers/{provider}/metadata` | GET | Download this provider's SP metadata XML (admin convenience; same document served publicly at `/server/auth/saml/{provider}/metadata`) |
 | `/api/{api_version}/server/{admin_path}/config/security/ratelimit` | GET | Get rate limit settings |
 | `/api/{api_version}/server/{admin_path}/config/security/ratelimit` | PATCH | Update rate limit settings |
 
@@ -22108,6 +22160,8 @@ This is NOT optional. This is NOT about "adding compatibility." If you're buildi
 | **NTP Server** | RFC 5905, 5906, etc. | FULL - ALL NTP RFCs |
 | **LDAP Server** | RFC 4510-4519, etc. | FULL - ALL LDAP RFCs |
 | **WebDAV Server** | RFC 4918, etc. | FULL - ALL WebDAV RFCs |
+| **SAML 2.0** | OASIS SAML 2.0 Core/Bindings/Profiles | FULL |
+| **OIDC / OAuth2 (client)** | RFC 6749, 7636 (PKCE), 8414 (discovery), OpenID Connect Core + Discovery + Back-Channel Logout | FULL |
 
 **Why this is critical:**
 - DNS server that violates DNS RFCs = broken DNS, network failures
@@ -28496,6 +28550,9 @@ web:
     # Common exemptions: OAuth callbacks, webhook receivers.
     exempt_paths:
       - /api/{api_version}/server/auth/oidc/*/callback
+      - /server/auth/saml/*/acs
+      - /server/auth/saml/*/slo
+      - /server/auth/saml/*/slo/callback
       - /api/{api_version}/webhooks/*
 ```
 
@@ -29921,6 +29978,7 @@ server:
 /server/{admin_path}/config/security/auth      # Authentication config and provider overview
 /server/{admin_path}/config/security/auth/oidc # OIDC provider management
 /server/{admin_path}/config/security/auth/ldap # LDAP provider management
+/server/{admin_path}/config/security/auth/saml # SAML provider management
 /server/{admin_path}/config/security/tokens    # API token management
 /server/{admin_path}/config/security/firewall  # Firewall rules
 /server/{admin_path}/config/users/             # User management (if multi-user)
@@ -30346,7 +30404,7 @@ pub fn register_admin_routes(cfg: &Config) -> axum::Router<Arc<AppState>> {
 | **Required** | **YES - all projects** | **OPTIONAL** (Multi-User feature) |
 | **Login** | `/server/auth/login` → `/server/{admin_path}/*` | `/server/auth/login` → `/users/*` |
 | **Access** | Admin panel (`/server/{admin_path}/*`) | User routes (`/users/*`) |
-| **Created by** | Setup wizard, existing admin, or OIDC/LDAP | Registration or admin invitation |
+| **Created by** | Setup wizard, existing admin, or OIDC/LDAP/SAML | Registration or admin invitation |
 
 **Important:** Server Admins and regular users are completely separate account types stored in different database tables. A Server Admin is NOT a "privileged user" - they are a different kind of account entirely.
 
@@ -30496,7 +30554,7 @@ On first run, a one-time setup token is generated and displayed in console. Admi
 | Method | Description |
 |--------|-------------|
 | **Manual creation** | Primary admin invites additional admin accounts via `/server/{admin_path}/config/admins` |
-| **OIDC/LDAP group mapping** | Map external identity provider groups to Server Admin role |
+| **OIDC/LDAP/SAML group mapping** | Map external identity provider groups (or SAML group/role assertion attributes) to Server Admin role |
 
 ### Admin Hierarchy
 
@@ -30504,12 +30562,12 @@ On first run, a one-time setup token is generated and displayed in console. Admi
 |------------|------------|--------------------|--------------------|
 | **Primary Admin** | Setup wizard | Yes | Yes (except self) |
 | **Additional Admins** | Primary or other admin | Yes | Yes (except self and primary) |
-| **OIDC/LDAP Admins** | Group mapping | Yes | Yes (except primary) |
+| **OIDC/LDAP/SAML Admins** | Group mapping | Yes | Yes (except primary) |
 
 **Rules:**
 - Primary admin cannot be deleted (only via `--maintenance setup`)
 - All admins have equal permissions (except deletion hierarchy)
-- OIDC/LDAP admin access is automatic based on group membership
+- OIDC/LDAP/SAML admin access is automatic based on group/attribute membership
 - Removing user from external group removes admin access on next login
 - All admin actions are audited with admin username
 
@@ -30567,35 +30625,35 @@ Admin clicks "Invite New Admin"
 - API token generated and shown once
 - Invite creation logged to audit log
 
-### OIDC/LDAP Admin Sync
+### OIDC/LDAP/SAML Admin Sync
 
-**When a user authenticates via OIDC/LDAP and belongs to a mapped admin group:**
+**When a user authenticates via OIDC/LDAP/SAML and belongs to a mapped admin group (OIDC/LDAP group claim) or attribute value (SAML assertion attribute):**
 
-1. User authenticates with OIDC/LDAP provider
-2. Server retrieves user's group memberships
+1. User authenticates with OIDC/LDAP/SAML provider
+2. Server retrieves user's group memberships (OIDC/LDAP) or admin attribute values (SAML)
 3. If user is in `admin_groups` → create/update local admin record
 4. Admin credentials synced to local database
-5. On next login, even if OIDC/LDAP is down, local credentials work
+5. On next login, even if OIDC/LDAP/SAML is down, local credentials work
 
 **Local Sync Fields (`admins` table):**
 | Field | Description |
 |-------|-------------|
-| `username` | Final local admin username (claim-derived, admin-chosen on first login, or from the previously linked local admin record) |
+| `username` | Final local admin username (claim/attribute-derived, admin-chosen on first login, or from the previously linked local admin record) |
 | `password` | Argon2id hash (synced or set locally) |
-| `source` | `local`, `oidc:{provider}`, `ldap:{provider}` |
-| `external_id` | Provider's user ID |
-| `groups` | JSON array of cached group memberships |
+| `source` | `local`, `oidc:{provider}`, `ldap:{provider}`, `saml:{provider}` |
+| `external_id` | Provider's user ID (OIDC `sub`, LDAP DN/entryUUID, SAML NameID) |
+| `groups` | JSON array of cached group memberships (OIDC/LDAP groups, SAML admin-attribute values) |
 | `last_sync` | Last successful sync timestamp |
 
 **Fallback Behavior:**
 | Scenario | Behavior |
 |----------|----------|
-| OIDC/LDAP available | Authenticate with provider, sync to local |
-| OIDC/LDAP unavailable | Use cached local credentials |
-| User removed from admin group | Next successful OIDC/LDAP login revokes admin |
+| OIDC/LDAP/SAML available | Authenticate with provider, sync to local |
+| OIDC/LDAP/SAML unavailable | Use cached local credentials |
+| User removed from admin group | Next successful OIDC/LDAP/SAML login revokes admin |
 | Provider permanently down | Local credentials continue to work |
 
-**Matching rule:** for OIDC/LDAP-backed admins, the stable identity key is `external_id` + provider source, not mutable username/email.
+**Matching rule:** for OIDC/LDAP/SAML-backed admins, the stable identity key is `external_id` + provider source, not mutable username/email.
 
 ## Server Admin Security
 
@@ -30856,7 +30914,7 @@ Admin Panel Header:
 |----------|-----------------|
 | Forgot password | Use own recovery keys OR contact Primary Admin |
 | Lost 2FA + recovery keys | Contact Primary Admin to delete account, re-invite |
-| OIDC/LDAP admin locked out | Fix in identity provider, or Primary Admin removes mapping |
+| OIDC/LDAP/SAML admin locked out | Fix in identity provider, or Primary Admin removes mapping |
 
 **Primary admin CANNOT:**
 - Reset other admin's password directly
@@ -30967,7 +31025,7 @@ Admin Panel Header:
 | `/server/{admin_path}/config/scheduler` | Scheduler | View/edit scheduled tasks |
 | `/server/{admin_path}/config/email` | Email | SMTP settings, templates |
 | `/server/{admin_path}/config/logs` | Logs | View access, error, audit logs |
-| `/server/{admin_path}/config/security/auth` | Authentication | Password, MFA, sessions, OIDC/LDAP provider overview |
+| `/server/{admin_path}/config/security/auth` | Authentication | Password, MFA, sessions, OIDC/LDAP/SAML provider overview |
 | `/server/{admin_path}/config/security/tokens` | API Tokens | Generate, revoke tokens |
 | `/server/{admin_path}/config/security/ratelimit` | Rate Limiting | Configure rate limits |
 | `/server/{admin_path}/config/security/firewall` | Firewall | IP allow/block lists |
@@ -31165,6 +31223,8 @@ Admin Panel Header:
 | `auth.oidc.providers` | Provider table | (empty) | No | Add/edit/remove/test OIDC providers |
 | `auth.ldap.enabled` | Toggle | Off | No | Enable LDAP login support |
 | `auth.ldap.providers` | Provider table | (empty) | No | Add/edit/remove/test LDAP providers |
+| `auth.saml.enabled` | Toggle | Off | No | Enable SAML 2.0 SP login support (requires a SAML-enabled build) |
+| `auth.saml.providers` | Provider table | (empty) | No | Add/edit/remove/test SAML providers; download SP metadata; manage SP signing/encryption certs (auto-generated self-signed by default, or admin-supplied) |
 
 #### Backup Section (`/server/{admin_path}/config/backup`)
 
@@ -34556,7 +34616,7 @@ server:
 
 | Label | Values | Notes |
 |-------|--------|-------|
-| `method` | `password`, `api_token`, `oidc`, `ldap`, `2fa` | Auth method used |
+| `method` | `password`, `api_token`, `oidc`, `ldap`, `saml`, `2fa` | Auth method used |
 | `status` | `success`, `failed`, `blocked` | Attempt result |
 
 ### Business Metrics (if using PART 34 multi-user)
@@ -35625,7 +35685,8 @@ groups:
 | Admin 2FA secret | Yes | Encrypted |
 | Admin recovery keys | Yes | Hashed |
 | Additional admin accounts | Yes | Same as above |
-| OIDC/LDAP admin mappings | Yes | Configuration only |
+| OIDC/LDAP/SAML admin mappings | Yes | Configuration only |
+| SAML SP signing/encryption keys | Yes | Private keys encrypted at rest (same store as 2FA secrets); auto-generated keypairs are regenerated on restore only if absent |
 
 ### Backup Format
 
@@ -36234,7 +36295,7 @@ POST /api/{api_version}/server/{admin_path}/config/backup/restore
 |------------|------------------|
 | **Primary Admin** | Must re-authenticate with setup token |
 | **Additional Admins (local)** | Can log in immediately with existing credentials |
-| **OIDC/LDAP Admins** | Can log in if OIDC/LDAP provider accessible |
+| **OIDC/LDAP/SAML Admins** | Can log in if OIDC/LDAP/SAML provider accessible (SAML also requires the restored SP keypair to still be trusted by the IdP) |
 
 ## Admin Recovery Command
 
@@ -39207,6 +39268,14 @@ RUN mkdir src && echo 'fn main() {}' > src/main.rs && \
     cargo fetch --locked
 
 # Copy full source and build
+# NOTE: The default build is pure-musl and fully static (no --features saml).
+# SAML support is OFF by default because the samael `xmlsec` feature links the
+# xmlsec1 C library (see PART 5 § SAML system-dependency exception). To build with
+# SAML, add `--features saml` below AND ensure the builder image provides the C
+# toolchain + headers: xmlsec-dev libxml2-dev openssl-dev pkgconfig (Alpine names).
+# casjaysdev/rust:latest must add these packages for SAML-enabled builds; a
+# --features saml binary is dynamically linked against libxmlsec1/libxml2/openssl
+# and therefore is NOT the fully-static musl artifact the default build produces.
 COPY . .
 RUN VERSION="${VERSION}" \
     COMMIT_ID="${COMMIT_ID}" \
@@ -39235,6 +39304,9 @@ ARG LICENSE=MIT
 
 # Install required packages
 # NOTE: Tor binary installed but NOT configured here - binary handles all Tor setup (see PART 32)
+# NOTE: A SAML-enabled build (--features saml) is dynamically linked and additionally
+# requires the xmlsec1 runtime shared libraries here: add `xmlsec libxml2 openssl`
+# to this apk add. The default (SAML-off) build needs none of these.
 RUN apk add --no-cache \
     git \
     curl \
@@ -39760,6 +39832,11 @@ RUN mkdir src && echo 'fn main(){}' > src/main.rs && cargo fetch
 COPY src/ ./src/
 
 # Build static binary (musl target — fully static, no libc dependency)
+# NOTE: SAML is OFF by default to preserve this fully-static musl guarantee. A
+# --features saml build links the xmlsec1 C library and is NOT fully static; it
+# needs xmlsec-dev libxml2-dev openssl-dev pkgconfig in the builder and the
+# xmlsec1 runtime libs (`libxmlsec1 libxml2 libssl3`) added to the Debian runtime
+# apt-get install below. See PART 5 § SAML system-dependency exception.
 ARG VERSION=dev
 ARG COMMIT=unknown
 ARG BUILD_TIME=unknown
@@ -46532,7 +46609,7 @@ All settings can be overridden via environment:
 All settings are configurable via the WebUI at `/server/{admin_path}`.
 
 Document:
-- external auth provider settings (OIDC/LDAP) if enabled
+- external auth provider settings (OIDC/LDAP/SAML) if enabled
 - well-known namespace settings and optional entries if enabled
 - health/public endpoint toggles that operators can change
 ```
@@ -46594,7 +46671,7 @@ GraphQL playground: [/server/docs/graphql](/server/docs/graphql)
 - Monitoring & logs
 
 Document:
-- `/server/{admin_path}/config/security/auth/*` for OIDC/LDAP provider management
+- `/server/{admin_path}/config/security/auth/*` for OIDC/LDAP/SAML provider management
 - `/server/{admin_path}/config/web/*` for robots/security/well-known management
 - any security-reporting or public-endpoint admin pages enabled by the project
 
@@ -46614,6 +46691,7 @@ Programmatic access via `/api/{api_version}/server/{admin_path}/` with bearer to
 - External identity for users/admins is documented here:
   - OIDC providers
   - LDAP providers
+  - SAML 2.0 providers (SP metadata endpoint, ACS, SLO, SP cert management)
   - first-login username confirmation flow
 
 ## Public Security Endpoints
@@ -46648,6 +46726,7 @@ Programmatic access via `/api/{api_version}/server/{admin_path}/` with bearer to
 
 - OIDC providers, scopes, and claim mapping
 - LDAP providers, attribute mapping, and group mapping
+- SAML 2.0 providers, attribute mapping, group/role assertion mapping, and SP metadata
 - Which flows apply to users, admins, or both
 
 ## Discovery & Protocol Endpoints
@@ -55439,7 +55518,7 @@ users:
 
 **Note:** Registration mode controls how NEW regular-user accounts are created. It does **not** control login for existing users or user profile visibility.
 
-**External identity note:** OIDC/LDAP-backed regular users count as "new regular-user accounts" when the system creates the first local user record for that external identity. Their first-login account creation MUST respect `auto_register` and the username collision rules in PART 34.
+**External identity note:** OIDC/LDAP/SAML-backed regular users count as "new regular-user accounts" when the system creates the first local user record for that external identity. Their first-login account creation MUST respect `auto_register` and the username collision rules in PART 34.
 
 **Admin Permission Reminder (see PART 17):**
 - Admin CANNOT set user passwords (only user can, via invite link or reset)
@@ -56323,7 +56402,7 @@ User receives: "Password reset requested by administrator.
 - Same response time for both cases (prevent timing attacks)
 - Links to recovery flow instead of revealing information
 
-### 2FA, Passkeys & OIDC
+### 2FA, Passkeys & External Identity (OIDC / LDAP / SAML)
 
 **Supported Authentication Methods:**
 | Method | Description |
@@ -56331,11 +56410,17 @@ User receives: "Password reset requested by administrator.
 | Password | Standard username/email + password |
 | TOTP (2FA) | Time-based one-time passwords (Google Authenticator, Authy, etc.) |
 | Passkeys | WebAuthn/FIDO2 passwordless authentication |
-| OIDC | External identity providers |
+| OIDC | External identity providers (OpenID Connect) |
+| LDAP | Directory bind authentication (Active Directory, OpenLDAP, FreeIPA) |
+| SAML 2.0 | SAML Service Provider (Web Browser SSO + SLO); feature-gated build, see PART 5 |
 
 **OIDC Providers (Examples):**
 - Self-hosted: Authentik, Authelia, Keycloak, Dex, Zitadel
 - Cloud: Auth0, Okta, Azure AD, Google, GitHub, GitLab
+
+**SAML 2.0 IdPs (Examples):**
+- Self-hosted: Keycloak (SAML client), Shibboleth, ADFS, Authentik
+- Cloud: Okta, Azure AD / Entra ID, OneLogin, Auth0
 
 **Recovery Keys (CRITICAL):**
 | Rule | Description |
@@ -56629,7 +56714,7 @@ POST /api/{api_version}/users/security/2fa/enable
 | Last key warning | ⚠️ Warning when only 1-2 keys remaining |
 | Zero keys + lost 2FA | Must contact admin for manual verification |
 
-**OIDC/LDAP Configuration:**
+**OIDC/LDAP/SAML Configuration:**
 ```yaml
 server:
   auth:
@@ -56671,6 +56756,36 @@ server:
             admin: ["admins", "administrators", "app-admins", "app-administrators", "platform-admins"]
             moderator: ["moderators", "support", "support-staff", "helpdesk", "reviewers"]
             user: ["users", "user", "members", "member", "employees", "staff", "developers", "engineering"]
+          # PKCE (RFC 7636). auto = use S256 when the discovery document advertises
+          # it, fall back to plain only if the provider requires it. Public clients
+          # MUST use PKCE; confidential clients SHOULD.
+          pkce: auto           # auto | s256 | disabled
+          # CSRF/replay protections for the authorization-code flow. Both are ON and
+          # non-optional in practice; exposed here only so operators can see them.
+          require_state: true  # opaque state param bound to the browser session
+          require_nonce: true  # nonce claim validated against the ID token
+          # Allowed clock skew (seconds) when validating iat/exp/nbf on the ID token.
+          max_clock_skew: 60
+          # Discovery document (.well-known/openid-configuration) + JWKS caching.
+          discovery:
+            # Refresh cadence for the cached discovery doc and JWKS. Signing-key
+            # rollover is picked up on refresh or on first unknown `kid`.
+            refresh_interval: 12h
+            # Serve from the last good cache if the provider is unreachable on refresh.
+            cache_on_failure: true
+          # Refresh-token handling (only when the provider issues one and offline_access
+          # is granted). Used to keep long-lived sessions without re-prompting.
+          token_refresh:
+            enabled: true
+            # Refresh this long before access-token expiry.
+            leeway: 60s
+          # RP-initiated logout (OIDC front-channel). When the provider publishes an
+          # end_session_endpoint, local logout also redirects there to end the IdP
+          # session. See § OIDC Session Termination below.
+          rp_initiated_logout: true
+          # Back-channel logout (OIDC Back-Channel Logout 1.0). When enabled the app
+          # exposes a logout token receiver and revokes the matching local session.
+          backchannel_logout: false
 
       ldap:
         enabled: false
@@ -56721,6 +56836,118 @@ server:
                 - "cn=staff,ou=groups,dc=example,dc=com"
                 - "cn=developers,ou=groups,dc=example,dc=com"
                 - "cn=engineering,ou=groups,dc=example,dc=com"
+            # Transport security. Plaintext ld:// with no TLS is REJECTED unless
+            # allow_insecure is explicitly set (dev only). Prefer ldaps:// or
+            # StartTLS on the standard 389 port.
+            tls:
+              # required | starttls | ldaps | disabled
+              mode: starttls
+              # Verify the directory server certificate against the system/CA bundle.
+              verify_cert: true
+              # Optional custom CA bundle path for private PKI.
+              ca_file: ""
+              # Escape hatch for lab/dev only; never in production.
+              allow_insecure: false
+            # Connection pooling + failover. `server` may be a single URL or a list;
+            # the pool round-robins and fails over on connection error.
+            servers:
+              - "ldaps://ldap1.example.com:636"
+              - "ldaps://ldap2.example.com:636"
+            pool:
+              max_connections: 8
+              # Idle connections are health-checked before reuse.
+              idle_timeout: 60s
+            # Chase referrals returned by the directory (AD often returns these).
+            follow_referrals: false
+            # Paged search (RFC 2696) for large directories / group enumeration.
+            page_size: 500
+            # Per-operation timeouts.
+            timeouts:
+              connect: 5s
+              bind: 5s
+              search: 10s
+            # Bind-failure throttling to blunt password spraying. Counts failed
+            # end-user binds per identity; independent of local-account lockout.
+            bind_lockout:
+              enabled: true
+              max_failures: 5
+              window: 15m
+              backoff: 30s
+
+      # SAML 2.0 Service Provider. Requires a SAML-enabled build (Cargo `saml`
+      # feature → samael + xmlsec1; see PART 5 § SAML system-dependency exception).
+      # If saml.enabled is true on a build compiled without the feature, the server
+      # MUST fail fast at startup with a clear message rather than silently ignore it.
+      saml:
+        enabled: false
+        # Service Provider signing/encryption keypair. Default is zero-config:
+        # the server auto-generates a self-signed keypair on first enable, persists
+        # it (encrypted at rest, same store as 2FA secrets), and publishes the public
+        # cert in SP metadata. Admins may instead supply their own PEM cert/key.
+        sp_certificate:
+          # auto (self-signed, generated + persisted) | provided
+          mode: auto
+          # Used only when mode: provided.
+          cert_file: ""
+          key_file: ""
+          # For mode: auto — validity of the generated self-signed cert; the server
+          # rotates before expiry and re-publishes metadata.
+          self_signed_days: 3650
+        providers:
+          - name: okta
+            display_name: "Login with Okta"
+            # IdP metadata: supply a URL (fetched + cached) OR an inline/xml file.
+            # entity_id, SSO/SLO endpoints, and signing certs are read from it.
+            idp_metadata_url: "https://example.okta.com/app/abc123/sso/saml/metadata"
+            idp_metadata_file: ""
+            # How often to refetch idp_metadata_url (cert rollover pickup).
+            metadata_refresh_interval: 12h
+            # This SP's entity ID. Default derives from the public base URL:
+            # {public_url}/server/auth/saml/{provider}/metadata
+            sp_entity_id: ""
+            # NameID format requested in the AuthnRequest.
+            name_id_format: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
+            # Require the IdP to sign assertions/responses (STRONGLY recommended).
+            want_assertions_signed: true
+            # Request encrypted assertions (IdP must support; needs SP enc key).
+            want_assertions_encrypted: false
+            # Sign our AuthnRequest / LogoutRequest with the SP key.
+            sign_requests: true
+            # Clock skew tolerance (seconds) for assertion NotBefore/NotOnOrAfter.
+            max_clock_skew: 60
+            # Auto-create regular user on first login (ONLY if multi-user is enabled).
+            auto_register: true
+            # Map SAML assertion attributes to user fields. Values are attribute
+            # Names (or FriendlyNames) as issued by the IdP.
+            attributes:
+              username: "urn:oid:0.9.2342.19200300.100.1.1"   # uid
+              email: "urn:oid:0.9.2342.19200300.100.1.3"      # mail
+              name: "urn:oid:2.16.840.1.113730.3.1.241"       # displayName
+              # Attribute whose values carry group/role membership.
+              groups: "http://schemas.xmlsoap.org/claims/Group"
+            username_resolution:
+              # prompt_on_first_login | prompt_if_conflict | reject_if_conflict
+              mode: prompt_on_first_login
+              allow_custom_on_first_login: true
+            # Assertion attribute values that grant the Server Admin role.
+            admin_groups:
+              - "admins"
+              - "administrators"
+              - "server-admins"
+              - "app-administrators"
+              - "platform-admins"
+            # Map assertion attribute values to user roles (if multi-user enabled).
+            role_mapping:
+              admin: ["admins", "administrators", "app-admins", "platform-admins"]
+              moderator: ["moderators", "support", "support-staff", "helpdesk"]
+              user: ["users", "members", "employees", "staff", "developers"]
+            # Single Logout. Supports both SP-initiated (user logs out locally →
+            # LogoutRequest to IdP) and IdP-initiated (IdP POSTs a LogoutRequest to
+            # our SLO endpoint). Requires signed LogoutRequests when enabled.
+            slo:
+              enabled: true
+              # redirect | post — binding used for SP-initiated LogoutRequest.
+              binding: redirect
 ```
 
 ### OIDC Provider Expectations & Common Providers
@@ -56731,14 +56958,14 @@ server:
 
 ### External Identity Provider Requirements
 
-- External identity support for Server Admins MUST include BOTH OIDC and LDAP
-- OIDC and LDAP MUST each support multiple named providers
-- All OIDC and LDAP providers MUST be manageable from the Admin WebUI under `/server/{admin_path}/config/security/auth/*`
+- External identity support for Server Admins MUST include OIDC, LDAP, and SAML 2.0 (SAML is feature-gated at build time; see PART 5)
+- OIDC, LDAP, and SAML MUST each support multiple named providers
+- All OIDC, LDAP, and SAML providers MUST be manageable from the Admin WebUI under `/server/{admin_path}/config/security/auth/*`
 - If `server.users.enabled: true`, the same provider definitions MUST also apply the regular-user auth rules (`auto_register`, username resolution, and `role_mapping`)
 - If `server.users.enabled: false`, those same providers remain valid for Server Admin auth only
-- Provider identity is part of the stored source value: `oidc:{provider}` or `ldap:{provider}`
+- Provider identity is part of the stored source value: `oidc:{provider}`, `ldap:{provider}`, or `saml:{provider}`
 
-**Why regular-user OIDC/LDAP support matters:** organizations that already run OIDC/LDAP expect the app to plug into their existing identity infrastructure instead of forcing a second local account system. When multi-user mode is enabled, the project MUST support regular-user OIDC/LDAP login so the app fits into the operator's existing SSO/directory environment.
+**Why regular-user OIDC/LDAP/SAML support matters:** organizations that already run OIDC, LDAP, or SAML expect the app to plug into their existing identity infrastructure instead of forcing a second local account system. When multi-user mode is enabled, the project MUST support regular-user OIDC/LDAP/SAML login so the app fits into the operator's existing SSO/directory environment.
 
 **Common OIDC providers to support cleanly:**
 
@@ -56758,9 +56985,42 @@ server:
 - Providers without a trustworthy username claim MUST derive an initial candidate username from email localpart or another documented stable field, then run normal collision checks
 - If a provider does not expose email, the project MUST document whether email is optional, separately collected, or that provider is unsupported
 
+### SAML Provider Expectations & Common Providers
+
+**SAML support applies to BOTH regular users and Server Admins**, mirroring OIDC/LDAP. The difference from OIDC/LDAP is the transport (browser POST of a signed XML assertion to the ACS endpoint) and that group/role membership arrives as **assertion attribute values**, not a groups claim or `memberOf`. Role mapping is otherwise identical:
+- regular users: created/synced via `auto_register`, `attributes`, and `role_mapping`
+- server admins: granted by `admin_groups` (matched against the mapped groups attribute's values)
+
+**Common SAML IdPs to support cleanly:**
+
+| Provider | Typical Username Attribute | Typical Email Attribute | Typical Groups / Roles Source | Notes |
+|----------|---------------------------|-------------------------|-------------------------------|-------|
+| **Okta** | `NameID` (persistent) or custom `uid` | `email` / `mail` | Custom `groups` attribute (must be added to the app's SAML settings in Okta) | Okta does not emit groups unless the app is configured to; document this |
+| **Azure AD / Entra ID** | `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name` or UPN | `.../emailaddress` | `http://schemas.microsoft.com/ws/2008/06/identity/claims/groups` (GUIDs, not names) | Groups arrive as object GUIDs by default; map GUIDs or enable group-name emission |
+| **OneLogin** | `NameID` or `User.Username` | `User.email` | `memberOf` / roles parameter | Roles configured per-app in OneLogin |
+| **ADFS** | `windowsaccountname` or UPN | `emailaddress` | `Group` / `Role` claim rules | Requires explicit claim rules on the relying party trust |
+| **Shibboleth** | `urn:oid:0.9.2342.19200300.100.1.1` (uid) | `urn:oid:0.9.2342.19200300.100.1.3` (mail) | `urn:oid:1.3.6.1.4.1.5923.1.5.1.1` (isMemberOf) | Uses OID attribute names; map explicitly |
+| **Keycloak (SAML)** | `NameID` or configured user attribute | `email` | `Role` / `Group` attribute mapper | Same realm as OIDC but a distinct SAML client |
+
+**SAML NameID format guidance:**
+
+| NameID Format | When to use |
+|---------------|-------------|
+| `...:persistent` | Preferred stable identifier; opaque, per-SP, does not change on email/name change |
+| `...:emailAddress` | When the IdP guarantees a stable email and no persistent ID is available |
+| `...:transient` | NOT usable as an identity key (changes every login); only acceptable with a stable attribute mapped to `username`/`external_id` |
+| `...:unspecified` | Treat as opaque; document the actual value the IdP sends |
+
+**SAML provider rules:**
+- The `external_id` for a SAML account is the assertion `NameID` (or a stable mapped attribute when NameID is transient); it MUST NOT be a mutable email/displayName
+- `want_assertions_signed: true` is the secure default; the server MUST reject unsigned assertions and validate the XML-DSig signature against the IdP metadata signing cert
+- The server MUST validate `Destination`, `Audience` (SP entity ID), `InResponseTo` (against a stored AuthnRequest ID), and the `NotBefore`/`NotOnOrAfter` window (within `max_clock_skew`), and MUST reject replayed assertion IDs
+- Group/role membership comes from the attribute named by `attributes.groups`; if the IdP emits opaque GUIDs (Azure AD), the operator MUST map GUIDs or enable name emission at the IdP
+- If the IdP does not emit email, the same optional/collected/unsupported documentation rule as OIDC applies
+
 ### Starter Group Mapping Presets
 
-**The setup UI SHOULD offer starter presets for OIDC and LDAP group mapping so a typical enterprise/provider setup works with minimal manual editing.**
+**The setup UI SHOULD offer starter presets for OIDC, LDAP, and SAML group mapping so a typical enterprise/provider setup works with minimal manual editing.** For SAML, the "Typical OIDC Group Names" column applies directly — the values are matched against the assertion attribute named by `attributes.groups` exactly as OIDC group-claim values are.
 
 **Security rule:** these are starter presets, not an excuse to auto-grant broad admin access blindly. Operators MUST still be able to review and trim the mapped groups before saving.
 
@@ -56773,6 +57033,7 @@ server:
 
 **Preset rules:**
 - For OIDC, these names are matched exactly against the configured group/role claim
+- For SAML, these names are matched exactly against the values of the assertion attribute named by `attributes.groups`
 - For LDAP, these should be emitted as full DN examples in config, but the setup UI may allow shorthand entry and expand to the configured group base DN
 - Providers that emit roles instead of groups MUST allow the operator to point `claims_mapping.groups` at that roles claim
 - The starter preset is a convenience baseline; custom mappings remain fully supported and canonical
@@ -56794,9 +57055,9 @@ server:
 - If nested groups are needed (common in AD), the project MUST document whether it resolves nested membership or only direct membership
 - If the LDAP directory does not expose `memberOf`, the project MUST support a documented alternate membership lookup or explicitly state that the provider is unsupported
 
-### OIDC/LDAP Username Resolution for Regular Users
+### OIDC/LDAP/SAML Username Resolution for Regular Users
 
-**Regular-user OIDC/LDAP login MUST support a first-login username confirmation step for every new external account, not only conflict cases.**
+**Regular-user OIDC/LDAP/SAML login MUST support a first-login username confirmation step for every new external account, not only conflict cases.** For SAML the "username claim" is the assertion attribute mapped by `attributes.username` (falling back to `NameID`); everything else in this section is identical.
 
 | Scenario | Required Behavior |
 |----------|-------------------|
@@ -56816,12 +57077,12 @@ server:
 - Normalization MUST strip a leading `@`; if the candidate is an email address, use only the localpart before `@`
 - If the normalized candidate is blocked or collides, the server MUST generate an available suggestion by appending random numeric digits, but MUST still show the final suggestion to the user before account creation
 - The username-selection step MUST use the same global namespace validation as local registration (`reserved` + existing user + existing org collision)
-- The chosen username is written once when the local account is created; after that, OIDC/LDAP login matches by `external_id`, not by re-deriving username every time
+- The chosen username is written once when the local account is created; after that, OIDC/LDAP/SAML login matches by `external_id`, not by re-deriving username every time
 - The project MUST NOT silently append random digits or mutate usernames without showing the user the final result first
 
-### OIDC/LDAP Username Resolution for Server Admins
+### OIDC/LDAP/SAML Username Resolution for Server Admins
 
-**OIDC/LDAP-backed Server Admins MUST support the same first-login username confirmation step for every new external admin account, not only conflict cases.**
+**OIDC/LDAP/SAML-backed Server Admins MUST support the same first-login username confirmation step for every new external admin account, not only conflict cases.**
 
 | Scenario | Required Behavior |
 |----------|-------------------|
@@ -56843,7 +57104,7 @@ server:
   - no collision with reserved admin-root children such as `config`
   - the normal syntax/length rules for admin usernames
 - Server Admin usernames remain exempt from the public username blocklist, but they are NOT exempt from route-collision checks
-- The chosen username is written once when the local admin record is created; after that, OIDC/LDAP admin login matches by `external_id`, not by re-deriving username every time
+- The chosen username is written once when the local admin record is created; after that, OIDC/LDAP/SAML admin login matches by `external_id`, not by re-deriving username every time
 
 ### Local Sync Rules for Regular Users
 
@@ -56851,12 +57112,12 @@ server:
 |-------|-------------|
 | `username` | Final local username (claim-derived or user-chosen on first login) |
 | `password` | Local Argon2id hash. Use a real fallback password hash when local fallback login is supported; otherwise store an unusable random secret so password login stays disabled for that external-only account |
-| `source` | `local`, `oidc:{provider}`, `ldap:{provider}` |
-| `external_id` | Stable provider subject / LDAP unique ID |
-| `groups` | Cached external groups/roles from last successful login |
-| `last_sync` | Last successful OIDC/LDAP sync timestamp |
+| `source` | `local`, `oidc:{provider}`, `ldap:{provider}`, `saml:{provider}` |
+| `external_id` | Stable provider subject / LDAP unique ID / SAML NameID (or mapped stable attribute) |
+| `groups` | Cached external groups/roles from last successful login (OIDC/LDAP groups or SAML group-attribute values) |
+| `last_sync` | Last successful OIDC/LDAP/SAML sync timestamp |
 
-**Matching rule:** for OIDC/LDAP-backed regular users, the stable identity key is `external_id` + provider source, NOT mutable username/email.
+**Matching rule:** for OIDC/LDAP/SAML-backed regular users, the stable identity key is `external_id` + provider source, NOT mutable username/email.
 
 ### Server Admin Group Mapping
 
@@ -56866,18 +57127,19 @@ server:
 |----------|---------------|-------------|
 | **OIDC** | `admin_groups` list | Group names from the `groups` claim |
 | **LDAP** | `admin_groups` list | Full DN of groups (e.g., `cn=admins,ou=groups,dc=example,dc=com`) |
+| **SAML** | `admin_groups` list | Values of the assertion attribute mapped by `attributes.groups` (e.g., `admins`; Azure AD emits group object GUIDs) |
 
 **How Group Mapping Works:**
 
-1. User authenticates via OIDC/LDAP
-2. Server retrieves user's group memberships from identity provider
-3. If user belongs to ANY group in `admin_groups` → grant Server Admin access
+1. User authenticates via OIDC/LDAP/SAML
+2. Server retrieves user's group memberships (OIDC/LDAP) or admin-attribute values (SAML) from the identity provider
+3. If user belongs to ANY group/value in `admin_groups` → grant Server Admin access
 4. Admin access persists for session duration
 5. On next login, group membership is re-evaluated
 6. If user is removed from all `admin_groups` → admin access revoked
 
 **Admin auth scope rule:**
-- OIDC and LDAP can authenticate regular users and Server Admins through the same `/server/auth/*` surface
+- OIDC, LDAP, and SAML can authenticate regular users and Server Admins through the same `/server/auth/*` surface
 - Server Admin access is NEVER inferred from normal user role mapping alone
 - Server Admin access requires `admin_groups` match (or an explicitly provisioned local admin account)
 
@@ -56892,16 +57154,21 @@ server:
 | `/server/{admin_path}/config/security/auth/ldap` | List/manage LDAP providers |
 | `/server/{admin_path}/config/security/auth/ldap/new` | Add LDAP provider |
 | `/server/{admin_path}/config/security/auth/ldap/{provider}` | Edit, test, enable/disable, or remove one LDAP provider |
+| `/server/{admin_path}/config/security/auth/saml` | List/manage SAML providers |
+| `/server/{admin_path}/config/security/auth/saml/new` | Add SAML provider (auto-generates a self-signed SP keypair unless certs supplied) |
+| `/server/{admin_path}/config/security/auth/saml/{provider}` | Edit, test, enable/disable, download SP metadata, manage SP certs, or remove one SAML provider |
 
 | Element | Type | Description |
 |---------|------|-------------|
 | OIDC Providers | Section | List of configured OIDC providers with add/edit/remove/test actions |
 | LDAP Providers | Section | List of configured LDAP providers with add/edit/remove/test actions |
+| SAML Providers | Section | List of configured SAML providers with add/edit/remove/test actions, SP metadata download, and SP signing/encryption cert management (auto-generated self-signed or admin-supplied) |
 | Applies To | Readonly summary | Server Admin auth always; regular-user auth too when multi-user mode is enabled |
 | Admin Groups | Tag input | Per-provider groups that grant Server Admin access |
 | Role Mapping | Table | Per-provider mapping from external groups to application roles |
-| Test Connection | Button | Test one selected OIDC/LDAP provider |
+| Test Connection | Button | Test one selected OIDC/LDAP/SAML provider (SAML: fetch/parse IdP metadata, validate SP cert, dry-run AuthnRequest) |
 | Test Group Mapping | Button | Test one selected provider's groups and resulting role |
+| Download SP Metadata | Button | SAML only: download this provider's SP metadata XML for handoff to the IdP |
 
 **Sane Defaults:**
 - `admin_groups`: Empty (no external groups granted admin by default)
@@ -56917,6 +57184,56 @@ server:
 | **Simplicity** | Admin-only mode doesn't need user management |
 | **Isolation** | Server admin credentials separate from user data |
 | **Recovery** | Can access admin even if database is corrupted |
+
+### SAML 2.0 Browser SSO Flow
+
+**SP-initiated login (`/server/auth/saml/{provider}`):**
+
+1. Server builds a SAML `AuthnRequest`, signs it with the SP key when `sign_requests: true`, and stores the request ID + a CSRF `RelayState` bound to the browser session.
+2. Browser is sent to the IdP SSO endpoint (Redirect binding for the request; the IdP replies via POST binding to the ACS).
+3. IdP authenticates the user and POSTs a signed (optionally encrypted) `Response` to `/server/auth/saml/{provider}/acs`.
+4. Server validates, in order: XML-DSig signature against the IdP metadata signing cert; `Destination` equals the ACS URL; `Audience` equals the SP entity ID; `InResponseTo` matches the stored request ID; the `NotBefore`/`NotOnOrAfter` window within `max_clock_skew`; and that the assertion ID has not been seen before (replay cache).
+5. On success, attributes are mapped per `attributes`; `admin_groups`/`role_mapping` are applied; and the first-login username confirmation flow runs for new accounts (identical to OIDC/LDAP).
+
+**IdP-initiated login:** the IdP POSTs an unsolicited `Response` to the ACS with no stored `InResponseTo`. This is accepted ONLY when the provider is explicitly configured to allow it (unsolicited assertions weaken CSRF guarantees); otherwise it is rejected. Signature, audience, and replay checks are unchanged.
+
+**Assertion validation is non-negotiable:** an unsigned assertion, a signature that does not chain to the IdP metadata cert, a wrong `Audience`/`Destination`, or a replayed assertion MUST all be rejected with an audit event (`saml.login_failed`).
+
+### SAML Single Logout (SLO)
+
+- **SP-initiated:** local logout builds a signed `LogoutRequest`, ends the local session, and redirects the browser to the IdP SLO endpoint (`slo.binding`). The IdP returns a `LogoutResponse` to `/server/auth/saml/{provider}/slo/callback`.
+- **IdP-initiated:** the IdP POSTs a signed `LogoutRequest` to `/server/auth/saml/{provider}/slo`; the server validates the signature, terminates the matching local session(s) by `NameID`/session index, and returns a signed `LogoutResponse`.
+- SLO requires signed logout messages; unsigned `LogoutRequest`/`LogoutResponse` are rejected.
+
+### SAML SP Certificate Management
+
+- **Default (zero-config):** on first enable of a provider, the server generates a self-signed SP signing/encryption keypair (`sp_certificate.mode: auto`), persists the private key encrypted at rest (same store as 2FA secrets), and publishes the public cert in SP metadata. The server rotates before `self_signed_days` expiry and re-publishes metadata.
+- **Admin-supplied:** `sp_certificate.mode: provided` uses operator PEM `cert_file`/`key_file` (e.g. a cert already trusted by the IdP). Rotation is the operator's responsibility.
+- Because most IdPs pin the SP cert from uploaded metadata, rotating the SP cert requires re-handing metadata (or the new cert) to the IdP; the admin UI surfaces the current cert fingerprint + expiry.
+
+### API-mode SAML Flow
+
+SAML is a browser protocol; API clients cannot complete it headlessly. The API flow bridges to the system browser:
+
+1. `GET /api/{api_version}/server/auth/saml/{provider}` returns `{ redirect_url, poll_token }`. `redirect_url` is the AuthnRequest URL; `poll_token` is a short-lived opaque handle bound to that request's `RelayState`.
+2. The client opens `redirect_url` in the system browser. The user authenticates at the IdP; the IdP POSTs the assertion to the normal browser ACS endpoint, which completes login and marks the `poll_token` satisfied.
+3. The client polls `POST /api/{api_version}/server/auth/saml/{provider}/poll` with the `poll_token`: `202` while pending, `200` + session/bearer token once the ACS step completed, `410` once the token expires.
+4. If the account is new, the poll response signals that the first-login username confirmation step is required before a token is issued.
+
+### OIDC Session Termination (Part B)
+
+- **RP-initiated logout:** when `rp_initiated_logout: true` and the provider publishes an `end_session_endpoint` in discovery, local logout ends the local session AND redirects to the IdP end-session endpoint (with `id_token_hint` + `post_logout_redirect_uri`) so the IdP session is also ended. If the provider lacks the endpoint, only the local session is ended and this is noted in the `oidc.logout` audit event.
+- **Back-channel logout:** when `backchannel_logout: true`, the server exposes a logout-token receiver; a validated OIDC Back-Channel Logout token (correct `iss`/`aud`, `events` claim, and `sid`/`sub`) revokes the matching local session server-side even if the browser never returns.
+- **Provider deletion / disable:** removing or disabling an OIDC provider MUST revoke all active local sessions whose `source` is `oidc:{provider}` (same rule stated for SAML provider deletion). External-only accounts can no longer authenticate; local-fallback accounts fall back to password.
+
+### LDAP Connection & Security Hardening (Part B)
+
+- **Transport:** plaintext `ldap://` with no TLS is rejected unless `tls.allow_insecure: true` (dev only). Production uses `ldaps://` or StartTLS (`tls.mode: starttls`) with `verify_cert: true`.
+- **Pooling & failover:** `servers` may list multiple URLs; the pool round-robins and fails over on connection error, health-checking idle connections before reuse (`pool.idle_timeout`).
+- **Referrals & paging:** `follow_referrals` controls chasing directory referrals (common with AD); `page_size` enables RFC 2696 paged search for large group/user result sets.
+- **Timeouts:** `connect`/`bind`/`search` are individually bounded so a slow directory cannot hang request threads.
+- **Bind-failure throttling:** `bind_lockout` counts failed end-user binds per identity within a window and applies backoff to blunt password spraying; this is independent of local-account lockout.
+- **Service-account rotation:** `bind_password` is a secret in `users.db`/secret store, never in the config file in plaintext; rotating it is a hot config update with a test-connection gate before it takes effect.
 
 ## Configuration
 
@@ -57624,6 +57941,9 @@ PATCH /api/{api_version}/users/settings
 | `/server/auth/refresh` | Session (web) / Bearer (API) | Must have a session/token to refresh |
 | `/server/auth/2fa` | Partial-session (post-password, pre-2FA) | Continuation of in-progress login |
 | `/server/auth/recovery/use` | Partial-session OR password-recovery token | 2FA bypass during account recovery |
+| `/server/auth/saml/{provider}/metadata` | None (public) | SP metadata XML must be readable by the IdP without a session |
+| `/server/auth/saml/{provider}/acs` | None (validated by signed assertion + `InResponseTo`) | IdP POSTs the assertion here; authenticity comes from XML-DSig, not a session |
+| `/server/auth/saml/{provider}/slo` | None (validated by signed LogoutRequest/Response) | IdP-initiated SLO endpoint; authenticity comes from the signed message |
 
 **Project-specific public routes** (e.g., `/jokes/random`, `/quotes`, `/ip`, `/weather`) inherit `Public → None` unless the project's IDEA.md declares a write/admin endpoint.
 
@@ -57923,7 +58243,12 @@ curl -q -LSsf https://api.example.com/api/autodiscover
 | `/server/auth/oidc/{provider}/callback` | OIDC callback (provider redirects back) |
 | `/server/auth/ldap` | LDAP provider chooser |
 | `/server/auth/ldap/{provider}` | LDAP login form for the selected provider |
-| `/server/auth/external/username` | First-login username confirmation page after successful OIDC/LDAP auth when a new user/admin record is being created |
+| `/server/auth/saml/{provider}` | SAML login initiation (build + redirect/POST signed AuthnRequest to IdP) |
+| `/server/auth/saml/{provider}/acs` | SAML Assertion Consumer Service (IdP POSTs the assertion here; POST binding) |
+| `/server/auth/saml/{provider}/metadata` | Public SP metadata XML for this provider (consumed by the IdP) |
+| `/server/auth/saml/{provider}/slo` | Single Logout endpoint (SP-initiated redirect out + IdP-initiated LogoutRequest in) |
+| `/server/auth/saml/{provider}/slo/callback` | SLO response landing (LogoutResponse from IdP after SP-initiated logout) |
+| `/server/auth/external/username` | First-login username confirmation page after successful OIDC/LDAP/SAML auth when a new user/admin record is being created |
 
 ### Users (`/users/`)
 
@@ -58001,6 +58326,9 @@ Organizations - only for projects with multi-user collaboration.
 | `/server/{admin_path}/config/security/auth/ldap` | LDAP provider list |
 | `/server/{admin_path}/config/security/auth/ldap/new` | Add LDAP provider |
 | `/server/{admin_path}/config/security/auth/ldap/{provider}` | LDAP provider detail/edit/test/remove |
+| `/server/{admin_path}/config/security/auth/saml` | SAML provider list |
+| `/server/{admin_path}/config/security/auth/saml/new` | Add SAML provider (auto-generates a self-signed SP keypair unless certs supplied) |
+| `/server/{admin_path}/config/security/auth/saml/{provider}` | SAML provider detail/edit/test/remove, SP metadata download, SP cert management |
 
 ### Admin - Web (`/server/{admin_path}/config/web/`)
 
@@ -58136,6 +58464,9 @@ Organizations - only for projects with multi-user collaboration.
 | `/api/{api_version}/server/auth/oidc/{provider}/callback` | POST | Exchange OIDC code for session, then apply user/admin mapping rules |
 | `/api/{api_version}/server/auth/ldap` | GET | List enabled LDAP providers and their display names for login UI/client selection |
 | `/api/{api_version}/server/auth/ldap/{provider}` | POST | LDAP authentication for the selected provider, then apply user/admin mapping rules |
+| `/api/{api_version}/server/auth/saml` | GET | List enabled SAML providers and their display names for login UI/client selection |
+| `/api/{api_version}/server/auth/saml/{provider}` | GET | Begin API-mode SAML login: returns `{ redirect_url, poll_token }`. Client opens `redirect_url` in the system browser; the browser completes SSO at the ACS endpoint (see § API SAML flow) |
+| `/api/{api_version}/server/auth/saml/{provider}/poll` | POST | Exchange the `poll_token` for a session/bearer token once the browser ACS step has completed; returns `202 pending` until then, `410` once expired |
 | `/api/{api_version}/server/auth/external/username` | POST | Complete external user/admin account creation after the first-login username confirmation step |
 
 ### Users (`/api/{api_version}/users/`)
@@ -59356,6 +59687,10 @@ When using remote database, the same tables are created but with appropriate typ
 | `password_hash` | String | Argon2id hash (PHC format) |
 | `totp_secret` | String | 2FA secret (encrypted, optional) |
 | `totp_enabled` | Boolean | 2FA enabled |
+| `source` | String | `local`, `oidc:{provider}`, `ldap:{provider}`, `saml:{provider}` (null/`local` for wizard-created admins) |
+| `external_id` | String | Stable provider subject / LDAP unique ID / SAML NameID or mapped stable attribute (external admins) |
+| `groups` | JSON | Cached external groups/roles from last successful login (OIDC/LDAP groups or SAML group-attribute values) |
+| `last_sync` | Timestamp | Last successful OIDC/LDAP/SAML sync |
 | `created_at` | Timestamp | Account creation |
 | `updated_at` | Timestamp | Last update |
 | `last_login_at` | Timestamp | Last login |
@@ -59363,7 +59698,7 @@ When using remote database, the same tables are created but with appropriate typ
 **Notes:**
 - Multiple admin rows supported — one row per Server Admin
 - First admin created via setup wizard on first run
-- Additional admins via invite (`/server/{admin_path}/config/admins/invite`) or OIDC/LDAP `admin_groups` provisioning
+- Additional admins via invite (`/server/{admin_path}/config/admins/invite`) or OIDC/LDAP/SAML `admin_groups` provisioning
 - Setup token displayed in console ONCE, used to access `/server/{admin_path}/config/setup`
 - Admin password and API token created during setup wizard (user must copy)
 - Admin API tokens live in the unified `tokens` table (`owner_type = 'admin'`), not in this table
@@ -59390,10 +59725,10 @@ When using remote database, the same tables are created but with appropriate typ
 | `totp_enabled` | Boolean | 2FA enabled |
 | `timezone` | String | User timezone |
 | `language` | String | User language |
-| `source` | String | `local`, `oidc:{provider}`, `ldap:{provider}` |
-| `external_id` | String | Stable provider subject / LDAP unique ID (external accounts) |
-| `groups` | JSON | Cached external groups/roles from last successful login |
-| `last_sync` | Timestamp | Last successful OIDC/LDAP sync |
+| `source` | String | `local`, `oidc:{provider}`, `ldap:{provider}`, `saml:{provider}` |
+| `external_id` | String | Stable provider subject / LDAP unique ID / SAML NameID or mapped stable attribute (external accounts) |
+| `groups` | JSON | Cached external groups/roles from last successful login (OIDC/LDAP groups or SAML group-attribute values) |
+| `last_sync` | Timestamp | Last successful OIDC/LDAP/SAML sync |
 | `created_at` | Timestamp | Account creation |
 | `updated_at` | Timestamp | Last update |
 | `last_login_at` | Timestamp | Last login |
