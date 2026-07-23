@@ -6664,15 +6664,15 @@ edition = "2021"
 | **OIDC** | `openidconnect` | OpenID Connect client |
 | **OAuth2** | `oauth2` | OAuth2 flows |
 | **LDAP** | `ldap3` | LDAP/Active Directory |
-| **SAML 2.0 (SP)** | `samael` (`xmlsec` feature) | SAML 2.0 Service Provider (Web Browser SSO + SLO). ⚠️ NOT pure Rust — the `xmlsec` feature links the `xmlsec1` C system library for XML-DSig signature verify/sign. See the exception note below. |
+| **SAML 2.0 (SP)** | `saml` (danielkov/saml) | SAML 2.0 Service Provider (Web Browser SSO + SLO). Pure Rust — no `libxml2`/`libxmlsec1`/`libxslt`/`openssl` C dependency, fully static-musl compatible. See the maturity note below. |
 | **Sessions** | `tower-sessions` | Cookie-based sessions |
 
-**⚠️ SAML system-dependency exception (samael + xmlsec1):**
-- `samael` is the only auth crate that breaks the "pure Rust / fully static musl" rule. Its `xmlsec` feature links the `xmlsec1` C library (plus `libxml2` and `openssl`/`libressl`) for XML digital-signature verification and signing, which SAML 2.0 assertions REQUIRE.
-- This is a deliberate, owner-approved departure from the pure-Rust default. Signature validation of SAML assertions cannot currently be done safely in pure Rust, so the C library is accepted here.
-- **Build toolchain:** the `casjaysdev/rust` image MUST have the xmlsec1 development headers added — Alpine/musl: `xmlsec-dev libxml2-dev openssl-dev pkgconfig`; Debian/glibc: `libxmlsec1-dev libxml2-dev libssl-dev pkg-config`. Gate this behind the SAML feature so non-SAML projects stay fully static (see PART 27: DOCKER).
-- **Runtime:** SAML-enabled builds are NOT fully static — the runtime image MUST also ship the matching shared libraries (Alpine: `xmlsec libxml2`). Projects that do not enable SAML remain fully static and require none of the above.
-- Put `samael` behind a Cargo feature (e.g. `saml`) so it is compiled out entirely unless SAML is enabled; the xmlsec1 dependency then only applies to builds that opt in.
+**⚠️ SAML crate maturity note (`saml` / danielkov/saml):**
+- This is the only pure-Rust, static-musl-compatible SAML 2.0 toolkit available; the more established `samael` crate was rejected because its `xmlsec` feature links the `xmlsec1` C library, breaking the fully-static-musl requirement.
+- As of this writing the crate is **v0.0.1-alpha** with a small community (repo has 2 GitHub stars) and explicitly makes **no claim of "production ready" or "battle-tested"** in its own documentation. There is no formal third-party security audit.
+- It IS tested against an interop corpus covering 8 major IdPs (Okta, Microsoft Entra ID, Auth0, Google Workspace, OneLogin, Keycloak, ADFS, Shibboleth), ships fuzzing harnesses, has active CI, and documents its own threat model — meaningfully more diligence than a typical alpha crate, but still pre-1.0.
+- This is a deliberate, owner-approved tradeoff: static-musl compatibility over crate maturity. Pin the exact version in `Cargo.lock`, monitor the upstream repo for security-relevant commits, and re-evaluate if a mature pure-Rust alternative or a production-ready release appears.
+- No system-dependency exception is needed — SAML-enabled builds remain fully static musl, same as every other feature.
 
 **Server Admin MFA (Recommended):**
 - TOTP and Passkeys are optional but STRONGLY recommended for Server Admins
@@ -6860,7 +6860,7 @@ libsql = "*"
 
 **Musl Static Build Rule:** All crates must compile cleanly with `--target x86_64-unknown-linux-musl`. If a crate requires dynamic linking or a system C library, find a pure Rust alternative or don't use it.
 
-**Documented exception — `samael` (SAML):** the only sanctioned break from this rule. When (and only when) the project enables the SAML feature, `samael`'s `xmlsec` feature links the `xmlsec1` C library for XML-DSig, so SAML-enabled builds are not fully static and the build/runtime images need xmlsec1 (see Authentication table above and PART 27: DOCKER). Keep it behind the `saml` Cargo feature so every non-SAML build stays pure Rust and fully static.
+**No exception needed for SAML:** the `saml` crate (danielkov/saml) is pure Rust with no C-library dependency, so SAML-enabled builds stay fully static musl like every other feature — see the maturity note in the Authentication table above instead.
 
 ### Example Cargo.toml
 
@@ -6923,8 +6923,8 @@ openidconnect = "*"
 oauth2 = "*"
 # LDAP/AD
 ldap3 = "*"
-# SAML 2.0 Service Provider (behind the `saml` feature; xmlsec feature links xmlsec1 C lib — NOT static musl)
-samael = { version = "*", features = ["xmlsec"], optional = true }
+# SAML 2.0 Service Provider (behind the `saml` feature; pure Rust, fully static musl)
+saml = { version = "*", optional = true }
 # Cookie sessions
 tower-sessions = "*"
 
@@ -6959,10 +6959,10 @@ tracing = "*"
 tracing-subscriber = { version = "*", features = ["json", "env-filter"] }
 
 [features]
-# SAML pulls in samael + the xmlsec1 C system library; off by default so
-# non-SAML builds stay pure Rust and fully static on musl.
+# SAML is pure Rust (no system C library); off by default so it is compiled
+# out entirely unless a project actually needs SAML.
 default = []
-saml = ["dep:samael"]
+saml = ["dep:saml"]
 ```
 
 **Notes:**
@@ -22160,8 +22160,6 @@ This is NOT optional. This is NOT about "adding compatibility." If you're buildi
 | **NTP Server** | RFC 5905, 5906, etc. | FULL - ALL NTP RFCs |
 | **LDAP Server** | RFC 4510-4519, etc. | FULL - ALL LDAP RFCs |
 | **WebDAV Server** | RFC 4918, etc. | FULL - ALL WebDAV RFCs |
-| **SAML 2.0** | OASIS SAML 2.0 Core/Bindings/Profiles | FULL |
-| **OIDC / OAuth2 (client)** | RFC 6749, 7636 (PKCE), 8414 (discovery), OpenID Connect Core + Discovery + Back-Channel Logout | FULL |
 
 **Why this is critical:**
 - DNS server that violates DNS RFCs = broken DNS, network failures
@@ -39268,14 +39266,12 @@ RUN mkdir src && echo 'fn main() {}' > src/main.rs && \
     cargo fetch --locked
 
 # Copy full source and build
-# NOTE: The default build is pure-musl and fully static (no --features saml).
-# SAML support is OFF by default because the samael `xmlsec` feature links the
-# xmlsec1 C library (see PART 5 § SAML system-dependency exception). To build with
-# SAML, add `--features saml` below AND ensure the builder image provides the C
-# toolchain + headers: xmlsec-dev libxml2-dev openssl-dev pkgconfig (Alpine names).
-# casjaysdev/rust:latest must add these packages for SAML-enabled builds; a
-# --features saml binary is dynamically linked against libxmlsec1/libxml2/openssl
-# and therefore is NOT the fully-static musl artifact the default build produces.
+# NOTE: SAML is off by default (no --features saml) so it is compiled out
+# entirely unless a project needs it. The `saml` crate (danielkov/saml) is
+# pure Rust with no C-library dependency, so a --features saml build is
+# STILL the same fully-static musl artifact as the default build — no
+# additional toolchain packages or dynamic linking are required either way
+# (see PART 5 § SAML crate maturity note for the v0.0.1-alpha caveat).
 COPY . .
 RUN VERSION="${VERSION}" \
     COMMIT_ID="${COMMIT_ID}" \
@@ -39304,9 +39300,8 @@ ARG LICENSE=MIT
 
 # Install required packages
 # NOTE: Tor binary installed but NOT configured here - binary handles all Tor setup (see PART 32)
-# NOTE: A SAML-enabled build (--features saml) is dynamically linked and additionally
-# requires the xmlsec1 runtime shared libraries here: add `xmlsec libxml2 openssl`
-# to this apk add. The default (SAML-off) build needs none of these.
+# NOTE: A SAML-enabled build (--features saml) is pure Rust and statically
+# linked, same as the default build — no additional runtime packages needed.
 RUN apk add --no-cache \
     git \
     curl \
@@ -39832,11 +39827,10 @@ RUN mkdir src && echo 'fn main(){}' > src/main.rs && cargo fetch
 COPY src/ ./src/
 
 # Build static binary (musl target — fully static, no libc dependency)
-# NOTE: SAML is OFF by default to preserve this fully-static musl guarantee. A
-# --features saml build links the xmlsec1 C library and is NOT fully static; it
-# needs xmlsec-dev libxml2-dev openssl-dev pkgconfig in the builder and the
-# xmlsec1 runtime libs (`libxmlsec1 libxml2 libssl3`) added to the Debian runtime
-# apt-get install below. See PART 5 § SAML system-dependency exception.
+# NOTE: SAML is OFF by default so it's compiled out unless needed. The `saml`
+# crate (danielkov/saml) is pure Rust with no C-library dependency, so a
+# --features saml build is STILL fully static — no extra builder headers or
+# runtime packages required. See PART 5 § SAML crate maturity note.
 ARG VERSION=dev
 ARG COMMIT=unknown
 ARG BUILD_TIME=unknown
@@ -56787,167 +56781,173 @@ server:
           # exposes a logout token receiver and revokes the matching local session.
           backchannel_logout: false
 
-      ldap:
-        enabled: false
-        providers:
-          - name: corp
-            display_name: "Corporate LDAP"
-            server: "ldap://ldap.example.com:389"
-            bind_dn: "cn=readonly,dc=example,dc=com"
-            bind_password: "{ldap_password}"
-            base_dn: "dc=example,dc=com"
-            user_filter: "(uid={username})"
-            # Auto-create regular user on first login (ONLY if multi-user is enabled)
-            auto_register: true
-            # Map LDAP attributes to user fields
-            attributes:
-              username: "uid"
-              email: "mail"
-              name: "cn"
-              groups: "memberOf"
-            username_resolution:
-              # prompt_on_first_login | prompt_if_conflict | reject_if_conflict
-              mode: prompt_on_first_login
-              allow_custom_on_first_login: true
-            # Map LDAP groups to Server Admin role
-            admin_groups:
+    ldap:
+      enabled: false
+      providers:
+        - name: corp
+          display_name: "Corporate LDAP"
+          server: "ldap://ldap.example.com:389"
+          bind_dn: "cn=readonly,dc=example,dc=com"
+          bind_password: "{ldap_password}"
+          base_dn: "dc=example,dc=com"
+          user_filter: "(uid={username})"
+          # Auto-create regular user on first login (ONLY if multi-user is enabled)
+          auto_register: true
+          # Map LDAP attributes to user fields
+          attributes:
+            username: "uid"
+            email: "mail"
+            name: "cn"
+            groups: "memberOf"
+          username_resolution:
+            # prompt_on_first_login | prompt_if_conflict | reject_if_conflict
+            mode: prompt_on_first_login
+            allow_custom_on_first_login: true
+          # Map LDAP groups to Server Admin role
+          admin_groups:
+            - "cn=admins,ou=groups,dc=example,dc=com"
+            - "cn=administrators,ou=groups,dc=example,dc=com"
+            - "cn=server-admins,ou=groups,dc=example,dc=com"
+            - "cn=app-administrators,ou=groups,dc=example,dc=com"
+            - "cn=platform-admins,ou=groups,dc=example,dc=com"
+            - "cn=infra-admins,ou=groups,dc=example,dc=com"
+          # Map LDAP groups to user roles (if multi-user enabled)
+          role_mapping:
+            admin:
               - "cn=admins,ou=groups,dc=example,dc=com"
               - "cn=administrators,ou=groups,dc=example,dc=com"
-              - "cn=server-admins,ou=groups,dc=example,dc=com"
+              - "cn=app-admins,ou=groups,dc=example,dc=com"
               - "cn=app-administrators,ou=groups,dc=example,dc=com"
-              - "cn=platform-admins,ou=groups,dc=example,dc=com"
-              - "cn=infra-admins,ou=groups,dc=example,dc=com"
-            # Map LDAP groups to user roles (if multi-user enabled)
-            role_mapping:
-              admin:
-                - "cn=admins,ou=groups,dc=example,dc=com"
-                - "cn=administrators,ou=groups,dc=example,dc=com"
-                - "cn=app-admins,ou=groups,dc=example,dc=com"
-                - "cn=app-administrators,ou=groups,dc=example,dc=com"
-              moderator:
-                - "cn=moderators,ou=groups,dc=example,dc=com"
-                - "cn=support,ou=groups,dc=example,dc=com"
-                - "cn=support-staff,ou=groups,dc=example,dc=com"
-                - "cn=helpdesk,ou=groups,dc=example,dc=com"
-              user:
-                - "cn=users,ou=groups,dc=example,dc=com"
-                - "cn=members,ou=groups,dc=example,dc=com"
-                - "cn=employees,ou=groups,dc=example,dc=com"
-                - "cn=staff,ou=groups,dc=example,dc=com"
-                - "cn=developers,ou=groups,dc=example,dc=com"
-                - "cn=engineering,ou=groups,dc=example,dc=com"
-            # Transport security. Plaintext ld:// with no TLS is REJECTED unless
-            # allow_insecure is explicitly set (dev only). Prefer ldaps:// or
-            # StartTLS on the standard 389 port.
-            tls:
-              # required | starttls | ldaps | disabled
-              mode: starttls
-              # Verify the directory server certificate against the system/CA bundle.
-              verify_cert: true
-              # Optional custom CA bundle path for private PKI.
-              ca_file: ""
-              # Escape hatch for lab/dev only; never in production.
-              allow_insecure: false
-            # Connection pooling + failover. `server` may be a single URL or a list;
-            # the pool round-robins and fails over on connection error.
-            servers:
-              - "ldaps://ldap1.example.com:636"
-              - "ldaps://ldap2.example.com:636"
-            pool:
-              max_connections: 8
-              # Idle connections are health-checked before reuse.
-              idle_timeout: 60s
-            # Chase referrals returned by the directory (AD often returns these).
-            follow_referrals: false
-            # Paged search (RFC 2696) for large directories / group enumeration.
-            page_size: 500
-            # Per-operation timeouts.
-            timeouts:
-              connect: 5s
-              bind: 5s
-              search: 10s
-            # Bind-failure throttling to blunt password spraying. Counts failed
-            # end-user binds per identity; independent of local-account lockout.
-            bind_lockout:
-              enabled: true
-              max_failures: 5
-              window: 15m
-              backoff: 30s
+            moderator:
+              - "cn=moderators,ou=groups,dc=example,dc=com"
+              - "cn=support,ou=groups,dc=example,dc=com"
+              - "cn=support-staff,ou=groups,dc=example,dc=com"
+              - "cn=helpdesk,ou=groups,dc=example,dc=com"
+            user:
+              - "cn=users,ou=groups,dc=example,dc=com"
+              - "cn=members,ou=groups,dc=example,dc=com"
+              - "cn=employees,ou=groups,dc=example,dc=com"
+              - "cn=staff,ou=groups,dc=example,dc=com"
+              - "cn=developers,ou=groups,dc=example,dc=com"
+              - "cn=engineering,ou=groups,dc=example,dc=com"
+          # Transport security. Plaintext ld:// with no TLS is REJECTED unless
+          # allow_insecure is explicitly set (dev only). Prefer ldaps:// or
+          # StartTLS on the standard 389 port.
+          tls:
+            # required | starttls | ldaps | disabled
+            mode: starttls
+            # Verify the directory server certificate against the system/CA bundle.
+            verify_cert: true
+            # Optional custom CA bundle path for private PKI.
+            ca_file: ""
+            # Escape hatch for lab/dev only; never in production.
+            allow_insecure: false
+          # Connection pooling + failover. `server` may be a single URL or a list;
+          # the pool round-robins and fails over on connection error.
+          servers:
+            - "ldaps://ldap1.example.com:636"
+            - "ldaps://ldap2.example.com:636"
+          pool:
+            max_connections: 8
+            # Idle connections are health-checked before reuse.
+            idle_timeout: 60s
+          # Chase referrals returned by the directory (AD often returns these).
+          follow_referrals: false
+          # Paged search (RFC 2696) for large directories / group enumeration.
+          page_size: 500
+          # Per-operation timeouts.
+          timeouts:
+            connect: 5s
+            bind: 5s
+            search: 10s
+          # Bind-failure throttling to blunt password spraying. Counts failed
+          # end-user binds per identity; independent of local-account lockout.
+          bind_lockout:
+            enabled: true
+            max_failures: 5
+            window: 15m
+            backoff: 30s
 
-      # SAML 2.0 Service Provider. Requires a SAML-enabled build (Cargo `saml`
-      # feature → samael + xmlsec1; see PART 5 § SAML system-dependency exception).
-      # If saml.enabled is true on a build compiled without the feature, the server
-      # MUST fail fast at startup with a clear message rather than silently ignore it.
-      saml:
-        enabled: false
-        # Service Provider signing/encryption keypair. Default is zero-config:
-        # the server auto-generates a self-signed keypair on first enable, persists
-        # it (encrypted at rest, same store as 2FA secrets), and publishes the public
-        # cert in SP metadata. Admins may instead supply their own PEM cert/key.
-        sp_certificate:
-          # auto (self-signed, generated + persisted) | provided
-          mode: auto
-          # Used only when mode: provided.
-          cert_file: ""
-          key_file: ""
-          # For mode: auto — validity of the generated self-signed cert; the server
-          # rotates before expiry and re-publishes metadata.
-          self_signed_days: 3650
-        providers:
-          - name: okta
-            display_name: "Login with Okta"
-            # IdP metadata: supply a URL (fetched + cached) OR an inline/xml file.
-            # entity_id, SSO/SLO endpoints, and signing certs are read from it.
-            idp_metadata_url: "https://example.okta.com/app/abc123/sso/saml/metadata"
-            idp_metadata_file: ""
-            # How often to refetch idp_metadata_url (cert rollover pickup).
-            metadata_refresh_interval: 12h
-            # This SP's entity ID. Default derives from the public base URL:
-            # {public_url}/server/auth/saml/{provider}/metadata
-            sp_entity_id: ""
-            # NameID format requested in the AuthnRequest.
-            name_id_format: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
-            # Require the IdP to sign assertions/responses (STRONGLY recommended).
-            want_assertions_signed: true
-            # Request encrypted assertions (IdP must support; needs SP enc key).
-            want_assertions_encrypted: false
-            # Sign our AuthnRequest / LogoutRequest with the SP key.
-            sign_requests: true
-            # Clock skew tolerance (seconds) for assertion NotBefore/NotOnOrAfter.
-            max_clock_skew: 60
-            # Auto-create regular user on first login (ONLY if multi-user is enabled).
-            auto_register: true
-            # Map SAML assertion attributes to user fields. Values are attribute
-            # Names (or FriendlyNames) as issued by the IdP.
-            attributes:
-              username: "urn:oid:0.9.2342.19200300.100.1.1"   # uid
-              email: "urn:oid:0.9.2342.19200300.100.1.3"      # mail
-              name: "urn:oid:2.16.840.1.113730.3.1.241"       # displayName
-              # Attribute whose values carry group/role membership.
-              groups: "http://schemas.xmlsoap.org/claims/Group"
-            username_resolution:
-              # prompt_on_first_login | prompt_if_conflict | reject_if_conflict
-              mode: prompt_on_first_login
-              allow_custom_on_first_login: true
-            # Assertion attribute values that grant the Server Admin role.
-            admin_groups:
-              - "admins"
-              - "administrators"
-              - "server-admins"
-              - "app-administrators"
-              - "platform-admins"
-            # Map assertion attribute values to user roles (if multi-user enabled).
-            role_mapping:
-              admin: ["admins", "administrators", "app-admins", "platform-admins"]
-              moderator: ["moderators", "support", "support-staff", "helpdesk"]
-              user: ["users", "members", "employees", "staff", "developers"]
-            # Single Logout. Supports both SP-initiated (user logs out locally →
-            # LogoutRequest to IdP) and IdP-initiated (IdP POSTs a LogoutRequest to
-            # our SLO endpoint). Requires signed LogoutRequests when enabled.
-            slo:
-              enabled: true
-              # redirect | post — binding used for SP-initiated LogoutRequest.
-              binding: redirect
+    # SAML 2.0 Service Provider. Requires a SAML-enabled build (Cargo `saml`
+    # feature → the `saml` crate, danielkov/saml; see PART 5 § SAML crate
+    # maturity note — pure Rust, no system C dependency, but v0.0.1-alpha).
+    # If saml.enabled is true on a build compiled without the feature, the server
+    # MUST fail fast at startup with a clear message rather than silently ignore it.
+    saml:
+      enabled: false
+      # Service Provider signing/encryption keypair. Default is zero-config:
+      # the server auto-generates a self-signed keypair on first enable, persists
+      # it (encrypted at rest, same store as 2FA secrets), and publishes the public
+      # cert in SP metadata. Admins may instead supply their own PEM cert/key.
+      sp_certificate:
+        # auto (self-signed, generated + persisted) | provided
+        mode: auto
+        # Used only when mode: provided.
+        cert_file: ""
+        key_file: ""
+        # For mode: auto — validity of the generated self-signed cert; the server
+        # rotates before expiry and re-publishes metadata.
+        self_signed_days: 3650
+      providers:
+        - name: okta
+          display_name: "Login with Okta"
+          # IdP metadata: supply a URL (fetched + cached) OR an inline/xml file.
+          # entity_id, SSO/SLO endpoints, and signing certs are read from it.
+          idp_metadata_url: "https://example.okta.com/app/abc123/sso/saml/metadata"
+          idp_metadata_file: ""
+          # How often to refetch idp_metadata_url (cert rollover pickup).
+          metadata_refresh_interval: 12h
+          # This SP's entity ID. Default derives from the public base URL:
+          # {public_url}/server/auth/saml/{provider}/metadata
+          sp_entity_id: ""
+          # NameID format requested in the AuthnRequest.
+          name_id_format: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
+          # Require the IdP to sign assertions/responses (STRONGLY recommended).
+          want_assertions_signed: true
+          # Request encrypted assertions (IdP must support; needs SP enc key).
+          want_assertions_encrypted: false
+          # Sign our AuthnRequest / LogoutRequest with the SP key.
+          sign_requests: true
+          # Clock skew tolerance (seconds) for assertion NotBefore/NotOnOrAfter.
+          max_clock_skew: 60
+          # Auto-create regular user on first login (ONLY if multi-user is enabled).
+          auto_register: true
+          # Map SAML assertion attributes to user fields. Values are attribute
+          # Names (or FriendlyNames) as issued by the IdP.
+          attributes:
+            username: "urn:oid:0.9.2342.19200300.100.1.1"   # uid
+            email: "urn:oid:0.9.2342.19200300.100.1.3"      # mail
+            name: "urn:oid:2.16.840.1.113730.3.1.241"       # displayName
+            # Attribute whose values carry group/role membership.
+            groups: "http://schemas.xmlsoap.org/claims/Group"
+          username_resolution:
+            # prompt_on_first_login | prompt_if_conflict | reject_if_conflict
+            mode: prompt_on_first_login
+            allow_custom_on_first_login: true
+          # Assertion attribute values that grant the Server Admin role.
+          admin_groups:
+            - "admins"
+            - "administrators"
+            - "server-admins"
+            - "app-administrators"
+            - "platform-admins"
+          # Map assertion attribute values to user roles (if multi-user enabled).
+          role_mapping:
+            admin: ["admins", "administrators", "app-admins", "platform-admins"]
+            moderator: ["moderators", "support", "support-staff", "helpdesk"]
+            user: ["users", "members", "employees", "staff", "developers"]
+          # Single Logout. Supports both SP-initiated (user logs out locally →
+          # LogoutRequest to IdP) and IdP-initiated (IdP POSTs a LogoutRequest to
+          # our SLO endpoint). Requires signed LogoutRequests when enabled.
+          slo:
+            enabled: true
+            # redirect | post — binding used for SP-initiated LogoutRequest.
+            binding: redirect
+          # Accept unsolicited (IdP-initiated) login for this provider.
+          # Off by default: unsolicited assertions have no InResponseTo to
+          # match against a stored AuthnRequest, which weakens CSRF
+          # guarantees. Enable only if the IdP requires IdP-initiated SSO.
+          allow_idp_initiated: false
 ```
 
 ### OIDC Provider Expectations & Common Providers
