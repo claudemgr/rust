@@ -21685,13 +21685,34 @@ template/
   page/
     home.html.tera
     search.html.tera
-    error.html.tera
+    error.html.tera        # Error pages (404, 500, 502, 503, etc.) - MUST use site theme
     offline.html.tera
 ```
 
 
-### Error Pages
+## Error Pages (MUST Match Theme)
 
+**ALL error pages MUST use the site theme system. No plain/unstyled error pages.**
+
+| Status | Page | Theme Required |
+|--------|------|----------------|
+| 400 | Bad Request | ✅ Yes |
+| 401 | Unauthorized | ✅ Yes |
+| 403 | Forbidden | ✅ Yes |
+| 404 | Not Found | ✅ Yes |
+| 500 | Internal Server Error | ✅ Yes |
+| 502 | Bad Gateway | ✅ Yes |
+| 503 | Service Unavailable | ✅ Yes |
+
+**Error page requirements:**
+- Use `error.html.tera` template (extends `public.html.tera` layout)
+- Respect user's theme preference (dark/light/auto)
+- Include navigation (user can navigate away)
+- Show appropriate error message (not stack traces in production)
+- Provide helpful action (go home, go back, contact support)
+- NO generic browser error pages - always render themed template
+
+**Error page structure:**
 ```
 {# Extends public layout #}
 {% extends "public.html.tera" %}
@@ -41077,7 +41098,7 @@ make docker
 - [ ] 500 Internal Server Error - themed
 - [ ] 502 Bad Gateway - themed
 - [ ] 503 Service Unavailable - themed
-- [ ] Error pages extend `public.tmpl` layout
+- [ ] Error pages extend `public.html.tera` layout
 - [ ] Error pages include navigation (user can navigate away)
 - [ ] No stack traces in production mode
 - [ ] No generic browser error pages - always render themed template
