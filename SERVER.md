@@ -40829,7 +40829,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - run: cargo build --release --target x86_64-unknown-linux-musl
 
-  vuln-check:
+  vuln-scan:
     runs-on: ubuntu-latest
     container:
       image: casjaysdev/rust:latest
