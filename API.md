@@ -23191,6 +23191,8 @@ Templates are stored as files on disk. Override any built-in template by placing
 |-------|-----------|:-----:|-------------|
 | Config validation error | ERROR | ✗ | Invalid config value (also fails fast at startup) |
 | Config reloaded | INFO | ✗ | Config file change applied |
+| Startup | INFO | ✗ | Application started |
+| Shutdown | INFO | ✗ | Application stopped |
 | Backup started | INFO | ✗ | Backup in progress |
 | Backup complete | INFO | Optional | Backup finished |
 | Backup failed | ERROR | ✓ | Critical - needs attention |

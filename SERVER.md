@@ -33468,7 +33468,9 @@ Do not reply to this email.
 | SSL renewed | ✓ | | ✓ | Certificate renewed |
 | SSL renewal failed | ✓ | ✓ | ✓ | Critical - needs attention |
 | Update available | | ✓ | ✓ | New version available |
+| Update installed | ✓ | | ✓ | Self-update completed |
 | Scheduler task failed | ✓ | | ✓ | Task error (suppressed when `Backup failed` or `SSL renewal failed` fires for the same execution) |
+| Security alert | ✓ | ✓ | ✓ | Critical - needs record |
 | New admin login | | | ✓ | Another admin logged in |
 | SMTP not configured | | ✓ | | Persistent warning |
 | Database connection issue | | ✓ | ✓ | Critical warning |
@@ -33482,8 +33484,10 @@ Do not reply to this email.
 
 | Event | Toast | Banner | Center | Description |
 |-------|:-----:|:------:|:------:|-------------|
+| Welcome (new user) | ✓ | | ✓ | Onboarding |
 | Profile updated | ✓ | | | Settings saved |
 | Password changed | ✓ | | ✓ | Security confirmation |
+| Token regenerated | ✓ | | ✓ | Security confirmation |
 | Email verified | ✓ | | ✓ | Verification complete |
 | 2FA enabled | ✓ | | ✓ | Security confirmation |
 | 2FA disabled | ✓ | | ✓ | Security warning |
