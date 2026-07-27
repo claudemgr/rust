@@ -1754,7 +1754,6 @@ Both files use the same structure. Settings are merged: `settings.local.json` ov
   "permissions": {
     "allow": [
       "Read(**)",
-      "Write(**)",
       "Edit(**)",
       "Bash(cargo *)",
       "Bash(make *)",
@@ -1834,8 +1833,7 @@ Both files use the same structure. Settings are merged: `settings.local.json` ov
 | Pattern | Description | Example |
 |---------|-------------|---------|
 | `Read(**)` | Read any file | All files recursively |
-| `Write(**)` | Write any file | All files recursively |
-| `Edit(**)` | Edit any file | All files recursively |
+| `Edit(**)` | Edit or write any file | All files recursively — `Write(...)` rules are NOT matched by permission checks; use `Edit(...)` for both write and edit tools |
 | `Bash(cmd *)` | Command with zero or more args | `Bash(cargo *)` → `cargo`, `cargo build`, `cargo test` |
 | `Bash(cmd arg *)` | Command with specific prefix | `Bash(git commit *)` → `git commit -m "msg"` |
 | `WebFetch(domain:x)` | Fetch from specific domain | `WebFetch(domain:github.com)` |
