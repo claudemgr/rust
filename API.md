@@ -1772,20 +1772,20 @@ Both files use the same structure. Settings are merged: `settings.local.json` ov
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Write(**)",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "if grep -qi 'anthropic\\|claude' \"$file\" 2>/dev/null; then echo 'Error: File contains vendor names (Anthropic/Claude)' >&2; exit 1; fi"
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); if [ -n \"$f\" ] && grep -qi 'anthropic\\|claude' \"$f\" 2>/dev/null; then echo 'Error: File contains vendor names (Anthropic/Claude)' >&2; exit 1; fi"
           }
         ]
       },
       {
-        "matcher": "Write(*.rs)",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "rustfmt --check \"$file\" 2>/dev/null && exit 0 || echo 'Error: Rust file would not be formatted by rustfmt' >&2 && exit 1"
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in *.rs) rustfmt --check \"$f\" 2>/dev/null && exit 0 || { echo 'Error: Rust file would not be formatted by rustfmt' >&2; exit 1; } ;; *) exit 0 ;; esac"
           }
         ]
       }
