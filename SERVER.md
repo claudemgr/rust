@@ -40843,8 +40843,6 @@ jobs:
 
 > **Note:** Security jobs (`secret-scan`, `workflow-policy`, `vuln-scan`, `image-scan`) are defined within `ci.yml`. They run on push, PR, and weekly schedule (`cron: '0 6 * * 1'`). Add `if: github.event_name != 'schedule'` to build/test/coverage/artifact jobs to skip non-security work on scheduled runs. Secret scanning is mandatory on every public repo via truffleHog (Apache-2.0). Use `github.event.before` / `github.event.after` for the scan range — never `default_branch`, which after a push resolves to the same commit as HEAD and silently skips the scan.
 
-## Build Toolchain Workflow (GitHub Actions)
-
 > **Rust projects default to no build-toolchain workflow.** The `casjaysdev/rust:latest` image is a standard maintained image; the CI pattern uses `container: image: casjaysdev/rust:latest` directly in each job. A `docker/Dockerfile.build` + `build-toolchain.yml` is allowed only for a genuine custom need the image cannot satisfy, and then the build image MUST be `FROM casjaysdev/rust:latest` (extend, never replace).
 
 ## Release Workflow — Stable (GitHub Actions)
