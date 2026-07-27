@@ -21480,6 +21480,10 @@ pub fn write_text(text: impl Into<String>) -> impl axum::response::IntoResponse 
 
 Enable only for `/api/` routes. Never enable for HTML page routes.
 
+**Default CORS policy allows all origins (`*`) unless configured.**
+
+### Configuration
+
 ```rust
 use tower_http::cors::{CorsLayer, Any};
 
@@ -21529,6 +21533,28 @@ server:
     max_age: 86400
 ```
 
+### CORS Headers
+
+| Header | Value |
+|--------|-------|
+| `Access-Control-Allow-Origin` | Configured origin(s) or `*` |
+| `Access-Control-Allow-Methods` | `GET, POST, PUT, PATCH, DELETE, OPTIONS` |
+| `Access-Control-Allow-Headers` | `Content-Type, Accept, X-Requested-With, Authorization, X-API-Key, X-Api-Key, API-Key, ApiKey, X-Auth-Token, X-Access-Token, X-Token, Token, X-CSRF-Token, X-XSRF-Token, X-Session-ID, X-Service-Token, X-Internal-Token` |
+| `Access-Control-Allow-Credentials` | `true` (only when specific origin, not `*`) |
+| `Access-Control-Max-Age` | `86400` (24 hours) |
+
+**Never `*` here:** the Fetch spec's `Access-Control-Allow-Headers: *` wildcard does NOT cover `Authorization`, and wildcards are invalid when credentials are allowed. Every supported auth header is listed by name — keep in sync with PART 8 → "Auth Token Headers (All Headers Supported)".
+
+### Behavior
+
+| Scenario | Behavior |
+|----------|----------|
+| `allowed_origins: ["*"]` | Allow all origins, credentials NOT allowed |
+| `allowed_origins: ["https://example.com"]` | Allow single origin, credentials allowed |
+| `allowed_origins: ["https://a.com", "https://b.com"]` | Allow listed origins, credentials allowed |
+| `allowed_origins: [""]` | No CORS headers (same-origin only) |
+| Preflight (OPTIONS) | Return CORS headers, 204 No Content |
+
 ### CORS Allow-list Resolution Order
 
 The effective CORS allow-list is resolved from these sources in order; the request `Origin` is matched against the combined list:
@@ -21539,6 +21565,13 @@ The effective CORS allow-list is resolved from these sources in order; the reque
 4. **Default** — if no source produced a list, fall back to `*` (credentials NOT allowed).
 
 Credentials (`Access-Control-Allow-Credentials: true`) are sent only when the resolved list is explicit — never with `*`. CSP `connect-src` `{learned_origins}` (PART 11 → "Content Security Policy") uses this same resolved list.
+
+### Mode-Specific Behavior
+
+| Mode | Default | Behavior |
+|------|---------|----------|
+| Production | `*` | Allow all origins by default (configure if needed) |
+| Development | `*` | Allow all origins |
 
 ---
 
