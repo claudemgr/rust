@@ -14874,6 +14874,8 @@ server:
 | `security.ip_unblocked` | IP address unblocked | IP, reason |
 | `security.country_blocked` | Request blocked by GeoIP signal | IP, country code |
 | `security.suspicious_activity` | Unusual activity detected | IP, activity type, details |
+| `security.installation_secret_rotated` | Installation secret rotated | IP, operator reason |
+| `security.encryption_key_rotated` | At-rest encryption key rotated | IP, operator reason |
 
 ### Backup & System Events
 
