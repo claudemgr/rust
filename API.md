@@ -24074,7 +24074,7 @@ server:
 |--------|---------|
 | `scheduler_task_duration_seconds` | 0.1, 0.5, 1, 5, 10, 30, 60, 300, 600 |
 
-### Rate Limit Metrics (REQUIRED)
+### Rate Limiting Metrics (if rate limiting enabled)
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
