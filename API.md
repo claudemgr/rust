@@ -14872,10 +14872,17 @@ server:
 | `security.rate_limit_exceeded` | Rate limit hit | IP, endpoint, limit |
 | `security.ip_blocked` | IP address blocked | IP, reason, duration |
 | `security.ip_unblocked` | IP address unblocked | IP, reason |
+| `security.ip_allowlisted` | IP/CIDR added to allowlist | CIDR, description |
+| `security.ip_allowlist_removed` | IP/CIDR removed from allowlist | CIDR |
 | `security.country_blocked` | Request blocked by GeoIP signal | IP, country code |
 | `security.suspicious_activity` | Unusual activity detected | IP, activity type, details |
 | `security.installation_secret_rotated` | Installation secret rotated | IP, operator reason |
 | `security.encryption_key_rotated` | At-rest encryption key rotated | IP, operator reason |
+| `security.csp_violation` | CSP violation report received | IP, blocked-uri, violated-directive |
+| `security.security_id_invalid` | Invalid/expired security.txt id used | IP, user-agent, supplied id |
+| `security.report_received` | Security vulnerability report received | tracking_id, severity, sanitized affected-component |
+| `security.private_key_exported` | PGP private key exported | Operator IP, reason |
+| `security.csrf_failure` | CSRF token validation failed | IP, endpoint, reason |
 
 ### Backup & System Events
 
@@ -21678,6 +21685,8 @@ async fn extract_form_csrf_token(
     (rebuilt, token)
 }
 ```
+
+**Validation failure logging:** every CSRF rejection (the `_ => Err(...)` arm above) is logged to `audit.log` as `security.csrf_failure` (IP, endpoint, reason — see PART 11 → "Audit Log Events").
 
 Include the CSRF token in every HTML form:
 
