@@ -9852,6 +9852,40 @@ Default config: /etc/apimgr/jokes/  # Hardcoded project name
 
 **For client flags, see PART 32.**
 
+## Flag Parsing (Server Binary)
+
+**Use `clap` (derive API) for all argument parsing — never hand-roll** (no manual `env::args()` loops for the primary flag set — see `rust_conventions.md` § CLI Flags). This applies to the server binary the same as the client CLI.
+
+```rust
+#[derive(clap::Parser)]
+#[command(name = "{project_name}", version, about)]
+struct Cli {
+    #[arg(long)]
+    config: Option<String>,
+    #[arg(long)]
+    data: Option<String>,
+    #[arg(long)]
+    port: Option<u16>,
+    #[arg(long)]
+    mode: Option<String>,
+    #[arg(long)]
+    daemon: bool,
+    #[arg(long)]
+    debug: bool,
+    #[arg(long, default_value = "auto")]
+    color: String,
+}
+
+fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+    // cli.config, cli.data, cli.port, cli.mode, cli.daemon, cli.debug, cli.color
+    // feed into config load / server startup below.
+    Ok(())
+}
+```
+
+`env::args()` usage elsewhere in this PART (e.g. daemon flag filtering for re-exec) operates on the raw args slice for process re-spawning, not as a substitute for this parser.
+
 ## NO_COLOR Support (ALL Binaries)
 
 **All binaries (server, client) MUST respect the [NO_COLOR](https://no-color.org/) standard.**
