@@ -27584,6 +27584,7 @@ test:
 		COVDIR=\$$(mktemp -d \"\$${TMPDIR:-/tmp}/$(PROJECT_ORG)/$(PROJECT_NAME)-XXXXXX\") && \
 		cargo fmt --check 2>&1 | tee \$$COVDIR/fmt.out && \
 		cargo clippy -- -D warnings 2>&1 | tee \$$COVDIR/clippy.out && \
+		cargo audit 2>&1 | tee \$$COVDIR/audit.out && \
 		cargo test --lib --no-fail-fast 2>&1 | tee \$$COVDIR/test.out && \
 		echo \"Tests complete ✓\""
 
@@ -30703,6 +30704,8 @@ test:
   stage: test
   script:
     # Explicit commands — CI never uses Makefile targets
+    - cargo clippy -- -D warnings
+    - cargo audit
     - cargo test --release
     - mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
     - export COVDIR="$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")"

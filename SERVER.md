@@ -38672,6 +38672,7 @@ test:
 	@$(RUST_DOCKER) sh -c " \
 		cargo fmt --check && \
 		cargo clippy -- -D warnings && \
+		cargo audit && \
 		cargo test --lib --no-fail-fast && \
 		cargo llvm-cov --summary-only --fail-under-lines 60"
 	@echo "Tests complete - Coverage >= 60% required ✓"
@@ -42743,6 +42744,7 @@ test:
   script:
     - cargo test
     - cargo clippy -- -D warnings
+    - cargo audit
   rules:
     - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+/
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
