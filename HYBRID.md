@@ -6405,7 +6405,7 @@ Every production image MUST satisfy:
 | Runtime stage | `alpine:latest` |
 | Meta labels | None in the Dockerfile — CI applies OCI labels/annotations at build time |
 | Required packages | git, curl, bash, tini, tor |
-| Tor handling | Installed but **binary controls** startup (see PART 31-equivalent Tor section) |
+| Tor handling | Installed but **binary controls** startup (see PART 26: TOR HIDDEN SERVICE) |
 | Binary location | `/usr/local/bin/{project_name}` |
 | Entrypoint script | `/usr/local/bin/entrypoint.sh` |
 | Init system | **tini** |
@@ -7363,7 +7363,7 @@ User-Agent: jokes/1.0.0             # Hardcoded project name
 Default config: /etc/apimgr/jokes/  # Hardcoded project name
 ```
 
-**For client flags, see PART 32.**
+**For client flags, see PART 8, "Client" subsection.**
 
 ## Flag Parsing (Server Binary)
 
@@ -8024,7 +8024,7 @@ PHASE 5: Server startup (actual server start)
     │   └─ ... and others (see PART 18)
     └─ Start scheduler async task
 
-17. Start Tor (if tor binary available) - see PART 31:
+17. Start Tor (if tor binary available) - see PART 26:
     ├─ tor not found in PATH → log INFO "Tor not available", skip
     ├─ tor found:
     │   ├─ Create directories: {config_dir}/tor/, {data_dir}/tor/, {data_dir}/tor/site/
