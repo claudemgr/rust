@@ -19537,25 +19537,25 @@ See the **"Themes (NON-NEGOTIABLE - PROJECT-WIDE)"** section for the complete th
 ```css
 /* Light Theme Colors */
 --light-bg: #ffffff;           /* Background */
---light-bg-alt: #f5f5f5;       /* Alternate background (topbar, etc.) */
---light-bg-elevated: #e0e0e0;  /* Elevated elements, borders */
---light-text: #1a1a1a;         /* Primary text */
---light-text-muted: #666666;   /* Muted text */
---light-accent-blue: #0066cc;  /* Links, GET methods */
---light-accent-green: #008000; /* Success, POST methods */
---light-accent-orange: #ff8c00; /* Warning, PUT methods */
---light-accent-red: #cc0000;   /* Error, DELETE methods */
---light-accent-purple: #6600cc; /* Primary accent */
---light-accent-teal: #008080;  /* Secondary accent */
+--light-bg-alt: #f6f8fa;       /* Alternate background (topbar, etc.) */
+--light-bg-elevated: #d1d9e0;  /* Elevated elements, borders */
+--light-text: #1f2328;         /* Primary text */
+--light-text-muted: #59636e;   /* Muted text */
+--light-accent-blue: #0969da;  /* Links, GET methods */
+--light-accent-green: #1a7f37; /* Success, POST methods */
+--light-accent-orange: #9a6700; /* Warning, PUT methods */
+--light-accent-red: #d1242f;   /* Error, DELETE methods */
+--light-accent-purple: #8250df; /* Primary accent */
+--light-accent-teal: #0969da;  /* Secondary accent */
 ```
 
 | Element | Style |
 |---------|-------|
 | Background | `#ffffff` (--light-bg) |
-| Text | `#1a1a1a` (--light-text) |
-| Links/Accents | Blue `#0066cc`, Green `#008000`, Purple `#6600cc` |
+| Text | `#1f2328` (--light-text) |
+| Links/Accents | Blue `#0969da`, Green `#1a7f37`, Purple `#8250df` |
 | Code blocks | Syntax highlighted with light theme colors |
-| Inputs | White background, dark text, visible borders `#cccccc` |
+| Inputs | White background, dark text, visible borders `#d1d9e0` |
 | Buttons | Accent colors with sufficient contrast (4.5:1 minimum) |
 
 **Swagger UI - Light Theme:**
@@ -19564,49 +19564,49 @@ See the **"Themes (NON-NEGOTIABLE - PROJECT-WIDE)"** section for the complete th
 /* Swagger UI - Light Theme */
 .swagger-ui.theme-light {
   background: #ffffff;
-  color: #1a1a1a;
+  color: #1f2328;
 }
 
 .swagger-ui.theme-light .topbar {
-  background: #f5f5f5;
-  border-bottom: 1px solid #e0e0e0;
+  background: #f6f8fa;
+  border-bottom: 1px solid #d1d9e0;
 }
 
 .swagger-ui.theme-light .info .title,
 .swagger-ui.theme-light .opblock-tag {
-  color: #1a1a1a;
+  color: #1f2328;
 }
 
 .swagger-ui.theme-light .opblock.opblock-get {
-  background: rgba(0, 102, 204, 0.05);
-  border-color: #0066cc;
+  background: rgba(9, 105, 218, 0.05);
+  border-color: #0969da;
 }
 
 .swagger-ui.theme-light .opblock.opblock-post {
   background: rgba(0, 128, 0, 0.05);
-  border-color: #008000;
+  border-color: #1a7f37;
 }
 
 .swagger-ui.theme-light .opblock.opblock-put {
   background: rgba(255, 140, 0, 0.05);
-  border-color: #ff8c00;
+  border-color: #9a6700;
 }
 
 .swagger-ui.theme-light .opblock.opblock-delete {
   background: rgba(204, 0, 0, 0.05);
-  border-color: #cc0000;
+  border-color: #d1242f;
 }
 
 .swagger-ui.theme-light input,
 .swagger-ui.theme-light textarea,
 .swagger-ui.theme-light select {
   background: #ffffff;
-  color: #1a1a1a;
-  border: 1px solid #cccccc;
+  color: #1f2328;
+  border: 1px solid #d1d9e0;
 }
 
 .swagger-ui.theme-light .btn {
-  background: #0066cc;
+  background: #0969da;
   color: #ffffff;
 }
 ```
@@ -19617,17 +19617,17 @@ See the **"Themes (NON-NEGOTIABLE - PROJECT-WIDE)"** section for the complete th
 /* GraphiQL - Light Theme */
 .graphiql-container.theme-light {
   background: #ffffff;
-  color: #1a1a1a;
+  color: #1f2328;
 }
 
 .graphiql-container.theme-light .CodeMirror {
   background: #ffffff;
-  color: #1a1a1a;
+  color: #1f2328;
 }
 
 .graphiql-container.theme-light .CodeMirror-gutters {
-  background: #f5f5f5;
-  border-right: 1px solid #e0e0e0;
+  background: #f6f8fa;
+  border-right: 1px solid #d1d9e0;
 }
 
 .graphiql-container.theme-light .result-window {
@@ -19635,14 +19635,14 @@ See the **"Themes (NON-NEGOTIABLE - PROJECT-WIDE)"** section for the complete th
 }
 
 .graphiql-container.theme-light .execute-button {
-  background: #008000;
+  background: #1a7f37;
   color: #ffffff;
 }
 
 .graphiql-container.theme-light .toolbar-button {
-  background: #f5f5f5;
-  color: #1a1a1a;
-  border: 1px solid #cccccc;
+  background: #f6f8fa;
+  color: #1f2328;
+  border: 1px solid #d1d9e0;
 }
 ```
 
@@ -21237,29 +21237,29 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
 
 ```css
 :root {
-  /* --- Colors (dark theme defaults; overridden by .theme-light) --- */
-  --color-bg:          #1a1b26;
-  --color-fg:          #c0caf5;
-  --color-primary:     #7aa2f7;
-  --color-secondary:   #9ece6a;
-  --color-accent:      #bb9af7;
-  --color-success:     #9ece6a;
-  --color-warning:     #e0af68;
-  --color-error:       #f7768e;
-  --color-info:        #7dcfff;
+  /* --- Colors (dark theme defaults; overridden by .theme-light) — based on Dracula --- */
+  --color-bg:          #282a36;
+  --color-fg:          #f8f8f2;
+  --color-primary:     #bd93f9;
+  --color-secondary:   #50fa7b;
+  --color-accent:      #ff79c6;
+  --color-success:     #50fa7b;
+  --color-warning:     #ffb86c;
+  --color-error:       #ff5555;
+  --color-info:        #8be9fd;
   /* Status banner/tint pairs (background + readable text) */
-  --color-success-bg:  #26301f;
-  --color-success-text:#9ece6a;
-  --color-warning-bg:  #33291a;
-  --color-warning-text:#e0af68;
-  --color-error-bg:    #362430;
-  --color-error-text:  #f7768e;
-  --color-info-bg:     #1e2a3a;
-  --color-info-text:   #7dcfff;
-  --color-surface:     #24283b;
-  --color-surface-alt: #1f2335;
-  --color-border:      #414868;
-  --color-muted:       #565f89;
+  --color-success-bg:  rgba(80, 250, 123, 0.15);
+  --color-success-text:#50fa7b;
+  --color-warning-bg:  rgba(255, 184, 108, 0.15);
+  --color-warning-text:#ffb86c;
+  --color-error-bg:    rgba(255, 85, 85, 0.15);
+  --color-error-text:  #ff5555;
+  --color-info-bg:     rgba(139, 233, 253, 0.15);
+  --color-info-text:   #8be9fd;
+  --color-surface:     #2b2d3a;
+  --color-surface-alt: #21222c;
+  --color-border:      #44475a;
+  --color-muted:       #6272a4;
 
   /* --- Typography --- */
   --font-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -21344,28 +21344,29 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
 
 /* Light theme overrides */
 .theme-light {
+  /* based on GitHub Light */
   --color-bg:          #ffffff;
-  --color-fg:          #1a1b26;
-  --color-primary:     #2e7de9;
-  --color-secondary:   #587539;
-  --color-accent:      #7847bd;
-  --color-success:     #587539;
-  --color-warning:     #8c6c3e;
-  --color-error:       #c64343;
-  --color-info:        #007197;
+  --color-fg:          #1f2328;
+  --color-primary:     #0969da;
+  --color-secondary:   #1a7f37;
+  --color-accent:      #8250df;
+  --color-success:     #1a7f37;
+  --color-warning:     #9a6700;
+  --color-error:       #d1242f;
+  --color-info:        #0969da;
   /* Status banner/tint pairs (background + readable text) */
-  --color-success-bg:  #e6eedb;
-  --color-success-text:#587539;
-  --color-warning-bg:  #f3e9d4;
-  --color-warning-text:#8c6c3e;
-  --color-error-bg:    #f7dcdc;
-  --color-error-text:  #c64343;
-  --color-info-bg:     #d8ecf3;
-  --color-info-text:   #007197;
-  --color-surface:     #f5f5f5;
-  --color-surface-alt: #e9e9ec;
-  --color-border:      #c0caf5;
-  --color-muted:       #6172b0;
+  --color-success-bg:  rgba(26, 127, 55, 0.12);
+  --color-success-text:#1a7f37;
+  --color-warning-bg:  rgba(154, 103, 0, 0.12);
+  --color-warning-text:#9a6700;
+  --color-error-bg:    rgba(209, 36, 47, 0.12);
+  --color-error-text:  #d1242f;
+  --color-info-bg:     rgba(9, 105, 218, 0.12);
+  --color-info-text:   #0969da;
+  --color-surface:     #f6f8fa;
+  --color-surface-alt: #eff2f5;
+  --color-border:      #d1d9e0;
+  --color-muted:       #59636e;
 }
 ```
 
@@ -22050,8 +22051,8 @@ window.addEventListener('online',  () => showToast('Back online', 'success'));
   "start_url": "/?source=pwa",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#1a1b26",
-  "theme_color": "#7aa2f7",
+  "background_color": "#282a36",
+  "theme_color": "#bd93f9",
   "icons": [
     { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
@@ -22667,18 +22668,18 @@ pub struct ThemePalette {
 }
 pub fn theme_palette_dark() -> ThemePalette {
     ThemePalette {
-        background: "#1a1b26".into(), foreground: "#c0caf5".into(),
-        primary: "#7aa2f7".into(), secondary: "#9ece6a".into(), accent: "#bb9af7".into(),
-        success: "#9ece6a".into(), warning: "#e0af68".into(), error: "#f7768e".into(), info: "#7dcfff".into(),
-        surface: "#24283b".into(), surface_alt: "#1f2335".into(), border: "#414868".into(), muted: "#565f89".into(),
+        background: "#282a36".into(), foreground: "#f8f8f2".into(),
+        primary: "#bd93f9".into(), secondary: "#50fa7b".into(), accent: "#ff79c6".into(),
+        success: "#50fa7b".into(), warning: "#ffb86c".into(), error: "#ff5555".into(), info: "#8be9fd".into(),
+        surface: "#2b2d3a".into(), surface_alt: "#21222c".into(), border: "#44475a".into(), muted: "#6272a4".into(),
     }
 }
 pub fn theme_palette_light() -> ThemePalette {
     ThemePalette {
-        background: "#ffffff".into(), foreground: "#1a1b26".into(),
-        primary: "#2e7de9".into(), secondary: "#587539".into(), accent: "#7847bd".into(),
-        success: "#587539".into(), warning: "#8c6c3e".into(), error: "#c64343".into(), info: "#007197".into(),
-        surface: "#f5f5f5".into(), surface_alt: "#e9e9ec".into(), border: "#c0caf5".into(), muted: "#6172b0".into(),
+        background: "#ffffff".into(), foreground: "#1f2328".into(),
+        primary: "#0969da".into(), secondary: "#1a7f37".into(), accent: "#8250df".into(),
+        success: "#1a7f37".into(), warning: "#9a6700".into(), error: "#d1242f".into(), info: "#0969da".into(),
+        surface: "#f6f8fa".into(), surface_alt: "#eff2f5".into(), border: "#d1d9e0".into(), muted: "#59636e".into(),
     }
 }
 ```
@@ -32457,16 +32458,16 @@ pymdown-extensions>=10.0
 :root {
   /* Light theme color palette */
   --light-bg: #ffffff;
-  --light-bg-alt: #f5f5f5;
-  --light-bg-elevated: #e0e0e0;
-  --light-text: #1a1a1a;
-  --light-text-muted: #666666;
-  --light-accent-blue: #0066cc;
-  --light-accent-green: #008000;
-  --light-accent-orange: #ff8c00;
-  --light-accent-red: #cc0000;
-  --light-accent-purple: #6600cc;
-  --light-accent-teal: #008080;
+  --light-bg-alt: #f6f8fa;
+  --light-bg-elevated: #d1d9e0;
+  --light-text: #1f2328;
+  --light-text-muted: #59636e;
+  --light-accent-blue: #0969da;
+  --light-accent-green: #1a7f37;
+  --light-accent-orange: #9a6700;
+  --light-accent-red: #d1242f;
+  --light-accent-purple: #8250df;
+  --light-accent-teal: #0969da;
 }
 
 /* Apply light theme customization */
@@ -32484,7 +32485,7 @@ pymdown-extensions>=10.0
   --md-primary-bg-color--light: var(--light-bg-alt);
 
   --md-accent-fg-color: var(--light-accent-blue);
-  --md-accent-fg-color--transparent: rgba(0, 102, 204, 0.1);
+  --md-accent-fg-color--transparent: rgba(9, 105, 218, 0.1);
   --md-accent-bg-color: var(--light-accent-blue);
 
   --md-code-fg-color: var(--light-text);
