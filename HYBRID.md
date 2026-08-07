@@ -11036,9 +11036,9 @@ fn is_remote_session() -> bool {
 
 ### CLI/TUI/GUI Theming
 
-**See PART 16 "Themes (NON-NEGOTIABLE - PROJECT-WIDE)" for the unified color palette.**
+**See PART 15 "Themes (NON-NEGOTIABLE - PROJECT-WIDE)" for the unified color palette.**
 
-**CLI/TUI/GUI use the same `theme::ThemePalette` from `src/common/theme/colors.rs`.**
+**CLI and TUI use the same `TerminalPalette` (ANSI-mapped) from `src/common/theme/colors.rs`; native GUI does not consume a literal palette — see "GUI Theming" above.**
 
 #### CLI Theme Configuration
 
@@ -11054,11 +11054,12 @@ theme:
 ```rust
 // src/client/tui/styles.rs
 
-use ratatui::style::{Color, Style, Modifier};
-use crate::common::theme;
+use ratatui::style::{Color, Modifier, Style};
+use crate::common::theme::TerminalPalette;
 
-// TUIStyles holds ratatui styles derived from ThemePalette
-pub struct TUIStyles {
+/// TUI styles derived from TerminalPalette (ANSI-safe — see "CLI/TUI Color
+/// Mapping"; never the literal hex ThemePalette).
+pub struct TuiStyles {
     pub base: Style,
     pub title: Style,
     pub selected: Style,
@@ -11069,23 +11070,25 @@ pub struct TUIStyles {
     pub border: Style,
 }
 
-pub fn styles_from_theme_palette(p: &theme::ThemePalette) -> TUIStyles {
-    TUIStyles {
-        base: Style::default()
-            .fg(Color::from_str(&p.foreground).unwrap_or(Color::White))
-            .bg(Color::from_str(&p.background).unwrap_or(Color::Black)),
-        title: Style::default()
-            .fg(Color::from_str(&p.primary).unwrap_or(Color::Cyan))
-            .add_modifier(Modifier::BOLD),
-        selected: Style::default()
-            .fg(Color::from_str(&p.background).unwrap_or(Color::Black))
-            .bg(Color::from_str(&p.primary).unwrap_or(Color::Cyan)),
-        error: Style::default().fg(Color::from_str(&p.error).unwrap_or(Color::Red)),
-        success: Style::default().fg(Color::from_str(&p.success).unwrap_or(Color::Green)),
-        warning: Style::default().fg(Color::from_str(&p.warning).unwrap_or(Color::Yellow)),
-        muted: Style::default().fg(Color::from_str(&p.muted).unwrap_or(Color::DarkGray)),
-        border: Style::default().fg(Color::from_str(&p.border).unwrap_or(Color::Gray)),
+impl TuiStyles {
+    pub fn from_palette(p: &TerminalPalette) -> Self {
+        Self {
+            base: Style::default().fg(ansi_color(&p.foreground)),
+            title: Style::default()
+                .fg(ansi_color(&p.primary))
+                .add_modifier(Modifier::BOLD),
+            selected: Style::default().add_modifier(Modifier::REVERSED),
+            error: Style::default().fg(ansi_color(&p.error)),
+            success: Style::default().fg(ansi_color(&p.success)),
+            warning: Style::default().fg(ansi_color(&p.warning)),
+            muted: Style::default().fg(ansi_color(&p.muted)),
+            border: Style::default().fg(ansi_color(&p.border)),
+        }
     }
+}
+
+fn ansi_color(index: &str) -> Color {
+    Color::Indexed(index.parse().unwrap_or(15))
 }
 ```
 
@@ -11094,25 +11097,29 @@ pub fn styles_from_theme_palette(p: &theme::ThemePalette) -> TUIStyles {
 ```rust
 // src/client/cli/output.rs
 
-use crate::common::theme;
+use crate::common::theme::TerminalPalette;
 
-// Apply palette colors to CLI text output
+pub struct Output {
+    colors: bool,
+    // ANSI-mapped, never the literal hex ThemePalette (see "CLI/TUI Color
+    // Mapping")
+    palette: TerminalPalette,
+}
+
 impl Output {
     pub fn print_success(&self, msg: &str) {
         if self.colors {
-            let (r, g, b) = hex_to_rgb(&self.palette.success);
-            println!("\x1b[38;2;{};{};{}m{}\x1b[0m", r, g, b, msg);
+            println!("\x1b[38;5;{}m{msg}\x1b[0m", self.palette.success);
         } else {
-            println!("{}", msg);
+            println!("{msg}");
         }
     }
 
     pub fn print_error(&self, msg: &str) {
         if self.colors {
-            let (r, g, b) = hex_to_rgb(&self.palette.error);
-            println!("\x1b[38;2;{};{};{}m{}\x1b[0m", r, g, b, msg);
+            println!("\x1b[38;5;{}m{msg}\x1b[0m", self.palette.error);
         } else {
-            println!("{}", msg);
+            println!("{msg}");
         }
     }
 }
@@ -23502,6 +23509,234 @@ When the contact form is disabled (`pages.contact.enabled: false`), the contact 
 | `/server/terms` | `terms_handler` | Terms of service page |
 
 ---
+## Themes (NON-NEGOTIABLE - PROJECT-WIDE)
+
+**Theme system applies to THE ENTIRE PROJECT - ALL interfaces share the same colors and settings:**
+- Web interface (HTML pages)
+- Admin panel
+- Swagger UI
+- GraphiQL interface
+- CLI colored output
+- TUI (ratatui/crossterm)
+- Native GUI
+- ReadTheDocs documentation (if possible)
+- All interactive elements
+
+**Scope split:** Web, Swagger, and GraphiQL consume the literal hex palette below directly. CLI and TUI map the same semantic roles to ANSI-safe colors instead of literal hex — see "CLI/TUI Color Mapping" below. Native GUI follows platform light/dark theming rather than painting widgets with the literal hex palette — see "GUI Theming" below.
+
+**Three Required Themes:**
+
+| Theme | When Active | Default | Color Scheme |
+|-------|-------------|---------|--------------|
+| **Dark** | User selects dark OR system dark + auto mode | **YES** | Dark theme colors (see `dark.css`) |
+| **Light** | User selects light OR system light + auto mode | No | Light theme colors (see `light.css`) |
+| **Auto** | Follows system preference (light/dark) | No | System `prefers-color-scheme` |
+
+**Critical Theme Rules (APPLY TO ENTIRE PROJECT):**
+- **BOTH light AND dark themes MUST be easy to read**
+- **NO color conflicts** - nothing should be invisible or unreadable in either theme
+- **Sufficient contrast ratio** - minimum WCAG AA compliance (4.5:1) in both themes
+- **Theme applies everywhere** - WebUI, admin panel, Swagger, GraphQL, etc.
+- **Theme switching MUST work seamlessly** without page reload
+- **All interactive elements MUST be clearly visible** in both themes
+- **Syntax highlighting MUST adapt** to theme (use appropriate colors for each theme)
+- **User preference persisted** in the `theme` cookie (server-readable; per-user DB preference for logged-in users) — NOT localStorage, so the server can render the correct theme class
+- **Default to dark** if no preference set
+
+**Theme Implementation Location:**
+
+| Component | File Location | Purpose |
+|-----------|---------------|---------|
+| **Common palette** | `src/common/theme/colors.rs` | Shared colors (single source of truth) |
+| Theme core logic | `src/server/theme.rs` | Theme detection, switching, persistence |
+| Swagger theming | `src/swagger/theme.rs` | Swagger UI theme application |
+| GraphQL theming | `src/graphql/theme.rs` | GraphiQL theme application |
+| WebUI theming | `templates/` | HTML template theme classes |
+| CSS variables | Embedded in templates | Theme-specific CSS custom properties |
+| **TUI theming** | `src/client/tui/styles.rs` | Ratatui styles from palette |
+| **CLI colors** | `src/client/cli/output.rs` | ANSI colors from palette |
+| **GUI theming** | `src/client/gui/theme.rs` | Native widget theming |
+
+### Unified Color Palette
+
+**Colors are defined ONCE in Rust, as the literal hex source of truth for Web CSS, Swagger, and GraphiQL.** CLI, TUI, and GUI derive their theming from the same semantic roles but resolve them differently (see below) rather than consuming the hex values directly.
+
+```rust
+// src/common/theme/colors.rs
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThemePalette {
+    pub background: String,
+    pub foreground: String,
+    pub primary: String,
+    pub secondary: String,
+    pub accent: String,
+    pub success: String,
+    pub warning: String,
+    pub error: String,
+    pub info: String,
+    pub surface: String,
+    pub surface_alt: String,
+    pub border: String,
+    pub muted: String,
+}
+
+pub fn dark_palette() -> ThemePalette {
+    ThemePalette {
+        background: "#282a36".into(),
+        foreground: "#f8f8f2".into(),
+        primary: "#bd93f9".into(),
+        secondary: "#50fa7b".into(),
+        accent: "#ff79c6".into(),
+        success: "#50fa7b".into(),
+        warning: "#ffb86c".into(),
+        error: "#ff5555".into(),
+        info: "#8be9fd".into(),
+        surface: "#2b2d3a".into(),
+        surface_alt: "#21222c".into(),
+        border: "#44475a".into(),
+        muted: "#6272a4".into(),
+    }
+}
+
+pub fn light_palette() -> ThemePalette {
+    ThemePalette {
+        background: "#ffffff".into(),
+        foreground: "#1f2328".into(),
+        primary: "#0969da".into(),
+        secondary: "#1a7f37".into(),
+        accent: "#8250df".into(),
+        success: "#1a7f37".into(),
+        warning: "#9a6700".into(),
+        error: "#d1242f".into(),
+        info: "#0969da".into(),
+        surface: "#f6f8fa".into(),
+        surface_alt: "#eff2f5".into(),
+        border: "#d1d9e0".into(),
+        muted: "#59636e".into(),
+    }
+}
+```
+
+### CLI/TUI Color Mapping
+
+**CLI and TUI do NOT consume the literal hex palette above** — terminals
+render a fixed, user-configured 16/256-color set, so forcing exact hex
+values is not appropriate. Instead, map the same semantic roles to the
+nearest ANSI color:
+
+| Role | Dark ANSI | Light ANSI |
+|------|-----------|------------|
+| `foreground` | `BrightWhite` | `Black` |
+| `muted` | `White` | `DarkGray` |
+| `primary` / `accent` | `BrightMagenta` | `Blue` |
+| `secondary` / `success` | `BrightGreen` | `Green` |
+| `warning` | `BrightYellow` | `Yellow` |
+| `error` | `BrightRed` | `Red` |
+| `info` | `BrightBlue` | `Blue` |
+
+- Respect `NO_COLOR` — `colors: color_enabled(None)` (PART 8) already covers
+  the full precedence order (CLI flag > config > `NO_COLOR` > TTY/`TERM`
+  auto-detect); CLI/TUI output MUST gate on that same result, never a
+  separate ad hoc check, and strip all ANSI color when it is `false`
+- `ratatui::style::Color` (TUI) and the CLI output module select the ANSI
+  name above per role and per theme — never a hardcoded hex/RGB value
+- True-color terminals MAY additionally accept the literal hex palette as
+  an opt-in enhancement, but the ANSI mapping is the required baseline
+
+```rust
+// TerminalPalette holds ANSI 16-color indices (0-15) for CLI/TUI — never
+// the literal hex ThemePalette. ratatui::style::Color::Indexed() and the
+// ESC[38;5;{n}m escape both accept these indices directly.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerminalPalette {
+    pub foreground: String,
+    pub muted: String,
+    pub primary: String,
+    pub success: String,
+    pub warning: String,
+    pub error: String,
+    pub info: String,
+    pub border: String,
+}
+
+pub fn terminal_palette_dark() -> TerminalPalette {
+    TerminalPalette {
+        foreground: "15".into(), muted: "7".into(), primary: "13".into(),
+        success: "10".into(), warning: "11".into(), error: "9".into(),
+        info: "12".into(), border: "13".into(),
+    }
+}
+
+pub fn terminal_palette_light() -> TerminalPalette {
+    TerminalPalette {
+        foreground: "0".into(), muted: "8".into(), primary: "4".into(),
+        success: "2".into(), warning: "3".into(), error: "1".into(),
+        info: "4".into(), border: "4".into(),
+    }
+}
+```
+
+- TUI: `ratatui`/`crossterm` do NOT auto-detect `NO_COLOR` — call
+  `color_enabled(None)` (PART 8) before constructing `TuiStyles` and, when
+  it returns `false`, use `TuiStyles` built entirely from `Style::default()`
+  (no `fg`/`bg`) instead of `from_palette()`
+- CLI: gate explicitly on `color_enabled(None)` as shown in
+  "CLI Colored Output" below — raw ANSI escapes are not NO_COLOR-aware by
+  themselves
+
+### GUI Theming
+
+**Native GUI does NOT consume the literal hex palette above either** —
+native widget theming should follow the OS, not a custom app palette.
+`src/client/gui/theme.rs` only detects light/dark (via the `dark-light`
+crate — see System Theme Detection below) and lets the native toolkit
+apply its own light/dark widget theme; it does not paint individual
+widgets with the hex values from `dark_palette()`/`light_palette()`.
+
+### System Theme Detection (Cross-Platform)
+
+| Platform | Detection Method | Notes |
+|----------|------------------|-------|
+| **Web** | `prefers-color-scheme` media query | Pure CSS — no JS needed |
+| **Linux** | `gsettings get org.gnome.desktop.interface color-scheme` | GNOME |
+| **macOS** | `defaults read -g AppleInterfaceStyle` | Returns "Dark" if dark mode |
+| **Windows** | Registry `AppsUseLightTheme` | 0 = dark, 1 = light |
+| **Terminal** | `COLORFGBG` env or fallback to dark | Terminal-specific |
+
+**See "CLI/TUI/GUI Theming" later in this document for implementation details.**
+
+**Theme Detection Flow:**
+```
+1. Server reads the `theme` cookie (logged-in users: DB preference) and renders
+   the theme class on <html> server-side - no FOUC, works without JS
+2. If no preference OR preference is "auto":
+   - Render no explicit theme class - pure CSS prefers-color-scheme media query
+     applies light or dark (no JS, no matchMedia)
+3. If preference is "light" or "dark":
+   - Render that theme class directly
+4. Default to dark if all detection fails
+```
+
+**Theme Switching:**
+- Provide theme toggle in UI (☀️ Light / 🌙 Dark / 🔄 Auto)
+- Store preference in the `theme` cookie (per-user DB preference when logged in) — server-readable, so every full page load renders correctly
+- Apply theme class to `<html>` element: `theme-light`, `theme-dark`
+- Without JS: the toggle is a small POST form — server sets the cookie and redirects back
+- With JS: NO page reload required - instant switching via CSS classes (enhancement only)
+- All components (Swagger, GraphQL, admin) switch simultaneously
+
+**Accessibility Requirements:**
+- Both themes MUST pass WCAG AA contrast requirements (4.5:1 minimum)
+- Focus indicators MUST be visible in both themes
+- Keyboard navigation MUST work identically in both themes
+- Screen readers MUST work correctly in both themes
+- No information conveyed by color alone
+
+
+---
+
 # PART 16: EMAIL & NOTIFICATIONS
 
 ## Overview

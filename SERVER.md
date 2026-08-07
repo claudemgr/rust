@@ -51961,7 +51961,7 @@ pub fn is_remote_session() -> bool {
 
 **See PART 16 "Themes (NON-NEGOTIABLE - PROJECT-WIDE)" for the unified color palette.**
 
-**CLI/TUI/GUI use the same `ThemePalette` from `src/common/theme/colors.rs`.**
+**CLI and TUI use the same `TerminalPalette` (ANSI-mapped) from `src/common/theme/colors.rs`; native GUI does not consume a literal palette — see "GUI Theming" above.**
 
 ### CLI Theme Configuration
 
