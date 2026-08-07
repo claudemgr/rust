@@ -20425,7 +20425,7 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
 
 ```css
 :root {
-  /* --- Colors (dark theme defaults; overridden by .theme-light) — based on Dracula --- */
+  /* --- Colors (dark theme defaults; overridden by .theme-light) --- */
   --color-bg:          #282a36;
   --color-fg:          #f8f8f2;
   --color-primary:     #bd93f9;
