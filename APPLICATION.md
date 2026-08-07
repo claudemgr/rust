@@ -1141,6 +1141,103 @@ When `NO_COLOR` is set and non-empty, disable ANSI color output. If the TUI depe
 | `NO_COLOR=1` | GUI unaffected unless project says otherwise | avoid color-dependent TUI | prefer CLI/plain |
 | stdout piped | avoid GUI | avoid TUI | use CLI |
 
+### Color Enablement Precedence
+
+```rust
+/// Return true if color output should be used
+pub fn color_enabled(force_color: Option<bool>) -> bool {
+    // 1. CLI flag overrides everything
+    if let Some(forced) = force_color {
+        return forced;
+    }
+    // 2. Config file (if applicable)
+    if let Some(cfg) = get_config() {
+        if cfg.output.color_set {
+            return cfg.output.color;
+        }
+    }
+    // 3. NO_COLOR env var (non-empty = disable)
+    if std::env::var("NO_COLOR").map(|v| !v.is_empty()).unwrap_or(false) {
+        return false;
+    }
+    // 4. Auto-detect: TTY + TERM support
+    if !atty::is(atty::Stream::Stdout) {
+        return false;
+    }
+    if std::env::var("TERM").map(|v| v == "dumb").unwrap_or(false) {
+        return false;
+    }
+    true
+}
+```
+
+CLI and TUI output MUST gate on `color_enabled(None)` — never a separate
+ad hoc `NO_COLOR` check. `ratatui`/`crossterm` do NOT auto-detect
+`NO_COLOR` — check `color_enabled(None)` before constructing styles and
+fall back to `Style::default()` (no `fg`/`bg`) when it returns `false`.
+Raw ANSI escapes in the CLI path are likewise not NO_COLOR-aware by
+themselves and must check `color_enabled()` explicitly.
+
+## Color Palette (TUI/CLI/GUI)
+
+**This is a single native binary — there is no Web CSS palette. TUI/CLI
+and GUI theming are defined separately, and neither uses literal hex:**
+
+### TUI/CLI — ANSI-mapped
+
+Terminals render a fixed, user-configured 16/256-color set, so TUI/CLI
+map semantic roles to the nearest ANSI color instead of literal hex:
+
+| Role | Dark ANSI | Light ANSI |
+|------|-----------|------------|
+| `foreground` | `BrightWhite` | `Black` |
+| `muted` | `White` | `DarkGray` |
+| `primary` / `accent` | `BrightMagenta` | `Blue` |
+| `secondary` / `success` | `BrightGreen` | `Green` |
+| `warning` | `BrightYellow` | `Yellow` |
+| `error` | `BrightRed` | `Red` |
+| `info` | `BrightBlue` | `Blue` |
+
+```rust
+// TerminalPalette holds ANSI 16-color indices (0-15) for TUI/CLI.
+// ratatui::style::Color::Indexed() and the ESC[38;5;{n}m escape both
+// accept these indices directly.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TerminalPalette {
+    pub foreground: String,
+    pub muted: String,
+    pub primary: String,
+    pub success: String,
+    pub warning: String,
+    pub error: String,
+    pub info: String,
+    pub border: String,
+}
+
+pub fn terminal_palette_dark() -> TerminalPalette {
+    TerminalPalette {
+        foreground: "15".into(), muted: "7".into(), primary: "13".into(),
+        success: "10".into(), warning: "11".into(), error: "9".into(),
+        info: "12".into(), border: "13".into(),
+    }
+}
+
+pub fn terminal_palette_light() -> TerminalPalette {
+    TerminalPalette {
+        foreground: "0".into(), muted: "8".into(), primary: "4".into(),
+        success: "2".into(), warning: "3".into(), error: "1".into(),
+        info: "4".into(), border: "4".into(),
+    }
+}
+```
+
+### GUI — native theming only
+
+GUI never consumes `TerminalPalette` or any literal hex palette. It
+detects light/dark only (the `dark-light` crate / OS theme APIs — see
+"Theme detection" above) and lets the native toolkit apply its own
+light/dark widget theme.
+
 ---
 
 # PART 8: TESTING, QUALITY, AND DEBUGGING
