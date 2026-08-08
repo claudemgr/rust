@@ -6314,7 +6314,7 @@ docker/
 ├── Dockerfile                              # production runtime image — two-stage (builder + minimal Alpine/Debian); tagged :latest
 ├── Dockerfile.dev                          # devel image — same as release but binary runs in debug mode; tagged :devel   (project-specific)
 ├── rootfs/                                 # build-time filesystem overlay copied into image at /   (project-specific)
-│   └── usr/local/bin/entrypoint.sh         # sets non-root UID/GID, prepares cache/target dirs; called by tini → entrypoint.sh → app
+│   └── usr/local/bin/entrypoint.sh         # prepares cache/target dirs; user creation and privilege drop happen in the binary; called by tini → entrypoint.sh → app
 ├── docker-compose.yml                      # production/human runtime — image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:latest
 ├── docker-compose.dev.yml                  # human development — image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:devel
 ├── docker-compose.test.yml                 # automated testing — builds from Dockerfile, valkey cache w/ ephemeral tmpfs, named bridge net; AI prefers tests/ scripts over running this directly
@@ -6395,7 +6395,7 @@ Every production image MUST satisfy:
 - **Startup chain `tini → entrypoint.sh → app`** — `ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]`. Never override `ENTRYPOINT` or `CMD` to bypass `tini` or the entrypoint shim. All startup customization goes in `docker/rootfs/usr/local/bin/entrypoint.sh`, which MUST end with `exec "$@"` (or `exec <binary> ... "$@"`) so the application replaces the shell as PID 1 and receives signals directly.
 - **`STOPSIGNAL SIGRTMIN+3`** (systemd-compatible clean shutdown; works well with Docker, Podman, Kubernetes; allows entrypoint.sh to coordinate shutdown of all services; avoids race conditions before forced termination)
 - **`HEALTHCHECK`** — every production image declares a `HEALTHCHECK` that exits non-zero when the binary is unhealthy. Image default: start 10m, interval 5m, timeout 15s (conservative fallback for plain `docker run`); compose files override with tighter timings (start 90s, interval 10s, timeout 5s) — the compose values are authoritative for deployments
-- **Non-root `USER`** — containers MUST NOT run as root. Create a non-root user/group in the Dockerfile and switch to it via `USER` before `ENTRYPOINT`. Alpine: `RUN addgroup -S app && adduser -S -G app app` then `USER app`. Debian/Ubuntu: `RUN groupadd -r app && useradd -r -g app app` then `USER app`. `entrypoint.sh` may remap UID/GID at runtime to match host ownership of mounted volumes. Exceptions (privileged port binding — prefer `setcap cap_net_bind_service` — device access, managing system services, etc.) MUST be documented in `IDEA.md`.
+- **Privilege drop, not Dockerfile users** — containers start as root with NO `USER` directive and no user/group creation in the Dockerfile. The binary itself creates its dedicated user/group, creates its directories, sets permissions, then drops privileges once initialization completes (see "Privileged Port Binding (<1024)" for the run-mode and drop rules). `entrypoint.sh` may export UID/GID env vars so the binary can match host ownership of mounted volumes. Running permanently as root (never dropping) is the exception and MUST be justified in `IDEA.md`.
 
 ### Dockerfile Requirements
 
