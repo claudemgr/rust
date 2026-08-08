@@ -2216,16 +2216,16 @@ server:
 
 ## How to Read This Large File
 
-**rust/API.md is ~1.6MB and ~41,910 lines. You CANNOT read it all at once. Follow these procedures.**
+**rust/API.md is ~1.6MB and ~43,000 lines. You CANNOT read it all at once. Follow these procedures.**
 
 ### File Size Reality
 
 | Constraint | Value |
 |------------|-------|
 | File size | ~1.6MB |
-| Line count | ~41,910 lines |
+| Line count | ~43,000 lines |
 | Read limit | ~500 lines per read |
-| Full reads needed | ~84 reads (impractical) |
+| Full reads needed | ~86 reads (impractical) |
 
 **Use the PART index to find relevant sections, then read each section COMPLETELY.**
 
@@ -2243,10 +2243,10 @@ server:
 | 5 | ~6815 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
 | 6 | ~8569 | Application Modes | Mode handling, debug endpoints |
 | 7 | ~9071 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~9786 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
+| 8 | ~9786 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags**, **Resource Owner Tokens** |
 | 9 | ~12673 | Error Handling & Caching | Error/cache patterns |
 | 10 | ~13097 | Database | Database work |
-| 11 | ~13512 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
+| 11 | ~13512 | Security & Logging | Security features, **Context Detection** |
 | 12 | ~15526 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
 | 13 | ~16924 | Health & Versioning | Health endpoints |
 | 14 | ~17559 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
@@ -3966,8 +3966,8 @@ User preferences like theme, language, and UI settings are stored client-side:
 
 | Storage | Use Case | Persistence |
 |---------|----------|-------------|
-| Cookies | Theme, language, consent flags, announcement dismissals — anything the server benefits from reading (server-rendered, no FOUC, works without JS); plus, only when the project defines owner tokens (PART 12, per IDEA.md), the `owner_token` cookie (HttpOnly + Secure + SameSite=Strict) set on web-form resource creation so token-gated web management works with JS disabled | Configurable expiry |
-| `localStorage` | Optional JS-enhancement copy of the resource-owner API token (PART 12) and pure client-only state — never load-bearing; every flow must also work via the `owner_token` cookie with JS disabled | Until cleared |
+| Cookies | Theme, language, consent flags, announcement dismissals — anything the server benefits from reading (server-rendered, no FOUC, works without JS); plus, only when the project defines owner tokens (PART 8, per IDEA.md), the `owner_token` cookie (HttpOnly + Secure + SameSite=Strict) set on web-form resource creation so token-gated web management works with JS disabled | Configurable expiry |
+| `localStorage` | Optional JS-enhancement copy of the resource-owner API token (PART 8) and pure client-only state — never load-bearing; every flow must also work via the `owner_token` cookie with JS disabled | Until cleared |
 
 ## AI Implementation Process
 
@@ -4390,13 +4390,13 @@ sqlx::query(&format!("SELECT * FROM users WHERE email = '{}'", email))
 |------------|-----------|--------------|
 | **Invalid input format** | "Please enter a valid value" | `validation_error: field format invalid, input=[redacted]` |
 | **Rate limited** | "Too many requests. Try again in a moment" | `rate_limit: endpoint=/api/{api_version}/..., ip=1.2.3.4, limit=10/min` |
-| **Database error** | "An error occurred. Please try again" | `db_error: open failed, path=/var/lib/claudemgr/claudemgr/db/server.db, err=[full error]` |
+| **Database error** | "An error occurred. Please try again" | `db_error: open failed, path=/var/lib/{internal_org}/{internal_name}/db/server.db, err=[full error]` |
 | **Internal panic** | "An unexpected error occurred" | `panic: [full stack trace], request_id=abc123` |
 
 **Console Output (Development):**
 ```
 [ERROR] 2025-01-15 10:30:45 database open failed
-        path: /var/lib/claudemgr/claudemgr/db/server.db
+        path: /var/lib/{internal_org}/{internal_name}/db/server.db
         error: unable to open database file
         stack: main.rs:123 → db.rs:45 → connect.rs:12
 ```
@@ -4409,7 +4409,7 @@ sqlx::query(&format!("SELECT * FROM users WHERE email = '{}'", email))
   "request_id": "abc123",
   "component": "database",
   "message": "open failed",
-  "path": "/var/lib/claudemgr/claudemgr/db/server.db",
+  "path": "/var/lib/{internal_org}/{internal_name}/db/server.db",
   "error": "unable to open database file",
   "stack": "..."
 }
@@ -5030,10 +5030,10 @@ fetch(`${config.apiBaseUrl}/api/${apiVersion}/items`)
 
 ```html
 <!-- ❌ WRONG - Bare path (breaks in emails, notifications) -->
-<a href="/server/security/report/{{.Token}}">View Report</a>
+<a href="/server/security/report/{{ token }}">View Report</a>
 
 <!-- ❌ WRONG — hardcodes https; ignores proxy headers; breaks behind a proxy -->
-<a href="https://{{.FQDN}}/server/security/report/{{.Token}}">View Report</a>
+<a href="https://{{ fqdn }}/server/security/report/{{ token }}">View Report</a>
 
 <!-- ✅ CORRECT — handler computes full URL via build_url(headers, ...) and passes it to the template -->
 <a href="{{ report_url }}">View Report</a>
@@ -5775,7 +5775,7 @@ See PART 26: DOCKER for complete annotation requirements.
 |-------|-------|
 | **Name** | {project_name} |
 | **Organization** | {project_org} |
-| **Official Site** | https://{project_name}.{project_org}.us |
+| **Official Site** | `{official_site}` (e.g. `https://{project_name}.example.com`) |
 | **Repository** | {PLATFORM_REPO_URL} |
 | **README** | README.md |
 | **License** | MIT > LICENSE.md |
@@ -7976,7 +7976,7 @@ ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]
 
 3. **Smart escalation flow:**
    ```rust
-   pub fn handle_escalation(action: &str) -> anyhow::Result<()> {
+   pub fn handle_escalation(action: &str, lang: &str) -> anyhow::Result<()> {
        if is_elevated() {
            // Already elevated
            return Ok(());
@@ -7991,7 +7991,7 @@ ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]
        }
 
        // User CAN escalate - ask and re-exec with elevated privileges
-       println!("{}", i18n::tf(lang, "cli.requires_privileges", action));
+       println!("{}", i18n::tf(lang, "cli.requires_privileges", &[("action", action)]));
        print!("{}", i18n::t(lang, "cli.escalate_prompt"));
 
        let mut response = String::new();
@@ -8010,7 +8010,7 @@ ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]
    ```rust
    // --service --install/uninstall/start/stop require escalation
    if service_cmd.is_some() && !is_elevated() {
-       handle_escalation("Service management")?;
+       handle_escalation("Service management", lang)?;
    }
    ```
 
@@ -17110,7 +17110,7 @@ pub struct StatsInfo {
 | Project description | `<p>` | No | `<p>A brief description</p>` |
 | Status | `.status-banner` | No | `<div class="status-banner status-ok">✅ Healthy</div>` |
 | Version | `<code>` | No | `<code>1.0.0</code>` |
-| Rust version | `<code>` | No | `<code>{{.RustVersion}}</code>` |
+| Rust version | `<code>` | No | `<code>{{ rust_version }}</code>` |
 | Build commit | `<code>` | Optional | `<code>abc1234</code>` |
 | Build date | `<time>` | No | `<time datetime="2024-01-10">Jan 10, 2024</time>` |
 | Uptime | plain text | No | `2d 5h 30m` |
@@ -17164,7 +17164,7 @@ pub struct StatsInfo {
 
 ```html
 <!DOCTYPE html>
-<html lang="{{.Lang}}" dir="{{.Dir}}" class="theme-dark">
+<html lang="{{ lang }}" dir="{{ dir }}" class="theme-dark">
 <head>
   <title>{project_name} - Health Status</title>
   <!-- Standard meta, CSS, theme support -->
@@ -17194,7 +17194,7 @@ pub struct StatsInfo {
         <dd><code>1.0.0</code></dd>
 
         <dt>🦀 Rust Version</dt>
-        <dd><code>{{.RustVersion}}</code></dd>
+        <dd><code>{{ rust_version }}</code></dd>
 
         <dt>🔨 Build</dt>
         <dd><code>abc1234</code> (2024-01-10)</dd>
@@ -17831,7 +17831,7 @@ This is the response text.
 **Output:**
 ```html
 <!DOCTYPE html>
-<html lang="{{.Lang}}" dir="{{.Dir}}">
+<html lang="{{ lang }}" dir="{{ dir }}">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20399,6 +20399,556 @@ All UI is designed mobile-first. Breakpoints:
 @media (min-width: 1024px) { .container { padding-inline: var(--space-8); } }
 ```
 
+---
+
+## Semantic HTML Elements
+
+**Use correct HTML elements for content type. This ensures accessibility, SEO, and proper styling.**
+
+### When to Use Each Element
+
+| Element | Use For | Example |
+|---------|---------|---------|
+| `<code>` | Inline code, values, identifiers | Usernames, versions, short values |
+| `<pre><code>` | Multi-line code blocks | Configuration, scripts |
+| `<kbd>` | Keyboard input | `Ctrl+C`, `Enter` |
+| `<samp>` | Sample output | Command output, logs |
+| `<var>` | Variables, placeholders | `{username}`, `$PATH` |
+| `<span>` | Inline styling hook | Status badges, icons |
+| `<div>` | Block-level container | Sections, wrappers |
+| `<time>` | Dates and times | Timestamps, durations |
+| `<mark>` | Highlighted text | Search matches |
+| `<abbr>` | Abbreviations | `<abbr title="Application Programming Interface">API</abbr>` |
+
+### Code Elements
+
+#### Inline Code (`<code>`)
+
+**Use for short, inline technical values:**
+
+| Use For | Example HTML | Renders As |
+|---------|--------------|------------|
+| Version numbers | `<code>v1.2.3</code>` | `v1.2.3` |
+| Usernames | `<code>@johndoe</code>` | `@johndoe` |
+| Short commands | `<code>git status</code>` | `git status` |
+| Config values | `<code>true</code>` | `true` |
+| File names | `<code>config.yml</code>` | `config.yml` |
+| Environment vars | `<code>$HOME</code>` | `$HOME` |
+
+```css
+/* Inline code styling */
+code {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.875em;
+  padding: 0.125rem 0.375rem;
+  background: var(--color-code-bg);
+  border-radius: 4px;
+  word-break: break-word;
+}
+```
+
+#### Code Blocks with Copy Button
+
+**For values users need to copy (URLs, tokens, addresses, etc.):**
+
+```html
+<div class="code-block">
+  <code class="code-content">abc123xyz789.onion</code>
+  <button type="button" class="copy-btn" data-copy="abc123xyz789.onion" data-copied-label="Copied!" aria-label="Copy to clipboard">
+    <span class="copy-icon">📋</span>
+    <span class="copy-text" aria-live="polite">Copy</span>
+  </button>
+</div>
+```
+
+**CSS (Mobile-First):**
+
+```css
+/* Code block with copy button - mobile-first */
+.code-block {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  margin: 0.25rem 0;
+}
+
+.code-content {
+  display: block;
+  flex: 1;
+  min-width: 0; /* Allow shrinking */
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-code-bg);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.875rem;
+  -webkit-overflow-scrolling: touch; /* Smooth scroll on iOS */
+}
+
+.copy-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg-secondary);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.copy-btn:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-hover);
+}
+
+.copy-btn:active,
+.copy-btn.copied {
+  background: var(--color-success-bg);
+  border-color: var(--color-success);
+}
+
+/* Hide "Copy" text on mobile, show only icon */
+.copy-text {
+  display: none;
+}
+
+/* The "Copied!" feedback is always visible, even on mobile */
+.copy-btn.copied .copy-text {
+  display: inline;
+}
+
+@media (min-width: 768px) {
+  .copy-text {
+    display: inline;
+  }
+}
+```
+
+**JavaScript:**
+
+```javascript
+// Copy button handler - every copy button MUST show visible "Copied!" feedback
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.copy-btn');
+  if (!btn) return;
+
+  const text = btn.dataset.copy || btn.previousElementSibling?.textContent;
+  if (!text) return;
+
+  navigator.clipboard.writeText(text).then(() => {
+    // Swap to checkmark + translated "Copied!" label, revert after 2s
+    const icon = btn.querySelector('.copy-icon');
+    const label = btn.querySelector('.copy-text');
+    const copied = btn.dataset.copiedLabel || 'Copied!';
+    const restore = [];
+    if (icon) {
+      restore.push([icon, icon.textContent]);
+      icon.textContent = '✓';
+    }
+    if (label) {
+      restore.push([label, label.textContent]);
+      label.textContent = copied;
+    }
+    if (!icon && !label) {
+      restore.push([btn, btn.textContent]);
+      btn.textContent = '✓ ' + copied;
+    }
+    btn.classList.add('copied');
+
+    setTimeout(() => {
+      restore.forEach(([el, t]) => {
+        el.textContent = t;
+      });
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+});
+```
+
+**Copy feedback is mandatory:** every copy button MUST show a visible "Copied!" confirmation on success — checkmark icon plus the translated label (i18n key `copied`, rendered server-side into `data-copied-label`), `.copied` class for the success colors (CSS custom properties only), reverting after 2 seconds. The `aria-live="polite"` region announces the change to screen readers. Icon-only buttons (e.g. the footer 📋) swap their own content and carry `aria-live="polite"` on the button itself.
+
+#### When to Use Copy Buttons
+
+| Content Type | Copy Button? | Reason |
+|--------------|--------------|--------|
+| Tor .onion addresses | **Yes** | Long, complex, users need to copy |
+| API tokens | **Yes** | Users need to paste elsewhere |
+| Git clone URLs | **Yes** | Users copy to terminal |
+| Build commit hash | Optional | May be useful for bug reports |
+| Version numbers | No | Short, rarely copied |
+| Usernames | No | Short, rarely copied |
+| Boolean values | No | Not useful to copy |
+
+#### Multi-line Code Blocks (`<pre><code>`)
+
+**For configuration, scripts, or multi-line output:**
+
+```html
+<div class="code-block-multi">
+  <div class="code-header">
+    <span class="code-lang">yaml</span>
+    <button type="button" class="copy-btn" data-copy-target="config-example">📋 Copy</button>
+  </div>
+  <pre><code id="config-example">server:
+  host: 0.0.0.0
+  port: 8080</code></pre>
+</div>
+```
+
+```css
+/* Multi-line code block - mobile-first */
+.code-block-multi {
+  margin: 1rem 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.75rem;
+}
+
+.code-lang {
+  color: var(--color-muted);
+  text-transform: uppercase;
+}
+
+.code-block-multi pre {
+  margin: 0;
+  padding: 0.75rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.code-block-multi code {
+  display: block;
+  padding: 0;
+  background: none;
+  white-space: pre;
+}
+
+@media (min-width: 768px) {
+  .code-header {
+    padding: 0.5rem 1rem;
+  }
+  .code-block-multi pre {
+    padding: 1rem;
+  }
+}
+```
+
+### Status & Badge Elements
+
+**Use `<span>` with semantic classes for status indicators:**
+
+```html
+<!-- Status badges -->
+<span class="status status-ok">✅ Healthy</span>
+<span class="status status-error">❌ Error</span>
+<span class="status status-warning">⚠️ Degraded</span>
+
+<!-- Feature badges -->
+<span class="badge badge-enabled">Enabled</span>
+<span class="badge badge-disabled">Disabled</span>
+
+<!-- Role badges -->
+<span class="badge badge-primary">Primary</span>
+<span class="badge badge-member">Member</span>
+```
+
+```css
+/* Status indicators - mobile-first */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-ok { background: var(--color-success-bg); color: var(--color-success); }
+.status-error { background: var(--color-error-bg); color: var(--color-error); }
+.status-warning { background: var(--color-warning-bg); color: var(--color-warning); }
+
+.badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .badge {
+    font-size: 0.875rem;
+  }
+}
+```
+
+### Data Display Patterns
+
+#### Key-Value Lists (Definition Lists)
+
+**Use `<dl>` for labeled data:**
+
+```html
+<dl class="info-list">
+  <dt>🏷️ Version</dt>
+  <dd><code>1.2.3</code></dd>
+
+  <dt>⏱️ Uptime</dt>
+  <dd>2d 5h 30m</dd>
+
+  <dt>🧅 Tor Address</dt>
+  <dd>
+    <div class="code-block">
+      <code class="code-content">abc123xyz789.onion</code>
+      <button class="copy-btn" data-copy="abc123xyz789.onion">📋</button>
+    </div>
+  </dd>
+</dl>
+```
+
+```css
+/* Info list - mobile-first (stacked) */
+.info-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.info-list dt {
+  font-weight: 600;
+  margin-top: 0.75rem;
+}
+
+.info-list dt:first-child {
+  margin-top: 0;
+}
+
+.info-list dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+/* Tablet+: side-by-side */
+@media (min-width: 768px) {
+  .info-list {
+    grid-template-columns: auto 1fr;
+    gap: 0.5rem 1rem;
+  }
+
+  .info-list dt {
+    margin-top: 0;
+  }
+}
+```
+
+#### Tables (Mobile-First)
+
+**Tables get horizontal scroll on mobile:**
+
+```html
+<div class="table-wrapper">
+  <table class="data-table">
+    <thead>
+      <tr><th>Component</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Database</td><td class="status-ok">✅ OK</td></tr>
+    </tbody>
+  </table>
+</div>
+```
+
+```css
+/* Table wrapper for horizontal scroll - mobile-first */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 1rem 0;
+}
+
+.data-table {
+  width: 100%;
+  min-width: 400px; /* Force scroll on narrow screens */
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .data-table {
+    min-width: 0; /* Allow natural width */
+    font-size: 1rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 0.75rem;
+    white-space: normal;
+  }
+}
+```
+
+#### Cards/Sections
+
+```css
+/* Section cards - mobile-first */
+.section-card {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-card);
+}
+
+.section-card h2,
+.section-card h3 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 1rem;
+}
+
+@media (min-width: 768px) {
+  .section-card {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+  }
+
+  .section-card h2,
+  .section-card h3 {
+    font-size: 1.25rem;
+  }
+}
+```
+
+### Feature Lists
+
+**For listing features/capabilities:**
+
+```html
+<ul class="feature-list">
+  <li class="feature-enabled">🌍 GeoIP</li>
+  <li class="feature-enabled">
+    🧅 Tor:
+    <span class="status status-ok">✅ healthy</span>
+    <div class="code-block">
+      <code class="code-content">abc123xyz789.onion</code>
+      <button class="copy-btn" data-copy="abc123xyz789.onion">📋</button>
+    </div>
+  </li>
+  <li class="feature-disabled">📊 GeoIP</li>
+</ul>
+```
+
+```css
+/* Feature list - mobile-first (stacked) */
+.feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.feature-enabled {
+  color: var(--color-text);
+}
+
+.feature-disabled {
+  color: var(--color-muted);
+  text-decoration: line-through;
+}
+
+/* Tablet+: horizontal wrap */
+@media (min-width: 768px) {
+  .feature-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+  }
+
+  /* Unless feature has sub-content (like Tor address) */
+  .feature-list li:has(.code-block) {
+    flex-basis: 100%;
+  }
+}
+```
+
+### URL Lists
+
+**For endpoints, related resources, etc.:**
+
+```html
+<ul class="node-list">
+  <li>
+    <div class="code-block">
+      <code class="code-content">https://node1.example.com</code>
+      <button class="copy-btn" data-copy="https://node1.example.com">📋</button>
+    </div>
+    <span class="badge badge-primary">👑 Primary</span>
+  </li>
+  <li>
+    <div class="code-block">
+      <code class="code-content">https://node2.example.com</code>
+      <button class="copy-btn" data-copy="https://node2.example.com">📋</button>
+    </div>
+    <span class="status status-ok">✅</span>
+  </li>
+</ul>
+```
+
+```css
+/* Node list - mobile-first */
+.node-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.node-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.node-list .code-block {
+  flex: 1;
+  min-width: 0;
+}
+```
 
 ---
 
@@ -20435,6 +20985,7 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
   --color-warning:     #ffb86c;
   --color-error:       #ff5555;
   --color-info:        #8be9fd;
+  --color-on-error:    #ffffff;
   /* Status banner/tint pairs (background + readable text) */
   --color-success-bg:  rgba(80, 250, 123, 0.15);
   --color-success-text:#50fa7b;
@@ -20542,6 +21093,7 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
   --color-warning:     #9a6700;
   --color-error:       #d1242f;
   --color-info:        #0969da;
+  --color-on-error:    #ffffff;
   /* Status banner/tint pairs (background + readable text) */
   --color-success-bg:  rgba(26, 127, 55, 0.12);
   --color-success-text:#1a7f37;
@@ -20623,7 +21175,7 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
 .btn:focus-visible { box-shadow: var(--focus-ring-offset); outline: none; }
 .btn-primary   { background: var(--color-primary);   color: var(--color-bg); }
 .btn-secondary { background: var(--color-surface);   color: var(--color-fg); border-color: var(--color-border); }
-.btn-danger    { background: var(--color-error);     color: #fff; }
+.btn-danger    { background: var(--color-error);     color: var(--color-on-error); }
 .btn-ghost     { background: transparent;            color: var(--color-fg); border-color: var(--color-border); }
 .btn[disabled], .btn[aria-busy="true"] { opacity: 0.6; cursor: not-allowed; }
 ```
@@ -20658,7 +21210,7 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
   top: 2px; left: 2px;
   width: calc(1.5rem - 6px);
   height: calc(1.5rem - 6px);
-  background: #fff;
+  background: var(--color-on-error);
   border-radius: var(--radius-full);
   transition: transform var(--transition-fast);
 }
@@ -21184,7 +21736,7 @@ async function requestLocation() {
 
 ### API Token Storage
 
-Resource owner tokens use **dual delivery** in the browser (see PART 12 → API Tokens): the raw token is shown once at creation (copy button), only its SHA-256 hash is stored server-side, and the create response also sets an `owner_token` cookie (HttpOnly + Secure + SameSite=Strict, Max-Age matching the token lifetime). WEB management routes authenticate via that cookie as plain POST forms, so every owner flow works with JS disabled. API routes accept the `Authorization: Bearer` header only and ignore cookies. No dedicated forget/revoke route: the cookie expires via its Max-Age, and clearing site data (or uninstalling the PWA) removes it along with any local copies.
+Resource owner tokens use **dual delivery** in the browser (see PART 8 → "API Token Model"): the raw token is shown once at creation (copy button), only its SHA-256 hash is stored server-side, and the create response also sets an `owner_token` cookie (HttpOnly + Secure + SameSite=Strict, Max-Age matching the token lifetime). WEB management routes authenticate via that cookie as plain POST forms, so every owner flow works with JS disabled. API routes accept the `Authorization: Bearer` header only and ignore cookies. No dedicated forget/revoke route: the cookie expires via its Max-Age, and clearing site data (or uninstalling the PWA) removes it along with any local copies.
 
 `localStorage` holds an optional JS convenience copy (pre-fill, copy button) — never load-bearing:
 
@@ -21349,14 +21901,14 @@ static/
 
 ## Unified Response Format
 
-All API endpoints return the same JSON envelope:
+**Canonical envelope — see PART 14 → "Error Response" for the authoritative definition.** All API endpoints return the same JSON shape; absent fields are omitted entirely, never emitted as `null`, and no endpoint may invent its own shape or add ad-hoc top-level fields.
+
+Success:
 
 ```json
 {
   "ok": true,
-  "data": { … },
-  "error": null,
-  "message": null
+  "data": { … }
 }
 ```
 
@@ -21365,9 +21917,22 @@ On error:
 ```json
 {
   "ok": false,
-  "data": null,
-  "error": "not_found",
+  "error": "NOT_FOUND",
   "message": "The requested resource does not exist."
+}
+```
+
+With optional structured context:
+
+```json
+{
+  "ok": false,
+  "error": "VALIDATION_FAILED",
+  "message": "Human readable message",
+  "details": {
+    "field": "email",
+    "rule": "format"
+  }
 }
 ```
 
@@ -21381,6 +21946,8 @@ pub struct ApiResponse {
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<serde_json::Value>,
 }
 pub fn parse_api_response(body: &[u8]) -> Result<ApiResponse, serde_json::Error> {
     serde_json::from_slice(body)
@@ -21834,43 +22401,7 @@ pub fn build_tera() -> Result<Tera> {
 
 ## Unified Color Palette
 
-// src/common/theme/colors.rs
-
-```rust
-// src/common/theme/colors.rs
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ThemePalette {
-    pub background: String,
-    pub foreground: String,
-    pub primary: String,
-    pub secondary: String,
-    pub accent: String,
-    pub success: String,
-    pub warning: String,
-    pub error: String,
-    pub info: String,
-    pub surface: String,
-    pub surface_alt: String,
-    pub border: String,
-    pub muted: String,
-}
-pub fn theme_palette_dark() -> ThemePalette {
-    ThemePalette {
-        background: "#282a36".into(), foreground: "#f8f8f2".into(),
-        primary: "#bd93f9".into(), secondary: "#50fa7b".into(), accent: "#ff79c6".into(),
-        success: "#50fa7b".into(), warning: "#ffb86c".into(), error: "#ff5555".into(), info: "#8be9fd".into(),
-        surface: "#2b2d3a".into(), surface_alt: "#21222c".into(), border: "#44475a".into(), muted: "#6272a4".into(),
-    }
-}
-pub fn theme_palette_light() -> ThemePalette {
-    ThemePalette {
-        background: "#ffffff".into(), foreground: "#1f2328".into(),
-        primary: "#0969da".into(), secondary: "#1a7f37".into(), accent: "#8250df".into(),
-        success: "#1a7f37".into(), warning: "#9a6700".into(), error: "#d1242f".into(), info: "#0969da".into(),
-        surface: "#f6f8fa".into(), surface_alt: "#eff2f5".into(), border: "#d1d9e0".into(), muted: "#59636e".into(),
-    }
-}
-```
+**Canonical definition — see PART 16 → "Themes (NON-NEGOTIABLE - PROJECT-WIDE)" → "Unified Color Palette" below for the `ThemePalette` struct, `dark_palette()`/`light_palette()` functions, and the full literal hex source of truth.**
 
 ### System Theme Detection
 
@@ -21900,17 +22431,7 @@ The base template renders `<html class="theme-light">` or `<html class="theme-da
 ```
 
 
-### Theme Implementation Location
-
-| File | Purpose |
-|---|---|
-| `src/common/theme/colors.rs` | `ThemePalette` struct + `theme_palette_dark/light` functions |
-| `src/server/theme.rs` | Server-side theme detection and injection into template context |
-| `src/swagger/theme.rs` | Swagger UI theme configuration |
-| `src/graphql/theme.rs` | GraphQL playground theme configuration |
-| `src/client/tui/styles.rs` | TUI color scheme |
-| `src/client/cli/output.rs` | CLI color output helpers |
-| `src/client/gui/theme_*.rs` | GUI theme variants |
+**See PART 16 → "Themes (NON-NEGOTIABLE - PROJECT-WIDE)" → "Theme Implementation Location" below for the canonical file/purpose table.**
 
 ---
 
@@ -22688,6 +23209,16 @@ When the contact form is disabled (`pages.contact.enabled: false`), the contact 
 | `/server/contact` | `contact_handler` | Contact page |
 | `/server/help` | `help_handler` | Help page |
 | `/server/terms` | `terms_handler` | Terms of service page |
+
+---
+
+## Layout
+
+| Screen Size | Width |
+|-------------|-------|
+| ≥ 768px | 90% (5% margins) |
+| < 768px | 98% (1% margins) |
+| Footer | Always centered, always at bottom |
 
 ---
 
@@ -24119,7 +24650,7 @@ server:
 | **Cache** | Hits, misses, evictions, size | Cache effectiveness |
 | **Scheduler** | Tasks run, duration, failures | Background task health |
 | **System** | CPU, memory, disk, async tasks | System resources |
-| **Business** | Users, sessions, API calls | Application-specific |
+| **Business** | Domain counters (requests, jobs, items) | Application-specific |
 
 ## Metric Naming Conventions
 
@@ -24200,7 +24731,7 @@ server:
 | **Scheduler metrics** | If using background scheduler (PART 18) |
 | **System metrics** | If `include_system: true` in config |
 | **Runtime metrics** | If `include_runtime: true` in config |
-| **Business metrics** | App-specific (users, sessions, etc.) |
+| **Business metrics** | App-specific (domain counters — requests, jobs, items, etc.) |
 
 ## Complete Metrics Reference
 
@@ -24366,23 +24897,23 @@ server:
 
 # HELP {project_name}_http_requests_total Total number of HTTP requests
 # TYPE {project_name}_http_requests_total counter
-{project_name}_http_requests_total{method="GET",path="/api/v1/users",status="200"} 1523
-{project_name}_http_requests_total{method="GET",path="/api/v1/users/:id",status="200"} 892
-{project_name}_http_requests_total{method="GET",path="/api/v1/users/:id",status="404"} 23
-{project_name}_http_requests_total{method="POST",path="/api/v1/users",status="201"} 42
+{project_name}_http_requests_total{method="GET",path="/api/{api_version}/items",status="200"} 1523
+{project_name}_http_requests_total{method="GET",path="/api/{api_version}/items/:id",status="200"} 892
+{project_name}_http_requests_total{method="GET",path="/api/{api_version}/items/:id",status="404"} 23
+{project_name}_http_requests_total{method="POST",path="/api/{api_version}/items",status="201"} 42
 {project_name}_http_requests_total{method="GET",path="/server/healthz",status="200"} 8640
 
 # HELP {project_name}_http_request_duration_seconds HTTP request duration in seconds
 # TYPE {project_name}_http_request_duration_seconds histogram
-{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/v1/users",le="0.001"} 120
-{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/v1/users",le="0.005"} 890
-{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/v1/users",le="0.01"} 1400
-{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/v1/users",le="0.025"} 1500
-{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/v1/users",le="0.05"} 1510
-{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/v1/users",le="0.1"} 1520
-{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/v1/users",le="+Inf"} 1523
-{project_name}_http_request_duration_seconds_sum{method="GET",path="/api/v1/users"} 12.456
-{project_name}_http_request_duration_seconds_count{method="GET",path="/api/v1/users"} 1523
+{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/{api_version}/items",le="0.001"} 120
+{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/{api_version}/items",le="0.005"} 890
+{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/{api_version}/items",le="0.01"} 1400
+{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/{api_version}/items",le="0.025"} 1500
+{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/{api_version}/items",le="0.05"} 1510
+{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/{api_version}/items",le="0.1"} 1520
+{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/{api_version}/items",le="+Inf"} 1523
+{project_name}_http_request_duration_seconds_sum{method="GET",path="/api/{api_version}/items"} 12.456
+{project_name}_http_request_duration_seconds_count{method="GET",path="/api/{api_version}/items"} 1523
 
 # HELP {project_name}_http_active_requests Number of active HTTP requests
 # TYPE {project_name}_http_active_requests gauge
@@ -25119,16 +25650,16 @@ pub fn start_uptime_updater() {
 ```
 # HELP {project_name}_http_requests_total Total number of HTTP requests
 # TYPE {project_name}_http_requests_total counter
-{project_name}_http_requests_total{method="GET",path="/api/{api_version}/users",status="200"} 1523
-{project_name}_http_requests_total{method="POST",path="/api/{api_version}/users",status="201"} 42
+{project_name}_http_requests_total{method="GET",path="/api/{api_version}/items",status="200"} 1523
+{project_name}_http_requests_total{method="POST",path="/api/{api_version}/items",status="201"} 42
 
 # HELP {project_name}_http_request_duration_seconds HTTP request duration in seconds
 # TYPE {project_name}_http_request_duration_seconds histogram
-{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/{api_version}/users",le="0.01"} 1400
-{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/{api_version}/users",le="0.1"} 1520
-{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/{api_version}/users",le="+Inf"} 1523
-{project_name}_http_request_duration_seconds_sum{method="GET",path="/api/{api_version}/users"} 12.456
-{project_name}_http_request_duration_seconds_count{method="GET",path="/api/{api_version}/users"} 1523
+{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/{api_version}/items",le="0.01"} 1400
+{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/{api_version}/items",le="0.1"} 1520
+{project_name}_http_request_duration_seconds_bucket{method="GET",path="/api/{api_version}/items",le="+Inf"} 1523
+{project_name}_http_request_duration_seconds_sum{method="GET",path="/api/{api_version}/items"} 12.456
+{project_name}_http_request_duration_seconds_count{method="GET",path="/api/{api_version}/items"} 1523
 
 # HELP {project_name}_db_connections_open Number of open database connections
 # TYPE {project_name}_db_connections_open gauge
@@ -25242,7 +25773,7 @@ groups:
 
 ```json
 {
-  "title": "{PROJECT_NAME} Metrics",
+  "title": "{project_name} Metrics",
   "panels": [
     {
       "title": "Request Rate",
@@ -25318,11 +25849,11 @@ groups:
 
 | Element | Config Key | Description |
 |---------|------------|-------------|
-| Enable metrics | `metrics.enabled` | Turn metrics on/off |
-| Endpoint | `metrics.path` | Metrics endpoint path (default: /metrics) |
-| Include system metrics | `metrics.system` | Include CPU/memory/disk |
-| Include runtime metrics | `metrics.runtime` | Include Rust runtime stats |
-| Authentication token | `metrics.token` | Bearer token (empty = no auth) |
+| Enable metrics | `server.metrics.enabled` | Turn metrics on/off |
+| Endpoint | `server.metrics.endpoint` | Metrics endpoint path (default: /metrics) |
+| Include system metrics | `server.metrics.include_system` | Include CPU/memory/disk |
+| Include runtime metrics | `server.metrics.include_runtime` | Include Rust runtime stats |
+| Authentication token | `server.metrics.token` | Bearer token (empty = no auth) |
 
 ---
 
@@ -25615,44 +26146,18 @@ Every backup is verified **immediately after creation** - backups must be 100% w
 
 ### Backup Files Created (Single Task at 02:00)
 
-**The backup task creates TWO files each run:**
+**The `backup_daily` task creates TWO files each run:**
 
 | File | Description | Retention |
 |------|-------------|-----------|
 | `{project_name}_backup_YYYY-MM-DD.tar.gz[.enc]` | Full backup (yesterday's data) | Controlled by `max_backups` |
 | `{project_name}-daily.tar.gz[.enc]` | Daily incremental (changes since full) | Always 1 (replaced each run) |
-| `{project_name}-hourly.tar.gz[.enc]` | Hourly incremental (if enabled) | Always 1 (replaced each run) |
 
-### Retention Configuration
+**The separate `backup_hourly` task (disabled by default) creates one additional file when enabled:**
 
-```yaml
-server:
-  backup:
-    retention:
-      # Full backups to keep (default: 1 = yesterday only)
-      max_backups: 1
-      # Optional: keep weekly backup (e.g., every Sunday's backup)
-      keep_weekly: 0
-      # Optional: keep monthly backup (e.g., 1st of month)
-      keep_monthly: 0
-      # Optional: keep yearly backup (e.g., Jan 1st)
-      keep_yearly: 0
-      # Percent of backup volume (e.g., 10%) or absolute (e.g., 50G); 0 = disabled
-      max_total_size: "10%"
-```
-
-**Retention Settings:**
-
-| Setting | Default | Valid | Description |
-|---------|---------|-------|-------------|
-| `max_backups` | 1 | ≥1 | Daily full backups to keep |
-| `keep_weekly` | 0 | ≥0 | Weekly backups (Sunday) - 0 = disabled |
-| `keep_monthly` | 0 | ≥0 | Monthly backups (1st) - 0 = disabled |
-| `keep_yearly` | 0 | ≥0 | Yearly backups (Jan 1st) - 0 = disabled |
-| `max_total_size` | `10%` | `N%`, `NG`, `0` | Max total size of all backup files; 0 = disabled |
-
-**Falsey Values (all mean disabled):**
-- `0`, `false`, `no`, `none`, `disable`, `disabled`, `off`
+| File | Description | Retention |
+|------|-------------|-----------|
+| `{project_name}-hourly.tar.gz[.enc]` | Hourly incremental | Always 1 (replaced each run) |
 
 **Validation (warn, don't error - server must start):**
 
@@ -25693,10 +26198,6 @@ WARN: keep_monthly: 24 exceeds recommended 12 (2 years of monthly backups)
 │              [Cancel]  [Save Anyway]                    │
 └─────────────────────────────────────────────────────────┘
 ```
-
-**Default: 2 files total (yesterday + today's incremental)**
-
-**With hourly enabled: 3 files total** (yesterday + daily + hourly incrementals)
 
 **Retention Priority Order:**
 ```
@@ -25828,17 +26329,6 @@ Restoring...
 │                                         │
 │           [Cancel]  [Restore]           │
 └─────────────────────────────────────────┘
-```
-
-**CLI Restore:**
-
-```bash
-# Encrypted backup - password required
-{project_name} --maintenance restore backup_2025-01-15.tar.gz.enc
-# Prompts for password
-
-# Unencrypted backup - no password
-{project_name} --maintenance restore backup_2025-01-15.tar.gz
 ```
 
 ### Restore Verification
@@ -26376,7 +26866,7 @@ pub fn verify_checksum(file_path: &str, expected_hash: &str) -> anyhow::Result<(
 
 Application user creation **REQUIRES** privilege escalation. If the user cannot escalate privileges, the application runs as the current user with user-level directories.
 
-**IMPORTANT: See PART 5 "Smart Escalation Logic" (lines ~7921-8191) for the complete escalation flow:**
+**IMPORTANT: See PART 5 "Smart escalation behavior" (lines ~7921-8191) for the complete escalation flow:**
 - Binary first checks if already root/admin → skips escalation prompt entirely
 - Only prompts if user CAN actually escalate (is in sudoers/wheel/admin group)
 - Never prompts if user cannot escalate → shows informative error instead
@@ -28600,7 +29090,7 @@ services:
   {project_name}:
     image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:latest
     container_name: {project_name}-app
-    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    hostname: {project_name}
     restart: always
     pull_policy: always
     logging: *default-logging
@@ -28659,7 +29149,7 @@ networks:
 | `container_name:` | `{project_name}-app`, `{project_name}-db` | e.g., `jokes-app`, `jokes-db` |
 | Main service | `{project_name}` | Service name matches project name |
 | Database service | `{project_name}-db` | Database service name |
-| `hostname:` | `${BASE_HOST_NAME:-$HOSTNAME}` | Uses env or system hostname |
+| `hostname:` | `{project_name}` | Hardcoded container hostname |
 | `restart:` | `always` (prod/dev) · `"no"` (test) | Restart policy |
 | `pull_policy:` | `always` | Always pull latest image |
 | `logging:` | `*default-logging` | Use the logging anchor |
@@ -29121,7 +29611,7 @@ rm -rf "$TEMP_DIR"
 **CI/CD workflows MUST NOT:**
 - Reference local user paths like `~/.local/share/cargo` (use `/tmp/` or CI-native caching)
 - Use Makefile targets (commands must be explicit for visibility)
-- Depend on local Docker containers for builds (GitHub/Gitea Actions use native Rust)
+- Depend on local Docker containers for builds (GitHub/Gitea Actions run jobs inside the `casjaysdev/rust:latest` container image, not a locally mounted container)
 - Cross-cancel different release refs - only older runs for the exact same branch/tag ref may be auto-canceled
 
 | Git Provider | CI System | Config Location | Self-Hosted |
@@ -34298,7 +34788,7 @@ docker run --name "{project_name}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -
 ## Links
 
 - [Repository]({PLATFORM_REPO_URL})
-- [Live Demo](https://{project_name}.{project_org}.us) (if applicable)
+- [Live Demo]({official_site}) (if applicable)
 - [API Documentation](/server/docs/swagger) (Swagger UI)
 - [GraphQL Playground](/server/docs/graphql)
 
@@ -34687,10 +35177,10 @@ pub async fn language_middleware(
 
 ```html
 <form method="get" action="">
-  <select name="lang" aria-label="{{t .Lang `common.select_language`}}">
-    {{range .AvailableLanguages}}
-      <option value="{{.Code}}" {{if eq .Code $.Lang}}selected{{end}}>{{.NativeName}}</option>
-    {{end}}
+  <select name="lang" aria-label="{{ t(key="common.select_language", lang=lang) }}">
+    {% for l in available_languages %}
+      <option value="{{ l.code }}" {% if l.code == lang %}selected{% endif %}>{{ l.native_name }}</option>
+    {% endfor %}
   </select>
   <button type="submit">Go</button>
 </form>
@@ -34739,6 +35229,10 @@ pub struct LocaleFS;
     "native_name": "Español",
     "direction": "ltr",
     "version": "1.0.0"
+  },
+
+  "app": {
+    "title": "{app_name}"
   },
 
   "common": {
@@ -34833,7 +35327,10 @@ pub struct LocaleFS;
     "build": "Compilación",
     "uptime": "Tiempo de actividad",
     "mode": "Modo",
-    "status": "Estado",
+    "status": {
+      "label": "Estado",
+      "title": "System Status"
+    },
     "features": "Características",
     "component_status": "Estado de componentes",
     "server_statistics": "Estadísticas del servidor",
@@ -34842,6 +35339,7 @@ pub struct LocaleFS;
     "active_connections": "Conexiones activas",
     "last_checked": "Última verificación:",
     "auto_refresh": "Auto-actualización en {seconds}s",
+    "ssl_expires_in": "SSL expires in {days} days",
     "ok": "OK",
     "connected": "Conectado",
     "disconnected": "Desconectado",
@@ -35060,13 +35558,16 @@ pub struct LocaleFS;
       "ssl_renewed": "Certificado SSL renovado - {app_name}",
       "ssl_renewal_failed": "Error al renovar SSL - {app_name}",
       "task_failed": "Tarea programada fallida - {app_name}",
-      "test_email": "Correo de prueba - {app_name}"
+      "test_email": "Correo de prueba - {app_name}",
+      "operator_alert": "Operator Alert - {app_name}"
     },
     "body": {
       "security_alert_heading": "ALERTA DE SEGURIDAD",
       "recommended_actions": "ACCIONES RECOMENDADAS",
       "contact_information": "INFORMACIÓN DE CONTACTO",
-      "from": "De: {app_name} ({fqdn})"
+      "from": "De: {app_name} ({fqdn})",
+      "alert_heading": "Operator Alert",
+      "alert_description": "An event on {app_name} requires operator attention."
     }
   },
 
@@ -35549,7 +36050,7 @@ i18n-validate:
 
 **HTML Implementation:**
 ```html
-<html lang="{{.Lang}}" dir="{{.Dir}}">
+<html lang="{{ lang }}" dir="{{ dir }}">
 ```
 
 **CSS for RTL:**
@@ -35704,12 +36205,12 @@ server:
 ```html
 <!-- Status messages -->
 <div role="status" aria-live="polite" aria-atomic="true">
-  {{.StatusMessage}}
+  {{ status_message }}
 </div>
 
 <!-- Error alerts -->
 <div role="alert" aria-live="assertive">
-  {{.ErrorMessage}}
+  {{ error_message }}
 </div>
 
 <!-- Loading indicator -->
@@ -39280,7 +39781,7 @@ eval "$({project_name}-cli --shell init)"
 
 **Implementation:**
 ```rust
-fn handle_shell_command(args: &[String]) {
+fn handle_shell_command(args: &[String], lang: &str) {
     if args.is_empty() {
         eprintln!("Usage: --shell [completions|init] [SHELL]");
         std::process::exit(1);
@@ -39299,8 +39800,8 @@ fn handle_shell_command(args: &[String]) {
         .unwrap_or_default();
 
     match cmd.as_str() {
-        "completions" => print_completions(&shell, &binary_name),
-        "init" => print_init(&shell, &binary_name),
+        "completions" => print_completions(&shell, &binary_name, lang),
+        "init" => print_init(&shell, &binary_name, lang),
         _ => {}
     }
 }
@@ -39317,7 +39818,7 @@ fn detect_shell() -> String {
         .unwrap_or_else(|| "bash".to_string())
 }
 
-fn print_completions(shell: &str, binary_name: &str) {
+fn print_completions(shell: &str, binary_name: &str, lang: &str) {
     match shell {
         "bash" => print!("{}", generate_bash_completions(binary_name)),
         "zsh" => print!("{}", generate_zsh_completions(binary_name)),
@@ -39325,13 +39826,13 @@ fn print_completions(shell: &str, binary_name: &str) {
         "sh" | "dash" | "ksh" => print!("{}", generate_posix_completions(binary_name)),
         "powershell" | "pwsh" => print!("{}", generate_powershell_completions(binary_name)),
         _ => {
-            eprintln!("{}", i18n::tf(lang, "cli.error_unsupported_shell", shell));
+            eprintln!("{}", i18n::tf(lang, "cli.error_unsupported_shell", &[("shell", shell)]));
             std::process::exit(1);
         }
     }
 }
 
-fn print_init(shell: &str, binary_name: &str) {
+fn print_init(shell: &str, binary_name: &str, lang: &str) {
     match shell {
         "bash" => println!("source <({} --shell completions bash)", binary_name),
         "zsh" => println!("source <({} --shell completions zsh)", binary_name),
@@ -39339,7 +39840,7 @@ fn print_init(shell: &str, binary_name: &str) {
         "sh" | "dash" | "ksh" => println!("eval \"$({} --shell completions {})\"", binary_name, shell),
         "powershell" | "pwsh" => println!("Invoke-Expression (& {} --shell completions powershell)", binary_name),
         _ => {
-            eprintln!("{}", i18n::tf(lang, "cli.error_unsupported_shell", shell));
+            eprintln!("{}", i18n::tf(lang, "cli.error_unsupported_shell", &[("shell", shell)]));
             std::process::exit(1);
         }
     }
@@ -40395,6 +40896,7 @@ Free-form prose, 1–3 paragraphs.}
 project_name:    {project_name}
 project_org:     {project_org}
 internal_name:   {project_name}        # FROZEN — equals project_name on first install, never changes
+internal_org:    {project_org}         # FROZEN — equals project_org on first install, never changes
 app_name:        {project_name}
 official_site:   {fqdn}
 maintainer_name: {maintainer_name — defaults to {project_org} if unset}
@@ -40445,6 +40947,7 @@ high-quality developer humor with category filtering and search.
 project_name:    jokes-api
 project_org:     casjay
 internal_name:   jokes-api
+internal_org:    casjay
 app_name:        Jokes API
 official_site:   jokes.example.com
 maintainer_name: Jane Doe
@@ -40497,6 +41000,7 @@ clicks, and view statistics.
 project_name:    linkshort
 project_org:     casjay
 internal_name:   linkshort
+internal_org:    casjay
 app_name:        LinkShort
 official_site:   short.example.com
 maintainer_name: Jane Doe
@@ -40549,6 +41053,7 @@ serves it in a unified format. Provides current conditions, forecasts, and alert
 project_name:    weather-api
 project_org:     casjay
 internal_name:   weather-api
+internal_org:    casjay
 app_name:        Weather API
 official_site:   weather.example.com
 maintainer_name: Jane Doe
@@ -40709,13 +41214,13 @@ maintainer_email: jane@example.com
 |-------|--------|
 | `docker compose up` in project dir | Use temp directory workflow |
 | Runtime data in project directory | `/tmp/{project_org}/{internal_name}-XXXXXX/` |
-| `mktemp -d` (bare) | `mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX"` |
+| `mktemp -d` (bare) | `mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${INTERNAL_NAME}-XXXXXX"` |
 | `/tmp/myfile` | `/tmp/{project_org}/{internal_name}-XXXXXX/myfile` |
 
 ```bash
 # Temp dir workflow
-mkdir -p "${TMPDIR:-/tmp}/${PROJECT_ORG}"
-TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX")
+mkdir -p "${TMPDIR:-/tmp}/${INTERNAL_ORG}"
+TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${INTERNAL_ORG}/${INTERNAL_NAME}-XXXXXX")
 mkdir -p "$TEMP_DIR/volumes/config" "$TEMP_DIR/volumes/data"
 cp docker/docker-compose.test.yml "$TEMP_DIR/docker-compose.yml"
 cd "$TEMP_DIR" && docker compose up -d
@@ -41670,7 +42175,7 @@ make docker
 - [ ] Priority: `?lang=` → cookie → `Accept-Language` → `en`
 - [ ] All error responses use `t(r, "errors.*")` — no hardcoded English
 - [ ] All API error/status responses use translation keys
-- [ ] `<html lang="{{.Lang}}" dir="{{.Dir}}">` on all pages — never hardcoded `lang="en"`
+- [ ] `<html lang="{{ lang }}" dir="{{ dir }}">` on all pages — never hardcoded `lang="en"`
 - [ ] WebUI serves `/locales/{lang}.json` from embedded files for JavaScript
 - [ ] Language selector present in WebUI header/footer
 
@@ -42184,7 +42689,7 @@ Implement the required client, then any project-specific optional features:
 
 #### Step 10: Project-Specific (IDEA.md)
 
-1. **Fill in IDEA.md in AI.md** - Define project-specific endpoints, data, config
+1. **Fill in IDEA.md** - Define project-specific endpoints, data, config
 2. **Implement project-specific features**
 3. **Add project-specific tests**
 4. **Update documentation with project specifics**
@@ -42336,16 +42841,16 @@ When stuck:
 
 ## How to Read This Large File
 
-**rust/API.md is ~1.6MB and ~41,910 lines. You CANNOT read it all at once. Follow these procedures.**
+**rust/API.md is ~1.6MB and ~43,000 lines. You CANNOT read it all at once. Follow these procedures.**
 
 ### File Size Reality
 
 | Constraint | Value |
 |------------|-------|
 | File size | ~1.6MB |
-| Line count | ~41,910 lines |
+| Line count | ~43,000 lines |
 | Read limit | ~500 lines per read |
-| Full reads needed | ~84 reads (impractical) |
+| Full reads needed | ~86 reads (impractical) |
 
 **Use the PART index to find relevant sections, then read each section COMPLETELY.**
 
@@ -42363,10 +42868,10 @@ When stuck:
 | 5 | ~6815 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
 | 6 | ~8569 | Application Modes | Mode handling, debug endpoints |
 | 7 | ~9071 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~9786 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags** |
+| 8 | ~9786 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags**, **Resource Owner Tokens** |
 | 9 | ~12673 | Error Handling & Caching | Error/cache patterns |
 | 10 | ~13097 | Database | Database work |
-| 11 | ~13512 | Security & Logging | Security features, **Resource Owner Tokens**, **Context Detection** |
+| 11 | ~13512 | Security & Logging | Security features, **Context Detection** |
 | 12 | ~15526 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
 | 13 | ~16924 | Health & Versioning | Health endpoints |
 | 14 | ~17559 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |

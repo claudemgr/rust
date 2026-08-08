@@ -200,19 +200,16 @@ Before I proceed, can you confirm [specific question]?
 
 | File | Covers |
 |------|--------|
-| `ai-rules.md` | AI Assistant Rules (PART 0) |
-| `project-rules.md` | Project Files, Governance & License, Project Structure, OS-Specific Paths (PARTs 1, 3, 4) |
-| `config-rules.md` | Configuration, Application & Server Model, Server Configuration (PARTs 2, 5, 12) |
-| `binary-rules.md` | Runtime Mode Selection & Privilege Escalation, Server Binary CLI & Client (PARTs 4, 8) |
-| `backend-rules.md` | Error Handling & Caching, Database, Security & Logging, Tor Hidden Service (PARTs 9, 10, 11, 26) |
+| `ai-rules.md` | Critical Rules, Project Files, Governance & License (PARTs 0, 1) |
+| `project-rules.md` | Application & Server Model, Project Structure & OS-Specific Paths, Runtime Mode Selection & Privilege Escalation (PARTs 2, 3, 4) |
+| `config-rules.md` | Configuration, Toolchain/Build & Packaging, Version/Site & Build Metadata (PARTs 5, 6, 7) |
+| `binary-rules.md` | Server Binary CLI & Client (PART 8) |
+| `backend-rules.md` | Error Handling & Caching, Database, Security/Logging & Privacy, Tor Hidden Service (PARTs 9, 10, 11, 26) |
 | `api-rules.md` | Server Configuration/Health/Versioning, API Structure, SSL/TLS & Let's Encrypt (PARTs 12, 13, 14) |
 | `frontend-rules.md` | Web Frontend (PART 15) |
 | `features-rules.md` | Email & Notifications, Scheduler, GeoIP, Metrics, Backup & Restore, Update Command (PARTs 16-21) |
-| `service-rules.md` | Toolchain/Build/Packaging privilege-escalation & service sections (PART 6) |
-| `makefile-rules.md` | Toolchain, Build & Packaging — Makefile (PART 6) |
-| `docker-rules.md` | Toolchain, Build & Packaging — Docker (PART 6) |
+| `testing-rules.md` | Testing/Quality & Debugging, Documentation/License/ReadTheDocs, I18N & A11Y, Checklists, IDEA.md Reference (PARTs 22, 24, 25, 27, 28) |
 | `cicd-rules.md` | CI/CD, Releases & Automation (PART 23) |
-| `testing-rules.md` | Testing/Quality/Debugging, Documentation/License/ReadTheDocs, I18N & A11Y (PARTs 22, 24, 25) |
 
 **Trigger conditions:** `.claude/rules/` missing → create all files. AI.md modified more recently than rule files → update all files. User explicitly requests regeneration → update all files. **This is NOT optional** — rule files enable efficient context loading without re-reading the entire AI.md every session.
 
@@ -670,7 +667,7 @@ Every server-side feature MUST work via:
 | Rule | Description |
 |------|-------------|
 | **MIT License** | All project code is MIT licensed unless IDEA.md explicitly states an additional compatible license policy |
-| **3rd party attribution** | All third-party licenses are listed in `LICENSE.md` (PART 1 → "License Compliance") |
+| **3rd party attribution** | All third-party licenses are listed in `LICENSE.md` (PART 24 → "License Compliance") |
 | **GPL / AGPL / LGPL denied by default** | Static linking would relicense the distributed binary away from MIT. Allowed only via a documented IDEA.md exception |
 | **Free & open source** | No paid tiers, enterprise gating, or artificial feature segmentation |
 | **No premium features** | GUI, TUI, CLI, and web/API surfaces expose the same core product capabilities where applicable |
@@ -1484,6 +1481,9 @@ panic = "abort"
 ```
 
 When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead. See PART 6 for the full pure-Rust library stack and cross-target build matrix.
+
+---
+
 # PART 3: PROJECT STRUCTURE & OS-SPECIFIC PATHS
 
 ## Project Information
@@ -1492,7 +1492,7 @@ When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
 |-------|-------|
 | **Name** | {project_name} |
 | **Organization** | {project_org} |
-| **Official Site** | https://{project_name}.{project_org}.us |
+| **Official Site** | `{official_site}` (e.g. `https://{project_name}.example.com`) |
 | **Repository** | {PLATFORM_REPO_URL} |
 | **README** | README.md |
 | **License** | MIT > LICENSE.md |
@@ -1556,11 +1556,13 @@ PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+
 | `{PROJECT_ORG}` | UPPERCASE | env vars, Makefile vars | `PROJECT_ORG=casjay` |
 | `{internal_name}` | lowercase, **frozen** | every on-disk identifier: `{config_dir}`, `{data_dir}`, `{log_dir}`, `{cache_dir}`, `{pid_file}`, service unit name, `{plist_name}` | `jokes` (even after a project rename) |
 | `{INTERNAL_NAME}` | UPPERCASE, **frozen** | env vars referring to the stable identity | `INTERNAL_NAME=jokes` |
+| `{internal_org}` | lowercase, **frozen** | every on-disk org segment: the org component of `{config_dir}`, `{data_dir}`, `{log_dir}`, `{cache_dir}`, Bundle ID org segment | `casjay` (even after an org rename) |
+| `{INTERNAL_ORG}` | UPPERCASE, **frozen** | env vars referring to the stable org identity | `INTERNAL_ORG=casjay` |
 | `{plist_name}` | derived | macOS LaunchAgent/LaunchDaemon Bundle ID — always `io.github.{project_org}.{internal_name}` | `io.github.casjay.jokes` |
 
 **Note:** camelCase (Rust variables) and PascalCase (Rust types) are NOT template placeholders. Write them directly in code using the actual project name (e.g., `jokes_server`, `struct JokesServer`).
 
-**Mutability rule:** `{project_name}` may change (project rename); `{internal_name}` may NOT. Initial value of `{internal_name}` equals `{project_name}` and is frozen forever after first-time setup.
+**Mutability rule:** `{project_name}` / `{project_org}` may change (project or org rename); `{internal_name}` / `{internal_org}` may NOT. Initial value of `{internal_name}` equals `{project_name}` and of `{internal_org}` equals `{project_org}`, both frozen forever after first-time setup.
 
 **Examples (assuming no git remote, inferred from path):**
 
@@ -1649,15 +1651,15 @@ PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+
 │   ├── agents/             # Project-level subagents (optional)
 │   │   └── *.md            # Agent definition files
 │   └── rules/              # Auto-loaded cheatsheet files (REQUIRED)
-│       ├── ai-rules.md         # PART 0, 1: AI Assistant Rules, Critical Rules
+│       ├── ai-rules.md         # PART 0, 1: Critical Rules, Project Files/Governance & License
 │       ├── project-rules.md    # PART 2, 3, 4: Application & Server Model, Project Structure & OS-Specific Paths, Runtime Mode Selection & Privilege Escalation
-│       ├── config-rules.md     # PART 5, 6, 12: Configuration, Toolchain/Build/Packaging, Server Configuration
-│       ├── binary-rules.md     # PART 7, 8: Version/Site/Build Metadata, Server Binary CLI & Client
+│       ├── config-rules.md     # PART 5, 6, 7: Configuration, Toolchain/Build & Packaging, Version/Site & Build Metadata
+│       ├── binary-rules.md     # PART 8: Server Binary CLI & Client
 │       ├── backend-rules.md    # PART 9, 10, 11, 26: Error Handling & Caching, Database, Security/Logging/Privacy, Tor Hidden Service
 │       ├── api-rules.md        # PART 12, 13, 14: Server Configuration/Health/Versioning, API Structure, SSL/TLS & Let's Encrypt
 │       ├── frontend-rules.md   # PART 15: Web Frontend
 │       ├── features-rules.md   # PART 16-21: Email & Notifications, Scheduler, GeoIP, Metrics, Backup & Restore, Update Command
-│       ├── testing-rules.md    # PART 22, 24, 25: Testing/Quality/Debugging, Documentation/License/ReadTheDocs, I18N & A11Y
+│       ├── testing-rules.md    # PART 22, 24, 25, 27, 28: Testing/Quality/Debugging, Documentation/License/ReadTheDocs, I18N & A11Y, Checklists, IDEA.md Reference
 │       └── cicd-rules.md       # PART 23: CI/CD, Releases & Automation
 ├── .cursor/                # Cursor AI configuration (optional)
 │   ├── rules/              # Same groupings as .claude/rules/ but .mdc extension
@@ -2559,7 +2561,7 @@ Before proceeding, confirm you understand:
 - [ ] Each OS has specific paths for privileged and non-privileged users
 - [ ] Config file is ALWAYS `server.yml` (not .yaml)
 - [ ] Docker uses simplified paths (/config, /data)
-- [ ] All paths follow the {internal_org}/{internal_name} pattern
+- [ ] All non-Docker filesystem paths follow the {internal_org}/{internal_name} pattern (Docker uses `{project_name}` under `/config` and `/data`)
 
 ---
 
@@ -2739,10 +2741,10 @@ Prefer platform-standard user directories:
 
 | Purpose | Linux / BSD | macOS | Windows |
 |---------|-------------|-------|---------|
-| Config | `~/.config/{internal_org}/{internal_name}/` | `~/Library/Application Support/{internal_name}/config/` | `%AppData%\\{internal_org}\\{internal_name}\\config\\` |
-| Data | `~/.local/share/{internal_org}/{internal_name}/` | `~/Library/Application Support/{internal_name}/data/` | `%LocalAppData%\\{internal_org}\\{internal_name}\\data\\` |
-| Cache | `~/.cache/{internal_org}/{internal_name}/` | `~/Library/Caches/{internal_name}/` | `%LocalAppData%\\{internal_org}\\{internal_name}\\cache\\` |
-| Logs | `~/.local/state/{internal_org}/{internal_name}/logs/` | `~/Library/Logs/{internal_name}/` | `%LocalAppData%\\{internal_org}\\{internal_name}\\logs\\` |
+| Config | `~/.config/{internal_org}/{internal_name}/` | `~/Library/Application Support/{internal_org}/{internal_name}/` | `%AppData%\{internal_org}\{internal_name}\` |
+| Data | `~/.local/share/{internal_org}/{internal_name}/` | `~/Library/Application Support/{internal_org}/{internal_name}/` | `%LocalAppData%\{internal_org}\{internal_name}\` |
+| Cache | `~/.cache/{internal_org}/{internal_name}/` | `~/Library/Caches/{internal_org}/{internal_name}/` | `%LocalAppData%\{internal_org}\{internal_name}\cache\` |
+| Logs | `~/.local/log/{internal_org}/{internal_name}/` | `~/Library/Logs/{internal_org}/{internal_name}/` | `%LocalAppData%\{internal_org}\{internal_name}\logs\` |
 
 **Rule:** Both `{internal_name}` and `{internal_org}` anchor on-disk identifiers and stable OS-registered names (Bundle IDs, package IDs, dbus names, keychain entries, updater channels). A rename of `{project_name}` or `{project_org}` MUST NOT silently move user data or change those identifiers.
 
@@ -2978,8 +2980,8 @@ Current:
 
 | Requirement | Value |
 |-------------|-------|
-| Username | `{project_name}` |
-| Group | `{project_name}` |
+| Username | `{internal_name}` |
+| Group | `{internal_name}` |
 | UID/GID | **Must match** - same value for both UID and GID |
 | UID/GID Range | **200-899** (safe system range, avoids well-known service IDs) |
 | Shell | `/sbin/nologin` or `/usr/sbin/nologin` |
@@ -3116,10 +3118,10 @@ useradd --system --uid {id} --gid {id} \
 |-------|-----------|---------|
 | Start | root | launchd starts binary as root |
 | Bind | root | Bind privileged ports (<1024) |
-| Drop | root→`{project_name}` | Binary drops privileges |
-| Run | `{project_name}` | Serve requests as unprivileged user |
+| Drop | root→`{internal_name}` | Binary drops privileges |
+| Run | `{internal_name}` | Serve requests as unprivileged user |
 
-**The `{project_name}` user is created automatically by the binary on first startup.**
+**The `{internal_name}` user is created automatically by the binary on first startup.**
 
 macOS uses `dscl` (Directory Service Command Line) to create system users. The user is hidden from login screen and has no shell access.
 
@@ -3141,9 +3143,9 @@ Same reserved IDs as Linux apply (see Reserved/Well-Known UIDs table above).
 # Start at 399, work down, skip reserved IDs
 
 # Create group with specific GID
-dscl . -create /Groups/{project_name}
-dscl . -create /Groups/{project_name} PrimaryGroupID {id}
-dscl . -create /Groups/{project_name} Password "*"
+dscl . -create /Groups/{internal_name}
+dscl . -create /Groups/{internal_name} PrimaryGroupID {id}
+dscl . -create /Groups/{internal_name} Password "*"
 
 # Create user with matching UID
 dscl . -create /Users/{internal_name}
@@ -3390,7 +3392,7 @@ fn install_windows_service() -> anyhow::Result<()> {
 
 ## Service Templates
 
-**Unix default:** service starts elevated only for privileged startup, then drops to `{project_name}` user after port binding.
+**Unix default:** service starts elevated only for privileged startup, then drops to `{internal_name}` user after port binding.
 **Windows: Service runs as Virtual Service Account (`NT SERVICE\{internal_name}`).**
 
 This allows any port configuration without service file changes.
@@ -3638,7 +3640,7 @@ sudo launchctl load /Library/LaunchDaemons/{plist_name}.plist
 sudo launchctl unload /Library/LaunchDaemons/{plist_name}.plist
 
 # Check status
-sudo launchctl list | grep {project_name}
+sudo launchctl list | grep {internal_name}
 ```
 
 ### Windows Service
@@ -3661,7 +3663,7 @@ use windows_service::service_control_handler::{self, ServiceControlHandlerResult
 define_windows_service!(ffi_service_main, service_main);
 
 pub fn run_as_service() -> anyhow::Result<()> {
-    service_dispatcher::start("{project_name}", ffi_service_main)?;
+    service_dispatcher::start("{internal_name}", ffi_service_main)?;
     Ok(())
 }
 
@@ -3676,7 +3678,7 @@ fn service_main(_arguments: Vec<std::ffi::OsString>) {
         }
     };
 
-    let status_handle = service_control_handler::register("{project_name}", event_handler)
+    let status_handle = service_control_handler::register("{internal_name}", event_handler)
         .expect("invariant: service control handler registration succeeds at startup");
 
     status_handle.set_service_status(ServiceStatus {
@@ -5587,13 +5589,13 @@ Before proceeding, confirm you understand:
 | Linting | `clippy` is required |
 | Testing | `cargo test` is required |
 | Docs | `cargo doc --no-deps` is required for public APIs/libraries inside the app workspace |
-| Source language | Rust only (PART 0 → "Rust-Only Application") |
+| Source language | Rust only (PART 0 → "Rust-Only Project") |
 
 ## Pure-Rust Library Stack
 
 This is the recommended starting point for satisfying common application and server needs with crates that do **not** drag in `*-sys` C dependencies. Pure-Rust crates are what make a single static binary that works on Windows, macOS, Linux, and BSD achievable; every C-linked crate becomes a portability tax across that target matrix.
 
-**Rule:** when a capability below is needed, prefer the pure-Rust option. Only deviate when (a) the pure-Rust option is not viable for the project's actual requirements, AND (b) the deviation is documented per the Rust-Only Application rule (PART 0 → "Rust-Only Application"). Note: PART 0 pre-grants the vendored-C exception for `ring` only — it requires LICENSE.md attribution but no per-project IDEA.md write-up. All other deviations (e.g., `rusqlite + bundled`, `zstd` / `zstd-safe`) require both an IDEA.md exception and LICENSE.md attribution.
+**Rule:** when a capability below is needed, prefer the pure-Rust option. Only deviate when (a) the pure-Rust option is not viable for the project's actual requirements, AND (b) the deviation is documented per the Rust-Only Project rule (PART 0 → "Rust-Only Project"). Note: PART 0 pre-grants the vendored-C exception for `ring` only — it requires LICENSE.md attribution but no per-project IDEA.md write-up. All other deviations (e.g., `rusqlite + bundled`, `zstd` / `zstd-safe`) require both an IDEA.md exception and LICENSE.md attribution.
 
 | Capability | Preferred (pure Rust) | Avoid (drags in C) |
 |------------|-----------------------|--------------------|
@@ -5601,7 +5603,7 @@ This is the recommended starting point for satisfying common application and ser
 | HTTP client | `reqwest` with `rustls-tls` (no `default-features`), `ureq` with `rustls` | anything pulling `openssl-sys` |
 | HTTP/web server framework | `axum`, `actix-web` | frameworks that pull `openssl-sys` for TLS |
 | Crypto | `RustCrypto/*` (`sha2`, `aes-gcm`, `ed25519-dalek`, …); `ring` is acceptable (asm + small C, statically linked, widely audited) | system OpenSSL via `openssl-sys` |
-| Compression | `flate2` with `rust_backend` feature, `miniz_oxide`, `zune-inflate`; for zstd decode, `ruzstd` (pure Rust). For zstd encode there is no pure-Rust option today — `zstd` / `zstd-safe` (vendors C) requires an IDEA.md exception per PART 0 → "Rust-Only Application", same as `rusqlite + bundled` | `flate2` default backend with `libz-sys`, system zlib |
+| Compression | `flate2` with `rust_backend` feature, `miniz_oxide`, `zune-inflate`; for zstd decode, `ruzstd` (pure Rust). For zstd encode there is no pure-Rust option today — `zstd` / `zstd-safe` (vendors C) requires an IDEA.md exception per PART 0 → "Rust-Only Project", same as `rusqlite + bundled` | `flate2` default backend with `libz-sys`, system zlib |
 | Serialization | `serde` + `serde_json` / `toml` / `ron` / `postcard` / `bincode` | — |
 | Async runtime | `tokio` (pure Rust), `smol`, `async-std` | — |
 | CLI parsing | `clap` (no system deps), `argh`, `lexopt` | — |
@@ -5676,7 +5678,7 @@ Bare `cargo …` invocations on the host are forbidden by PART 0 → "No Host To
 
 ## Build Rules
 
-- **Pure Rust by default** — every dependency is pure Rust unless a specific exception is documented in `IDEA.md` and the C code is statically linked into the final binary (PART 0 → "Rust-Only Application")
+- **Pure Rust by default** — every dependency is pure Rust unless a specific exception is documented in `IDEA.md` and the C code is statically linked into the final binary (PART 0 → "Rust-Only Project")
 - Release builds use `cargo build --release` against a static target (e.g., `--target x86_64-unknown-linux-musl`) inside the Docker image
 - The final artifact MUST be a single statically linked binary per target (PART 0 → "Single Static Binary") — this applies equally when the binary is a server: the server binary embeds its own frontend assets, templates, and static files, it never ships a companion asset directory
 - Use `RUSTFLAGS="-C target-feature=+crt-static"` for Windows GNU targets (`x86_64-pc-windows-gnu`, `aarch64-pc-windows-gnullvm`) — the image has no MSVC toolchain, so `*-pc-windows-msvc` is not an option; use musl targets for Linux; for BSDs, use the platform's native target triple and statically link where the platform allows
@@ -5918,7 +5920,7 @@ format_version_tag() {
 
 ### NEVER Copy or Symlink Binaries
 
-**Binaries are NEVER copied or symlinked. They stay in `binaries/` until explicitly moved for release.**
+**Binaries are NEVER copied or symlinked by manual/ad-hoc commands. They stay in `binaries/` until moved for release by the CI/CD pipeline or the `make release` target.**
 
 | Action | Example | Why Prohibited |
 |--------|---------|-----------------|
@@ -5928,7 +5930,7 @@ format_version_tag() {
 | Copy between dirs | `cp binaries/app releases/app` | Use CI/CD release process |
 | Install locally | Any form of "installing" the binary | Run from `binaries/` directly |
 
-**The only exception** is the CI/CD release process, where binaries are built fresh, stripped (debug symbols removed), and uploaded directly to the release (GitHub Releases, registry, etc.) — this is handled by CI/CD, not manual commands.
+**The only exceptions** are the CI/CD release process and the `make release` target, where binaries are built fresh, stripped (debug symbols removed), copied into the release directory, and uploaded directly to the release (GitHub Releases, registry, etc.) — these are handled by CI/CD or the sanctioned `make release` target, not ad-hoc manual commands.
 
 ### Directory Rules
 
@@ -6776,7 +6778,7 @@ services:
   {project_name}:
     image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:latest
     container_name: {project_name}-app
-    hostname: ${BASE_HOST_NAME:-$HOSTNAME}
+    hostname: {project_name}
     restart: always
     pull_policy: always
     logging: *default-logging
@@ -6835,7 +6837,7 @@ networks:
 | `container_name:` | `{project_name}-app`, `{project_name}-db` | e.g., `jokes-app`, `jokes-db` |
 | Main service | `{project_name}` | Service name matches project name |
 | Database service | `{project_name}-db` | Database service name |
-| `hostname:` | `${BASE_HOST_NAME:-$HOSTNAME}` | Uses env or system hostname |
+| `hostname:` | `{project_name}` | Hardcoded container hostname |
 | `restart:` | `always` (prod/dev) · `"no"` (test) | Restart policy |
 | `pull_policy:` | `always` | Always pull latest image |
 | `logging:` | `*default-logging` | Use the logging anchor |
@@ -7365,6 +7367,291 @@ Default config: /etc/apimgr/jokes/  # Hardcoded project name
 
 **For client flags, see PART 8, "Client" subsection.**
 
+## Display & Terminal Environment Detection
+
+**ALL binaries (server, CLI) MUST detect the display environment and adapt output accordingly.** These symbols (`detect_display_env`, `DisplayEnv`, `DisplayMode`, `SizeMode`, `TerminalSize`, `get_terminal_size`) live in `src/common/display/` and `src/common/terminal/` and are shared across every binary and surface.
+
+### Display Mode Hierarchy
+
+| Mode | When Used | Requirements |
+|------|-----------|--------------|
+| **GUI** | Native display available, CLI binary only | X11, Wayland, Windows, macOS |
+| **TUI** | Terminal available, interactive | TTY, SSH, mosh, screen, tmux |
+| **CLI** | Command provided or piped output | Any environment |
+| **Headless** | No display, no TTY | Daemon, service, cron |
+
+### Platform Detection
+
+| Platform | Display Check | Notes |
+|----------|---------------|-------|
+| **Linux/BSD** | `WAYLAND_DISPLAY` or `DISPLAY` | Wayland preferred over X11 |
+| **macOS** | Always (unless SSH) | Native Cocoa display |
+| **Windows** | Always (unless service) | Native Win32 display |
+| **SSH/Mosh** | `SSH_CLIENT`, `SSH_TTY`, `MOSH` | No GUI, TUI or CLI only |
+
+### Module Layout
+
+```
+src/
+├── common/
+│   ├── display/                     # Display/terminal detection
+│   │   ├── detect.rs                # Core detection logic (detect_display_env)
+│   │   ├── detect_unix.rs           # Linux/BSD/macOS detection
+│   │   ├── detect_windows.rs        # Windows detection
+│   │   └── mode.rs                  # DisplayMode type and helpers
+│   └── terminal/                    # Terminal utilities
+│       ├── size.rs                  # Terminal size and breakpoints (get_terminal_size)
+│       ├── resize.rs                # SIGWINCH handling
+│       └── symbols.rs               # Unicode/ASCII symbols
+```
+
+### Display Environment Detection
+
+```rust
+// src/common/display/detect.rs
+use std::env;
+
+/// DisplayMode - UI display mode (NOT app mode)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DisplayMode {
+    /// No display, no TTY
+    Headless,
+    /// Command-line only (piped or command provided)
+    Cli,
+    /// Terminal UI (interactive terminal)
+    Tui,
+    /// Native graphical UI
+    Gui,
+}
+
+/// DisplayEnv - detected display environment
+#[derive(Debug, Clone)]
+pub struct DisplayEnv {
+    pub mode: DisplayMode,
+    /// X11, Wayland, Windows, macOS display
+    pub has_display: bool,
+    /// "x11", "wayland", "windows", "macos", "none"
+    pub display_type: String,
+    /// stdout is a TTY
+    pub is_terminal: bool,
+    /// Running over SSH
+    pub is_ssh: bool,
+    /// Running over mosh
+    pub is_mosh: bool,
+    /// Running in screen/tmux
+    pub is_screen: bool,
+    /// TERM value
+    pub terminal_type: String,
+    /// Terminal columns (0 if no terminal)
+    pub cols: u16,
+    /// Terminal rows (0 if no terminal)
+    pub rows: u16,
+}
+
+/// auto-detect display environment
+pub fn detect_display_env() -> DisplayEnv {
+    let is_terminal = atty::is(atty::Stream::Stdout);
+    let (cols, rows) = if is_terminal {
+        terminal_size::terminal_size()
+            .map(|(w, h)| (w.0, h.0))
+            .unwrap_or((0, 0))
+    } else {
+        (0, 0)
+    };
+    let terminal_type = env::var("TERM").unwrap_or_default();
+
+    // Remote session detection
+    let is_ssh = env::var("SSH_CLIENT").is_ok() || env::var("SSH_TTY").is_ok();
+    let is_mosh = env::var("MOSH").is_ok() || terminal_type.contains("mosh");
+    let is_screen = env::var("STY").is_ok() || env::var("TMUX").is_ok();
+
+    let (has_display, display_type) = detect_platform_display(is_ssh);
+
+    let mut env = DisplayEnv {
+        mode: DisplayMode::Headless,
+        has_display,
+        display_type,
+        is_terminal,
+        is_ssh,
+        is_mosh,
+        is_screen,
+        terminal_type,
+        cols,
+        rows,
+    };
+    env.mode = env.auto_detect_display_mode();
+    env
+}
+
+impl DisplayEnv {
+    /// determine display mode from environment
+    fn auto_detect_display_mode(&self) -> DisplayMode {
+        if !self.is_terminal && !self.has_display {
+            return DisplayMode::Headless;
+        }
+        // TERM=dumb: force CLI mode (no TUI, no ANSI escapes)
+        if self.terminal_type == "dumb" {
+            return DisplayMode::Cli;
+        }
+        if self.has_display && !self.is_ssh && !self.is_mosh {
+            return DisplayMode::Gui;
+        }
+        if self.is_terminal {
+            return DisplayMode::Tui;
+        }
+        DisplayMode::Cli
+    }
+
+    /// check if running in dumb terminal (no ANSI support)
+    pub fn is_dumb_terminal(&self) -> bool {
+        self.terminal_type == "dumb"
+    }
+
+    pub fn is_gui(&self) -> bool      { self.mode == DisplayMode::Gui }
+    pub fn is_tui(&self) -> bool      { self.mode == DisplayMode::Tui }
+    pub fn is_cli(&self) -> bool      { self.mode == DisplayMode::Cli }
+    pub fn is_headless(&self) -> bool { self.mode == DisplayMode::Headless }
+}
+```
+
+### Platform-Specific Display Detection
+
+```rust
+// src/common/display/detect_unix.rs
+#[cfg(not(target_os = "windows"))]
+pub fn detect_platform_display(is_ssh: bool) -> (bool, String) {
+    use std::env;
+    use std::process::Command;
+
+    // Check for Wayland first (preferred on Linux)
+    if env::var("WAYLAND_DISPLAY").is_ok() {
+        return (true, "wayland".to_string());
+    }
+
+    // Check for X11
+    if env::var("DISPLAY").is_ok() {
+        return (true, "x11".to_string());
+    }
+
+    // macOS: check if we have access to WindowServer
+    #[cfg(target_os = "macos")]
+    {
+        // On macOS, display is always available unless:
+        // - Running over SSH
+        // - Running as a LaunchDaemon (no GUI session)
+        if !is_ssh && env::var("__CFBundleIdentifier").is_ok() {
+            return (true, "macos".to_string());
+        }
+        // Check if WindowServer is accessible
+        if let Ok(output) = Command::new("launchctl").arg("managername").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if stdout.contains("Aqua") {
+                return (true, "macos".to_string());
+            }
+        }
+    }
+
+    let _ = is_ssh;
+    (false, "none".to_string())
+}
+```
+
+```rust
+// src/common/display/detect_windows.rs
+#[cfg(target_os = "windows")]
+pub fn detect_platform_display(_is_ssh: bool) -> (bool, String) {
+    use std::env;
+
+    // Windows always has a display unless running as a service.
+    // Check if we're in session 0 (service session) via windows-sys.
+    let session_id = get_current_session_id();
+    if session_id == 0 {
+        // Running as a service (session 0) - no interactive desktop
+        return (false, "none".to_string());
+    }
+
+    // Check for remote desktop session
+    let session_name = env::var("SESSIONNAME").unwrap_or_default();
+    if session_name.starts_with("RDP-Tcp") {
+        return (true, "windows-rdp".to_string());
+    }
+
+    // Normal Windows session with display
+    if console_window_exists() {
+        (true, "windows".to_string())
+    } else {
+        (false, "none".to_string())
+    }
+}
+```
+
+### Terminal Size Detection
+
+```rust
+// src/common/terminal/size.rs
+use terminal_size::{terminal_size, Height, Width};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SizeMode {
+    /// <40 cols or <10 rows
+    Micro,
+    /// 40-59 cols or 10-15 rows
+    Minimal,
+    /// 60-79 cols or 16-23 rows
+    Compact,
+    /// 80-119 cols and 24-39 rows
+    Standard,
+    /// 120-199 cols and 40-59 rows
+    Wide,
+    /// 200-399 cols and 60-79 rows
+    Ultrawide,
+    /// 400+ cols and 80+ rows
+    Massive,
+}
+
+#[derive(Debug, Clone)]
+pub struct TerminalSize {
+    pub cols: u16,
+    pub rows: u16,
+    pub mode: SizeMode,
+}
+
+pub fn get_terminal_size() -> TerminalSize {
+    let (cols, rows) = terminal_size()
+        .map(|(Width(w), Height(h))| (w, h))
+        .unwrap_or((80, 24));
+    let cols = if cols == 0 { 80 } else { cols };
+    let rows = if rows == 0 { 24 } else { rows };
+
+    TerminalSize {
+        cols,
+        rows,
+        mode: calculate_mode(cols, rows),
+    }
+}
+
+fn calculate_mode(cols: u16, rows: u16) -> SizeMode {
+    match (cols, rows) {
+        (c, r) if c < 40 || r < 10 => SizeMode::Micro,
+        (c, r) if c < 60 || r < 16 => SizeMode::Minimal,
+        (c, r) if c < 80 || r < 24 => SizeMode::Compact,
+        (c, r) if c < 120 || r < 40 => SizeMode::Standard,
+        (c, r) if c < 200 || r < 60 => SizeMode::Wide,
+        (c, r) if c < 400 || r < 80 => SizeMode::Ultrawide,
+        _ => SizeMode::Massive,
+    }
+}
+
+impl SizeMode {
+    pub fn show_ascii_art(self) -> bool { self >= SizeMode::Standard }
+    pub fn show_borders(self) -> bool   { self >= SizeMode::Compact }
+    pub fn show_sidebar(self) -> bool   { self >= SizeMode::Wide }
+    pub fn show_icons(self) -> bool     { self >= SizeMode::Minimal }
+}
+```
+
+**For `TERM=dumb` handling and disabling ANSI escapes, see PART 5 "NO_COLOR Support".**
+
 ## Flag Parsing (Server Binary)
 
 **Use `clap` (derive API) for all argument parsing — never hand-roll** (no manual `env::args()` loops for the primary flag set — see `rust_conventions.md` § CLI Flags). This applies to the server binary the same as the client CLI.
@@ -7494,7 +7781,7 @@ output:
   emoji: true
 ```
 
-**Note:** For disabling ALL ANSI escapes (not just colors), use `TERM=dumb`. See PART 7 "TERM=dumb Handling".
+**Note:** For disabling ALL ANSI escapes (not just colors), use `TERM=dumb`. See PART 5 "NO_COLOR Support".
 
 **Testing:**
 ```bash
@@ -7944,7 +8231,7 @@ PHASE 5: Server startup (actual server start)
       └─ {backup_dir}/
    c. Set ownership: chown -R {internal_name}:{internal_name} on all dirs
    d. Set permissions: 0755 general dirs, 0700 sensitive (security/, ssl/, tor/)
-   e. Determine ports (see PART 15 for full port rules):
+   e. Determine ports (see PART 5 for full port rules):
       ├─ Format 1: --port {port} (single port)
       │   ├─ HTTP by default
       │   ├─ If port is 443 → HTTPS-only mode
@@ -8012,7 +8299,7 @@ PHASE 5: Server startup (actual server start)
     ├─ Run schema migrations if needed
     └─ Verify database integrity
 
-16. Start scheduler (see PART 18 for full task list):
+16. Start scheduler (see PART 17 for full task list):
     ├─ Initialize background task scheduler
     ├─ Load task state from database
     ├─ Register built-in tasks (key tasks):
@@ -8021,7 +8308,7 @@ PHASE 5: Server startup (actual server start)
     │   ├─ token_cleanup (every 15m)
     │   ├─ geoip_update (03:00 Sunday)
     │   ├─ public_ip_refresh (startup + every 12h, hardcoded)
-    │   └─ ... and others (see PART 18)
+    │   └─ ... and others (see PART 17)
     └─ Start scheduler async task
 
 17. Start Tor (if tor binary available) - see PART 26:
@@ -8096,7 +8383,7 @@ PHASE 5: Server startup (actual server start)
 - Starting child processes (tor, scheduler)
 - Signal handling
 
-**Port binding examples (see PART 15 for full rules):**
+**Port binding examples (see PART 5 for full rules):**
 
 | Config | Port(s) | Bind As | Protocol |
 |--------|---------|---------|----------|
@@ -9638,8 +9925,8 @@ services:
       - --pid=/run/{internal_name}.pid
       - --port=8080
     volumes:
-      # Config (read-only)
-      - config:/config:ro
+      # Config (read-write; server generates server.yml on first run)
+      - config:/config
       # Data (read-write)
       - data:/data
       # Logs (read-write)
@@ -10311,15 +10598,15 @@ let user_agent = format!("{}-cli/{}", PROJECT_NAME, version);
 
 ### CLI Auto-Update (Same Pattern as Server Self-Update)
 
-**The CLI follows the same flow as the server's self-update (PART 22): check version via autodiscover, download from the server, verify SHA-256, atomic replace, restart.**
+**The CLI follows the same flow as the server's self-update (PART 21): check version via autodiscover, download from the server, verify SHA-256, atomic replace, restart.**
 
 | Step | Action |
 |------|--------|
 | 1. Discover | CLI's `/api/autodiscover` response includes `cli_versions: { "linux-amd64": {"version": "1.2.3", "sha256": "..."}, ... }` and `cli_min_version`. CLI checks on every start (it's short-lived; no separate poll loop needed) and additionally on `{project_name}-cli --update check`. |
 | 2. Decide | If `current_version < cli_versions[os-arch].version`: prompt the user (interactive) OR auto-update silently (when `update.auto: true` AND non-interactive AND `--update yes` was passed earlier). If `current_version < cli_min_version`: refuse to make further requests until updated; print "this CLI is too old; the server requires {min_version} — run '{project_name}-cli --update yes' to upgrade." |
 | 3. Download | Fetch `{base}/cli/binaries/{project_name}-cli-{os}-{arch}` over HTTPS. Save to a tmp path (`/tmp/{project_org}/{project_name}-XXXXXX/cli.update.tmp` per the spec's tmp-dir rules). |
-| 4. Verify SHA-256 | Same `verify_checksum()` from PART 22 — match against the `sha256` from autodiscover. Mismatch → delete temp, abort with stderr error. |
-| 5. Atomic swap | Same platform-specific `replace_binary()` from PART 22. The CLI is user-installed (typically `/usr/local/bin/` or `~/bin/`) — if the user lacks write permission to the install path, CLI prints "you do not have permission to update {binary_path}; ask your admin or move the binary to a writable path" and exits cleanly. |
+| 4. Verify SHA-256 | Same `verify_checksum()` from PART 21 — match against the `sha256` from autodiscover. Mismatch → delete temp, abort with stderr error. |
+| 5. Atomic swap | Same platform-specific `replace_binary()` from PART 21. The CLI is user-installed (typically `/usr/local/bin/` or `~/bin/`) — if the user lacks write permission to the install path, CLI prints "you do not have permission to update {binary_path}; ask your admin or move the binary to a writable path" and exits cleanly. |
 | 6. Re-exec | After successful replace, CLI re-execs the new binary with the original argv to continue the in-progress command. (Server restarts via service manager; CLI just re-execs since it's foreground.) |
 
 **Configuration (`cli.yml`):**
@@ -10540,7 +10827,7 @@ fn detect_mode(args: &[String]) -> &'static str {
 
 ### Display Environment Detection (CLI-Specific)
 
-**Uses `display::detect_display_env()` from PART 7 (`src/common/display/detect.rs`).**
+**Uses `display::detect_display_env()` from PART 8 (`src/common/display/detect.rs`).**
 
 **CLI binary uses the auto-detected display mode:**
 
@@ -11209,7 +11496,7 @@ fn calculate_gui_layout(width: u32, height: u32, dpi: f64) -> Layout {
 
 #### TUI Responsive Layout
 
-**TUI uses `terminal::SizeMode` from common/terminal (see PART 7) for size detection.**
+**TUI uses `terminal::SizeMode` from common/terminal (see PART 8) for size detection.**
 
 ```rust
 // src/client/tui/layout.rs
@@ -12535,7 +12822,7 @@ pub fn get_binary_name() -> String {
 
 **Build command (CI/CD injects version from git tag):**
 ```bash
-# VERSION comes from git tag (see PART 25/28 for version handling)
+# VERSION comes from git tag (see PART 6/PART 7 for version handling)
 cargo build --release --target x86_64-unknown-linux-musl
 ```
 
@@ -12869,7 +13156,7 @@ fn detect_input(args: &[String]) -> (String, String) {
 
 ### Build Integration
 
-**CLI builds follow the same container-only development rules as the server. See PART 25: MAKEFILE for complete targets.**
+**CLI builds follow the same container-only development rules as the server. See PART 6: MAKEFILE for complete targets.**
 
 #### Local Development (Makefile + Docker)
 
@@ -12891,7 +13178,7 @@ make build
 
 ```bash
 # CI/CD runs inside `casjaysdev/rust:latest` (or uses `docker run ... casjaysdev/rust:latest`), NOT `actions/setup-rust`
-# See PART 27: CI/CD WORKFLOWS for complete examples
+# See PART 23: CI/CD WORKFLOWS for complete examples
 cargo build --release --target x86_64-unknown-linux-musl
 ```
 
@@ -12956,7 +13243,7 @@ impl Model {
 
 **Phone SSH and small terminal support is required. Many users work remotely via phone.**
 
-**See PART 7 for `SizeMode`, `TerminalSize`, and `get_terminal_size()` definitions in `src/common/terminal/size.rs`.**
+**See PART 8 for `SizeMode`, `TerminalSize`, and `get_terminal_size()` definitions in `src/common/terminal/size.rs`.**
 
 | Breakpoint | Columns | Rows | SizeMode Constant | Behavior |
 |------------|---------|------|-------------------|----------|
@@ -12968,9 +13255,9 @@ impl Model {
 | **Minimal** | 40-59 | 10-15 | `SizeMode::Minimal` | Single column, no borders, text only |
 | **Micro** | <40 | <10 | `SizeMode::Micro` | Critical info only, scrollable |
 
-client uses `common::terminal` from PART 7:
+client uses `common::terminal` from PART 8:
 ```rust
-// CLI uses common/terminal module (defined in PART 7)
+// CLI uses common/terminal module (defined in PART 8)
 use crate::common::terminal;
 
 impl SizeMode {
@@ -13058,7 +13345,7 @@ impl Model {
 
 #### Theme Support
 
-**TUI MUST support themes per PART 16 theme rules. Uses same colors as server frontend.**
+**TUI MUST support themes per PART 15 theme rules. Uses same colors as server frontend.**
 
 ```rust
 // src/client/tui/theme.rs
@@ -13066,7 +13353,7 @@ impl Model {
 use ratatui::style::Color;
 
 // TUITheme defines ratatui colors for TUI rendering
-// Colors should match ThemePalette from common/theme (see PART 16)
+// Colors should match ThemePalette from common/theme (see PART 15)
 pub struct TUITheme {
     pub name: &'static str,
     pub background: Color,
@@ -13441,7 +13728,7 @@ Error with structured context (validation, etc.):
 
 ### Error Codes
 
-**Standard error codes (see PART 15 for full list):**
+**Standard error codes:**
 
 | Code | HTTP | Message |
 |------|------|---------|
@@ -13452,6 +13739,7 @@ Error with structured context (validation, etc.):
 | `TOKEN_INVALID` | 401 | "Invalid token" |
 | `FORBIDDEN` | 403 | "Permission denied" |
 | `ACCOUNT_LOCKED` | 403 | "Account locked" |
+| `CSRF_FAILED` | 403 | "CSRF validation failed" |
 | `NOT_FOUND` | 404 | "Resource not found" |
 | `METHOD_NOT_ALLOWED` | 405 | "Method not allowed" |
 | `CONFLICT` | 409 | "Resource already exists" |
@@ -13503,7 +13791,7 @@ pub fn map_api_error_code_to_http_status(code: &str) -> u16 {
     match code {
         "BAD_REQUEST" | "VALIDATION_FAILED" => 400,
         "UNAUTHORIZED" | "TOKEN_EXPIRED" | "TOKEN_INVALID" => 401,
-        "FORBIDDEN" | "ACCOUNT_LOCKED" => 403,
+        "FORBIDDEN" | "ACCOUNT_LOCKED" | "CSRF_FAILED" => 403,
         "NOT_FOUND" => 404,
         "METHOD_NOT_ALLOWED" => 405,
         "CONFLICT" => 409,
@@ -14241,7 +14529,7 @@ fn is_serialization_error(err: &anyhow::Error) -> bool {
 - Prefer safe Rust and audited crates
 - Use `rustls` for TLS. On macOS and Windows, the platform-native TLS APIs (`security-framework` on Apple, Schannel via `windows`/`windows-sys` on Windows) are also acceptable since they reach the OS through Apple frameworks / Windows system DLLs that are already in the allowed runtime set. On Linux/BSD, do **not** fall back to GnuTLS or system OpenSSL — they would require a `*-sys` exception per PART 0, and `rustls` covers the use case
 - Use `secrecy` for in-memory secret handling
-- For OS-level secret storage, use pure-Rust crates that speak the platform protocol directly: `secret-service` (Linux/BSD freedesktop Secret Service over D-Bus), the `security-framework` Rust binding to Apple frameworks (counts as an Apple-frameworks dependency, not third-party C), and the `windows` / `windows-sys` crates for Windows DPAPI / Credential Manager. Do **not** link to `libsecret` / `libgnome-keyring` / `kwallet` directly — those would be `*-sys` C deps and would need an IDEA.md exception per PART 0 → "Rust-Only Application"
+- For OS-level secret storage, use pure-Rust crates that speak the platform protocol directly: `secret-service` (Linux/BSD freedesktop Secret Service over D-Bus), the `security-framework` Rust binding to Apple frameworks (counts as an Apple-frameworks dependency, not third-party C), and the `windows` / `windows-sys` crates for Windows DPAPI / Credential Manager. Do **not** link to `libsecret` / `libgnome-keyring` / `kwallet` directly — those would be `*-sys` C deps and would need an IDEA.md exception per PART 0 → "Rust-Only Project"
 
 ## Public Endpoint Safety Principle (Security First)
 
@@ -14471,7 +14759,7 @@ The root secret all other derived material hangs off. Without it, in-flight HMAC
 | Generated | First start. Stored in `server.db` row `app_secrets.installation_secret`, base64-encoded. |
 | Scope | Server-wide. Generated on first start and persisted to `server.db`. NEVER appears in a request, response, or log. |
 | Used by | `{security_id}` HMAC (PART 11 → "Security Reports"); PGP private-key KDF (PART 11 → "GPG Keypair Management"); future derived material (cookie signing salts, etc.). |
-| Rotation | Manual via `--maintenance secret rotate installation_secret` (PART 5 → "Secret Rotation"). Sensitive-operation flow (PART 5 → "Sensitive Operations"): re-prompt for the server token, log to `audit.log` as `security.installation_secret_rotated`. Rotation re-encrypts the PGP private key and re-bases all live HMACs. The previous secret is kept for 7 days to validate any in-flight `{security_id}` URLs that referenced it. |
+| Rotation | Manual via `--maintenance secret rotate installation_secret` (PART 11 → "Secret Rotation"). Sensitive-operation flow (PART 5 → "Sensitive Operations"): re-prompt for the server token, log to `audit.log` as `security.installation_secret_rotated`. Rotation re-encrypts the PGP private key and re-bases all live HMACs. The previous secret is kept for 7 days to validate any in-flight `{security_id}` URLs that referenced it. |
 | Backup | Always — see PART 20 → "Backup Contents". Required for any restore: without it, the PGP private key in the backup is undecryptable. |
 | Loss = catastrophic | Lost = cannot decrypt PGP private key (and therefore cannot decrypt in-flight encrypted security reports); cannot validate `{security_id}` URLs on existing security.txt copies until the file regenerates. Recovery requires the operator to: regenerate keypair, regenerate `installation_secret`, accept that all in-flight encrypted reports are unreadable. |
 
@@ -14486,7 +14774,7 @@ The root secret all other derived material hangs off. Without it, in-flight HMAC
 
 | Key | Length | Storage | Purpose | Rotation |
 |-----|--------|---------|---------|----------|
-| `server.security.encryption_key` | 32 bytes (AES-256-GCM) | `server.yml` (auto-generated on first run) | At-rest encryption for ALL sensitive server data: API token hashes, security report bodies (used as the AES fallback when no PGP keypair exists, see PART 11 → "Security Reports"), and any future at-rest encrypted data. | Manual via `--maintenance secret rotate encryption_key` (PART 5 → "Secret Rotation"). Sensitive-operation flow (PART 5 → "Sensitive Operations"): re-prompt for the server token, log to `audit.log` as `security.encryption_key_rotated`. 30-day grace for in-flight encrypted data. |
+| `server.security.encryption_key` | 32 bytes (AES-256-GCM) | `server.yml` (auto-generated on first run) | At-rest encryption for ALL sensitive server data: API token hashes, security report bodies (used as the AES fallback when no PGP keypair exists, see PART 11 → "Security Reports"), and any future at-rest encrypted data. | Manual via `--maintenance secret rotate encryption_key` (PART 11 → "Secret Rotation"). Sensitive-operation flow (PART 5 → "Sensitive Operations"): re-prompt for the server token, log to `audit.log` as `security.encryption_key_rotated`. 30-day grace for in-flight encrypted data. |
 
 ### Secret Rotation (`--maintenance secret` / `server.token`)
 
@@ -16706,7 +16994,7 @@ Every outbound webhook POST includes these headers so the receiver can verify th
 |--------|-------|
 | `X-Webhook-Signature` | `sha256=<hex_hmac>` where `hmac = HMAC-SHA256(per_webhook_secret, request_body_bytes)`. The `per_webhook_secret` is auto-generated when the webhook URL is first saved (random 32 bytes, persisted in `server.yml` under the separate `webhook_secrets.<name>` key — never under `webhooks`, where every key is a transport name) and returned ONCE in the API response for the operator to configure on the receiving end. |
 | `X-Webhook-Timestamp` | Unix seconds — receiver SHOULD reject if delta exceeds `±5 min` to prevent replay |
-| `X-Webhook-ID` | UUID v7 (PART 12) — idempotency key the receiver can use to deduplicate retries |
+| `X-Webhook-ID` | UUID v7 (PART 11) — idempotency key the receiver can use to deduplicate retries |
 | `X-Webhook-Event` | The event type (e.g., `security.report_received`, `admin.backup_failed`) |
 | `User-Agent` | `{project_name}/{project_version} (+{app_url})` |
 
@@ -17927,7 +18215,7 @@ pub struct StatsInfo {
 | Project description | `<p>` | No | `<p>A brief description</p>` |
 | Status | `.status-banner` | No | `<div class="status-banner status-ok">✅ Healthy</div>` |
 | Version | `<code>` | No | `<code>1.0.0</code>` |
-| Rust version | `<code>` | No | `<code>{{.RustVersion}}</code>` |
+| Rust version | `<code>` | No | `<code>{{ rust_version }}</code>` |
 | Build commit | `<code>` | Optional | `<code>abc1234</code>` |
 | Build date | `<time>` | No | `<time datetime="2024-01-10">Jan 10, 2024</time>` |
 | Uptime | plain text | No | `2d 5h 30m` |
@@ -17981,7 +18269,7 @@ pub struct StatsInfo {
 
 ```html
 <!DOCTYPE html>
-<html lang="{{.Lang}}" dir="{{.Dir}}" class="theme-dark">
+<html lang="{{ lang }}" dir="{{ dir }}" class="theme-dark">
 <head>
   <title>{project_name} - Health Status</title>
   <!-- Standard meta, CSS, theme support -->
@@ -18011,7 +18299,7 @@ pub struct StatsInfo {
         <dd><code>1.0.0</code></dd>
 
         <dt>🦀 Rust Version</dt>
-        <dd><code>{{.RustVersion}}</code></dd>
+        <dd><code>{{ rust_version }}</code></dd>
 
         <dt>🔨 Build</dt>
         <dd><code>abc1234</code> (2024-01-10)</dd>
@@ -18648,7 +18936,7 @@ This is the response text.
 **Output:**
 ```html
 <!DOCTYPE html>
-<html lang="{{.Lang}}" dir="{{.Dir}}">
+<html lang="{{ lang }}" dir="{{ dir }}">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18888,7 +19176,7 @@ fn get_api_response_format(req: &Request) -> &'static str {
 **Testing:** Test scripts MUST verify:
 - API `.txt` extension works
 - Frontend smart detection works (browser → HTML, CLI → formatted text)
-- Accept headers work on both API and frontend (see PART 22: TESTING & DEVELOPMENT)
+- Accept headers work on both API and frontend (see PART 22: TESTING, QUALITY & DEBUGGING)
 
 ### Content Negotiation Priority
 
@@ -19653,6 +19941,143 @@ See the **"Themes (NON-NEGOTIABLE - PROJECT-WIDE)"** section for the complete th
 }
 ```
 
+**Swagger UI & GraphiQL - Auto Mode Fallback:**
+
+**Auto mode sets NO `.theme-dark`/`.theme-light` class, so it needs `@media (prefers-color-scheme: …)` fallbacks — same pattern as the web frontend's `html:not(.theme-dark):not(.theme-light)` rule. Without these, an auto-mode visitor gets unstyled (default) Swagger/GraphiQL.**
+
+```css
+/* Auto mode: follow OS preference when no explicit theme class is set */
+@media (prefers-color-scheme: dark) {
+  .swagger-ui:not(.theme-dark):not(.theme-light) {
+    background: #282a36;
+    color: #f8f8f2;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) .topbar {
+    background: #1e1f29;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) .info .title,
+  .swagger-ui:not(.theme-dark):not(.theme-light) .opblock-tag {
+    color: #f8f8f2;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) .opblock.opblock-get {
+    background: rgba(139, 233, 253, 0.1);
+    border-color: #8be9fd;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) .opblock.opblock-post {
+    background: rgba(80, 250, 123, 0.1);
+    border-color: #50fa7b;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) .opblock.opblock-put {
+    background: rgba(255, 184, 108, 0.1);
+    border-color: #ffb86c;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) .opblock.opblock-delete {
+    background: rgba(255, 85, 85, 0.1);
+    border-color: #ff5555;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) input,
+  .swagger-ui:not(.theme-dark):not(.theme-light) textarea,
+  .swagger-ui:not(.theme-dark):not(.theme-light) select {
+    background: #44475a;
+    color: #f8f8f2;
+    border: 1px solid #6272a4;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) .btn {
+    background: #6272a4;
+    color: #f8f8f2;
+  }
+  .graphiql-container:not(.theme-dark):not(.theme-light) {
+    background: #282a36;
+    color: #f8f8f2;
+  }
+  .graphiql-container:not(.theme-dark):not(.theme-light) .CodeMirror {
+    background: #282a36;
+    color: #f8f8f2;
+  }
+  .graphiql-container:not(.theme-dark):not(.theme-light) .CodeMirror-gutters {
+    background: #1e1f29;
+    border-right: 1px solid #44475a;
+  }
+  .graphiql-container:not(.theme-dark):not(.theme-light) .result-window {
+    background: #282a36;
+  }
+  .graphiql-container:not(.theme-dark):not(.theme-light) .execute-button {
+    background: #50fa7b;
+    color: #282a36;
+  }
+  .graphiql-container:not(.theme-dark):not(.theme-light) .toolbar-button {
+    background: #44475a;
+    color: #f8f8f2;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  .swagger-ui:not(.theme-dark):not(.theme-light) {
+    background: #ffffff;
+    color: #1f2328;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) .topbar {
+    background: #f6f8fa;
+    border-bottom: 1px solid #d1d9e0;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) .info .title,
+  .swagger-ui:not(.theme-dark):not(.theme-light) .opblock-tag {
+    color: #1f2328;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) .opblock.opblock-get {
+    background: rgba(9, 105, 218, 0.05);
+    border-color: #0969da;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) .opblock.opblock-post {
+    background: rgba(0, 128, 0, 0.05);
+    border-color: #1a7f37;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) .opblock.opblock-put {
+    background: rgba(255, 140, 0, 0.05);
+    border-color: #9a6700;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) .opblock.opblock-delete {
+    background: rgba(204, 0, 0, 0.05);
+    border-color: #d1242f;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) input,
+  .swagger-ui:not(.theme-dark):not(.theme-light) textarea,
+  .swagger-ui:not(.theme-dark):not(.theme-light) select {
+    background: #ffffff;
+    color: #1f2328;
+    border: 1px solid #d1d9e0;
+  }
+  .swagger-ui:not(.theme-dark):not(.theme-light) .btn {
+    background: #0969da;
+    color: #ffffff;
+  }
+  .graphiql-container:not(.theme-dark):not(.theme-light) {
+    background: #ffffff;
+    color: #1f2328;
+  }
+  .graphiql-container:not(.theme-dark):not(.theme-light) .CodeMirror {
+    background: #ffffff;
+    color: #1f2328;
+  }
+  .graphiql-container:not(.theme-dark):not(.theme-light) .CodeMirror-gutters {
+    background: #f6f8fa;
+    border-right: 1px solid #d1d9e0;
+  }
+  .graphiql-container:not(.theme-dark):not(.theme-light) .result-window {
+    background: #ffffff;
+  }
+  .graphiql-container:not(.theme-dark):not(.theme-light) .execute-button {
+    background: #1a7f37;
+    color: #ffffff;
+  }
+  .graphiql-container:not(.theme-dark):not(.theme-light) .toolbar-button {
+    background: #f6f8fa;
+    color: #1f2328;
+    border: 1px solid #d1d9e0;
+  }
+}
+```
+
 ---
 
 **Theme Implementation Requirements:**
@@ -19924,7 +20349,7 @@ Need additional compatible endpoints?"
 
 | Behavior | Still applies? | Why |
 |----------|----------------|-----|
-| Trailing-slash 301 normalization (`/api/swagger/` → `/api/swagger`) | **Yes** | URL canonicalization, not version routing — see "Normalization Rules" in PART 15 |
+| Trailing-slash 301 normalization (`/api/swagger/` → `/api/swagger`) | **Yes** | URL canonicalization, not version routing — see "URL Normalization Middleware" in PART 15 |
 | HTTP → HTTPS 301 | **Yes** | Transport-level, unrelated to API versioning |
 | Auth redirect for protected endpoints (e.g., operator-token-protected debug API → 401) | **Yes** | Security, unrelated |
 
@@ -21236,6 +21661,53 @@ Use CSS custom properties for repeated or long strings. Never hardcode them inli
 }
 ```
 
+**Long unbreakable strings WILL break mobile layouts if not handled properly.**
+
+| String Type | Example Length | Example |
+|-------------|----------------|---------|
+| IPv6 address | 39 chars | `2001:0db8:85a3:0000:0000:8a2e:0370:7334` |
+| Tor v3 .onion | 62 chars | `duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion` |
+| API token | 32-64 chars | `tok_EXAMPLE1234567890abcdefghij...` |
+| SHA-256 hash | 64 chars | `e3b0c44298fc1c149afbf4c8996fb924...` |
+| UUID | 36 chars | `550e8400-e29b-41d4-a716-446655440000` |
+| Base64 data | Variable | Long encoded strings |
+
+Every element that may render one of these MUST break the string so it can never overflow its container:
+
+```css
+/* Apply to elements containing: IPs, URLs, hashes, tokens, codes */
+.long-string,
+.ip-address,
+.onion-address,
+.api-token,
+.hash,
+.uuid,
+.monospace-data {
+  /* Break long strings to prevent overflow */
+  word-break: break-all;
+  overflow-wrap: break-word;
+  /* Monospace for readability */
+  font-family: var(--font-mono);
+  /* Smaller font keeps long values on-screen on mobile */
+  font-size: var(--font-size-sm);
+}
+
+/* Alternative: horizontal scroll for code blocks */
+.code-block {
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+```
+
+| Context | CSS Class | Behavior |
+|---------|-----------|----------|
+| Inline display (tables, lists) | `.long-string` | Word-break to wrap |
+| Code blocks | `.code-block` | Horizontal scroll |
+| Copy-friendly fields | `.monospace-data` | Word-break + select all |
+
+**NEVER let long strings overflow their container or break mobile layouts.**
+
 ---
 
 ## CSS Variable Reference
@@ -22003,7 +22475,7 @@ async function requestLocation() {
 
 ### API Token Storage
 
-Resource owner tokens use **dual delivery** in the browser (see PART 12 → API Tokens): the raw token is shown once at creation (copy button), only its SHA-256 hash is stored server-side, and the create response also sets an `owner_token` cookie (HttpOnly + Secure + SameSite=Strict, Max-Age matching the token lifetime). WEB management routes authenticate via that cookie as plain POST forms, so every owner flow works with JS disabled. API routes accept the `Authorization: Bearer` header only and ignore cookies. No dedicated forget/revoke route: the cookie expires via its Max-Age, and clearing site data (or uninstalling the PWA) removes it along with any local copies.
+Resource owner tokens use **dual delivery** in the browser (see PART 8 → API Token Model): the raw token is shown once at creation (copy button), only its SHA-256 hash is stored server-side, and the create response also sets an `owner_token` cookie (HttpOnly + Secure + SameSite=Strict, Max-Age matching the token lifetime). WEB management routes authenticate via that cookie as plain POST forms, so every owner flow works with JS disabled. API routes accept the `Authorization: Bearer` header only and ignore cookies. No dedicated forget/revoke route: the cookie expires via its Max-Age, and clearing site data (or uninstalling the PWA) removes it along with any local copies.
 
 `localStorage` holds an optional JS convenience copy (pre-fill, copy button) — never load-bearing:
 
@@ -23513,7 +23985,6 @@ When the contact form is disabled (`pages.contact.enabled: false`), the contact 
 
 **Theme system applies to THE ENTIRE PROJECT - ALL interfaces share the same colors and settings:**
 - Web interface (HTML pages)
-- Admin panel
 - Swagger UI
 - GraphiQL interface
 - CLI colored output
@@ -23536,11 +24007,11 @@ When the contact form is disabled (`pages.contact.enabled: false`), the contact 
 - **BOTH light AND dark themes MUST be easy to read**
 - **NO color conflicts** - nothing should be invisible or unreadable in either theme
 - **Sufficient contrast ratio** - minimum WCAG AA compliance (4.5:1) in both themes
-- **Theme applies everywhere** - WebUI, admin panel, Swagger, GraphQL, etc.
+- **Theme applies everywhere** - WebUI, Swagger, GraphQL, etc.
 - **Theme switching MUST work seamlessly** without page reload
 - **All interactive elements MUST be clearly visible** in both themes
 - **Syntax highlighting MUST adapt** to theme (use appropriate colors for each theme)
-- **User preference persisted** in the `theme` cookie (server-readable; per-user DB preference for logged-in users) — NOT localStorage, so the server can render the correct theme class
+- **User preference persisted** in the `theme` cookie (server-readable) — NOT localStorage, so the server can render the correct theme class
 - **Default to dark** if no preference set
 
 **Theme Implementation Location:**
@@ -23709,7 +24180,7 @@ widgets with the hex values from `dark_palette()`/`light_palette()`.
 
 **Theme Detection Flow:**
 ```
-1. Server reads the `theme` cookie (logged-in users: DB preference) and renders
+1. Server reads the `theme` cookie and renders
    the theme class on <html> server-side - no FOUC, works without JS
 2. If no preference OR preference is "auto":
    - Render no explicit theme class - pure CSS prefers-color-scheme media query
@@ -23721,7 +24192,7 @@ widgets with the hex values from `dark_palette()`/`light_palette()`.
 
 **Theme Switching:**
 - Provide theme toggle in UI (☀️ Light / 🌙 Dark / 🔄 Auto)
-- Store preference in the `theme` cookie (per-user DB preference when logged in) — server-readable, so every full page load renders correctly
+- Store preference in the `theme` cookie — server-readable, so every full page load renders correctly
 - Apply theme class to `<html>` element: `theme-light`, `theme-dark`
 - Without JS: the toggle is a small POST form — server sets the cookie and redirects back
 - With JS: NO page reload required - instant switching via CSS classes (enhancement only)
@@ -26059,7 +26530,7 @@ groups:
 
 ```json
 {
-  "title": "{PROJECT_NAME} Metrics",
+  "title": "{project_name} Metrics",
   "panels": [
     {
       "title": "Request Rate",
@@ -26563,11 +27034,10 @@ Backups on disk (January 15, 2026):
   myapp_backup_2026-01-15.tar.gz.enc    ← Yesterday (daily)
   myapp_backup_2026-01-12.tar.gz.enc    ← Last Sunday (weekly)
   myapp_backup_2026-01-01.tar.gz.enc    ← 1st of Jan 2026 (monthly + yearly)
-  myapp_backup_2025-12-01.tar.gz.enc    ← 1st of Dec 2025 (monthly, kept until Feb)
   myapp_backup_2025-01-01.tar.gz.enc    ← 1st of Jan 2025 (yearly)
   myapp-daily.tar.gz.enc                 ← Incremental
 
-Total: 6 files (1 daily + 1 weekly + 2 monthly + 1 yearly + incremental)
+Total: 5 files (1 daily + 1 weekly + 1 monthly + 1 yearly + incremental)
 ```
 
 **Backup Cleanup Logic (runs after successful backup and at startup):**
@@ -26645,17 +27115,6 @@ Restoring...
 │                                         │
 │           [Cancel]  [Restore]           │
 └─────────────────────────────────────────┘
-```
-
-**CLI Restore:**
-
-```bash
-# Encrypted backup - password required
-{project_name} --maintenance restore backup_2025-01-15.tar.gz.enc
-# Prompts for password
-
-# Unencrypted backup - no password
-{project_name} --maintenance restore backup_2025-01-15.tar.gz
 ```
 
 ### Restore Verification
@@ -27352,7 +27811,7 @@ Config files are NEVER in the repository. They are generated at RUNTIME:
 
 | File | Location | Created When |
 |------|----------|--------------|
-| `server.yml` | `{config_dir}/server.yml` (see PART 4) | Server first run |
+| `server.yml` | `{config_dir}/server.yml` (see PART 5) | Server first run |
 | `cli.yml` | `~/.config/{internal_org}/{internal_name}/cli.yml` | CLI first run |
 | Tor config | `{config_dir}/tor/torrc` (see PART 26) | When Tor enabled |
 | Tor data | `{data_dir}/tor/` (see PART 26) | When Tor enabled |
@@ -27848,33 +28307,7 @@ make test
 
 ### Coverage Enforcement
 
-**In CI/CD Pipeline (REQUIRED):**
-
-```yaml
-# .github/workflows/test.yml
-test:
-  runs-on: ubuntu-latest
-  steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-
-    - name: Run tests with coverage
-      run: |
-        # coverage output goes to the mounted workspace (/app), not /tmp — two separate docker run
-        # invocations cannot share /tmp; the workspace mount is the only shared path between them.
-        # The runner workspace is ephemeral so this is safe.
-        docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD:/app -w /app casjaysdev/rust:latest \
-          cargo test
-
-    - name: Check coverage is ≥60%
-      run: |
-        COVERAGE=$(docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v $PWD:/app -w /app casjaysdev/rust:latest \
-          cargo tarpaulin --out Stdout | grep 'coverage' | awk '{print $1}' | sed 's/%//')
-        if [ $(echo "$COVERAGE < 60" | bc -l) -eq 1 ]; then
-          echo "ERROR: Coverage is $COVERAGE%, must be >= 60%"
-          exit 1
-        fi
-        echo "Coverage: $COVERAGE% ✓"
-```
+**In CI/CD Pipeline (REQUIRED):** the canonical coverage-enforcing workflow is `ci.yml` in PART 23 → "CI/CD Workflows" — do not duplicate it here. The single-source rules are: coverage is computed by `cargo tarpaulin`/`cargo llvm-cov` inside `casjaysdev/rust:latest`, the threshold defaults to 60% (overridable via `IDEA.md ## Business logic`), coverage output stays in the ephemeral runner workspace mount (never committed to the project tree — see the tempdir rules earlier in this PART), and the job MUST fail when coverage drops below the threshold. See PART 23's `ci.yml` for the actual pinned, ready-to-use job definition, and the "Coverage Gate" subsection above for the equivalent local Docker-wrapped command.
 
 ### How to Achieve 60% Coverage
 
@@ -29025,7 +29458,7 @@ The release job MUST NOT publish the Docker image (server-mode artifact) unless 
 | Portability | No hardcoded org, project name, official site, or registry value anywhere in workflows. Use `${{ github.repository_owner }}` / `${{ github.event.repository.name }}` (and provider equivalents). Workflows must keep working after a fork without editing values. |
 | Renovate only | `renovate.json` at repo root is the only supported dependency-update tool — it covers GitHub Actions SHAs, Docker image digests, Cargo deps, and works across all five providers from a single config. Dependabot is **forbidden** (GitHub-only; duplicates Renovate on GitHub; cannot serve the other four providers). |
 | `act` pre-commit validation | Before committing any change to `.github/workflows/*.yml`, run `act --list -W {file}` on each changed file. Fix all errors before committing. The `validate-workflows.sh` PreToolUse hook enforces this automatically. |
-| Concurrency groups | Every push/PR workflow declares `concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }`. Release workflows use `cancel-in-progress: false` so a release in flight is never cancelled by a follow-up push. |
+| Concurrency groups | Every push/PR workflow declares `concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }`. Release workflows use `cancel-in-progress: true` with a per-tag-ref group (`release-${{ github.ref }}`) so a newer push of the *same* tag supersedes the in-flight release build, while a different tag is never cancelled. |
 | Artifact retention | Every `actions/upload-artifact` step sets `retention-days: 7` (or shorter) — no infinite retention of build outputs. |
 
 ## Workflow Permissions
@@ -29076,7 +29509,7 @@ Every external action (`uses: owner/action@...`) MUST be pinned to a full commit
 - uses: actions/checkout@v4
 
 # Correct — SHA is immutable
-- uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+- uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 ```
 
 **When updating a pinned SHA**, verify three things:
@@ -29173,13 +29606,13 @@ jobs:
   secret-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           # required: truffleHog needs full history
           fetch-depth: 0
 
       - name: TruffleHog secret scan
-        uses: trufflesecurity/trufflehog@b634fb72d9901a4f942e5b8e4ef5f7ec59c97e7c  # v3.88.2
+        uses: trufflesecurity/trufflehog@27b0417c16317ca9a472a9a8092acce143b49c55  # v3.95.9
         with:
           # NEVER use default_branch — it resolves to HEAD post-push and skips the scan
           base: ${{ github.event.before }}
@@ -29189,7 +29622,7 @@ jobs:
   workflow-policy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - name: Verify all third-party actions are pinned to a 40-char SHA
         run: |
           set -eo pipefail
@@ -29204,7 +29637,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ hashFiles('Cargo.lock') != '' }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - name: cargo audit (inside :build image)
         run: |
           IMAGE="ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:build"
@@ -29216,7 +29649,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ hashFiles('docker/Dockerfile') != '' }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
       - name: Build local image for scanning
         run: |
@@ -29260,7 +29693,7 @@ jobs:
     container:
       image: casjaysdev/rust:latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - run: cargo build --release
 ```
 
@@ -29274,7 +29707,7 @@ concurrency:
   cancel-in-progress: true
 ```
 
-Release workflows (`release.yml`) MUST use `cancel-in-progress: false` so a release build already in flight is not killed by a follow-up push.
+Release workflows (`release.yml`) MUST use `cancel-in-progress: true` with a per-tag-ref group (`group: release-${{ github.ref }}`) so a newer push of the *same* tag supersedes the in-flight release build, while a run for a different tag is never cancelled.
 
 Every `actions/upload-artifact` step MUST set a finite `retention-days`:
 
@@ -29365,7 +29798,7 @@ The GitHub Releases API returns HTTP 422 `"tag_name is not a valid tag"` when th
 The `release` job already has `contents: write` to push assets — this covers tag push as well.
 
 ```yaml
-- uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+- uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
   with:
     # required: full history needed to inspect and push tags
     fetch-depth: 0
@@ -29589,7 +30022,7 @@ jobs:
       - name: Build image for scanning
         run: docker build -t local/scan-target:ci -f docker/Dockerfile .
       - name: Scan image (Trivy)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        uses: aquasecurity/trivy-action@76071ef0d7ec797419534a183b498b4d6366cf37  # v0.70.0
         with:
           image-ref: local/scan-target:ci
           exit-code: '1'
@@ -33081,7 +33514,7 @@ docker run --name "{project_name}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -
 ## Links
 
 - [Repository]({PLATFORM_REPO_URL})
-- [Live Demo](https://{project_name}.{project_org}.us) (if applicable)
+- [Live Demo]({official_site}) (if applicable)
 - [API Documentation](/server/docs/swagger) (Swagger UI)
 - [GraphQL Playground](/server/docs/graphql)
 
@@ -33467,10 +33900,10 @@ pub async fn language_middleware(
 
 ```html
 <form method="get" action="">
-  <select name="lang" aria-label="{{t .Lang `common.select_language`}}">
-    {{range .AvailableLanguages}}
-      <option value="{{.Code}}" {{if eq .Code $.Lang}}selected{{end}}>{{.NativeName}}</option>
-    {{end}}
+  <select name="lang" aria-label="{{ t(key="common.select_language", lang=lang) }}">
+    {% for l in available_languages %}
+      <option value="{{ l.code }}" {% if l.code == lang %}selected{% endif %}>{{ l.native_name }}</option>
+    {% endfor %}
   </select>
   <button type="submit">Go</button>
 </form>
@@ -33626,7 +34059,8 @@ pub struct LocaleFS;
     "connected": "Conectado",
     "disconnected": "Desconectado",
     "production": "Producción",
-    "development": "Desarrollo"
+    "development": "Desarrollo",
+    "ssl_expires_in": "El certificado SSL expira en {days} días"
   },
 
   "status_values": {
@@ -33840,12 +34274,15 @@ pub struct LocaleFS;
       "ssl_renewed": "Certificado SSL renovado - {app_name}",
       "ssl_renewal_failed": "Error al renovar SSL - {app_name}",
       "task_failed": "Tarea programada fallida - {app_name}",
-      "test_email": "Correo de prueba - {app_name}"
+      "test_email": "Correo de prueba - {app_name}",
+      "operator_alert": "Alerta del operador: {alert_type} - {app_name}"
     },
     "body": {
       "security_alert_heading": "ALERTA DE SEGURIDAD",
       "recommended_actions": "ACCIONES RECOMENDADAS",
       "contact_information": "INFORMACIÓN DE CONTACTO",
+      "alert_heading": "ALERTA DEL OPERADOR",
+      "alert_description": "El sistema ha detectado una condición que requiere la atención del operador.",
       "from": "De: {app_name} ({fqdn})"
     }
   },
@@ -34329,7 +34766,7 @@ i18n-validate:
 
 **HTML Implementation:**
 ```html
-<html lang="{{.Lang}}" dir="{{.Dir}}">
+<html lang="{{ lang }}" dir="{{ dir }}">
 ```
 
 **CSS for RTL:**
@@ -34484,12 +34921,12 @@ server:
 ```html
 <!-- Status messages -->
 <div role="status" aria-live="polite" aria-atomic="true">
-  {{.StatusMessage}}
+  {{ status_message }}
 </div>
 
 <!-- Error alerts -->
 <div role="alert" aria-live="assertive">
-  {{.ErrorMessage}}
+  {{ error_message }}
 </div>
 
 <!-- Loading indicator -->
@@ -36002,7 +36439,7 @@ Tor Hidden Service: Connected
 - [ ] `.dockerignore` exists at project root with Rust-specific entries (`target/`, plus the standard exclusions from `dockerfile_conventions.md` → ".dockerignore")
 - [ ] `docker/Dockerfile.build` does not exist — Rust projects always use `casjaysdev/rust:latest` directly; no custom toolchain image is ever needed
 - [ ] `ci.yml` and `release.yml` use `container: image: casjaysdev/rust:latest` — no `ensure-build-image` pre-flight, no `build-toolchain.yml`
-- [ ] If IDEA.md documents a `*-sys` exception requiring system dev libs at build time, only the minimum set needed by that crate is added to the image — by default the image carries no GUI-stack C dev libs (PART 0 → "Rust-Only Application")
+- [ ] If IDEA.md documents a `*-sys` exception requiring system dev libs at build time, only the minimum set needed by that crate is added to the image — by default the image carries no GUI-stack C dev libs (PART 0 → "Rust-Only Project")
 - [ ] `rust-toolchain.toml` pins the toolchain; `.cargo/config.toml` pins static-link rustflags
 - [ ] `Cargo.toml` release profile uses `opt-level = "z"`, `lto = true`, `codegen-units = 1`, `strip = true`, `panic = "abort"`
 - [ ] Repo has `assets/` (build-time source) and a Rust embedding module (`include_bytes!` / `rust-embed`) wiring it into the binary
@@ -36036,6 +36473,7 @@ Tor Hidden Service: Connected
 - [ ] Global `server.token` authentication is enforced on every protected server route and was verified with a request that omits/misuses the token (expect 401/403)
 - [ ] The project is never described as an "API server" anywhere — code comments, docs, CLI help text, startup banners, and health output all say "server"
 - [ ] Web frontend and REST/GraphQL API are served from the same binary and the same port — no separate frontend deployment
+- [ ] If a GUI surface is in scope, both X11 and Wayland backends are supported and runtime-selected — neither X11-only nor Wayland-only is acceptable (PART 0 → "X11 AND Wayland Are Both Required")
 
 ## Quality Checklist
 
@@ -36050,6 +36488,8 @@ All gates run inside the project Docker image — never on the host.
 - [ ] `make i18n-validate` passes with zero errors (if i18n is in scope — PART 25)
 - [ ] Web frontend assets are embedded in the release binary — verified by running the release build with the source `assets/`/`src/server/frontend/` tree removed or renamed and confirming the frontend still renders
 - [ ] New behavior includes tests where practical
+- [ ] If a GUI surface is in scope: smoke test exercised under both X11 and Wayland forwarding, and the documented X11 (Xorg/XWayland) and Wayland forwarding sample commands both work against a real session (PART 6 → "X11 and Wayland Forwarding")
+- [ ] Health/status endpoint returns correct component states with the database, scheduler, and (if enabled) SSL/Tor components stopped or degraded, not just in the fully-healthy case
 
 ## Security Checklist
 
@@ -36061,6 +36501,8 @@ All gates run inside the project Docker image — never on the host.
 - [ ] Global `server.token` auth verified against protected routes (see Implementation Checklist)
 - [ ] SSL/TLS certificate acquisition and renewal flow tested end-to-end if SSL/Let's Encrypt is enabled (PART 14 → "SSL/TLS & Let's Encrypt")
 - [ ] Tor hidden service (if the `tor` binary is present) logs with `SafeLogging` enabled and never leaks the .onion private key or control-port cookie
+- [ ] Rate limiting, blocklists, and IP/country blocking (if enabled) were exercised against a real request, not just unit-tested in isolation
+- [ ] Backup files, if they contain database dumps or secrets, are encrypted at rest or excluded from unencrypted transport
 
 ## Release Checklist
 
@@ -36158,6 +36600,7 @@ maintainer_email: {maintainer@example.com — or empty; used only if set}
 - {User type 2}
 
 **Surfaces (declare which apply — see PART 2 → "Application & Server Model"):**
+- GUI: {yes / no — and on which platforms; if yes, both X11 and Wayland are mandatory on Linux/BSD, see PART 0}
 - Web frontend: {yes / no}
 - REST API: {yes / no}
 - GraphQL API: {yes / no}
@@ -36273,7 +36716,7 @@ maintainer_email: jane@example.com
 - Cache: `~/.cache/casjay/notes/`
 
 **License exceptions:**
-- `rusqlite` with `bundled` feature for the local notes database. Pure-Rust alternative (`limbo`) is not yet stable for production; statically vendored SQLite C is acceptable per PART 0 → "Rust-Only Application" exception path. Distribution license remains MIT.
+- `rusqlite` with `bundled` feature for the local notes database. Pure-Rust alternative (`limbo`) is not yet stable for production; statically vendored SQLite C is acceptable per PART 0 → "Rust-Only Project" exception path. Distribution license remains MIT.
 ```
 
 **Example 2: Feeds (TUI + CLI, consumes a remote API)**

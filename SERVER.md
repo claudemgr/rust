@@ -1360,7 +1360,8 @@ For complete details, see AI.md PART 0, 1
 - ✅ CSS `word-break: break-all` for long strings (IPv6, .onion, tokens)
 - ✅ Full admin panel with ALL settings
 - ✅ WCAG 2.1 AA accessibility
-- ✅ Touch targets minimum 44x44px- ✅ /server/about content from IDEA.md (name, tagline, description, features)
+- ✅ Touch targets minimum 44x44px
+- ✅ /server/about content from IDEA.md (name, tagline, description, features)
 - ✅ /server/help content from IDEA.md (real endpoints, real examples)
 - ✅ All pages fully functional - no "coming soon" or placeholder pages
 - ✅ All routes implemented - no 501 Not Implemented responses
@@ -1604,7 +1605,7 @@ On EVERY new conversation or after "context compacted" message:
 - AI behavior: `.claude/rules/ai-rules.md` (PART 0, 1)
 - Project structure: `.claude/rules/project-rules.md` (PART 2, 3, 4)
 - Frontend/WebUI: `.claude/rules/frontend-rules.md` (PART 16, 17)
-- Full spec: `AI.md` (~63k lines) ← **SOURCE OF TRUTH**
+- Full spec: `AI.md` (~64k lines) ← **SOURCE OF TRUTH**
 
 ## Current Project State
 [AI updates this section as work progresses]
@@ -1968,16 +1969,22 @@ Instructions for how this agent should behave...
 | `CLAUDE.md` | ✓ | Claude Code project memory (primary location) | No |
 | `CLAUDE.local.md` | - | Personal Claude Code preferences | **Yes** |
 | `SPEC.md` | - | Project-specific rule overrides — SPEC.md > AI.md > global CLAUDE.md; created only when a rule must differ from template | No |
+| `PLAN.md` | - | Project plan — human edits/owns | No |
+| `PLAN.AI.md` | - | Project plan — AI creates/updates | No |
+| `TODO.md` | - | Task list — human edits/owns | No |
+| `TODO.AI.md` | - | Task list — AI creates/updates (3+ tasks only) | No |
 | `README.md` | ✓ | Project documentation | No |
 | `LICENSE.md` | ✓ | MIT license + embedded third-party licenses | No |
 | `Cargo.toml` | ✓ | Rust workspace/package definition | No |
 | `Cargo.lock` | ✓ | Rust dependency lockfile | No |
 | `rust-toolchain.toml` | ✓ | Pinned toolchain (`channel = "stable"`) | No |
 | `Makefile` | ✓ | Local development only | No |
+| `Jenkinsfile` | ✓ | Jenkins pipeline — required on every project per `cicd_conventions.md` | No |
 | `mkdocs.yml` | ✓ | MkDocs configuration | No |
+| `.readthedocs.yaml` | ✓ | ReadTheDocs configuration | No |
 | `.gitignore` | ✓ | Git ignore patterns | No |
 | `.dockerignore` | ✓ | Docker ignore patterns | No |
-| `.gitattributes` | ✓ | Git attributes | No |
+| `.gitattributes` | - | Git attributes | No |
 | `.editorconfig` | - | Editor configuration | No |
 | `release.txt` | ✓ | Version source of truth | No |
 | `site.txt` | - | Official site URL (optional, never guess) | No |
@@ -2329,16 +2336,16 @@ server:
 
 ## How to Read This Large File
 
-**AI.md is ~2.4MB and ~63,110 lines. You CANNOT read it all at once. Follow these procedures.**
+**AI.md is ~2.5MB and ~64,283 lines. You CANNOT read it all at once. Follow these procedures.**
 
 ### File Size Reality
 
 | Constraint | Value |
 |------------|-------|
 | File size | ~2.4MB |
-| Line count | ~63,110 lines |
+| Line count | ~64,283 lines |
 | Read limit | ~500 lines per read |
-| Full reads needed | ~127 reads (impractical) |
+| Full reads needed | ~129 reads (impractical) |
 
 **Use the PART index to find relevant sections, then read each section COMPLETELY.**
 
@@ -3364,6 +3371,12 @@ Spec version: {line count or hash}
 | Skipping validation | Security requirement |
 | Hardcoding secrets | Security vulnerability |
 | Using deprecated APIs | Maintainability issue |
+
+### Host System Safety Rule
+
+**Never build, run, or test project toolchains directly on the host.** All builds, test runs, and debugging steps that could affect host state (installing packages, changing network config, running `systemctl`, `mount`, `reboot`, `iptables`, or similar) MUST run inside a container, VM, chroot, or network namespace — see the Build & Execution hierarchy (QEMU/KVM > Incus > Docker > host) elsewhere in this file.
+
+If a requested action would run a forbidden command on the host, AI MUST refuse and explain the container/VM alternative rather than executing it directly.
 
 ## Code Style Rules
 
@@ -5475,7 +5488,7 @@ curl -q -LSsf -X POST -d '{"key":"value"}' {url}
 
 | Flag | Purpose | Why Required |
 |------|---------|--------------|
-| `-q` | Quiet mode | Don't read `.curlrc` - ensures consistent behavior |
+| `-q` | Skip config file | Don't read `.curlrc` - ensures consistent behavior |
 | `-L` | Follow redirects | Handle 301/302 automatically |
 | `-S` | Show errors | Display errors even in silent mode |
 | `-s` | Silent | No progress bar/meter |
@@ -5946,7 +5959,6 @@ See PART 27: DOCKER for complete annotation requirements.
 name = "{internal_name}"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
 authors = ["{project_org}"]
 description = "{project_name} - {short description}"
 repository = "https://github.com/{project_org}/{project_name}"
@@ -6012,7 +6024,7 @@ panic = "abort"
 |-------|-------|
 | **Name** | {project_name} |
 | **Organization** | {project_org} |
-| **Official Site** | https://{project_name}.{project_org}.us |
+| **Official Site** | `{official_site}` (e.g. `https://{project_name}.example.com`) |
 | **Repository** | {PLATFORM_REPO_URL} |
 | **README** | README.md |
 | **License** | MIT > LICENSE.md |
@@ -6105,7 +6117,7 @@ PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+
 | `~/Projects/` | Base projects directory (recommended) | Can be `~/Projects/`, `~/Documents/`, `/opt/`, etc. |
 | `{gitprovider}` | Git hosting provider or `local` | `github`, `gitlab`, `bitbucket`, `private`, `local` |
 | `{project_org}` | Organization/username (inferred) | `apimgr`, `casjay`, `myorg` |
-| `{project_name}` | Project name (inferred) | `jokes`, `icons`, `myproject` |
+| `{internal_name}` | Frozen on-disk project name (inferred) | `jokes`, `icons`, `myproject` |
 
 **Examples of recommended structure:**
 ```
@@ -6669,7 +6681,7 @@ edition = "2021"
 - This is the only pure-Rust, static-musl-compatible SAML 2.0 toolkit available; the more established `samael` crate was rejected because its `xmlsec` feature links the `xmlsec1` C library, breaking the fully-static-musl requirement.
 - As of this writing the crate is **v0.0.1-alpha** with a small community (repo has 2 GitHub stars) and explicitly makes **no claim of "production ready" or "battle-tested"** in its own documentation. There is no formal third-party security audit.
 - It IS tested against an interop corpus covering 8 major IdPs (Okta, Microsoft Entra ID, Auth0, Google Workspace, OneLogin, Keycloak, ADFS, Shibboleth), ships fuzzing harnesses, has active CI, and documents its own threat model — meaningfully more diligence than a typical alpha crate, but still pre-1.0.
-- This is a deliberate, owner-approved tradeoff: static-musl compatibility over crate maturity. Pin the exact version in `Cargo.lock`, monitor the upstream repo for security-relevant commits, and re-evaluate if a mature pure-Rust alternative or a production-ready release appears.
+- This is a deliberate, user-approved tradeoff: static-musl compatibility over crate maturity. Pin the exact version in `Cargo.lock`, monitor the upstream repo for security-relevant commits, and re-evaluate if a mature pure-Rust alternative or a production-ready release appears.
 - No system-dependency exception is needed — SAML-enabled builds remain fully static musl, same as every other feature.
 
 **Server Admin MFA (Recommended):**
@@ -6867,7 +6879,6 @@ libsql = "*"
 name = "{internal_name}"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
 authors = ["{project_org}"]
 description = "{project_name} - {short description}"
 repository = "https://github.com/{project_org}/{project_name}"
@@ -10733,7 +10744,7 @@ Run '{project_name} <command> help' for detailed help on any command.
 | `--backup` | Directory | `/mnt/Backups/{internal_org}/{internal_name}/` (if writable, else `{data_dir}/backup/`) | `~/.local/share/Backups/{internal_org}/{internal_name}/` |
 | `--pid` | File | `/var/run/{internal_org}/{internal_name}.pid` | `~/.local/share/{internal_org}/{internal_name}/{internal_name}.pid` |
 
-**Note:** `--backup` prefers the system backup dir if writable. Fallback is mode-aware: system mode (started as root) falls back to `{data_dir}/backup/` — never a `$HOME`-derived path; user mode falls back to the user dir. See `get_backup_dir()` in PART 5.
+**Note:** `--backup` prefers the system backup dir if writable. Fallback is mode-aware: system mode (started as root) falls back to `{data_dir}/backup/` — never a `$HOME`-derived path; user mode falls back to the user dir. See `get_backup_dir()` in PART 8.
 
 **Directory mode is locked at process start.** System vs user paths are decided ONCE from the EUID at startup, before any privilege drop, and cached for the process lifetime. Never resolve `~` or `$HOME` after the privilege drop — the service account's HOME points at `{data_dir}` (e.g. `/var/lib/{internal_org}/{internal_name}`), so a late `$HOME` lookup nests user-style paths like `.local/share/Backups/` inside the system data dir.
 
@@ -11046,7 +11057,7 @@ PHASE 5: Server startup (actual server start)
    ├─ {data_dir}    (/var/lib/... or ~/.local/share/...)
    ├─ {cache_dir}   (/var/cache/... or ~/.cache/...)
    ├─ {log_dir}     (/var/log/... or ~/.local/log/...)
-   ├─ {backup_dir}  (see PART 5 get_backup_dir - /mnt/Backups/... if writable, else {data_dir}/backup/ in system mode)
+   ├─ {backup_dir}  (see PART 8 get_backup_dir - /mnt/Backups/... if writable, else {data_dir}/backup/ in system mode)
    └─ Never resolve ~/$HOME again after step 8g — the service account's HOME is {data_dir}
 
 8. IF RUNNING AS ROOT - setup system resources BEFORE dropping privileges:
@@ -11061,7 +11072,7 @@ PHASE 5: Server startup (actual server start)
       └─ {backup_dir}/
    c. Set ownership: chown -R {internal_name}:{internal_name} on all dirs
    d. Set permissions: 0755 general dirs, 0700 sensitive (security/, ssl/, tor/)
-   e. Determine ports (see PART 15 for full port rules):
+   e. Determine ports (see PART 5 for full port rules):
       ├─ Format 1: --port {port} (single port)
       │   ├─ HTTP by default
       │   ├─ If port is 443 → HTTPS-only mode
@@ -11214,7 +11225,7 @@ PHASE 5: Server startup (actual server start)
 - Starting child processes (tor, scheduler)
 - Signal handling
 
-**Port binding examples (see PART 15 for full rules):**
+**Port binding examples (see PART 5 for full rules):**
 
 | Config | Port(s) | Bind As | Protocol |
 |--------|---------|---------|----------|
@@ -12008,7 +12019,8 @@ All projects use SQLite with two database files:
 |----------|-------|---------|
 | `server.db` | `config` | Key-value config storage |
 | `server.db` | `config_meta` | Config version tracking |
-| `server.db` | `sessions` | Admin WebUI login sessions |
+| `server.db` | `admin_sessions` | Admin WebUI login sessions |
+| `server.db` | `admin_preferences` | Admin UI preferences (theme, etc.) |
 | `server.db` | `rate_limits` | Sliding window rate limit counters |
 | `server.db` | `audit_log` | Admin actions, config changes, security events |
 | `server.db` | `scheduler_tasks` | Background task definitions |
@@ -12016,8 +12028,15 @@ All projects use SQLite with two database files:
 | `server.db` | `backups` | Backup metadata and history |
 | `users.db` | `admins` | Server admin accounts (WebUI access) |
 | `users.db` | `users` | Regular app users (if project has users) |
+| `users.db` | `user_preferences` | User UI/notification/privacy preferences |
 | `users.db` | `api_keys` | API authentication keys |
 | `users.db` | `password_resets` | Password reset tokens |
+| `users.db` | `orgs` | Organizations (multi-user projects) |
+| `users.db` | `org_members` | Organization membership and roles |
+| `users.db` | `org_preferences` | Organization-level preferences |
+| `users.db` | `user_sessions` | Regular user login sessions |
+| `users.db` | `passkeys` | WebAuthn/FIDO2 credentials |
+| `users.db` | `trusted_devices` | Remembered 2FA devices |
 | `users.db` | `email_verifications` | Email verification tokens |
 | `users.db` | `totp_secrets` | 2FA TOTP secrets and backup codes |
 
@@ -15673,7 +15692,7 @@ Sends `Content-Security-Policy-Report-Only` instead of the enforcing header. Vio
 
 Server-side handling:
 - Accept `application/csp-report` (legacy) and `application/reports+json` (Reporting API)
-- Log to `security.log` as `security.csp_violation` (see PART 11 → security log events)
+- Log to `security.log` as `security.csp_violation` (see PART 11 → "Security Events")
 - Rate-limit per-IP to prevent flooding
 - Respond `204 No Content` to keep the browser happy
 - NEVER return user-controlled fields back in the response body
@@ -16476,7 +16495,7 @@ All three coexist under the admin tree. The admin-panel UI groups them under a s
 
 | Field | Description |
 |-------|-------------|
-| `fingerprint` | Full SHA-256 fingerprint, displayed on admin page and in security.txt comments |
+| `fingerprint` | Full key fingerprint, displayed on admin page and in security.txt comments |
 | `created_at` | When the keypair was generated |
 | `expires_at` | Key expiry (2 years default) |
 | `last_rotated_at` | When most recently rotated (NULL if never) |
@@ -18387,7 +18406,7 @@ Expires: {expiry_date}
 - `Preferred-Languages:` line is **omitted** (locale fingerprinting risk on Tor)
 - Served per-request via `build_url(headers, path)`; never cached or frozen at startup
 
-> **Full Tor implementation:** The above covers request detection, `build_url` integration, and privacy rules only. For Tor binary lifecycle (external `tor` process management), hidden service setup, and outbound routing, see **PART 32 → "Tor Hidden Service"**.
+> **Full Tor implementation:** The above covers request detection, `build_url` integration, and privacy rules only. For Tor binary lifecycle (external `tor` process management), hidden service setup, and outbound routing, see **PART 32 → "Tor Process Management"**.
 
 ## Session Configuration
 
@@ -20323,9 +20342,11 @@ pub struct StatsInfo {
 }
 ```
 
-### /api/{api_version}/server/healthz Security Rules
+### Security Rules (all health responses)
 
-**NEVER expose in /server/healthz response:**
+These rules apply to the health payload in every format and on every health route (`/server/healthz`, `/api/{api_version}/server/healthz`, `/api/healthz`).
+
+**NEVER expose in a health response:**
 
 | Category | NEVER Include | Why |
 |----------|---------------|-----|
@@ -20678,7 +20699,8 @@ This is a server application, not a client-side SPA. The server should handle as
 | Data transformation | **Server** | Server has full context, client shouldn't need to transform |
 | Business logic | **Server** | Never in client - security and consistency |
 | Formatting (dates, numbers) | **Server** | Consistent output, works without JS |
-| Pagination/sorting | **Server** | Database handles efficiently || Search/filtering | **Server** | Database indexes, security |
+| Pagination/sorting | **Server** | Database handles efficiently |
+| Search/filtering | **Server** | Database indexes, security |
 | HTML rendering | **Server** | Askama templates, works everywhere |
 | State management | **Server** (sessions) | Client just displays current state |
 
@@ -22059,7 +22081,8 @@ Result:
 | Rule | Description |
 |------|-------------|
 | **Research first** | NEVER guess - look up actual API documentation |
-| **Default is features** | Compatibility means feature/behavior parity unless route/API compatibility was explicitly requested || **1:1 parity = features** | "1:1 parity" / "1:1+ parity" means feature parity, not automatic route parity |
+| **Default is features** | Compatibility means feature/behavior parity unless route/API compatibility was explicitly requested |
+| **1:1 parity = features** | "1:1 parity" / "1:1+ parity" means feature parity, not automatic route parity |
 | **Routes only when asked** | Add external routes only when the user explicitly requests route/API/client compatibility |
 | **Match response format** | Field names, structure, content-type must match target exactly |
 | **Standard routes for rest** | Use our `/api/{api_version}/*` patterns for all other operations |
@@ -23356,9 +23379,11 @@ Startup (for configured FQDN)
 | **Accessibility** | WCAG 2.1 AA compliant, screen reader friendly |
 | **UX** | Readable, navigable, intuitive, user-friendly, self-explanatory |
 | **PWA Support** | Progressive Web App - installable, offline-capable |
-| **CORS** | `Access-Control-Allow-Origin: *` for API endpoints |
+| **CORS** | Resolved allow-list (config → DOMAIN → proxy-learned; `*` only as fallback) — see "CORS Allow-list Resolution Order" |
 
-## Frontend Consumes Backend**API is the source of truth. Frontend fully integrates with relevant API endpoints.**
+## Frontend Consumes Backend
+
+**API is the source of truth. Frontend fully integrates with relevant API endpoints.**
 
 | Rule | Description |
 |------|-------------|
@@ -23538,7 +23563,7 @@ pub fn url_normalize_layer() -> impl Layer<
 
 async fn url_normalize_middleware(
     req: Request<Body>,
-    next: axum::middleware::Next<Body>,
+    next: axum::middleware::Next,
 ) -> impl IntoResponse {
     let path = req.uri().path().to_owned();
 
@@ -24471,7 +24496,7 @@ document.addEventListener('click', function(e) {
 **All components use these CSS variables for consistent theming:**
 
 ```css
-:root {
+html.theme-dark {
   /* Backgrounds — dark palette */
   --color-bg: #282a36;
   --color-bg-secondary: #21222c;
@@ -25026,7 +25051,7 @@ dismissAllToasts();
   position: absolute;
   top: -4px;
   right: -4px;
-  background: var(--color-danger);
+  background: var(--color-error);
   color: white;
   font-size: 0.75rem;
   min-width: 18px;
@@ -25064,7 +25089,7 @@ dismissAllToasts();
 }
 
 .dropdown-item:hover {
-  background: var(--color-hover);
+  background: var(--color-bg-hover);
 }
 
 .dropdown-divider {
@@ -26082,6 +26107,7 @@ Example:
 ```
 
 **Tracking PWA launches:**
+
 ```javascript
 // start_url: "/?source=pwa"
 // Analytics can track PWA vs browser usage
@@ -27027,8 +27053,8 @@ src/server/static/
 ```css
 :root {
   /* Colors — reuse the --color-* variables from the CSS Variable Reference
-     above (defined once in :root / html.theme-light); never redefine them
-     here with different names or values. */
+     above (defined once in html.theme-dark / html.theme-light); never
+     redefine them here with different names or values. */
 
   /* Typography */
   --font-family: system-ui, -apple-system, sans-serif;
@@ -27276,7 +27302,9 @@ Mobile:
           <a href="/users">Profile</a>
           <a href="/users/settings">Settings</a>
           <hr />
-          <a href="/server/auth/logout">Logout</a>
+          <form action="/server/auth/logout" method="POST">
+            <button type="submit" class="dropdown-item logout">Logout</button>
+          </form>
         </div>
       </div>
     {% else %}
@@ -27463,7 +27491,8 @@ main {
 - `.print-include` - Exception for buttons that should print
 
 **Footer contains (informational links):**
-- Standard pages: About, Privacy, Contact, Help- External links: GitHub
+- Standard pages: About, Privacy, Contact, Help
+- External links: GitHub
 - Branding: project name, version, copyright
 
 **Rule:** Every page template MUST include header, nav, and footer partials. No page may define its own.
@@ -29050,8 +29079,8 @@ function loadTracking() {
   left: 0;
   right: 0;
   width: 100%;
-  background: #7c5295;  /* Purple/magenta - or var(--accent-color) */
-  color: #ffffff;
+  background: var(--color-primary);
+  color: white;
   z-index: 9999;
 }
 
@@ -29073,7 +29102,7 @@ function loadTracking() {
 }
 
 .cookie-banner .policy-link {
-  color: #ffffff;
+  color: white;
   text-decoration: underline;
 }
 
@@ -29091,7 +29120,7 @@ function loadTracking() {
 .cookie-banner .btn-decline {
   background: transparent;
   border: none;
-  color: #ffffff;
+  color: white;
   padding: 0.625rem 1.5rem;
   cursor: pointer;
   font-size: 0.9rem;
@@ -29102,9 +29131,9 @@ function loadTracking() {
 }
 
 .cookie-banner .btn-accept {
-  background: #ffffff;
+  background: white;
   border: none;
-  color: #7c5295;
+  color: var(--color-primary);
   padding: 0.625rem 1.5rem;
   cursor: pointer;
   font-size: 0.9rem;
@@ -32844,7 +32873,9 @@ No action is required on your part.
 --
 {app_name}
 {app_url}
-```### Example: Login Alert (Required Format)
+```
+
+### Example: Login Alert (Required Format)
 
 ```
 Subject: New Login Detected - {app_name}
@@ -34032,14 +34063,17 @@ In cluster mode, tasks are distributed to prevent duplicate execution:
 - `geoip_update`
 - `blocklist_update`
 - `cve_update`
-- `backup_daily`
 - `update_check` (the check and notification run once; with `auto_install = true` the install is rolled out node-by-node — never all nodes at once, so the cluster stays available)
 
-**Local Tasks (run on each node):**
+**Local Tasks (run on each node — every node maintains its own valid backups per the Cluster Backup Rules below):**
 - `session_cleanup`
 - `token_cleanup`
 - `healthcheck_self`
 - `cluster_heartbeat`
+- `backup_daily`
+- `backup_hourly`
+- `log_rotation`
+- `tor_health`
 
 ### Task Locking (Cluster Mode)
 
@@ -36005,36 +36039,7 @@ Every backup is verified **immediately after creation** - backups must be 100% w
 | `{project_name}-daily.tar.gz[.enc]` | Daily incremental (changes since full) | Always 1 (replaced each run) |
 | `{project_name}-hourly.tar.gz[.enc]` | Hourly incremental (if enabled) | Always 1 (replaced each run) |
 
-### Retention Configuration
-
-```yaml
-server:
-  backup:
-    retention:
-      # Full backups to keep (default: 1 = yesterday only)
-      max_backups: 1
-      # Optional: keep weekly backup (e.g., every Sunday's backup)
-      keep_weekly: 0
-      # Optional: keep monthly backup (e.g., 1st of month)
-      keep_monthly: 0
-      # Optional: keep yearly backup (e.g., Jan 1st)
-      keep_yearly: 0
-      # Percent of backup volume (e.g., 10%) or absolute (e.g., 50G); 0 = disabled
-      max_total_size: "10%"
-```
-
-**Retention Settings:**
-
-| Setting | Default | Valid | Description |
-|---------|---------|-------|-------------|
-| `max_backups` | 1 | ≥1 | Daily full backups to keep |
-| `keep_weekly` | 0 | ≥0 | Weekly backups (Sunday) - 0 = disabled |
-| `keep_monthly` | 0 | ≥0 | Monthly backups (1st) - 0 = disabled |
-| `keep_yearly` | 0 | ≥0 | Yearly backups (Jan 1st) - 0 = disabled |
-| `max_total_size` | `"10%"` | `N%`, `NG`, `0` | Max total size of all backup files; `0` = disabled; overrides count limits |
-
-**Falsey Values (all mean disabled):**
-- `0`, `false`, `no`, `none`, `disable`, `disabled`, `off`
+### Retention Validation & Examples
 
 **Validation (warn, don't error - server must start):**
 
@@ -36076,10 +36081,6 @@ WARN: keep_monthly: 24 exceeds recommended 12 (2 years of monthly backups)
 +----------------------------------------------------------+
 ```
 
-**Default: 2 files total (yesterday + today's incremental)**
-
-**With hourly enabled: 3 files total** (yesterday + daily + hourly incrementals)
-
 **Retention Priority Order:**
 ```
 1. Yearly (Jan 1st) - highest priority, never deleted if in keep_yearly count
@@ -36109,7 +36110,7 @@ retention:
 Backups on disk (January 15, 2025):
   myapp_backup_2025-01-15.tar.gz.enc    <- Yesterday (daily)
   myapp_backup_2025-01-12.tar.gz.enc    <- Last Sunday (weekly)
-  myapp_backup_2025-01-01.tar.gz.enc    <- 1st of Jan 2025 (monthly + yearly)
+  myapp_backup_2025-01-01.tar.gz.enc    <- 1st of Jan 2025 (yearly - outranks monthly, counted once)
   myapp-daily.tar.gz.enc                 <- Incremental
 
 Total: 4 files
@@ -36693,13 +36694,12 @@ pub async fn check_for_update(
     current_version: &str,
     branch: &str,
 ) -> Result<Option<Release>> {
+    // {project_org}/{project_name} are template placeholders substituted at
+    // project generation time — by the time this code compiles they are
+    // fixed literals, so no runtime format!() interpolation is needed.
     let url = match branch {
-        "stable" => format!(
-            "https://api.github.com/repos/{project_org}/{project_name}/releases/latest"
-        ),
-        _ => format!(
-            "https://api.github.com/repos/{project_org}/{project_name}/releases"
-        ),
+        "stable" => "https://api.github.com/repos/{project_org}/{project_name}/releases/latest".to_string(),
+        _ => "https://api.github.com/repos/{project_org}/{project_name}/releases".to_string(),
     };
 
     let response = client
@@ -36959,7 +36959,7 @@ fn verify_checksum(file_path: &std::path::Path, expected_hash: &str) -> Result<(
 
 Application user creation **REQUIRES** privilege escalation. If the user cannot escalate privileges, the application runs as the current user with user-level directories.
 
-**IMPORTANT: See PART 5 "Smart Escalation Logic" for the complete escalation flow:**
+**IMPORTANT: See PART 5 "Smart escalation behavior" for the complete escalation flow:**
 - Binary first checks if already root/admin → skips escalation prompt entirely
 - Only prompts if user CAN actually escalate (is in sudoers/wheel/admin group)
 - Never prompts if user cannot escalate → shows informative error instead
@@ -38422,7 +38422,7 @@ VERSION := $(shell [ -f release.txt ] && cat release.txt || echo "$${VERSION:-de
 
 # Build info — ISO 8601 / RFC 3339 UTC per version_conventions.md
 # Format: "2025-12-04T13:05:13Z"
-BUILD_DATE := $(shell date -u +"%%Y-%%m-%%dT%%H:%%M:%%SZ")
+BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 COMMIT_ID := $(shell git rev-parse --short HEAD 2>/dev/null || echo "N/A")
 # COMMIT_ID used directly - no VCS_REF alias
 
@@ -38651,6 +38651,7 @@ docker:
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg BUILD_DATE="$(BUILD_DATE)" \
 		--build-arg COMMIT_ID="$(COMMIT_ID)" \
+		--build-arg OFFICIAL_SITE="$(OFFICIAL_SITE)" \
 		-t $(REGISTRY):$(VERSION) \
 		-t $(REGISTRY):latest \
 		.
@@ -39312,7 +39313,7 @@ RUN mkdir src && echo 'fn main() {}' > src/main.rs && \
 # pure Rust with no C-library dependency, so a --features saml build is
 # STILL the same fully-static musl artifact as the default build — no
 # additional toolchain packages or dynamic linking are required either way
-# (see PART 5 § SAML crate maturity note for the v0.0.1-alpha caveat).
+# (see PART 3 § SAML crate maturity note for the v0.0.1-alpha caveat).
 COPY . .
 RUN VERSION="${VERSION}" \
     COMMIT_ID="${COMMIT_ID}" \
@@ -39871,12 +39872,14 @@ COPY src/ ./src/
 # NOTE: SAML is OFF by default so it's compiled out unless needed. The `saml`
 # crate (danielkov/saml) is pure Rust with no C-library dependency, so a
 # --features saml build is STILL fully static — no extra builder headers or
-# runtime packages required. See PART 5 § SAML crate maturity note.
+# runtime packages required. See PART 3 § SAML crate maturity note.
 ARG VERSION=dev
-ARG COMMIT=unknown
-ARG BUILD_TIME=unknown
+ARG COMMIT_ID=unknown
+ARG BUILD_DATE=unknown
+ARG OFFICIAL_SITE
 
-RUN RUSTFLAGS="-C target-feature=+crt-static" \
+RUN VERSION="${VERSION}" COMMIT_ID="${COMMIT_ID}" BUILD_DATE="${BUILD_DATE}" OFFICIAL_SITE="${OFFICIAL_SITE}" \
+    RUSTFLAGS="-C target-feature=+crt-static" \
     cargo build --release --target x86_64-unknown-linux-musl \
     && cp target/x86_64-unknown-linux-musl/release/{project_name} /app/{project_name}
 
@@ -41561,19 +41564,8 @@ jobs:
             VERSION=${{ env.VERSION }}
             BUILD_DATE=${{ env.BUILD_DATE }}
             COMMIT_ID=${{ env.COMMIT_ID }}
-          labels: |
-            org.opencontainers.image.vendor={project_org}
-            org.opencontainers.image.authors={project_org}
-            org.opencontainers.image.title=${{ env.PROJECT_NAME }}
-            org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
-            org.opencontainers.image.description=${{ env.PROJECT_NAME }} - standard image (alpine)
-            org.opencontainers.image.version=${{ env.VERSION }}
-            org.opencontainers.image.created=${{ env.BUILD_DATE }}
-            org.opencontainers.image.revision=${{ env.COMMIT_ID }}
-            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.licenses=MIT
+            OFFICIAL_SITE=${{ env.OFFICIAL_SITE }}
+          labels: ""
           annotations: |
             manifest:org.opencontainers.image.vendor={project_org}
             manifest:org.opencontainers.image.authors={project_org}
@@ -41630,19 +41622,8 @@ jobs:
             VERSION=${{ env.VERSION }}
             BUILD_DATE=${{ env.BUILD_DATE }}
             COMMIT_ID=${{ env.COMMIT_ID }}
-          labels: |
-            org.opencontainers.image.vendor={project_org}
-            org.opencontainers.image.authors={project_org}
-            org.opencontainers.image.title=${{ env.PROJECT_NAME }}-devel
-            org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
-            org.opencontainers.image.description=${{ env.PROJECT_NAME }} - development image (alpine, debug mode)
-            org.opencontainers.image.version=${{ env.VERSION }}
-            org.opencontainers.image.created=${{ env.BUILD_DATE }}
-            org.opencontainers.image.revision=${{ env.COMMIT_ID }}
-            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.licenses=MIT
+            OFFICIAL_SITE=${{ env.OFFICIAL_SITE }}
+          labels: ""
           annotations: |
             manifest:org.opencontainers.image.vendor={project_org}
             manifest:org.opencontainers.image.authors={project_org}
@@ -41764,18 +41745,8 @@ jobs:
             VERSION=${{ env.VERSION }}
             BUILD_DATE=${{ env.BUILD_DATE }}
             COMMIT_ID=${{ env.COMMIT_ID }}
-          labels: |
-            org.opencontainers.image.vendor={project_org}
-            org.opencontainers.image.authors={project_org}
-            org.opencontainers.image.title=${{ env.PROJECT_NAME }}-aio
-            org.opencontainers.image.description=${{ env.PROJECT_NAME }} - all-in-one (debian + postgresql + valkey + tor)
-            org.opencontainers.image.version=${{ env.VERSION }}
-            org.opencontainers.image.created=${{ env.BUILD_DATE }}
-            org.opencontainers.image.revision=${{ env.COMMIT_ID }}
-            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.licenses=MIT
+            OFFICIAL_SITE=${{ env.OFFICIAL_SITE }}
+          labels: ""
           annotations: |
             manifest:org.opencontainers.image.vendor={project_org}
             manifest:org.opencontainers.image.authors={project_org}
@@ -42081,6 +42052,26 @@ jobs:
             arch: amd64
           - target: aarch64-unknown-linux-musl
             os: linux
+            arch: arm64
+          - target: x86_64-apple-darwin
+            os: darwin
+            arch: amd64
+          - target: aarch64-apple-darwin
+            os: darwin
+            arch: arm64
+          - target: x86_64-pc-windows-gnu
+            os: windows
+            arch: amd64
+            ext: .exe
+          - target: aarch64-pc-windows-gnullvm
+            os: windows
+            arch: arm64
+            ext: .exe
+          - target: x86_64-unknown-freebsd
+            os: freebsd
+            arch: amd64
+          - target: aarch64-unknown-freebsd
+            os: freebsd
             arch: arm64
 
     steps:
@@ -42493,19 +42484,8 @@ jobs:
             VERSION=${{ env.VERSION }}
             BUILD_DATE=${{ env.BUILD_DATE }}
             COMMIT_ID=${{ env.COMMIT_ID }}
-          labels: |
-            org.opencontainers.image.vendor={project_org}
-            org.opencontainers.image.authors={project_org}
-            org.opencontainers.image.title=${{ env.PROJECT_NAME }}
-            org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
-            org.opencontainers.image.description=${{ env.PROJECT_NAME }} - standard image (alpine)
-            org.opencontainers.image.version=${{ env.VERSION }}
-            org.opencontainers.image.created=${{ env.BUILD_DATE }}
-            org.opencontainers.image.revision=${{ env.COMMIT_ID }}
-            org.opencontainers.image.url=${{ gitea.server_url }}/${{ gitea.repository }}
-            org.opencontainers.image.source=${{ gitea.server_url }}/${{ gitea.repository }}
-            org.opencontainers.image.documentation=${{ gitea.server_url }}/${{ gitea.repository }}
-            org.opencontainers.image.licenses=MIT
+            OFFICIAL_SITE=${{ env.OFFICIAL_SITE }}
+          labels: ""
           annotations: |
             manifest:org.opencontainers.image.vendor={project_org}
             manifest:org.opencontainers.image.authors={project_org}
@@ -42569,19 +42549,8 @@ jobs:
             VERSION=${{ env.VERSION }}
             BUILD_DATE=${{ env.BUILD_DATE }}
             COMMIT_ID=${{ env.COMMIT_ID }}
-          labels: |
-            org.opencontainers.image.vendor={project_org}
-            org.opencontainers.image.authors={project_org}
-            org.opencontainers.image.title=${{ env.PROJECT_NAME }}-devel
-            org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
-            org.opencontainers.image.description=${{ env.PROJECT_NAME }} - development image (alpine, debug mode)
-            org.opencontainers.image.version=${{ env.VERSION }}
-            org.opencontainers.image.created=${{ env.BUILD_DATE }}
-            org.opencontainers.image.revision=${{ env.COMMIT_ID }}
-            org.opencontainers.image.url=${{ gitea.server_url }}/${{ gitea.repository }}
-            org.opencontainers.image.source=${{ gitea.server_url }}/${{ gitea.repository }}
-            org.opencontainers.image.documentation=${{ gitea.server_url }}/${{ gitea.repository }}
-            org.opencontainers.image.licenses=MIT
+            OFFICIAL_SITE=${{ env.OFFICIAL_SITE }}
+          labels: ""
           annotations: |
             manifest:org.opencontainers.image.vendor={project_org}
             manifest:org.opencontainers.image.authors={project_org}
@@ -42709,18 +42678,8 @@ jobs:
             VERSION=${{ env.VERSION }}
             BUILD_DATE=${{ env.BUILD_DATE }}
             COMMIT_ID=${{ env.COMMIT_ID }}
-          labels: |
-            org.opencontainers.image.vendor={project_org}
-            org.opencontainers.image.authors={project_org}
-            org.opencontainers.image.title=${{ env.PROJECT_NAME }}-aio
-            org.opencontainers.image.description=${{ env.PROJECT_NAME }} - all-in-one (debian + postgresql + valkey + tor)
-            org.opencontainers.image.version=${{ env.VERSION }}
-            org.opencontainers.image.created=${{ env.BUILD_DATE }}
-            org.opencontainers.image.revision=${{ env.COMMIT_ID }}
-            org.opencontainers.image.url=${{ gitea.server_url }}/${{ gitea.repository }}
-            org.opencontainers.image.source=${{ gitea.server_url }}/${{ gitea.repository }}
-            org.opencontainers.image.documentation=${{ gitea.server_url }}/${{ gitea.repository }}
-            org.opencontainers.image.licenses=MIT
+            OFFICIAL_SITE=${{ env.OFFICIAL_SITE }}
+          labels: ""
           annotations: |
             manifest:org.opencontainers.image.vendor={project_org}
             manifest:org.opencontainers.image.authors={project_org}
@@ -43165,6 +43124,7 @@ docker:build:
         --build-arg VERSION="${VERSION}" \
         --build-arg COMMIT_ID="${CI_COMMIT_SHORT_SHA}" \
         --build-arg BUILD_DATE="${BUILD_DATE}" \
+        --build-arg OFFICIAL_SITE="${OFFICIAL_SITE}" \
         --label "org.opencontainers.image.vendor=${PROJECT_ORG}" \
         --label "org.opencontainers.image.authors=${PROJECT_ORG}" \
         --label "org.opencontainers.image.title=${PROJECT_NAME}" \
@@ -43232,6 +43192,7 @@ docker:build-aio:
         --build-arg VERSION="${VERSION}" \
         --build-arg COMMIT_ID="${CI_COMMIT_SHORT_SHA}" \
         --build-arg BUILD_DATE="${BUILD_DATE}" \
+        --build-arg OFFICIAL_SITE="${OFFICIAL_SITE}" \
         --label "org.opencontainers.image.vendor=${PROJECT_ORG}" \
         --label "org.opencontainers.image.authors=${PROJECT_ORG}" \
         --label "org.opencontainers.image.title=${PROJECT_NAME}-aio" \
@@ -43289,6 +43250,7 @@ docker:build-devel:
         --build-arg VERSION="${VERSION}" \
         --build-arg COMMIT_ID="${CI_COMMIT_SHORT_SHA}" \
         --build-arg BUILD_DATE="${BUILD_DATE}" \
+        --build-arg OFFICIAL_SITE="${OFFICIAL_SITE}" \
         --label "org.opencontainers.image.vendor=${PROJECT_ORG}" \
         --label "org.opencontainers.image.authors=${PROJECT_ORG}" \
         --label "org.opencontainers.image.title=${PROJECT_NAME}-devel" \
@@ -44130,6 +44092,7 @@ pipeline {
                             --build-arg VERSION="${VERSION}" \
                             --build-arg COMMIT_ID="${COMMIT_ID}" \
                             --build-arg BUILD_DATE="${BUILD_DATE}" \
+                            --build-arg OFFICIAL_SITE="${OFFICIAL_SITE}" \
                             --label "org.opencontainers.image.vendor=${PROJECT_ORG}" \
                             --label "org.opencontainers.image.authors=${PROJECT_ORG}" \
                             --label "org.opencontainers.image.title=${PROJECT_NAME}" \
@@ -44196,6 +44159,7 @@ pipeline {
                             --build-arg VERSION="${VERSION}" \
                             --build-arg COMMIT_ID="${COMMIT_ID}" \
                             --build-arg BUILD_DATE="${BUILD_DATE}" \
+                            --build-arg OFFICIAL_SITE="${OFFICIAL_SITE}" \
                             --label "org.opencontainers.image.vendor=${PROJECT_ORG}" \
                             --label "org.opencontainers.image.authors=${PROJECT_ORG}" \
                             --label "org.opencontainers.image.title=${PROJECT_NAME}-aio" \
@@ -44248,6 +44212,7 @@ pipeline {
                             --build-arg VERSION="${VERSION}" \
                             --build-arg COMMIT_ID="${COMMIT_ID}" \
                             --build-arg BUILD_DATE="${BUILD_DATE}" \
+                            --build-arg OFFICIAL_SITE="${OFFICIAL_SITE}" \
                             --label "org.opencontainers.image.vendor=${PROJECT_ORG}" \
                             --label "org.opencontainers.image.authors=${PROJECT_ORG}" \
                             --label "org.opencontainers.image.title=${PROJECT_NAME}-devel" \
@@ -46879,7 +46844,7 @@ pymdown-extensions>=10.0
 
 ### docs/index.md
 
-```markdown
+````markdown
 # {PROJECT_NAME}
 
 {Brief project description}
@@ -46913,18 +46878,18 @@ docker run --name "{project_name}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -
 ## Links
 
 - [Repository]({PLATFORM_REPO_URL})
-- [Live Demo](https://{project_name}.{project_org}.us) (if applicable)
+- [Live Demo]({official_site}) (if applicable)
 - [API Documentation](/server/docs/swagger) (Swagger UI)
 - [GraphQL Playground](/server/docs/graphql)
 
 ## License
 
 MIT - See [LICENSE.md]({PLATFORM_REPO_URL}/blob/main/LICENSE.md)
-```
+````
 
 ### docs/installation.md
 
-```markdown
+````markdown
 # Installation
 
 ## Docker (Recommended)
@@ -46959,11 +46924,11 @@ sudo systemctl enable {project_name}
 ## Configuration
 
 See [Configuration](configuration.md) for all options.
-```
+````
 
 ### docs/configuration.md
 
-```markdown
+````markdown
 # Configuration
 
 ## Config File
@@ -47001,11 +46966,11 @@ Document:
 - external auth provider settings (OIDC/LDAP/SAML) if enabled
 - well-known namespace settings and optional entries if enabled
 - health/public endpoint toggles that operators can change
-```
+````
 
 ### docs/api.md
 
-```markdown
+````markdown
 # API Reference
 
 ## REST API
@@ -47037,7 +47002,7 @@ GraphQL playground: [/server/docs/graphql](/server/docs/graphql)
 ```graphql
 # ... (GraphQL schema)
 ```
-```
+````
 
 ### docs/admin.md
 
@@ -47138,7 +47103,7 @@ Programmatic access via `/api/{api_version}/server/{admin_path}/` with bearer to
 
 ### docs/development.md
 
-```markdown
+````markdown
 # Development Guide
 
 ## Prerequisites
@@ -47181,7 +47146,7 @@ make test
 - Run `cargo clippy -- -D warnings` and fix all warnings
 - Add tests for new features
 - Update documentation
-```
+````
 
 ---
 
@@ -47295,13 +47260,13 @@ use time::Duration;
 #[derive(Debug, Clone)]
 pub struct LangKey;
 
-pub async fn language_middleware<B>(
+pub async fn language_middleware(
     State(state): State<Arc<AppState>>,
     Query(params): Query<std::collections::HashMap<String, String>>,
     jar: CookieJar,
     headers: HeaderMap,
-    mut req: Request<B>,
-    next: Next<B>,
+    mut req: Request,
+    next: Next,
 ) -> Response {
     let mut lang = String::new();
     let mut set_cookie: Option<Cookie<'static>> = None;
@@ -49812,6 +49777,7 @@ pub async fn start_dedicated_tor(
     let torrc_path = config_dir.join("tor").join("torrc");
     let tor_data_dir = data_dir.join("tor");
     let key_path = data_dir.join("tor").join("site").join("hs_ed25519_secret_key");
+    let control_port_path = data_dir.join("tor").join("control_port");
 
     let torrc_content = get_tor_config(cfg, data_dir);
 
@@ -49834,17 +49800,22 @@ pub async fn start_dedicated_tor(
 
     // Wait for bootstrap via control port polling
     let bootstrap_timeout = Duration::from_secs(cfg.bootstrap_timeout);
-    wait_for_bootstrap(&torrc_path, bootstrap_timeout).await?;
+    wait_for_bootstrap(&control_port_path, bootstrap_timeout).await?;
 
     // Determine SOCKS address if outbound is enabled
     let socks_addr = if cfg.use_network || cfg.allow_user_preference {
-        Some(read_socks_addr(&torrc_path).unwrap_or_else(|_| "127.0.0.1:9999".into()))
+        Some(
+            read_socks_addr(&control_port_path)
+                .await
+                .unwrap_or_else(|_| "127.0.0.1:9999".into()),
+        )
     } else {
         None
     };
 
     // Create hidden service via ADD_ONION control command
-    let service_id = add_onion_service(&torrc_path, server_port, cfg.virtual_port, &key_path)?;
+    let service_id =
+        add_onion_service(&control_port_path, server_port, cfg.virtual_port, &key_path).await?;
 
     info!(
         "Tor hidden service started: {}.onion:{} → 127.0.0.1:{}",
@@ -49904,6 +49875,180 @@ fn save_onion_key(path: &Path, key_bytes: &[u8]) -> Result<(), AppError> {
     fs::write(path, key_bytes)?;
     fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
     Ok(())
+}
+
+/// Locates the `tor` binary to spawn: an explicit configured path first,
+/// then well-known system locations. Never assumes a bare `tor` on PATH
+/// unless nothing more specific is configured or found.
+fn resolve_tor_binary(cfg: &TorConfig) -> Result<PathBuf, AppError> {
+    if let Some(configured) = &cfg.binary_path {
+        let path = PathBuf::from(configured);
+        if path.is_file() {
+            return Ok(path);
+        }
+        return Err(AppError::Internal(format!(
+            "configured tor.binary_path {} not found",
+            path.display()
+        )));
+    }
+
+    for candidate in ["/usr/bin/tor", "/usr/sbin/tor", "/usr/local/bin/tor", "/opt/homebrew/bin/tor"] {
+        let path = PathBuf::from(candidate);
+        if path.is_file() {
+            return Ok(path);
+        }
+    }
+
+    which::which("tor").map_err(|_| AppError::Internal("tor binary not found on PATH or well-known locations".into()))
+}
+
+/// Reads the `127.0.0.1:{port}` address Tor wrote to `ControlPortWriteToFile`,
+/// retrying until the file appears (Tor creates it only after opening the
+/// control listener).
+async fn read_control_addr(control_port_path: &Path, timeout: Duration) -> Result<String, AppError> {
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        if let Ok(contents) = tokio::fs::read_to_string(control_port_path).await {
+            if let Some(addr) = contents.trim().strip_prefix("PORT=") {
+                return Ok(addr.trim().to_string());
+            }
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(AppError::Internal(format!(
+                "timed out waiting for control port file at {}",
+                control_port_path.display()
+            )));
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+}
+
+/// Opens an authenticated control-port connection (cookie auth via
+/// `CookieAuthentication 1`, falling back to `AUTHENTICATE` with no
+/// credentials when cookie auth is unavailable).
+async fn open_control_conn(control_port_path: &Path, timeout: Duration) -> Result<TcpStream, AppError> {
+    let addr = read_control_addr(control_port_path, timeout).await?;
+    let mut stream = TcpStream::connect(&addr)
+        .await
+        .map_err(|e| AppError::Internal(format!("failed to connect to tor control port {addr}: {e}")))?;
+    stream
+        .write_all(b"AUTHENTICATE\r\n")
+        .await
+        .map_err(|e| AppError::Internal(format!("tor control AUTHENTICATE failed: {e}")))?;
+    let mut buf = vec![0u8; 512];
+    let n = stream
+        .read(&mut buf)
+        .await
+        .map_err(|e| AppError::Internal(format!("tor control read failed: {e}")))?;
+    if !buf[..n].starts_with(b"250") {
+        return Err(AppError::Internal(format!(
+            "tor control authentication rejected: {}",
+            String::from_utf8_lossy(&buf[..n])
+        )));
+    }
+    Ok(stream)
+}
+
+/// Polls `GETINFO status/bootstrap-phase` on the control port until Tor
+/// reports `PROGRESS=100`, or returns an error once `bootstrap_timeout` elapses.
+async fn wait_for_bootstrap(control_port_path: &Path, timeout: Duration) -> Result<(), AppError> {
+    let deadline = tokio::time::Instant::now() + timeout;
+    let mut stream = open_control_conn(control_port_path, timeout).await?;
+
+    loop {
+        stream
+            .write_all(b"GETINFO status/bootstrap-phase\r\n")
+            .await
+            .map_err(|e| AppError::Internal(format!("tor control GETINFO failed: {e}")))?;
+        let mut buf = vec![0u8; 512];
+        let n = stream
+            .read(&mut buf)
+            .await
+            .map_err(|e| AppError::Internal(format!("tor control read failed: {e}")))?;
+        let line = String::from_utf8_lossy(&buf[..n]);
+
+        if line.contains("PROGRESS=100") {
+            return Ok(());
+        }
+
+        if tokio::time::Instant::now() >= deadline {
+            return Err(AppError::Internal(format!(
+                "tor bootstrap did not complete within {}s: {}",
+                timeout.as_secs(),
+                line.trim()
+            )));
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+}
+
+/// Reads the live SOCKS listener address via `GETINFO net/listeners/socks`.
+/// Used instead of a hardcoded port because `SocksPort auto` picks a random
+/// available port at startup.
+async fn read_socks_addr(control_port_path: &Path) -> Result<String, AppError> {
+    let mut stream = open_control_conn(control_port_path, Duration::from_secs(10)).await?;
+    stream
+        .write_all(b"GETINFO net/listeners/socks\r\n")
+        .await
+        .map_err(|e| AppError::Internal(format!("tor control GETINFO socks failed: {e}")))?;
+    let mut buf = vec![0u8; 512];
+    let n = stream
+        .read(&mut buf)
+        .await
+        .map_err(|e| AppError::Internal(format!("tor control read failed: {e}")))?;
+    let line = String::from_utf8_lossy(&buf[..n]);
+
+    line.split('"')
+        .nth(1)
+        .map(|s| s.to_string())
+        .ok_or_else(|| AppError::Internal(format!("could not parse SOCKS address from: {}", line.trim())))
+}
+
+/// Creates (or restores) the hidden service via the `ADD_ONION` control
+/// command, mapping `.onion:{virtual_port}` → `127.0.0.1:{server_port}`.
+/// If `key_path` already holds a saved ED25519-V3 key, restores that
+/// identity (`ADD_ONION ED25519-V3:{key}`); otherwise requests a new key
+/// (`ADD_ONION NEW:ED25519-V3`) and persists it via `save_onion_key`.
+async fn add_onion_service(
+    control_port_path: &Path,
+    server_port: u16,
+    virtual_port: u16,
+    key_path: &Path,
+) -> Result<String, AppError> {
+    let mut stream = open_control_conn(control_port_path, Duration::from_secs(10)).await?;
+
+    let key_arg = match fs::read(key_path) {
+        Ok(existing) => format!("ED25519-V3:{}", base64::encode(existing)),
+        Err(_) => "NEW:ED25519-V3".to_string(),
+    };
+
+    let cmd = format!(
+        "ADD_ONION {key_arg} Flags=Detach Port={virtual_port},127.0.0.1:{server_port}\r\n"
+    );
+    stream
+        .write_all(cmd.as_bytes())
+        .await
+        .map_err(|e| AppError::Internal(format!("tor control ADD_ONION failed: {e}")))?;
+
+    let mut buf = vec![0u8; 1024];
+    let n = stream
+        .read(&mut buf)
+        .await
+        .map_err(|e| AppError::Internal(format!("tor control read failed: {e}")))?;
+    let response = String::from_utf8_lossy(&buf[..n]);
+
+    let service_id = response
+        .lines()
+        .find_map(|l| l.strip_prefix("250-ServiceID="))
+        .ok_or_else(|| AppError::Internal(format!("ADD_ONION did not return a ServiceID: {}", response.trim())))?
+        .trim()
+        .to_string();
+
+    if let Some(priv_key) = response.lines().find_map(|l| l.strip_prefix("250-PrivateKey=ED25519-V3:")) {
+        save_onion_key(key_path, &base64::decode(priv_key.trim()).unwrap_or_default())?;
+    }
+
+    Ok(service_id)
 }
 ```
 
@@ -50630,6 +50775,42 @@ pub fn validate_tor_config(config: &TorConfig) -> Vec<ValidationError> {
         });
     }
 
+    if config.virtual_port < 1 {
+        errors.push(ValidationError {
+            field: "virtual_port".to_string(),
+            message: "Must be a valid port (1-65535)".to_string(),
+        });
+    }
+
+    // Performance validation (bootstrap + streams)
+    if config.bootstrap_timeout < 30 || config.bootstrap_timeout > 600 {
+        errors.push(ValidationError {
+            field: "bootstrap_timeout".to_string(),
+            message: "Must be between 30 and 600 seconds".to_string(),
+        });
+    }
+
+    if config.max_streams_per_circuit < 10 || config.max_streams_per_circuit > 500 {
+        errors.push(ValidationError {
+            field: "max_streams_per_circuit".to_string(),
+            message: "Must be between 10 and 500".to_string(),
+        });
+    }
+
+    // Bandwidth validation (monthly cap) — number + GB/TB, or the literal "unlimited"
+    let monthly = config.max_monthly_bandwidth.trim();
+    let monthly_valid = monthly == "unlimited"
+        || monthly
+            .split_once(char::is_whitespace)
+            .map(|(n, unit)| n.parse::<u64>().is_ok() && (unit == "GB" || unit == "TB"))
+            .unwrap_or(false);
+    if !monthly_valid {
+        errors.push(ValidationError {
+            field: "max_monthly_bandwidth".to_string(),
+            message: "Format: number + GB/TB or 'unlimited' (e.g., '100 GB')".to_string(),
+        });
+    }
+
     errors
 }
 ```
@@ -51111,7 +51292,7 @@ The CLI never adds URLs that weren't in the autodiscover response — operators 
 
 ## CLI Auto-Update (Same Pattern as Server Self-Update + Agent)
 
-**The CLI follows the same flow as the server's self-update (PART 23) and the agent's auto-update (PART 33 above): check version via autodiscover, download from the server, verify SHA-256, atomic replace, restart.**
+**The CLI follows the same flow as the server's self-update (PART 23) and the agent's auto-update (PART 33 below): check version via autodiscover, download from the server, verify SHA-256, atomic replace, restart.**
 
 | Step | Action |
 |------|--------|
@@ -54645,76 +54826,11 @@ Build Info:
 
 **Version compatibility check:** CLI queries server `/api/{api_version}/version` and warns if versions differ significantly.
 
-## Determining If Project Needs CLI
+## CLI Is Required for All Projects
 
-**Key Question: Would users benefit from terminal-based access to your service?**
+**The CLI client is REQUIRED for every project — there is no include/skip decision.** Every server MUST ship a companion CLI (see the opening of this PART). Only the agent is a per-project determination (next section).
 
-### When CLI is Needed vs Not Needed
-
-| Scenario | CLI Needed? | Why |
-|----------|-------------|-----|
-| Developers querying API data | ✅ YES | `mycli search term` faster than browser |
-| Sysadmins managing servers | ✅ YES | Terminal is their native environment |
-| CI/CD pipeline integration | ✅ YES | Scripts need programmatic access |
-| Bulk data operations | ✅ YES | `mycli import file.csv` beats web forms |
-| Simple consumer web app | ❌ NO | Users expect browser, not terminal |
-| Photo sharing for families | ❌ NO | Grandma won't use CLI |
-| Single-purpose widget | ❌ NO | Too simple, just use curl |
-| Mobile-first application | ❌ NO | No terminal on phones |
-
-### Project Examples: CLI vs No CLI
-
-**Projects that DO benefit from CLI:**
-
-| Project Type | Example Names | CLI Use Case |
-|--------------|---------------|--------------|
-| **Data Lookup APIs** | IP geolocation, airport codes, country data | `mycli lookup JFK` quick terminal queries |
-| **Developer Tools** | GitHub CLI, Vercel CLI, Netlify CLI | Developers live in terminal |
-| **DevOps/Infra** | kubectl, docker, terraform | Automation and scripting |
-| **Pastebin/Snippet** | GitHub Gist, ix.io, termbin | `cat file \| mycli paste` |
-| **Git Hosting** | Gitea, Forgejo (via gh/glab) | PR/issue management from terminal |
-| **Password Manager** | Bitwarden CLI, 1Password CLI | Secure scripted access |
-| **Note Taking** | Standard Notes CLI, Joplin CLI | Quick capture from terminal |
-| **URL Shortener** | YOURLS, Shlink | `mycli shorten https://...` |
-| **Bookmark Manager** | Linkding, Shaarli | Batch import/export |
-| **Time Tracking** | Toggl CLI, Clockify CLI | `mycli start "task"` without context switch |
-
-**Projects that do NOT need CLI:**
-
-| Project Type | Example Names | Why No CLI |
-|--------------|---------------|------------|
-| **Photo Sharing** | Immich, Photoprism, Google Photos | Visual content needs visual interface |
-| **Social Media** | Mastodon, Pixelfed | Social experience is visual |
-| **E-commerce** | WooCommerce, Shopify | Shopping is visual/browsing |
-| **Video Streaming** | Jellyfin, Plex | Watching video requires GUI |
-| **Dating/Social Apps** | Any social app | Human interaction, not automation |
-| **Games** | Any game | Games need GUI |
-| **CMS/Blogs** | WordPress, Ghost | Content creation is visual |
-| **Forum/Community** | Discourse, Flarum | Discussion is web-based |
-| **Calendar/Scheduling** | Calendly, Cal.com | Visual scheduling |
-| **Survey/Forms** | Typeform, Google Forms | Form filling is web-native |
-
-### CLI Decision Tree
-
-```
-Is your target user comfortable in a terminal?
-│
-├─► YES (developers, sysadmins, power users)
-│   │
-│   ├─► Would terminal access save them time?
-│   │   └─► YES → CLI beneficial
-│   │
-│   ├─► Would scripting/automation be valuable?
-│   │   └─► YES → CLI beneficial
-│   │
-│   └─► Is data lookup/search a common use case?
-│       └─► YES → CLI beneficial
-│
-└─► NO (general consumers, non-technical users)
-    └─► Skip CLI - focus on web/mobile UI
-```
-
-### CLI vs Just Using curl
+### Why a Dedicated CLI Beats Raw curl
 
 **When CLI adds value over raw curl:**
 
@@ -54727,20 +54843,6 @@ Is your target user comfortable in a terminal?
 | Offline caching | Not possible | Local cache support |
 | Tab completion | None | Command/arg completion |
 | Interactive mode | None | TUI for browsing |
-
-**If users would just use curl anyway, CLI is worthwhile.**
-**If users would never touch terminal, skip CLI.**
-
-### Quick Decision
-
-| If your users are... | CLI? |
-|---------------------|------|
-| Developers | ✅ Yes |
-| Sysadmins/DevOps | ✅ Yes |
-| Technical power users | ✅ Yes |
-| General consumers | ❌ No |
-| Non-technical business users | ❌ No |
-| Mobile-only users | ❌ No |
 
 ---
 
@@ -56757,9 +56859,9 @@ User receives: "Password reset requested by administrator.
 | Scenario | Error Message |
 |----------|---------------|
 | Blocklisted username | `Username contains blocked word: {word}` |
-| Username too short | `Username must be at least 3 characters` |
-| Username too long | `Username cannot exceed 32 characters` |
-| Invalid characters | `Username can only contain lowercase letters, numbers, underscore, and hyphen` |
+| Username too short | `Username must be at least 2 characters` |
+| Username too long | `Username cannot exceed 39 characters` |
+| Invalid characters | `Username can only contain lowercase letters, numbers, and hyphens` |
 | Invalid email format | `Please enter a valid email address` |
 | Password too weak | `Password must be at least 8 characters` |
 
@@ -56786,7 +56888,7 @@ User receives: "Password reset requested by administrator.
 | Passkeys | WebAuthn/FIDO2 passwordless authentication |
 | OIDC | External identity providers (OpenID Connect) |
 | LDAP | Directory bind authentication (Active Directory, OpenLDAP, FreeIPA) |
-| SAML 2.0 | SAML Service Provider (Web Browser SSO + SLO); feature-gated build, see PART 5 |
+| SAML 2.0 | SAML Service Provider (Web Browser SSO + SLO); feature-gated build, see PART 3 |
 
 **OIDC Providers (Examples):**
 - Self-hosted: Authentik, Authelia, Keycloak, Dex, Zitadel
@@ -57249,7 +57351,7 @@ server:
             backoff: 30s
 
     # SAML 2.0 Service Provider. Requires a SAML-enabled build (Cargo `saml`
-    # feature → the `saml` crate, danielkov/saml; see PART 5 § SAML crate
+    # feature → the `saml` crate, danielkov/saml; see PART 3 § SAML crate
     # maturity note — pure Rust, no system C dependency, but v0.0.1-alpha).
     # If saml.enabled is true on a build compiled without the feature, the server
     # MUST fail fast at startup with a clear message rather than silently ignore it.
@@ -57338,7 +57440,7 @@ server:
 
 ### External Identity Provider Requirements
 
-- External identity support for Server Admins MUST include OIDC, LDAP, and SAML 2.0 (SAML is feature-gated at build time; see PART 5)
+- External identity support for Server Admins MUST include OIDC, LDAP, and SAML 2.0 (SAML is feature-gated at build time; see PART 3)
 - OIDC, LDAP, and SAML MUST each support multiple named providers
 - All OIDC, LDAP, and SAML providers MUST be manageable from the Admin WebUI under `/server/{admin_path}/config/security/auth/*`
 - If `server.users.enabled: true`, the same provider definitions MUST also apply the regular-user auth rules (`auto_register`, username resolution, and `role_mapping`)
@@ -59123,7 +59225,7 @@ Moderation only - Server Admin does not manage org members/roles.
 | Database | File | Purpose |
 |----------|------|---------|
 | **Server DB** | `{data_dir}/db/server.db` | Server state, configuration, scheduler |
-| **Users DB** | `{data_dir}/db/users.db` | Admin and user accounts, tokens, sessions |
+| **Users DB** | `{data_dir}/db/users.db` | Admin and user accounts, tokens, user sessions |
 
 ### Why Two Databases?
 
@@ -60823,14 +60925,20 @@ GET /api/{api_version}/orgs/acme-corp/members/very_private_user
 
 ### Database Schema Update
 
-```sql
--- Add org_visibility to users table
-ALTER TABLE users ADD COLUMN org_visibility INTEGER NOT NULL DEFAULT 1;
--- 1 = show basic info in orgs, 0 = username only
+**Applied via the idempotent Schema Updates mechanism (PART 10) — never run directly as a bare `ALTER TABLE`:**
 
--- Index for efficient org member queries
-CREATE INDEX IF NOT EXISTS idx_users_org_visibility ON users(visibility, org_visibility);
+```rust
+// Added to SCHEMA_UPDATES in ensure_schema() (see PART 10 § Schema Updates)
+const SCHEMA_UPDATES: &[&str] = &[
+    // Add org_visibility to users table (1 = show basic info in orgs, 0 = username only)
+    "ALTER TABLE users ADD COLUMN org_visibility INTEGER NOT NULL DEFAULT 1",
+
+    // Index for efficient org member queries
+    "CREATE INDEX IF NOT EXISTS idx_users_org_visibility ON users(visibility, org_visibility)",
+];
 ```
+
+Each `ALTER TABLE ADD COLUMN` statement runs through `ensure_schema()`'s guard: on SQLite, "duplicate column" errors from a prior run are caught by `is_column_exists_error()` and ignored, making the statement safe to re-run on every startup.
 
 ### Implementation Logic
 
@@ -61176,9 +61284,9 @@ server:
 **Environment variable override:**
 
 ```bash
-CUSTOM_DOMAINS_ENABLED=true
-CUSTOM_DOMAINS_MAX_PER_USER=5
-CUSTOM_DOMAINS_MAX_PER_ORG=20
+{PROJECT_NAME}_CUSTOM_DOMAINS_ENABLED=true
+{PROJECT_NAME}_CUSTOM_DOMAINS_MAX_PER_USER=5
+{PROJECT_NAME}_CUSTOM_DOMAINS_MAX_PER_ORG=20
 ```
 
 ## Database Schema
@@ -61248,7 +61356,6 @@ CREATE TABLE IF NOT EXISTS custom_domains (
     updated_at          INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_domains_domain ON custom_domains(domain);
 CREATE INDEX IF NOT EXISTS idx_custom_domains_owner ON custom_domains(owner_type, owner_id);
 CREATE INDEX IF NOT EXISTS idx_custom_domains_status ON custom_domains(status);
 CREATE INDEX IF NOT EXISTS idx_custom_domains_ssl_expires ON custom_domains(ssl_expires_at);
@@ -62116,8 +62223,8 @@ project_org:     {project_org}
 internal_name:   {project_name}        # FROZEN — equals project_name on first install, never changes
 app_name:        {project_name}
 official_site:   {fqdn}
-maintainer_name: {maintainer_name — defaults to {project_org} if unset}
-maintainer_email: {maintainer_email — or empty; used only if set}
+maintainer_name: {maintainer_name}     # defaults to {project_org} if unset
+maintainer_email: {maintainer_email}   # optional — used only if set, otherwise leave empty
 
 ## Business logic
 
@@ -63706,7 +63813,7 @@ After each significant change:
 **If project has existing database:**
 
 1. **NEVER break existing data**
-2. All schema changes are idempotent and applied on startup using `CREATE TABLE IF NOT EXISTS` + `ALTER TABLE IF NOT EXISTS ADD COLUMN IF NOT EXISTS` via sqlx
+2. All schema changes are idempotent and applied on startup using `CREATE TABLE IF NOT EXISTS` for new tables, plus a guarded `ALTER TABLE ADD COLUMN` for new columns — the guard catches and ignores the "duplicate column" error on re-run (PostgreSQL 9.6+ can use `ADD COLUMN IF NOT EXISTS` directly; see PART 10 § Schema Updates)
 3. No `migrations/` directory, no migration tool, no SQL migration files, no version tracking — the schema bootstrap runs every startup and is a no-op when already current
 4. Test schema bootstrap on backup data first
 5. Forward-only — schema changes must remain backward-compatible with the previous binary release (additive columns, never destructive)
@@ -63932,7 +64039,7 @@ When bootstrapping a new project from this specification:
 1. **Create src/server/mod.rs** - Axum server setup
 2. **Create src/handlers/health.rs** - Health check handler
 3. **Add CLI flags** per PART 8 specification (clap derive macros)
-4. **Add service support** per PART 24
+4. **Add service support** per PART 25
 5. **Create Makefile** per PART 26
 
 **Test:** Server starts and responds to `/server/healthz`

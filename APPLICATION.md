@@ -2,7 +2,7 @@
 
 **Name**: {project_name}
 
-**About this file:** `TEMPLATE.md` is the master template. When applied to a project, this file is copied (or symlinked) into the project as `AI.md`. Throughout this document, all references to `AI.md` refer to that resulting file in a real project.
+**About this file:** `APPLICATION.md` is the master template. When applied to a project, this file is copied (or symlinked) into the project as `AI.md`. Throughout this document, all references to `AI.md` refer to that resulting file in a real project.
 
 **Note:** `{PROJECT_NAME}` and `{project_name}` in this file are reference tokens, not setup-time text replacements. Their values are resolved from `IDEA.md ## Project variables` while `AI.md` remains read-only.
 
@@ -574,10 +574,10 @@ Prefer platform-standard user directories:
 
 | Purpose | Linux / BSD | macOS | Windows |
 |---------|-------------|-------|---------|
-| Config | `~/.config/{internal_org}/{internal_name}/` | `~/Library/Application Support/{internal_name}/config/` | `%AppData%\\{internal_org}\\{internal_name}\\config\\` |
-| Data | `~/.local/share/{internal_org}/{internal_name}/` | `~/Library/Application Support/{internal_name}/data/` | `%LocalAppData%\\{internal_org}\\{internal_name}\\data\\` |
-| Cache | `~/.cache/{internal_org}/{internal_name}/` | `~/Library/Caches/{internal_name}/` | `%LocalAppData%\\{internal_org}\\{internal_name}\\cache\\` |
-| Logs | `~/.local/state/{internal_org}/{internal_name}/logs/` | `~/Library/Logs/{internal_name}/` | `%LocalAppData%\\{internal_org}\\{internal_name}\\logs\\` |
+| Config | `~/.config/{internal_org}/{internal_name}/` | `~/Library/Application Support/{internal_org}/{internal_name}/config/` | `%AppData%\\{internal_org}\\{internal_name}\\config\\` |
+| Data | `~/.local/share/{internal_org}/{internal_name}/` | `~/Library/Application Support/{internal_org}/{internal_name}/data/` | `%LocalAppData%\\{internal_org}\\{internal_name}\\data\\` |
+| Cache | `~/.cache/{internal_org}/{internal_name}/` | `~/Library/Caches/{internal_org}/{internal_name}/` | `%LocalAppData%\\{internal_org}\\{internal_name}\\cache\\` |
+| Logs | `~/.local/state/{internal_org}/{internal_name}/logs/` | `~/Library/Logs/{internal_org}/{internal_name}/` | `%LocalAppData%\\{internal_org}\\{internal_name}\\logs\\` |
 
 **Rule:** Both `{internal_name}` and `{internal_org}` anchor on-disk identifiers and stable OS-registered names (Bundle IDs, package IDs, dbus names, keychain entries, updater channels). A rename of `{project_name}` or `{project_org}` MUST NOT silently move user data or change those identifiers.
 
@@ -853,10 +853,15 @@ Every production image MUST satisfy:
 Every `docker run` invocation in this project (CI, scripts, docs, examples) MUST use:
 
 ```bash
+PROJECT_NAME="{project_name}"
+PROJECT_IMAGE="casjaysdev/rust:latest"
+
 docker run --rm \
   --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
   ...
 ```
+
+`PROJECT_NAME` and `PROJECT_IMAGE` are shell variables set once (e.g., in the Makefile or the calling script) before any of the `docker run` examples below — `PROJECT_NAME` resolves to the project's `{project_name}` and `PROJECT_IMAGE` to the toolchain image selected under PART 5 (normally `casjaysdev/rust:latest`).
 
 - `--rm` — self-remove on exit (no orphaned containers)
 - `-it` — interactive-capable for log streaming and signal handling
@@ -1341,7 +1346,7 @@ Plugin downloads are an additional case and apply only when IDEA.md defines a ha
 
 - Keep dependencies minimal
 - Remove unused crates promptly
-- **Renovate is the only supported dependency-update tool** — covers Cargo deps, GitHub Actions SHAs, and Docker image digests from a single `renovate.json` at the repo root. Works on GitHub, GitLab, Gitea, Forgejo, and Bitbucket.
+- **Renovate is the only supported dependency-update tool** — covers Cargo deps, GitHub Actions SHAs, and Docker image digests from a single `renovate.json` at the repo root. Works on GitHub, GitLab, Gitea, Forgejo, and Jenkins.
 - **Dependabot is forbidden** — GitHub-only, duplicates Renovate's work on GitHub, and cannot serve the other four providers. Never enable both.
 - Public repos MUST ship `renovate.json` so Cargo / Actions / Docker updates land as PRs automatically; Renovate uses `pinDigests: true` to keep all `uses:` lines pinned to immutable SHAs
 - Renovate only updates the SHA; the **runtime-still-supported** verification (e.g., node24 vs deprecated runtimes) remains a manual check on every SHA bump (PART 10 → "Third-party Action Pinning")
@@ -1370,7 +1375,7 @@ No hidden telemetry. Any analytics, crash reporting, or update pings must be doc
 | Portability | No hardcoded org, project name, official site, or registry value anywhere in workflows. Use `${{ github.repository_owner }}` / `${{ github.event.repository.name }}` (and provider equivalents). Workflows must keep working after a fork without editing values. |
 | Renovate only | `renovate.json` at repo root is the only supported dependency-update tool — it covers GitHub Actions SHAs, Docker image digests, Cargo deps, and works across all five providers from a single config. Dependabot is **forbidden** (GitHub-only; duplicates Renovate on GitHub; cannot serve the other four providers). |
 | `act` pre-commit validation | Before committing any change to `.github/workflows/*.yml`, run `act --list -W {file}` on each changed file. Fix all errors before committing. The `validate-workflows.sh` PreToolUse hook enforces this automatically. |
-| Concurrency groups | Every push/PR workflow declares `concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }`. Release workflows use `cancel-in-progress: false` so a release in flight is never cancelled by a follow-up push. |
+| Concurrency groups | Every push/PR workflow declares `concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }`. Release workflows also use `cancel-in-progress: true` — a newer tag push supersedes the in-flight release build. |
 | Artifact retention | Every `actions/upload-artifact` step sets `retention-days: 7` (or shorter) — no infinite retention of build outputs. |
 
 ## Workflow Permissions
@@ -1421,7 +1426,7 @@ Every external action (`uses: owner/action@...`) MUST be pinned to a full commit
 - uses: actions/checkout@v4
 
 # Correct — SHA is immutable
-- uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+- uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 ```
 
 **When updating a pinned SHA**, verify three things:
@@ -1518,7 +1523,7 @@ jobs:
   secret-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           # required: truffleHog needs full history
           fetch-depth: 0
@@ -1534,7 +1539,7 @@ jobs:
   workflow-policy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - name: Verify all third-party actions are pinned to a 40-char SHA
         run: |
           set -eo pipefail
@@ -1549,10 +1554,10 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ hashFiles('Cargo.lock') != '' }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-      - name: cargo audit (inside :build image)
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - name: cargo audit (inside casjaysdev/rust:latest)
         run: |
-          IMAGE="ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:build"
+          IMAGE="casjaysdev/rust:latest"
           docker run --rm -i \
             --name "${{ github.event.repository.name }}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
             -v "$PWD":/work -w /work "$IMAGE" cargo audit
@@ -1561,7 +1566,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ hashFiles('docker/Dockerfile') != '' }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
       - name: Build local image for scanning
         run: |
@@ -1605,7 +1610,7 @@ jobs:
     container:
       image: casjaysdev/rust:latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - run: cargo build --release
 ```
 
@@ -1619,7 +1624,7 @@ concurrency:
   cancel-in-progress: true
 ```
 
-Release workflows (`release.yml`) MUST use `cancel-in-progress: false` so a release build already in flight is not killed by a follow-up push.
+Release workflows (`release.yml`) MUST use `cancel-in-progress: true` — a newer tag push supersedes the in-flight release build, so the superseded run should be cancelled rather than left to finish.
 
 Every `actions/upload-artifact` step MUST set a finite `retention-days`:
 
@@ -1658,7 +1663,9 @@ diff LICENSE.committed-generated.md LICENSE.generated.md
 # `cargo --target` keeps the full Rust target triple. The published artifact
 # is renamed to {project_name}-{platform}-{arch}{.ext} with -musl / vendor / ABI
 # tokens stripped (see PART 2 → "Binary Model").
-for TARGET in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
+for TARGET in x86_64-unknown-linux-musl aarch64-unknown-linux-musl \
+              x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm \
+              x86_64-apple-darwin aarch64-apple-darwin; do
   docker run --rm \
     --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
     -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
@@ -1666,20 +1673,41 @@ for TARGET in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
 
   # Map triple → artifact name: x86_64-unknown-linux-musl → linux-amd64
   case "$TARGET" in
-    x86_64-unknown-linux-musl)   ARTIFACT="{project_name}-linux-amd64" ;;
-    aarch64-unknown-linux-musl)  ARTIFACT="{project_name}-linux-arm64" ;;
+    x86_64-unknown-linux-musl)     ARTIFACT="{project_name}-linux-amd64" ;;
+    aarch64-unknown-linux-musl)    ARTIFACT="{project_name}-linux-arm64" ;;
+    x86_64-pc-windows-gnu)         ARTIFACT="{project_name}-windows-amd64.exe" ;;
+    aarch64-pc-windows-gnullvm)    ARTIFACT="{project_name}-windows-arm64.exe" ;;
+    x86_64-apple-darwin)           ARTIFACT="{project_name}-darwin-amd64" ;;
+    aarch64-apple-darwin)          ARTIFACT="{project_name}-darwin-arm64" ;;
   esac
 
-  cp "target/$TARGET/release/{project_name}" "binaries/$ARTIFACT"
+  # Windows binaries carry the .exe extension in the build output; others do not.
+  case "$TARGET" in
+    *-pc-windows-*) BIN="{project_name}.exe" ;;
+    *)              BIN="{project_name}" ;;
+  esac
+  cp "target/$TARGET/release/$BIN" "binaries/$ARTIFACT"
   sha256sum "binaries/$ARTIFACT" > "binaries/$ARTIFACT.sha256"
 
-  # Verify static linkage for this target — fails the build if unexpected
-  # dynamic deps appear. Use the appropriate inspector per target family:
+  # Verify static/expected linkage for this target — fails the build if
+  # unexpected dynamic deps appear. Use the appropriate inspector per target family:
   #   Linux musl     → ldd  (expect "not a dynamic executable" / "statically linked")
   #   Apple darwin   → otool -L (expect only Apple-provided frameworks)
   #   Windows GNU    → dumpbin /dependents (expect no MinGW runtime DLLs; image has no MSVC toolchain)
-  docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
-    sh -c "ldd target/$TARGET/release/{project_name} 2>&1 | grep -qE 'not a dynamic executable|statically linked'"
+  case "$TARGET" in
+    *-unknown-linux-musl)
+      docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
+        sh -c "ldd target/$TARGET/release/{project_name} 2>&1 | grep -qE 'not a dynamic executable|statically linked'"
+      ;;
+    *-apple-darwin)
+      docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
+        sh -c "otool -L target/$TARGET/release/{project_name}"
+      ;;
+    *-pc-windows-*)
+      docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
+        sh -c "dumpbin /dependents target/$TARGET/release/{project_name}.exe"
+      ;;
+  esac
 done
 
 # Generate the SBOM (CycloneDX) — published alongside the release artifacts.
@@ -1710,7 +1738,7 @@ The GitHub Releases API returns HTTP 422 `"tag_name is not a valid tag"` when th
 The `release` job already has `contents: write` to push assets — this covers tag push as well.
 
 ```yaml
-- uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+- uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
   with:
     # required: full history needed to inspect and push tags
     fetch-depth: 0
@@ -1802,12 +1830,12 @@ Never use a GitHub Actions badge for a GitLab or Gitea project — the CI badge 
 
 # GitLab
 [![Release](https://gitlab.com/{project_org}/{project_name}/-/badges/release.svg)](https://gitlab.com/{project_org}/{project_name}/-/releases)
-[![License](https://img.shields.io/github/license/{project_org}/{project_name})](LICENSE.md)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 [![Docs](https://readthedocs.org/projects/{RTD_PROJECT}/badge/?version=latest)](https://{RTD_URL})
 
 # Gitea/Forgejo (use shields.io with custom endpoint or static badge)
 [![Release](https://img.shields.io/badge/dynamic/json?url=https://git.example.com/api/{api_version}/repos/{project_org}/{project_name}/releases/latest&query=$.tag_name&label=release)](https://git.example.com/{project_org}/{project_name}/releases)
-[![License](https://img.shields.io/github/license/{project_org}/{project_name})](LICENSE.md)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 [![Docs](https://readthedocs.org/projects/{RTD_PROJECT}/badge/?version=latest)](https://{RTD_URL})
 
 # {RTD_PROJECT} and {RTD_URL} - Use one of:
@@ -2356,7 +2384,7 @@ maintainer_email: jane@example.com
 - Symlinks are created relative to the dotfiles repo so the home directory remains portable
 
 **Platform constraints:**
-- POSIX-style filesystem operations; Windows support uses junction-style links via the standard library
+- POSIX-style filesystem operations; Windows support uses real NTFS symlinks via `std::os::windows::fs::symlink_file` / `symlink_dir` (not junctions — a separate reparse-point mechanism), which require Developer Mode or elevated privileges to create
 
 **Outbound network use:** none
 

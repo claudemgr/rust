@@ -16,9 +16,9 @@ Template specifications for CasjaysDev Rust projects. Each file is a master temp
 | File | Purpose |
 |------|---------|
 | `API.md` | Rust API server template — source of truth for API projects (PARTs 0–33) |
-| `APPLICATION.md` | Rust application template — source of truth for GUI/TUI/CLI projects |
-| `SERVER.md` | Rust web server template — source of truth for full-stack server projects |
-| `HYBRID.md` | Rust hybrid application+server template — source of truth for single-binary projects that are also a full server |
+| `APPLICATION.md` | Rust application template — source of truth for GUI/TUI/CLI projects (PARTs 0–13) |
+| `SERVER.md` | Rust web server template — source of truth for full-stack server projects (PARTs 0–37) |
+| `HYBRID.md` | Rust hybrid application+server template — source of truth for single-binary projects that are also a full server (PARTs 0–28) |
 | `README.md` | This file |
 | `LICENSE.md` | Repository license (WTFPL) |
 
