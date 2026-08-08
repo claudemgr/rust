@@ -39288,6 +39288,9 @@ See dockerfile_conventions.md → OCI Annotations for the complete list of requi
 # =============================================================================
 FROM casjaysdev/rust:latest AS builder
 
+# Install git and bash (git: required for cargo fetch; bash: for build scripts)
+RUN apk add --no-cache git bash
+
 ARG TARGETARCH
 ARG VERSION=dev
 ARG BUILD_DATE
@@ -39892,6 +39895,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-contrib \
     valkey \
     supervisor \
+    tini \
     tor \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
@@ -39931,7 +39935,7 @@ EXPOSE 80
 HEALTHCHECK --start-period=10m --interval=5m --timeout=15s --retries=3 \
     CMD /usr/local/bin/{project_name} --status || exit 1
 
-ENTRYPOINT ["tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh"]
+ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]
 ```
 
 **All-in-One supervisor config (`docker/rootfs/etc/supervisor/conf.d/services.conf`):**
