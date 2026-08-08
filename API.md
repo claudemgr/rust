@@ -658,7 +658,7 @@ let cache_size = (avail_mem / 10)
 | **VERSION precedence** | `release.txt` wins when present; otherwise use the workflow/build-specific fallback (tag, beta timestamp, etc.) |
 | **Build metadata** | Passed as env vars (VERSION, COMMIT_ID, BUILD_DATE, OFFICIAL_SITE) and embedded via `build.rs` → `option_env!("APP_*")`: version, commit ID, build date, official site |
 | **Docker builds on EVERY push** | Any branch push triggers Docker image build |
-| **Docker tags** | Any push → `{commit}`; beta → adds `beta`; tag → `{version}`, `latest`, `YYMM`, `{commit}`; `devel` = local Dockerfile.dev build only, never CI |
+| **Docker tags** | Any push → `{commit}`; beta → adds `beta`; tag → `{version}`, `latest`, `YYMM`, `{commit}`; `devel` = built by the dedicated `docker-devel.yml` workflow from `docker/Dockerfile.dev`, on every push and on a daily schedule |
 | **Workflow permissions** | Default to read-only / least privilege; grant write only to the specific release/publish job that needs it |
 | **Third-party action pinning** | External actions MUST be pinned to a full commit SHA — never float on `@main`, `@master`, or broad tags; verify runtime and maintenance status on every SHA update |
 | **Unsafe PR triggers forbidden by default** | Do NOT use `pull_request_target` for untrusted code execution, build, test, or artifact upload paths |
@@ -28544,13 +28544,13 @@ exec $APP_BIN $FLAGS "$@"
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TZ` | `America/New_York` | Timezone for app and scheduler |
-| `MODE` | `development` | `production` (strict) or `development` (relaxed) |
+| `MODE` | `development` | `production` (strict) or `dev`/`devel`/`development` (relaxed, synonymous) |
 | `DEBUG` | `false` | Enable ALL debug features (debug endpoints, detailed logging) |
 | `ADDRESS` | `0.0.0.0` | Listen address |
 | `PORT` | `80` | Listen port (update docker-compose ports: to match) |
 
 **MODE vs DEBUG:**
-- `MODE=development`: Relaxed security, verbose logging, no caching (sensible for local dev)
+- `MODE=development` (aliases `dev` and `devel` are treated as synonymous — the app must accept all three as the same relaxed mode): Relaxed security, verbose logging, no caching (sensible for local dev)
 - `MODE=production`: Strict security, minimal logging, caching enabled
 - `DEBUG=true`: Enables debug endpoints (`/debug/*`), regardless of MODE
 
@@ -29146,7 +29146,8 @@ rm -rf "$TEMP_DIR"
 | `beta.yml` | Push to `beta` branch | Beta releases |
 | `daily.yml` | Daily at 3am UTC + push to main/master | Daily builds |
 | `docker.yml` | Version tag, push to main/master/beta | Docker images |
-> **Note:** `ci.yml` and `release.yml` are required on every project. Rust projects never have `build-toolchain.yml` — `casjaysdev/rust:latest` is maintained externally. `beta.yml`, `daily.yml`, and `docker.yml` are project-specific optional workflows — include only when the project requires them.
+| `docker-devel.yml` | Push (all branches, excluding version tags) + daily cron | `:devel` image (from `docker/Dockerfile.dev`) |
+> **Note:** `ci.yml` and `release.yml` are required on every project. Rust projects never have `build-toolchain.yml` — `casjaysdev/rust:latest` is maintained externally. `beta.yml`, `daily.yml`, `docker.yml`, and `docker-devel.yml` are project-specific optional workflows — include only when the project requires them.
 
 **Branch push auto-cancel policy:** Any workflow triggered by pushes to `main`, `master`, `devel`, `dev`, or `beta` MUST use workflow concurrency to cancel older in-progress runs for the same ref. This applies to branch-based CI (for example `beta.yml`, `daily.yml`, `docker.yml`, and any project-specific branch-push workflow).
 
@@ -29798,7 +29799,7 @@ jobs:
 | Push to beta branch | `beta`, `{commit_id}` |
 | Version tag (`v*`, `*.*.*`) | `{version}`, `latest`, `YYMM` |
 
-> **Note:** CI never tags `:devel` — that tag is reserved for the `docker/Dockerfile.dev` debug image, which is built locally (see the compose Build Commands), never by CI.
+> **Note:** `docker.yml` never tags `:devel`. That tag is built by the dedicated `.github/workflows/docker-devel.yml` workflow from `docker/Dockerfile.dev`, on every push (all branches, excluding version tags) and on a daily schedule (see Devel Image Workflow below) — never as part of the standard-image workflow above.
 
 **Notes:**
 - `{commit_id}` = short SHA (7 characters) from `git rev-parse --short HEAD`
@@ -29929,13 +29930,113 @@ jobs:
 
 ```
 
+### Devel Image Workflow
+
+The `:devel` tag is built by its own dedicated workflow, never folded into `docker.yml`. It builds from `docker/Dockerfile.dev` (which sets `ENV MODE=devel`), runs on every push to any branch (excluding version tags) and once daily on a cron schedule to pick up base-image security updates, and can also be triggered manually. It always publishes the single static `:devel` tag — no commit, version, or beta variants.
+
+**File:** `.github/workflows/docker-devel.yml`
+
+```yaml
+name: Docker Devel Build
+
+on:
+  push:
+    branches: ['**']
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: docker-devel-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT_NAME: {project_name}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-devel:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up QEMU
+        # v4.1.0
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3
+
+      - name: Set up Docker Buildx
+        # v4.1.0
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
+
+      - name: Log in to Container Registry
+        # v4.2.0
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set build info
+        run: |
+          echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(date +"%a %b %d, %Y at %H:%M:%S %Z")" >> $GITHUB_ENV
+
+      - name: Build and push (devel)
+        # v7.2.0
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
+        with:
+          context: .
+          file: docker/Dockerfile.dev
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: false
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:devel
+          build-args: |
+            VERSION=${{ env.VERSION }}
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            COMMIT_ID=${{ env.COMMIT_ID }}
+          labels: |
+            org.opencontainers.image.vendor={project_org}
+            org.opencontainers.image.authors={project_org}
+            org.opencontainers.image.title=${{ env.PROJECT_NAME }}
+            org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
+            org.opencontainers.image.description=${{ env.PROJECT_NAME }} - development image (alpine, debug mode)
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.created=${{ env.BUILD_DATE }}
+            org.opencontainers.image.revision=${{ env.COMMIT_ID }}
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.licenses=MIT
+          annotations: |
+            manifest:org.opencontainers.image.vendor={project_org}
+            manifest:org.opencontainers.image.authors={project_org}
+            manifest:org.opencontainers.image.title=${{ env.PROJECT_NAME }}
+            manifest:org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
+            manifest:org.opencontainers.image.description=${{ env.PROJECT_NAME }} - development image (alpine, debug mode)
+            manifest:org.opencontainers.image.version=${{ env.VERSION }}
+            manifest:org.opencontainers.image.created=${{ env.BUILD_DATE }}
+            manifest:org.opencontainers.image.revision=${{ env.COMMIT_ID }}
+            manifest:org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
+            manifest:org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            manifest:org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
+            manifest:org.opencontainers.image.licenses=MIT
+
+```
+
 **Image Tag Summary:**
 
 | Use Case | Image Tag |
 |----------|-----------|
 | Latest stable | `{name}:latest` |
 | Specific version | `{name}:1.2.3` |
-| Development (local `Dockerfile.dev` build, never CI) | `{name}:devel` |
+| Development (built by CI via `docker-devel.yml`, push + daily schedule) | `{name}:devel` |
 | Beta | `{name}:beta` |
 | Commit | `{name}:abc1234` |
 
@@ -29993,6 +30094,7 @@ For self-hosted runners, change `runs-on: ubuntu-latest` to your runner label.
 | `beta.yml` | Push to `beta` branch | Beta releases |
 | `daily.yml` | Daily at 3am UTC + push to main/master | Daily builds |
 | `docker.yml` | Version tag, push to main/master/beta | Docker images |
+| `docker-devel.yml` | Every push (all branches) + daily schedule | Devel image (`:devel`, from `Dockerfile.dev`) |
 
 ## Release Workflow — Stable (Gitea/Forgejo Actions)
 
@@ -30567,7 +30669,7 @@ jobs:
             TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
             TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.YYMM }}"
           else
-            # Beta branch also gets beta tag; :devel is never tagged by CI (local Dockerfile.dev build only)
+            # Beta branch also gets beta tag; :devel is tagged separately by docker-devel.yml (push + daily schedule)
             if [[ "${{ gitea.ref }}" == refs/heads/beta ]]; then
               TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:beta"
             fi
@@ -30616,6 +30718,8 @@ jobs:
             manifest:org.opencontainers.image.licenses=MIT
 
 ```
+
+> **Note:** `:devel` is built by a dedicated `docker-devel.yml` workflow from `docker/Dockerfile.dev`, triggered on every push (all branches, excluding version tags) and on a daily schedule — mirroring the GitHub Actions `docker-devel.yml` shown above, adapted to Gitea/Forgejo context variables.
 
 ## Variable Mapping (GitHub → Gitea → Forgejo)
 
@@ -31046,6 +31150,63 @@ docker:build:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
     - if: $CI_COMMIT_BRANCH == "beta"
 
+# =============================================================================
+# DOCKER DEVEL BUILD (every push + daily schedule, from Dockerfile.dev)
+# =============================================================================
+
+docker:build-devel:
+  stage: docker
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_BUILDKIT: "1"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker buildx create --name multiarch-builder --use 2>/dev/null || docker buildx use multiarch-builder
+  script:
+    - |
+      # :devel is a static tag, built from Dockerfile.dev, never from the standard docker:build job
+      BUILD_DATE="$(date -Iseconds)"
+    - |
+      docker buildx build \
+        -f docker/Dockerfile.dev \
+        --platform linux/amd64,linux/arm64 \
+        --build-arg VERSION="${CI_COMMIT_SHORT_SHA}" \
+        --build-arg COMMIT_ID="${CI_COMMIT_SHORT_SHA}" \
+        --build-arg BUILD_DATE="${BUILD_DATE}" \
+        --label "org.opencontainers.image.vendor=${PROJECT_ORG}" \
+        --label "org.opencontainers.image.authors=${PROJECT_ORG}" \
+        --label "org.opencontainers.image.title=${PROJECT_NAME}" \
+        --label "org.opencontainers.image.base.name=${PROJECT_NAME}" \
+        --label "org.opencontainers.image.description=${PROJECT_NAME} - development image (alpine, debug mode)" \
+        --label "org.opencontainers.image.licenses=MIT" \
+        --label "org.opencontainers.image.version=${CI_COMMIT_SHORT_SHA}" \
+        --label "org.opencontainers.image.created=${BUILD_DATE}" \
+        --label "org.opencontainers.image.revision=${CI_COMMIT_SHORT_SHA}" \
+        --label "org.opencontainers.image.url=${CI_PROJECT_URL}" \
+        --label "org.opencontainers.image.source=${CI_PROJECT_URL}" \
+        --label "org.opencontainers.image.documentation=${CI_PROJECT_URL}" \
+        --annotation "manifest:org.opencontainers.image.vendor=${PROJECT_ORG}" \
+        --annotation "manifest:org.opencontainers.image.authors=${PROJECT_ORG}" \
+        --annotation "manifest:org.opencontainers.image.title=${PROJECT_NAME}" \
+        --annotation "manifest:org.opencontainers.image.base.name=${PROJECT_NAME}" \
+        --annotation "manifest:org.opencontainers.image.description=${PROJECT_NAME} - development image (alpine, debug mode)" \
+        --annotation "manifest:org.opencontainers.image.licenses=MIT" \
+        --annotation "manifest:org.opencontainers.image.version=${CI_COMMIT_SHORT_SHA}" \
+        --annotation "manifest:org.opencontainers.image.created=${BUILD_DATE}" \
+        --annotation "manifest:org.opencontainers.image.revision=${CI_COMMIT_SHORT_SHA}" \
+        --annotation "manifest:org.opencontainers.image.url=${CI_PROJECT_URL}" \
+        --annotation "manifest:org.opencontainers.image.source=${CI_PROJECT_URL}" \
+        --annotation "manifest:org.opencontainers.image.documentation=${CI_PROJECT_URL}" \
+        -t $CI_REGISTRY_IMAGE:devel \
+        --push \
+        .
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_BRANCH && $CI_COMMIT_TAG == null
+
 ```
 
 ## GitLab CI Variables
@@ -31125,7 +31286,8 @@ pipeline {
 
     triggers {
         // Daily build at 3am UTC (matches GitHub Actions daily.yml)
-        cron('0 3 * * *')
+        // Daily devel image rebuild at 4am UTC (matches GitHub Actions docker-devel.yml)
+        cron('0 3 * * *\n0 4 * * *')
     }
 
     environment {
@@ -31600,7 +31762,7 @@ pipeline {
                         tags += " -t ${REGISTRY}:${yymm}"
                     } else if (env.BUILD_TYPE == 'beta') {
                         // Beta branch - beta tag; all builds already carry the commit-id tag.
-                        // :devel is never tagged by CI (local Dockerfile.dev build only)
+                        // :devel is built separately by the "Docker: Devel" stage below, not here
                         tags += " -t ${REGISTRY}:beta"
                     }
 
@@ -31644,6 +31806,58 @@ pipeline {
                             --annotation "manifest:org.opencontainers.image.source=https://${GIT_FQDN}/${PROJECT_ORG}/${PROJECT_NAME}" \
                             --annotation "manifest:org.opencontainers.image.documentation=https://${GIT_FQDN}/${PROJECT_ORG}/${PROJECT_NAME}" \
                             ${tags} \
+                            --push \
+                            .
+                    """
+                }
+            }
+        }
+
+        // Docker Devel - matches docker-devel.yml (every push, all branches, plus daily cron above)
+        // :devel is a static tag, always built from Dockerfile.dev — never folded into the "Docker" stage above
+        stage('Docker: Devel') {
+            agent { label 'amd64' }
+            steps {
+                script {
+                    // Login to container registry
+                    sh """
+                        echo "\${GIT_TOKEN}" | docker login ${REGISTRY.split('/')[0]} -u ${PROJECT_ORG} --password-stdin
+                    """
+
+                    // Build multi-arch devel image with OCI labels and manifest annotations
+                    sh """
+                        docker buildx create --name ${PROJECT_NAME}-devel-builder --use 2>/dev/null || docker buildx use ${PROJECT_NAME}-devel-builder
+                        docker buildx build \
+                            -f docker/Dockerfile.dev \
+                            --platform linux/amd64,linux/arm64 \
+                            --build-arg VERSION="${VERSION}" \
+                            --build-arg COMMIT_ID="${COMMIT_ID}" \
+                            --build-arg BUILD_DATE="${BUILD_DATE}" \
+                            --label "org.opencontainers.image.vendor=${PROJECT_ORG}" \
+                            --label "org.opencontainers.image.authors=${PROJECT_ORG}" \
+                            --label "org.opencontainers.image.title=${PROJECT_NAME}" \
+                            --label "org.opencontainers.image.base.name=${PROJECT_NAME}" \
+                            --label "org.opencontainers.image.description=${PROJECT_NAME} - development image (alpine, debug mode)" \
+                            --label "org.opencontainers.image.licenses=MIT" \
+                            --label "org.opencontainers.image.version=${VERSION}" \
+                            --label "org.opencontainers.image.created=${BUILD_DATE}" \
+                            --label "org.opencontainers.image.revision=${COMMIT_ID}" \
+                            --label "org.opencontainers.image.url=https://${GIT_FQDN}/${PROJECT_ORG}/${PROJECT_NAME}" \
+                            --label "org.opencontainers.image.source=https://${GIT_FQDN}/${PROJECT_ORG}/${PROJECT_NAME}" \
+                            --label "org.opencontainers.image.documentation=https://${GIT_FQDN}/${PROJECT_ORG}/${PROJECT_NAME}" \
+                            --annotation "manifest:org.opencontainers.image.vendor=${PROJECT_ORG}" \
+                            --annotation "manifest:org.opencontainers.image.authors=${PROJECT_ORG}" \
+                            --annotation "manifest:org.opencontainers.image.title=${PROJECT_NAME}" \
+                            --annotation "manifest:org.opencontainers.image.base.name=${PROJECT_NAME}" \
+                            --annotation "manifest:org.opencontainers.image.description=${PROJECT_NAME} - development image (alpine, debug mode)" \
+                            --annotation "manifest:org.opencontainers.image.licenses=MIT" \
+                            --annotation "manifest:org.opencontainers.image.version=${VERSION}" \
+                            --annotation "manifest:org.opencontainers.image.created=${BUILD_DATE}" \
+                            --annotation "manifest:org.opencontainers.image.revision=${COMMIT_ID}" \
+                            --annotation "manifest:org.opencontainers.image.url=https://${GIT_FQDN}/${PROJECT_ORG}/${PROJECT_NAME}" \
+                            --annotation "manifest:org.opencontainers.image.source=https://${GIT_FQDN}/${PROJECT_ORG}/${PROJECT_NAME}" \
+                            --annotation "manifest:org.opencontainers.image.documentation=https://${GIT_FQDN}/${PROJECT_ORG}/${PROJECT_NAME}" \
+                            -t ${REGISTRY}:devel \
                             --push \
                             .
                     """
@@ -31722,6 +31936,7 @@ REGISTRY = "ghcr.io/${PROJECT_ORG}/${PROJECT_NAME}"
 | Beta | `beta.yml` (beta branch) | `BUILD_TYPE == 'beta'` (beta branch) |
 | Daily | `daily.yml` (schedule + main) | `BUILD_TYPE == 'daily'` (cron + main/master) |
 | Docker | `docker.yml` (all branches) | Docker stage (always runs) |
+| Docker Devel | `docker-devel.yml` (all branches + daily schedule) | Docker: Devel stage (always runs + 4am cron) |
 
 ---
 
