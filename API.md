@@ -868,7 +868,7 @@ The `release` job already has `contents: write` to push assets — this covers t
 ```
 --help                       # Show help (-h allowed)
 --version                    # Show version (-v allowed)
---mode {production|development}
+--mode {production|development|debug}
 --config {config_dir}
 --data {data_dir}
 --log {log_dir}
@@ -1008,7 +1008,7 @@ src/
 │   └── theme/
 │       └── colors.rs          # Shared color palette
 ├── mode/
-│   └── mod.rs                 # Application mode (production/development)
+│   └── mod.rs                 # Application mode (production/development/debug)
 ├── paths/
 │   └── mod.rs                 # Path resolution
 ├── ssl/
@@ -4146,7 +4146,7 @@ Public releases include SBOM and provenance/attestation when platform supports i
 
 ### Security & Operations
 ```
-Mode detection (production/development) working
+Mode detection (production/development/debug) working
 Debug flag (--debug/DEBUG) working
 SSL/TLS support implemented
 User authentication implemented
@@ -7682,7 +7682,7 @@ impl CreateResourceRequest {
 | `NO_COLOR` | Disable ANSI color output when set and non-empty (see PART 8) |
 | `TERM` | Terminal type; `TERM=dumb` disables ALL ANSI escapes and forces CLI mode (see PART 7) |
 | `DOMAIN` | FQDN override (highest priority for hostname resolution) |
-| `MODE` | `production` (default) or `development` |
+| `MODE` | `production` (default; shortcut `prod`) · `development` (shortcuts `dev`, `devel`) · `debug` (explicit opt-in only — see MODE vs DEBUG in PART 26) |
 | `DATABASE_DRIVER` | `sqlite` (+ `sqlite2`, `sqlite3`), `libsql` (+ `turso`) |
 | `DATABASE_URL` | Database connection string |
 | `SMTP_HOST` | SMTP server hostname (if set, skips autodetect) |
@@ -8597,12 +8597,12 @@ Before proceeding, confirm you understand:
 **Debug:**
 1. `--debug` CLI flag (highest priority)
 2. `DEBUG` environment variable (truthy values)
-3. `--mode debug` / `MODE=debug` alias
+3. `--mode debug` / `MODE=debug` (debug mode defaults debug on)
 4. Default: `false`
 
-**`debug` mode alias:** `--mode debug` / `MODE=debug` expands to mode `development` + debug `on`. An explicit `--debug` flag or `DEBUG` env var still wins — `MODE=debug DEBUG=false` runs development mode with debug off.
+**`debug` mode:** `--mode debug` / `MODE=debug` selects debug mode — explicit opt-in only, NEVER implied or auto-enabled. It defaults the debug flag to on; an explicit `--debug` flag or `DEBUG` env var still wins — `MODE=debug DEBUG=false` runs debug mode with the `/debug/*` endpoints off.
 
-## Four Operational States
+## Six Operational States
 
 | State | Mode | Debug | Use Case |
 |-------|------|-------|----------|
@@ -8610,6 +8610,8 @@ Before proceeding, confirm you understand:
 | **Production + Debug** | `production` | `true` | Live debugging (temporary) |
 | **Development** | `development` | `false` | Local development, sensible defaults |
 | **Development + Debug** | `development` | `true` | Full debugging, all features |
+| **Debug** | `debug` | `false` | Debug-mode diagnostics with `/debug/*` explicitly off (`MODE=debug DEBUG=false`) |
+| **Debug + Endpoints** | `debug` | `true` | Full diagnostics (the default when `MODE=debug` and `DEBUG` unset) |
 
 ## Production Mode (Default)
 
@@ -8620,8 +8622,8 @@ Before proceeding, confirm you understand:
 | tokio-console | **Disabled** |
 | Error messages | Generic (no stack traces) |
 | Panic recovery | Graceful (logs error, returns 500) |
-| Template caching | Enabled |
-| Static file caching | Enabled |
+| Template caching | Config-driven (default: enabled) |
+| Static file caching | Config-driven (default: enabled) |
 | Rate limiting | Enforced |
 | Security headers | All enabled |
 | Sensitive data | Never shown |
@@ -8638,12 +8640,24 @@ Before proceeding, confirm you understand:
 | tokio-console | **Disabled** (use `--debug` to enable) |
 | Error messages | Detailed (stack traces in logs) |
 | Panic recovery | Verbose (full stack in response) |
-| Template caching | Disabled (hot reload) |
-| Static file caching | Disabled (hot reload) |
+| Template caching | Config-driven (default: disabled for hot reload) |
+| Static file caching | Config-driven (default: disabled for hot reload) |
 | Rate limiting | Relaxed/disabled |
 | Security headers | Relaxed (CORS permissive) |
-| Sensitive data | Can be shown (with warning) |
+| Sensitive data | Sanitized — output/log sanitization fully enforced |
 | Request logging | Verbose (headers, body preview) |
+
+## Debug Mode (`MODE=debug`)
+
+**Explicit opt-in only — NEVER implied or auto-enabled. Selecting it defaults the debug flag to on (an explicit `--debug`/`DEBUG` still wins).**
+
+| Setting | Behavior |
+|---------|----------|
+| Logging | `debug` level, maximum verbosity |
+| Sanitization | Minimal — internals, dumps, and stack traces may be exposed |
+| Credentials | Keys, tokens, passwords, secrets ALWAYS redacted — no exceptions |
+| Security checks | Never disabled — authentication and authorization fully enforced |
+| Everything else | As Development Mode |
 
 ## Debug Flag (`--debug` / `DEBUG=true`)
 
@@ -8675,7 +8689,7 @@ Before proceeding, confirm you understand:
 | `--mode development` | development |
 | `--mode prod` | production |
 | `--mode production` | production |
-| `--mode debug` | development + debug on |
+| `--mode debug` | debug (defaults the debug flag on) |
 
 ## Debug Endpoints (`--debug` / `DEBUG=true` Only)
 
@@ -9917,7 +9931,7 @@ NO_COLOR=1 {project_name} --status | grep -E '✅|❌|⚠️|🚀'
 # Print shell init for eval (auto-detect if SHELL omitted)
 --shell init [SHELL]
 # Set application mode
---mode {production|development}
+--mode {production|development|debug}
 # Set config directory
 --config {config_dir}
 # Set data directory
@@ -9974,7 +9988,7 @@ Shell Integration:
 --shell help                           - Show shell help
 
 Server Configuration:
---mode {production|development}        - Application mode (default: production)
+--mode {production|development|debug}  - Application mode (default: production)
 --config DIR                           - Config directory
 --data DIR                             - Data directory
 --cache DIR                            - Cache directory
@@ -10445,7 +10459,7 @@ PHASE 5: Server startup (actual server start)
 
 20. Log startup complete:
     ├─ Log "Listening on {address}:{port}"
-    ├─ Log "Mode: {production|development}"
+    ├─ Log "Mode: {production|development|debug}"
     ├─ Log "Tor: {.onion address}" (if enabled)
     └─ If first_run: log path to generated `server.yml`
 
@@ -11819,7 +11833,7 @@ $ kill -TERM $(cat /var/run/myapp.pid)
 | `--pid` | `PID_FILE` | PID file path |
 | `--port` | `PORT` | Listen port |
 | `--address` | `LISTEN` | Listen address |
-| `--mode` | `MODE` | Application mode (production/development) |
+| `--mode` | `MODE` | Application mode (production/development/debug) |
 | (none) | `DATABASE_DIR` | SQLite database directory (Docker: `/data/db/sqlite`, Native: `{data_dir}/db/`) |
 | (none) | `BACKUP_DIR` | Backup directory (defaults to `{data_dir}/backup/`, changeable) |
 
@@ -19703,7 +19717,7 @@ pub fn print_server_banner_micro(app_name: &str, urls: &[String]) {
 
 pub fn print_server_banner_app_mode_line(app_mode: &str, use_icons: bool) {
     if use_icons {
-        let icon = if app_mode == "development" { "🔧" } else { "🔒" };
+        let icon = if app_mode == "development" { "🔧" } else if app_mode == "debug" { "🐛" } else { "🔒" };
         println!("{} {}: {}", icon, i18n::t("cli.running_in_mode_label"), app_mode);
     } else {
         println!("{}: {}", i18n::t("cli.running_in_mode_label"), app_mode);
@@ -19799,8 +19813,10 @@ Displayed immediately after the header line, before URLs. Shows current mode and
 | production | true | `🔒 Running in mode: production [debugging]` |
 | development | false | `🔧 Running in mode: development` |
 | development | true | `🔧 Running in mode: development [debugging]` |
+| debug | false | `🐛 Running in mode: debug` |
+| debug | true | `🐛 Running in mode: debug [debugging]` |
 
-**Note:** Development mode does NOT enable debug features — only the debug flag does. `[debugging]` shows exactly when the debug flag is on (`--debug`, `DEBUG=true`, or the `MODE=debug` alias when `DEBUG` is not explicitly set).
+**Note:** Development mode does NOT enable debug features — only the debug flag does. `[debugging]` shows exactly when the debug flag is on (`--debug`, `DEBUG=true`, or `MODE=debug` when `DEBUG` is not explicitly set — debug mode defaults the flag on).
 
 **Port Configuration (Project-Wide, NON-NEGOTIABLE):**
 
@@ -29047,15 +29063,17 @@ exec $APP_BIN $FLAGS "$@"
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TZ` | `America/New_York` | Timezone for app and scheduler |
-| `MODE` | `development` | `production` (strict) or `dev`/`devel`/`development` (relaxed, synonymous) |
+| `MODE` | `development` | `production` (`prod`) strict · `development` (`dev`/`devel`) relaxed · `debug` explicit-only |
 | `DEBUG` | `false` | Enable ALL debug features (debug endpoints, detailed logging) |
 | `ADDRESS` | `0.0.0.0` | Listen address |
 | `PORT` | `80` | Listen port (update docker-compose ports: to match) |
 
 **MODE vs DEBUG:**
-- `MODE=development` (aliases `dev` and `devel` are treated as synonymous — the app must accept all three as the same relaxed mode): Relaxed security, verbose logging, no caching (sensible for local dev)
-- `MODE=production`: Strict security, minimal logging, caching enabled
-- `DEBUG=true`: Enables debug endpoints (`/debug/*`), regardless of MODE
+- `MODE=production` (shortcut `prod` — the default): Strict security, minimal logging, full output/log sanitization
+- `MODE=development` (shortcuts `dev` / `devel`): In between production and debug — relaxed security, verbose logging, sanitization still fully enforced
+- `MODE=debug`: Explicit opt-in only — NEVER implied or auto-enabled. Minimal sanitization (internals, dumps, stack traces may be exposed). Credentials (keys, tokens, passwords, secrets) are ALWAYS redacted in every mode, no exceptions
+- `DEBUG=truthy`: Enables debug endpoints (`/debug/*`) regardless of MODE; nothing else may auto-enable debug
+- Caching: every mode uses the cache when one is configured — cache use is config-driven, not mode-driven
 
 **Note:** Boolean env vars accept all truthy/falsy values (see Boolean Values table). Examples: `DEBUG=yes`, `DEBUG=enable`, `DEBUG=1`, `DEBUG=oui`.
 
@@ -35357,7 +35375,8 @@ pub struct LocaleFS;
     "connected": "Conectado",
     "disconnected": "Desconectado",
     "production": "Producción",
-    "development": "Desarrollo"
+    "development": "Desarrollo",
+    "debug": "Depuración"
   },
 
   "status_values": {
@@ -37912,7 +37931,7 @@ fn save_if_empty_or_invalid(
 | `--tui` | Auto-detected |
 | `--cli` | Auto-detected |
 | `--gui` | Auto-detected |
-| `--mode tui/cli/gui` | `--mode` is ONLY for `production`/`development` (app mode), NOT UI |
+| `--mode tui/cli/gui` | `--mode` is ONLY for `production`/`development`/`debug` (app mode), NOT UI |
 | `tui` subcommand | Auto-detected |
 
 **Display mode is auto-detected from environment. Override via config only (not flags).**
@@ -41339,7 +41358,7 @@ make docker
 - [ ] Production mode: Default, optimized, no debug
 - [ ] Development mode: Verbose logging (does NOT enable debug endpoints)
 - [ ] Mode priority: `--mode` CLI flag > `MODE` env var > default production
-- [ ] Debug priority: `--debug` CLI flag > `DEBUG` env var (truthy) > `MODE=debug` alias > default off
+- [ ] Debug priority: `--debug` CLI flag > `DEBUG` env var (truthy) > `MODE=debug` (debug mode defaults debug on) > default off
 - [ ] `/debug/*` endpoints enabled only by debug flag, never by mode
 
 ### Phase 2: Binary Core (PARTS 7-9)
@@ -41366,7 +41385,7 @@ make docker
 - [ ] `--address {addr}` - Listen address
 - [ ] `--port {port}` - Listen port
 - [ ] `--baseurl {path}` - URL path prefix (default: /)
-- [ ] `--mode {production|development}` - Application mode (aliases: prod, dev, devel; `debug` = development + debug on)
+- [ ] `--mode {production|development|debug}` - Application mode (shortcuts: prod, dev, devel; `debug` is explicit opt-in only and defaults the debug flag on)
 - [ ] `--status` - Show running status
 - [ ] `--daemon` - Daemonize (detach)
 - [ ] `--debug` - Enable debug mode
@@ -42130,7 +42149,7 @@ make docker
 - [ ] `{baseurl}` - URL path prefix (auto-detected from reverse proxy)
 - [ ] `{port}` - Port number (stripped if 80/443)
 - [ ] `{address}` - Listen IP address
-- [ ] `{app_mode}` - Application mode (production/development)
+- [ ] `{app_mode}` - Application mode (production/development/debug)
 - [ ] `{onion_address}` - Tor .onion address (if enabled)
 - [ ] `{i2p_address}` - I2P address (if enabled)
 - [ ] `{smtp_address}` - SMTP server address (if configured)
