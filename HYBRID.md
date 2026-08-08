@@ -29450,9 +29450,8 @@ If signing or attestation is required but keys/permissions are unavailable, stop
 | `release.yml` | Tag push (`v*`, `*.*.*`) | Production releases |
 | `beta.yml` | Push to `beta` branch | Beta releases |
 | `daily.yml` | Daily at 3am UTC + push to main/master | Daily builds |
-| `docker.yml` | Version tag, push to main/master/beta | Docker images |
-| `docker-devel.yml` | Push (all branches, excluding version tags) + daily cron | `:devel` image (from `docker/Dockerfile.dev`) |
-> **Note:** `ci.yml` and `release.yml` are required on every project. Rust projects never have `build-toolchain.yml` — `casjaysdev/rust:latest` is maintained externally. `beta.yml`, `daily.yml`, `docker.yml`, and `docker-devel.yml` are project-specific optional workflows — include only when the project requires them.
+| `docker.yml` | Version tag, push to main/master/beta (`build-standard` job); non-tag push, daily cron, manual dispatch (`build-devel` job, from `docker/Dockerfile.dev`) | Docker images |
+> **Note:** `ci.yml` and `release.yml` are required on every project. Rust projects never have `build-toolchain.yml` — `casjaysdev/rust:latest` is maintained externally. `beta.yml`, `daily.yml`, and `docker.yml` are project-specific optional workflows — include only when the project requires them.
 
 **Branch push auto-cancel policy:** Any workflow triggered by pushes to `main`, `master`, `devel`, `dev`, or `beta` MUST use workflow concurrency to cancel older in-progress runs for the same ref. This applies to branch-based CI (for example `beta.yml`, `daily.yml`, `docker.yml`, and any project-specific branch-push workflow).
 
@@ -30104,13 +30103,14 @@ jobs:
 | Push to beta branch | `beta`, `{commit_id}` |
 | Version tag (`v*`, `*.*.*`) | `{version}`, `latest`, `YYMM` |
 
-> **Note:** `:devel` is not tagged by `docker.yml`. It is built by the dedicated `docker-devel.yml` workflow (below) from `docker/Dockerfile.dev`, triggered on every push and on a daily schedule.
+> **Note:** `:devel` is not tagged by `build-standard`. It is built by the `build-devel` job in the same `docker.yml` workflow (below) from `docker/Dockerfile.dev`, triggered on every non-tag push and on a daily schedule.
 
 **Notes:**
 - `{commit_id}` = short SHA (7 characters) from `git rev-parse --short HEAD`
 - `YYMM` = year/month (e.g., `2512`)
 - Built for `linux/amd64` and `linux/arm64` using `docker buildx`
 - Registry: `ghcr.io`
+- `docker.yml` also runs on a daily schedule (`0 4 * * *`) so the `build-devel` job keeps `:devel` fresh even without new pushes
 
 **File:** `.github/workflows/docker.yml`
 
@@ -30124,6 +30124,8 @@ on:
     tags:
       - 'v*'
       - '*.*.*'
+  schedule:
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -30137,6 +30139,7 @@ env:
 
 jobs:
   build-standard:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30233,35 +30236,8 @@ jobs:
             manifest:org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
             manifest:org.opencontainers.image.licenses=MIT
 
-```
-
-### Devel Image Workflow
-
-The `:devel` image is built from `docker/Dockerfile.dev` (debug tooling, alpine base) by its own dedicated workflow, never folded into `docker.yml`. It runs on every push to any branch (excluding version tags) and on a daily schedule, so `:devel` always reflects both the latest commit and stays fresh even without new pushes. `Dockerfile.dev` sets `MODE=devel` via `ENV`; the app treats `dev`, `devel`, and `development` as synonymous valid `MODE` values. The static `:devel` tag is always overwritten — no commit-SHA or dated tags are produced by this workflow.
-
-**File:** `.github/workflows/docker-devel.yml`
-
-```yaml
-name: Docker Devel Build
-
-on:
-  push:
-    branches: ['**']
-  schedule:
-    - cron: '0 4 * * *'
-  workflow_dispatch:
-
-concurrency:
-  group: docker-devel-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  PROJECT_NAME: {project_name}
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
-jobs:
   build-devel:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30302,7 +30278,6 @@ jobs:
           provenance: false
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:devel
           build-args: |
-            VERSION=${{ env.COMMIT_ID }}
             BUILD_DATE=${{ env.BUILD_DATE }}
             COMMIT_ID=${{ env.COMMIT_ID }}
           labels: |
@@ -30311,7 +30286,6 @@ jobs:
             org.opencontainers.image.title=${{ env.PROJECT_NAME }}
             org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
             org.opencontainers.image.description=${{ env.PROJECT_NAME }} - development image (alpine, debug mode)
-            org.opencontainers.image.version=${{ env.COMMIT_ID }}
             org.opencontainers.image.created=${{ env.BUILD_DATE }}
             org.opencontainers.image.revision=${{ env.COMMIT_ID }}
             org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
@@ -30324,7 +30298,6 @@ jobs:
             manifest:org.opencontainers.image.title=${{ env.PROJECT_NAME }}
             manifest:org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
             manifest:org.opencontainers.image.description=${{ env.PROJECT_NAME }} - development image (alpine, debug mode)
-            manifest:org.opencontainers.image.version=${{ env.COMMIT_ID }}
             manifest:org.opencontainers.image.created=${{ env.BUILD_DATE }}
             manifest:org.opencontainers.image.revision=${{ env.COMMIT_ID }}
             manifest:org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
@@ -30334,13 +30307,15 @@ jobs:
 
 ```
 
+The `:devel` image is built from `docker/Dockerfile.dev` (debug tooling, alpine base) by the `build-devel` job in this same `docker.yml` workflow. It runs on every non-tag push to any branch, on a daily schedule, and on manual dispatch, so `:devel` always reflects both the latest commit and stays fresh even without new pushes. `Dockerfile.dev` sets `MODE=devel` via `ENV`; the app treats `dev`, `devel`, and `development` as synonymous valid `MODE` values. The static `:devel` tag is always overwritten — no commit-SHA or dated tags are produced by this job.
+
 **Image Tag Summary:**
 
 | Use Case | Image Tag |
 |----------|-----------|
 | Latest stable | `{name}:latest` |
 | Specific version | `{name}:1.2.3` |
-| Development (built by `docker-devel.yml`, push + daily schedule) | `{name}:devel` |
+| Development (built by the `build-devel` job in `docker.yml`) | `{name}:devel` |
 | Beta | `{name}:beta` |
 | Commit | `{name}:abc1234` |
 
@@ -30397,8 +30372,7 @@ For self-hosted runners, change `runs-on: ubuntu-latest` to your runner label.
 | `release.yml` | Tag push (`v*`, `*.*.*`) | Production releases |
 | `beta.yml` | Push to `beta` branch | Beta releases |
 | `daily.yml` | Daily at 3am UTC + push to main/master | Daily builds |
-| `docker.yml` | Version tag, push to main/master/beta | Docker images |
-| `docker-devel.yml` | Push (all branches, excluding version tags) + daily cron | `:devel` image (from `docker/Dockerfile.dev`) |
+| `docker.yml` | Version tag, push to main/master/beta (`build-standard` job); non-tag push, daily cron, manual dispatch (`build-devel` job, from `docker/Dockerfile.dev`) | Docker images |
 
 ## Release Workflow — Stable (Gitea/Forgejo Actions)
 
@@ -30903,6 +30877,8 @@ on:
     tags:
       - 'v*'
       - '*.*.*'
+  schedule:
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -30917,6 +30893,7 @@ env:
 
 jobs:
   build-standard:
+    if: gitea.event_name != 'schedule'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30973,7 +30950,7 @@ jobs:
             TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
             TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.YYMM }}"
           else
-            # Beta branch also gets beta tag; :devel is tagged separately by docker-devel.yml
+            # Beta branch also gets beta tag; :devel is built by the build-devel job below
             if [[ "${{ gitea.ref }}" == refs/heads/beta ]]; then
               TAGS="$TAGS,${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:beta"
             fi
@@ -31021,30 +30998,8 @@ jobs:
             manifest:org.opencontainers.image.documentation=${{ gitea.server_url }}/${{ gitea.repository }}
             manifest:org.opencontainers.image.licenses=MIT
 
-```
-
-### Devel Image Workflow (Gitea/Forgejo Actions)
-
-Same design as GitHub's `docker-devel.yml` (see above): a dedicated workflow, never folded into `docker.yml`, builds `:devel` from `docker/Dockerfile.dev`.
-
-**File:** `.gitea/workflows/docker-devel.yml`
-
-```yaml
-name: Docker Devel Build
-
-on:
-  push:
-    branches: ['**']
-  schedule:
-    - cron: '0 4 * * *'
-  workflow_dispatch:
-
-concurrency:
-  group: docker-devel-${{ gitea.ref }}
-  cancel-in-progress: true
-
-jobs:
   build-devel:
+    if: gitea.event_name == 'schedule' || gitea.event_name == 'workflow_dispatch' || (gitea.event_name == 'push' && !startsWith(gitea.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31061,6 +31016,7 @@ jobs:
 
       - name: Set registry from server URL
         run: |
+          # Extract registry from Gitea server URL (works with self-hosted)
           SERVER_URL="${{ gitea.server_url }}"
           REGISTRY="${SERVER_URL#https://}"
           REGISTRY="${REGISTRY#http://}"
@@ -31073,6 +31029,11 @@ jobs:
           username: ${{ gitea.actor }}
           password: ${{ secrets.GITEA_TOKEN }}
 
+      - name: Set build info
+        run: |
+          echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITEA_ENV
+          echo "BUILD_DATE=$(date +"%a %b %d, %Y at %H:%M:%S %Z")" >> $GITEA_ENV
+
       - name: Build and push (devel)
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
         with:
@@ -31081,9 +31042,38 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           provenance: false
-          tags: ${{ env.REGISTRY }}/${{ gitea.repository }}:devel
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:devel
+          build-args: |
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            COMMIT_ID=${{ env.COMMIT_ID }}
+          labels: |
+            org.opencontainers.image.vendor={project_org}
+            org.opencontainers.image.authors={project_org}
+            org.opencontainers.image.title=${{ env.PROJECT_NAME }}
+            org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
+            org.opencontainers.image.description=${{ env.PROJECT_NAME }} - development image (alpine, debug mode)
+            org.opencontainers.image.created=${{ env.BUILD_DATE }}
+            org.opencontainers.image.revision=${{ env.COMMIT_ID }}
+            org.opencontainers.image.url=${{ gitea.server_url }}/${{ gitea.repository }}
+            org.opencontainers.image.source=${{ gitea.server_url }}/${{ gitea.repository }}
+            org.opencontainers.image.documentation=${{ gitea.server_url }}/${{ gitea.repository }}
+            org.opencontainers.image.licenses=MIT
+          annotations: |
+            manifest:org.opencontainers.image.vendor={project_org}
+            manifest:org.opencontainers.image.authors={project_org}
+            manifest:org.opencontainers.image.title=${{ env.PROJECT_NAME }}
+            manifest:org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
+            manifest:org.opencontainers.image.description=${{ env.PROJECT_NAME }} - development image (alpine, debug mode)
+            manifest:org.opencontainers.image.created=${{ env.BUILD_DATE }}
+            manifest:org.opencontainers.image.revision=${{ env.COMMIT_ID }}
+            manifest:org.opencontainers.image.url=${{ gitea.server_url }}/${{ gitea.repository }}
+            manifest:org.opencontainers.image.source=${{ gitea.server_url }}/${{ gitea.repository }}
+            manifest:org.opencontainers.image.documentation=${{ gitea.server_url }}/${{ gitea.repository }}
+            manifest:org.opencontainers.image.licenses=MIT
 
 ```
+
+The `:devel` image is built by the `build-devel` job in this same `docker.yml` workflow, from `docker/Dockerfile.dev`, on every non-tag push, on a daily schedule, and on manual dispatch — mirroring the GitHub Actions design above.
 
 ## Variable Mapping (GitHub → Gitea → Forgejo)
 
@@ -32303,7 +32293,7 @@ REGISTRY = "ghcr.io/${PROJECT_ORG}/${PROJECT_NAME}"
 | Beta | `beta.yml` (beta branch) | `BUILD_TYPE == 'beta'` (beta branch) |
 | Daily | `daily.yml` (schedule + main) | `BUILD_TYPE == 'daily'` (cron + main/master) |
 | Docker | `docker.yml` (all branches) | Docker stage (always runs) |
-| Docker devel | `docker-devel.yml` (push + daily) | Docker Devel stage (push + daily) |
+| Docker devel | `docker.yml` `build-devel` job (push + daily) | Docker Devel stage (push + daily) |
 
 ---
 
@@ -32324,7 +32314,7 @@ Before proceeding, confirm you understand:
 | Beta release | `beta.yml` | `beta.yml` | `rules: beta` | `BUILD_TYPE == 'beta'` |
 | Daily release | `daily.yml` | `daily.yml` | `rules: schedule` | `BUILD_TYPE == 'daily'` |
 | Docker images | `docker.yml` | `docker.yml` | `docker:build` | Docker stage |
-| Docker devel image | `docker-devel.yml` | `docker-devel.yml` | `docker:build:devel` | Docker Devel stage |
+| Docker devel image | `docker.yml` `build-devel` job | `docker.yml` `build-devel` job | `docker:build:devel` | Docker Devel stage |
 | Self-hosted | No | Yes | Yes | Yes |
 
 # PART 24: DOCUMENTATION, LICENSE & READTHEDOCS
