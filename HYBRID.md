@@ -2541,9 +2541,9 @@ When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
 ```yaml
 volumes:
   # Host ./volumes/config → Container /config
-  - './volumes/config:/config:z'
+  - ./volumes/config:/config:z
   # Host ./volumes/data → Container /data
-  - './volumes/data:/data:z'
+  - ./volumes/data:/data:z
 ```
 
 ---
@@ -6710,8 +6710,8 @@ docker run --rm \
 
 ```yaml
 volumes:
-  - './volumes/config:/config:z'
-  - './volumes/data:/data:z'
+  - ./volumes/config:/config:z
+  - ./volumes/data:/data:z
 ```
 
 | Host Path | Container Path |
@@ -8423,7 +8423,7 @@ myapp is running (PID 12345)
 **Used for Docker/compose healthcheck:**
 ```yaml
 healthcheck:
-  test: /usr/local/bin/{project_name} --status
+  test: ["CMD", "/usr/local/bin/{project_name}", "--status"]
   interval: 10s
   timeout: 5s
   retries: 3
