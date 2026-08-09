@@ -21146,7 +21146,7 @@ format_url(host, 8443, true);
 - Tor/I2P provide end-to-end encryption at the network layer
 - HTTPS adds overhead without additional security benefit
 
-**Footer timestamp format:** `%B %-d, %Y at %H:%M:%S %Z` → `December 4, 2025 at 13:05:13 EST` — anything user-facing MUST use this format; use `%Y-%m-%dT%H:%M:%S%:z` (RFC 3339) only where machine-readability matters (API responses, logs, health endpoints)
+**Footer timestamp format:** `%B %d, %Y at %H:%M:%S %Z` → `December 04, 2025 at 13:05:13 EST` — anything user-facing MUST use this format; use `%Y-%m-%dT%H:%M:%S%:z` (RFC 3339) only where machine-readability matters (API responses, logs, health endpoints)
 
 **"Last update" MUST use build date, NEVER hardcoded.** Use `{build_datetime}` template variable which comes from `BUILD_DATE` at compile time. This ensures the footer always shows when the binary was built, not a static date in the source code.
 
@@ -23560,7 +23560,7 @@ pub fn validate_footer_html(html: &str) -> Result<String> {
   {% if footer_custom_html %}
     {{ footer_custom_html | safe }}
   {% endif %}
-  {% if tor_enabled and tor_running %}
+  {% if tor_enabled and tor_running and tor_address %}
     <p class="footer-onion">
       <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
       <code class="onion-address">{{ tor_address }}</code>
@@ -23868,7 +23868,7 @@ General help and FAQ page. Includes a Tor access section when Tor is configured 
 | `tor_address` | `String` | `.onion` hostname |
 
 ```html
-{% if tor_enabled and tor_running %}
+{% if tor_enabled and tor_running and tor_address %}
 <section id="tor-access" class="tor-access">
   <h4>Onion Address</h4>
   <div class="code-block">
