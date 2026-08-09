@@ -2152,7 +2152,7 @@ This distinction exists for clarity. When referring to OS-level resources that b
 
 | Purpose | Endpoints | Access | Format |
 |---------|-----------|--------|--------|
-| **Public server status/info** | `/server/healthz`, optional `/healthz`, `/api/{api_version}/server/healthz` | **PUBLIC** | HTML/JSON/text |
+| **Public server status/info** | `/server/healthz`, optional `/healthz`, `/api/{api_version}/server/healthz`, `/api/healthz` | **PUBLIC** | HTML/JSON/text |
 | **Prometheus metrics** | `/metrics` | **INTERNAL** | Prometheus text exposition (everything) |
 
 **Endpoints:**
@@ -2162,6 +2162,7 @@ This distinction exists for clarity. When referring to OS-level resources that b
 | `/server/healthz` | Frontend route - content negotiation (HTML for browsers, JSON for API clients, text for CLI) |
 | `/healthz` | Optional root alias for `/server/healthz` when `server.healthz.root.enabled: true` |
 | `/api/{api_version}/server/healthz` | API route - JSON by default; text via standard API text rules |
+| `/api/healthz` | Unversioned direct alias for machine-friendly versionless probing |
 | `/metrics` | Prometheus - all metrics, internal only |
 
 **Optional root health alias:**
@@ -5157,7 +5158,7 @@ Configuration is auto-generated on first run. Edit the config file directly.
 
 Key settings:
 - `server.port` - Listen port (default: random 64xxx)
-- `server.mode` - production or development
+- `server.mode` - production, development, or debug
 
 ## API
 
@@ -7372,9 +7373,14 @@ X-Maintenance-Reason: database_connection
 
 ```json
 {
+  "project": {
+    "name": "My Application",
+    "tagline": "The best app ever",
+    "description": "A brief description of what this application does"
+  },
   "status": "maintenance",
   "version": "1.0.0",
-  "mode": "maintenance",
+  "mode": "production",
   "uptime": "2d 5h 30m",
   "maintenance": {
     "reason": "database_connection",
@@ -7394,6 +7400,8 @@ X-Maintenance-Reason: database_connection
   }
 }
 ```
+
+**`mode` always reports the configured MODE (`production`/`development`/`debug`) — maintenance is a state carried by `status`, never a mode. HTTP code: `503 Service Unavailable`.**
 
 ### Recovery (Automatic)
 
@@ -8435,7 +8443,7 @@ server:
   fqdn: {hostname}
   # [::] = all interfaces IPv4/IPv6
   address: "[::]"
-  # production or development
+  # production, development, or debug
   mode: production
   # API version prefix (default: v1) - used in /api/{api_version}/ routes
   api_version: v1
@@ -11685,18 +11693,27 @@ pub async fn health_handler(State(state): State<AppState>) -> impl IntoResponse 
 
     let mut response = build_health_response(&state).await;
 
-    // Check shutdown state
-    if is_shutting_down() {
+    // Health status → HTTP code (see Health Status Values & HTTP Codes)
+    let status_code = if is_shutting_down() {
         response.status = "shutting_down".to_string();
-        return (StatusCode::SERVICE_UNAVAILABLE, Json(response)).into_response();
+        StatusCode::SERVICE_UNAVAILABLE
+    } else if state.maintenance_manager.active() {
+        response.status = "maintenance".to_string();
+        StatusCode::SERVICE_UNAVAILABLE
+    } else if response.status == "unhealthy" {
+        StatusCode::SERVICE_UNAVAILABLE
     } else if state.config_manager.pending_restart() {
         response.status = "restart_required".to_string();
-        response.pending_restart = true;
-        response.restart_reason = state.config_manager.restart_settings();
-        return (StatusCode::OK, Json(response)).into_response();
-    }
+        response.pending_restart = Some(true);
+        response.restart_reason = Some(state.config_manager.restart_settings());
+        // Still healthy, just needs restart
+        StatusCode::OK
+    } else {
+        // healthy or degraded — still serving
+        StatusCode::OK
+    };
 
-    (StatusCode::OK, Json(response)).into_response()
+    (status_code, Json(response)).into_response()
 }
 
 // build_health_response collects ALL dynamic data for /server/healthz
@@ -11708,11 +11725,14 @@ async fn build_health_response(state: &AppState) -> HealthResponse {
         // Project info (from branding config)
         project: ProjectInfo {
             name: state.config.branding.title.clone(),
+            tagline: state.config.branding.tagline.clone(),
             description: state.config.branding.description.clone(),
         },
 
         // Basic status
         status: get_overall_status().to_string(),
+        pending_restart: None,
+        restart_reason: None,
         version: env!("CARGO_PKG_VERSION").to_string(),
         mode: state.config.server.mode.clone(),
         uptime: format_uptime(state.start_time),
@@ -11727,7 +11747,7 @@ async fn build_health_response(state: &AppState) -> HealthResponse {
 
         // Features (PUBLIC only - do NOT include /metrics)
         features: FeaturesInfo {
-            geo_ip: state.config.features.geo_ip.enabled,
+            geoip: state.config.geoip.enabled,
             tor: TorInfo {
                 enabled: state.config.features.tor.enabled,
                 running: state.tor_manager.is_running(),
@@ -11748,7 +11768,7 @@ async fn build_health_response(state: &AppState) -> HealthResponse {
         stats: StatsInfo {
             requests_total: state.stats.total_requests(),
             requests_24h: state.stats.requests_24h(),
-            active_conns: state.stats.active_connections(),
+            active_connections: state.stats.active_connections(),
             // APP-SPECIFIC: Add your app's stats here
         },
         // APP-SPECIFIC: Add your app's custom fields here
@@ -11776,7 +11796,7 @@ impl ConfigManager {
 
 Normal operation:
 ```json
-{"status": "ok"}
+{"status": "healthy"}
 ```
 
 Restart required (service running but config changed):
@@ -12127,7 +12147,7 @@ All templates, Swagger/OpenAPI, GraphQL, email links, etc. MUST use these resolv
 | `{baseurl}` | URL path prefix (auto-detected) | `/` or `/myproject` |
 | `{port}` | Port number (ALWAYS stripped if 80/443) | `8080` or empty |
 | `{address}` | Listen IP address | `203.0.113.50` |
-| `{app_mode}` | Application mode | `production` or `development` |
+| `{app_mode}` | Application mode | `production`, `development`, or `debug` |
 | `{onion_address}` | Tor .onion address (if enabled) | `abc...xyz.onion` |
 | `{i2p_address}` | I2P address (if enabled) | `abc...xyz.b32.i2p` |
 | `{smtp_address}` | SMTP server address (if configured) | `172.17.0.1` |
@@ -13520,7 +13540,7 @@ fn is_serialization_error(err: &anyhow::Error) -> bool {
 | `build_date` | `/server/healthz`, `--version` | Same as above |
 | `rust_version` | `/server/healthz` (under `runtime`) | Build metadata, not a vulnerability vector on its own |
 | `uptime` (seconds or human) | `/server/healthz` | Operational diagnostic |
-| `mode` (`production` / `development`) | `/server/healthz` | Operational diagnostic; debug is gated separately |
+| `mode` (`production` / `development` / `debug`) | `/server/healthz` | Operational diagnostic; debug detail is gated separately |
 | `db_type` (`sqlite` / `libsql`) | `/server/healthz` | Just the engine family — no host, no creds |
 | `db_locality` (`local` / `remote`) | `/server/healthz` | Fuzzy — no host name or IP |
 | `request_count_24h`, `active_connections`, `total_connections` | `/server/healthz` (under `metrics`) | Operational, aggregate |
@@ -16918,6 +16938,7 @@ All settings above are configured via config file:
 - `/server/healthz` - Frontend route (follows PART 14 content negotiation rules)
 - Optional `/healthz` - root alias to `/server/healthz` only when `server.healthz.root.enabled: true`
 - `/api/{api_version}/server/healthz` - API route (JSON by default; text via PART 14 API rules)
+- `/api/healthz` - Unversioned direct alias for machine-friendly versionless probing
 
 **Content negotiation:** Follows standard frontend rules (see PART 14). No special `/server/healthz` rules. If `/healthz` is enabled, it follows the exact same negotiation because it mounts the same handler.
 
@@ -16974,7 +16995,7 @@ pub struct HealthResponse {
     pub project: ProjectInfo,
 
     // 2. Overall status
-    // "healthy", "unhealthy", "degraded"
+    // "healthy", "degraded", "restart_required", "unhealthy", "maintenance", "shutting_down"
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     // true if restart needed
@@ -16993,7 +17014,7 @@ pub struct HealthResponse {
     // 4. Runtime info (PART 6: application modes)
     // human readable "2d 5h 30m"
     pub uptime: String,
-    // "production" or "development"
+    // "production", "development", or "debug"
     pub mode: String,
     // current UTC time
     pub timestamp: chrono::DateTime<chrono::Utc>,
@@ -17099,12 +17120,15 @@ pub struct StatsInfo {
 | `project.tagline` | `cfg.branding.tagline` | 16 |
 | `project.description` | `cfg.branding.description` | 16 |
 | `status` | `get_overall_status()` | - |
+| `pending_restart` | `config_manager.pending_restart()` (only when a restart is pending) | - |
+| `restart_reason` | `config_manager.restart_settings()` (only with `pending_restart`) | - |
 | `version` | `version::VERSION` (build var) | 7 |
 | `rust_version` | `rustc version` | 7 |
 | `build.commit` | `version::COMMIT` (build var) | 7 |
 | `build.date` | `version::DATE` (build var) | 7 |
 | `uptime` | `format_uptime(start_time)` | - |
 | `mode` | `cfg.server.mode` | 6 |
+| `timestamp` | `chrono::Utc::now()` | - |
 | `features.tor.*` | `tor_manager.*` | 31 |
 | `features.geoip` | `cfg.geoip.enabled` (true/false) | 19 |
 | `features.*` (project-specific) | Show actual status when project-specific optional features used | - |
@@ -17141,7 +17165,7 @@ pub struct StatsInfo {
 | Build commit | `<code>` | Optional | `<code>abc1234</code>` |
 | Build date | `<time>` | No | `<time datetime="2024-01-10">Jan 10, 2024</time>` |
 | Uptime | plain text | No | `2d 5h 30m` |
-| Mode | `.badge` | No | `<span class="badge badge-production">Production</span>` |
+| Mode | `.badge` | No | `<span class="badge badge-production">Production</span>` (class is `badge-{mode}`: `badge-production` / `badge-development` / `badge-debug`) |
 | Timestamp | `<time>` | No | `<time datetime="...">Jan 15, 2024 10:30 AM</time>` |
 | Tor address | `.code-block` | **Yes** | 56-char v3 onion, copy button, horizontal scroll |
 | Feature enabled | `.feature-enabled` | No | `<li class="feature-enabled">🌍 GeoIP</li>` |
@@ -17211,7 +17235,7 @@ pub struct StatsInfo {
       <span class="status-icon">✅</span>
       <span class="status-text">All Systems Operational</span>
     </div>
-    <!-- Use .status-ok (healthy), .status-error (unhealthy), .status-warning (degraded) -->
+    <!-- Banner class/icon/text by status — see table below -->
 
     <!-- Version & Build Info -->
     <section class="section-card">
@@ -17297,6 +17321,17 @@ pub struct StatsInfo {
 </html>
 ```
 
+**Status banner by `status` value:**
+
+| `status` | Banner class | Icon | Text |
+|----------|--------------|------|------|
+| `healthy` | `.status-ok` | ✅ | All Systems Operational |
+| `degraded` | `.status-warning` | ⚠️ | Degraded Performance |
+| `restart_required` | `.status-warning` | 🔄 | Restart Required |
+| `unhealthy` | `.status-error` | ❌ | Systems Unhealthy |
+| `maintenance` | `.status-error` | 🚧 | Maintenance in Progress |
+| `shutting_down` | `.status-error` | 🛑 | Shutting Down |
+
 **Healthz-specific styles (extends PART 16):**
 
 ```css
@@ -17345,6 +17380,8 @@ pub struct StatsInfo {
 
 #### JSON (Accept: application/json)
 
+**Envelope exception:** health responses are BARE — no `{ "ok": ..., "data": ... }` wrapper, on any health route, in any state. Kubernetes probes, uptime monitors, and load balancers expect a flat body; the HTTP status code plus the top-level `status` field carry the health state.
+
 **Fields in canonical order (see "Field Order & Structure" above). References template PARTS.**
 
 **Note:** Only non-negotiable features shown with actual status (true/false, enabled/disabled). If project uses project-specific optional features, those become non-negotiable for that project and show their actual enabled/disabled status.
@@ -17390,7 +17427,9 @@ pub struct StatsInfo {
 }
 ```
 
-### /api/{api_version}/server/healthz Security Rules
+### Security Rules (all health responses)
+
+These rules apply to the health payload in every format and on every health route (`/server/healthz`, `/healthz` alias, `/api/{api_version}/server/healthz`, `/api/healthz`).
 
 **NEVER expose in /server/healthz response:**
 
@@ -17414,7 +17453,7 @@ pub struct StatsInfo {
 | **Features** | Enabled PUBLIC features only (not /metrics) | `tor: enabled` |
 | **Checks** | Service status (ok/error only) | `database: ok` |
 | **Stats** | Aggregate counts only | `requests_total: 12345` |
-| **Mode** | Production/development | `production` |
+| **Mode** | Production/development/debug | `production` |
 
 **Rule: Health can be expansive if the field is intentionally public-safe and acceptable for any unauthenticated internet viewer to see.**
 
@@ -17478,10 +17517,13 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 | Field | Description |
 |-------|-------------|
 | `project.name` | Application name (from branding config) |
+| `project.tagline` | Application tagline/slogan (from branding config) |
 | `project.description` | Application description (from branding config) |
-| `status` | healthy, degraded, unhealthy |
+| `status` | healthy, degraded, unhealthy, restart_required, maintenance, shutting_down (see Health Status Values & HTTP Codes) |
+| `pending_restart` | Present (`true`) only when a config change requires a restart |
+| `restart_reason` | Settings that changed (only with `pending_restart`) |
 | `version` | Application version (SemVer) |
-| `mode` | production, development |
+| `mode` | production, development, debug |
 | `uptime` | Human-readable uptime |
 | `timestamp` | ISO 8601 timestamp |
 | `rust_version` | Rust runtime version |
@@ -17501,6 +17543,19 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 - Browsers, curl, and uptime checks use `/server/healthz`
 - CLI uses `/api/{api_version}/server/healthz` for status checks
 - Unversioned `/api/healthz` exists for machine-friendly versionless probing
+
+### Health Status Values & HTTP Codes
+
+**Applies to every health route (`/server/healthz`, `/healthz` alias, `/api/{api_version}/server/healthz`, `/api/healthz`) and every format (HTML/JSON/text). The body renders normally in all states — only the HTTP status code changes.**
+
+| `status` | Meaning | HTTP code |
+|----------|---------|-----------|
+| `healthy` | All checks pass | 200 |
+| `degraded` | Some non-critical checks failing; still serving | 200 |
+| `restart_required` | Healthy, but a config change needs a restart (`pending_restart: true`) | 200 |
+| `unhealthy` | Critical checks failing | 503 |
+| `maintenance` | Maintenance mode active | 503 |
+| `shutting_down` | Graceful shutdown in progress | 503 |
 
 ## Versioning
 
@@ -17808,7 +17863,7 @@ GET /api/{api_version}/items?status=active            ✓ Filtering
 | **Indentation** | 2 spaces — never tabs, never 4 spaces |
 | **Trailing newline** | Every JSON response ends with exactly one `\n` |
 | **No bare arrays at root** | Never emit a top-level JSON array — always wrap: `{ "data": [...] }`. Bare arrays cannot grow new sibling fields (pagination, metadata) without a breaking change, and some older clients reject them as JSON. |
-| **Success shape** | `{ "ok": true, "data": { ... } }` — `ok` is the discriminator; `data` carries the payload |
+| **Success shape** | `{ "ok": true, "data": { ... } }` — `ok` is the discriminator; `data` carries the payload. Exception: health endpoints return the bare health object (see PART 13). |
 | **Error shape** | `{ "ok": false, "error": "CODE", "message": "...", "details": {} }` — see PART 14 |
 
 ```rust
@@ -20721,6 +20776,11 @@ document.addEventListener('click', function(e) {
   font-weight: 500;
   white-space: nowrap;
 }
+
+/* Mode badges (badge-{mode} — see PART 13 healthz display rules) */
+.badge-production { background: var(--color-success-bg); color: var(--color-success); }
+.badge-development { background: var(--color-warning-bg); color: var(--color-warning); }
+.badge-debug { background: var(--color-error-bg); color: var(--color-error); }
 
 @media (min-width: 768px) {
   .badge {
@@ -28696,7 +28756,7 @@ docker/
 | Entrypoint script | `/usr/local/bin/entrypoint.sh` |
 | Init system | **tini** |
 | Internal port | **80** |
-| **ENV MODE** | **not set** — binary defaults to production; compose files set `MODE` explicitly (`production` / `development`) |
+| **ENV MODE** | **not set** — binary defaults to production; compose files set `MODE` explicitly (`production` / `development` / `debug`) |
 
 ### Container Paths
 
@@ -37732,7 +37792,7 @@ Tor Hidden Service: Connected
 |-------|-------------|
 | Server Status | Running, stopped, or starting |
 | Port | Bind port |
-| Mode | production or development |
+| Mode | production, development, or debug |
 | Uptime | Human-readable uptime |
 | Tor | Connected/disabled and onion address |
 
