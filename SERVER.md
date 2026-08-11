@@ -2273,7 +2273,7 @@ This distinction exists for clarity. When referring to OS-level resources that b
 | Purpose | Endpoints | Access | Format |
 |---------|-----------|--------|--------|
 | **Public server status/info** | `/server/healthz`, optional `/healthz`, `/api/{api_version}/server/healthz`, `/api/healthz` | **PUBLIC** | HTML/JSON/text |
-| **Prometheus metrics** | `/metrics` | **INTERNAL** | Prometheus text exposition (everything) |
+| **Prometheus metrics** | `/server/metrics`, `/server/metrics/{prometheus\|grafana\|loki}`, root alias `/metrics[/{service}]` | **INTERNAL** | Prometheus text exposition (everything) + Grafana/Loki JSON services |
 
 **Endpoints:**
 
@@ -2283,7 +2283,7 @@ This distinction exists for clarity. When referring to OS-level resources that b
 | `/healthz` | Optional root alias for `/server/healthz` when `server.healthz.root.enabled: true` |
 | `/api/{api_version}/server/healthz` | API route - JSON by default; text via standard API text rules |
 | `/api/healthz` | Unversioned direct alias for machine-friendly versionless probing |
-| `/metrics` | Prometheus - all metrics, internal only |
+| `/server/metrics[/{service}]` | Prometheus/Grafana/Loki - all metrics, internal only; root alias `/metrics[/{service}]` when `server.metrics.root.enabled: true` (default true) |
 
 **Optional root health alias:**
 
@@ -2305,9 +2305,9 @@ server:
 
 | Aspect | Public Status (PART 13) | Prometheus Metrics (PART 21) |
 |--------|-------------------------|------------------------------|
-| **Endpoints** | `/server/healthz`, optional `/healthz`, `/api/{api_version}/server/healthz` | `/metrics` |
+| **Endpoints** | `/server/healthz`, optional `/healthz`, `/api/{api_version}/server/healthz` | `/server/metrics`, `/server/metrics/{prometheus\|grafana\|loki}`, root alias `/metrics[/{service}]` |
 | **Visibility** | Public internet | Internal network only |
-| **Authentication** | None | Optional bearer token |
+| **Authentication** | None | Mandatory per-service bearer tokens (`prometheus`, `grafana`, `loki`) |
 | **Data** | Public-safe status/info only | Everything (all telemetry) |
 | **Format** | HTML, JSON, text | Prometheus text exposition |
 | **Use case** | "Is the server running? What version?" | "How is it performing? Alert on this." |
@@ -2328,7 +2328,7 @@ server:
 | Tokio tasks, allocator stats | ✗ | ✓ | Runtime internals |
 
 **NEVER:**
-- Expose `/metrics` publicly (firewall it, or use token auth)
+- Serve any metrics endpoint without its per-service bearer token (token auth is mandatory; firewalling is additional defense in depth)
 - Include metrics status in public healthz response
 - Use healthz stats for alerting (use Prometheus for that)
 - Duplicate detailed metrics in healthz (keep it simple)
@@ -2377,7 +2377,7 @@ server:
 | 18 | ~32338 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
 | 19 | ~33672 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
 | 20 | ~34171 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 21 | ~34272 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~34272 | Metrics | `/server/metrics` + Prometheus/Grafana/Loki services, **INTERNAL only** |
 | 22 | ~35582 | Backup & Restore | Backup features, **Compliance encryption**, **Cluster backups** |
 | 23 | ~36346 | Update Command | Update feature |
 | 24 | ~36846 | Privilege Escalation & Service | Service/privilege work |
@@ -3075,7 +3075,7 @@ See IDEA.md for the full project breakdown.
 
 **AI MUST verify its own work with real tools before reporting a task as done. Do not rely on "the code looks right."**
 
-**This rule applies to EVERY change type covered by this template — backend logic, API, frontend, CLI binaries, Docker, CI/CD, configuration, schema, documentation, observability, i18n, security — not only frontend or web changes.** Whatever you touched, you verify.
+**This rule applies to EVERY change type covered by this specification — backend logic, API, frontend, CLI binaries, Docker, CI/CD, configuration, schema, documentation, observability, i18n, security — not only frontend or web changes.** Whatever you touched, you verify.
 
 Getting code correct on the first try is much harder than iterating with feedback. Close the loop every time.
 
@@ -3093,7 +3093,7 @@ Getting code correct on the first try is much harder than iterating with feedbac
 | Configuration / settings | Start the binary with the new config; verify defaults; verify validation rejects bad input with a useful error |
 | Docker / container build | Build the image; run the container; smoke-test at least one endpoint or command to confirm the image actually starts and serves |
 | CI/CD workflow | Run the workflow on a branch (or via `act`/equivalent dry-run); verify each job's exit status, not just YAML validity |
-| Health / observability | Hit `/healthz`, `/readyz`, `/metrics`; verify scrape format and that new metrics actually appear |
+| Health / observability | Hit `/healthz`, `/readyz`, `/server/metrics`; verify scrape format and that new metrics actually appear |
 | Logging / error paths | Trigger the error path; verify the log line/structured event was emitted with expected fields |
 | i18n / translation | Switch each supported locale; verify text renders correctly and no placeholders leak |
 | Security-sensitive change (auth, crypto, input validation) | Test both the success path AND attempted bypass paths; never assume a guard works without exercising it |
@@ -13097,7 +13097,7 @@ async fn build_health_response(state: &Arc<AppState>) -> HealthResponse {
             role: state.cluster_manager.role(),
         },
 
-        // Features (PUBLIC only - do NOT include /metrics)
+        // Features (PUBLIC only - do NOT include /server/metrics)
         features: FeaturesInfo {
             // PROJECT-SPECIFIC: when optional PARTS are used, show actual status:
             // multi_user: state.config.features.multi_user,
@@ -13468,6 +13468,26 @@ volumes:
 | Never show | `0.0.0.0`, `127.0.0.1`, `localhost` |
 | Always show | Valid FQDN, host, or IP |
 | Show only | One address, the most relevant |
+
+## Human-Readable Values (Frontend)
+
+**Every value shown on a user-facing surface — web pages, `/server/healthz` HTML,
+admin panel, error pages, TUI/GUI, pretty console output — MUST be human-readable.
+Raw machine values belong to JSON/API responses, Prometheus metrics, and logs only.**
+
+| Kind | Rule | Examples |
+|------|------|----------|
+| **Durations** | Largest fitting unit, at most two units, correct singular/plural: <60 s → seconds · ≥60 s → minutes · ≥60 min → hours · ≥24 h → days | `1 second` · `45 seconds` · `3 minutes` · `2 minutes 5 seconds` · `2 hours` · `1 hour 30 minutes` · `3 days 4 hours` |
+| **Sizes** | 1024 boundaries, full unit names, singular/plural, at most one decimal (drop `.0`): bytes → kilobytes → megabytes → gigabytes → terabytes | `1 byte` · `512 bytes` · `1 kilobyte` · `2.5 megabytes` · `5 gigabytes` · `1.2 terabytes` |
+| **Counts** | Locale-aware thousands separators | `12,847` |
+| **Timestamps** | Footer/display format `%B %d, %Y at %H:%M:%S %Z` (zero-padded day) as already specified | `January 05, 2026 at 14:03:07 UTC` |
+
+| Rule | Detail |
+|------|--------|
+| **Shared helpers** | One implementation: `format::duration()` / `format::size()` / `format::count()` in the shared/common formatting module — never per-page ad-hoc formatting |
+| **i18n** | Unit names go through translation keys (`format.seconds_one`, `format.seconds_other`, …) with per-language plural rules — never hardcoded English unit strings |
+| **Raw value preserved** | HTML MAY carry the machine value in a `title=`/`data-` attribute for tooltips; the visible text is always the human form |
+| **Machine surfaces unchanged** | JSON API fields, Prometheus metrics, and log files keep raw base units (seconds, bytes) — formatting is a presentation concern only |
 
 ## URL & FQDN Detection
 
@@ -14368,32 +14388,82 @@ pub async fn get_user_versioned(
 
 | Content Type | Cache-Control Header | Description |
 |--------------|---------------------|-------------|
-| Static assets (JS/CSS/images) | `public, max-age=31536000, immutable` | 1 year, fingerprinted files |
-| HTML pages | `no-store` | Always fetch fresh |
+| Static assets with matching `?v=` build stamp | `public, max-age=31536000, immutable` | 1 year — URL changes every release, so this can never go stale |
+| Static assets without / with mismatched `?v=` | `no-cache` + `ETag` | Always revalidated — never trusted across updates |
+| HTML pages | `no-store` + build-stamp `ETag` | Always fetch fresh; intermediaries that ignore `no-store` still revalidate |
 | API responses (public) | `public, max-age=60` | Short cache for CDN |
 | API responses (private) | `private, no-store` | User-specific data |
 | Authenticated pages | `private, no-store` | Never cache |
 | Error pages | `no-store` | Don't cache errors |
 
+### Asset Version-Busting (REQUIRED)
+
+**A stale browser cache must never survive an update.** Assets are embedded in the
+binary, so every release changes their content but not their paths — long-lived
+caching on bare paths is exactly how an old frontend keeps rendering after an
+update. The fix is mandatory URL stamping:
+
+| Rule | Detail |
+|------|--------|
+| **`asset()` template helper** | Every static asset reference in every template goes through a shared helper that appends the build stamp: `/static/app.css?v={project_version}-{short_commit}`. Hand-written bare `/static/...` URLs in templates are a bug. |
+| **`immutable` only on a matching stamp** | The static handler sends `public, max-age=31536000, immutable` ONLY when the request's `?v=` equals the running build's stamp. Missing or mismatched stamp → `no-cache` + `ETag` (the bytes still serve — cached HTML from an old version never breaks, it just revalidates). |
+| **HTML is never cached** | All HTML documents: `Cache-Control: no-store` plus an `ETag` derived from the build stamp, so any intermediary that ignores `no-store` still revalidates. |
+| **Service worker (if the project adds one)** | Cache name MUST embed `{project_version}`; `activate` deletes all caches from other versions. |
+
+**Result:** deploying a new version changes every asset URL, so browsers fetch the
+new frontend on the first page load after an update — no manual cache clearing, ever.
+
 ```rust
 use axum::response::Response;
-use http::header::{CACHE_CONTROL, HeaderValue};
+use http::header::{CACHE_CONTROL, ETAG, HeaderValue};
 
-pub fn set_cache_headers(mut response: Response, content_type: &str, is_authenticated: bool) -> Response {
-    let value = if is_authenticated {
-        "private, no-store"
-    } else {
-        match content_type {
-            "static" => "public, max-age=31536000, immutable",
-            "api" => "public, max-age=60",
-            _ => "no-store",
+use crate::build_info;
+
+pub fn set_cache_headers(
+    mut response: Response,
+    content_type: &str,
+    is_authenticated: bool,
+    version_param: &str,
+) -> Response {
+    if is_authenticated {
+        response.headers_mut().insert(
+            CACHE_CONTROL,
+            HeaderValue::from_static("private, no-store"),
+        );
+        return response;
+    }
+
+    match content_type {
+        // asset_stamp() = "{project_version}-{short_commit}"
+        "static" if version_param == build_info::asset_stamp() => {
+            response.headers_mut().insert(
+                CACHE_CONTROL,
+                HeaderValue::from_static("public, max-age=31536000, immutable"),
+            );
         }
-    };
-
-    response.headers_mut().insert(
-        CACHE_CONTROL,
-        HeaderValue::from_static(value),
-    );
+        "static" => {
+            response.headers_mut().insert(
+                CACHE_CONTROL,
+                HeaderValue::from_static("no-cache"),
+            );
+            let etag = format!("\"{}\"", build_info::asset_stamp());
+            if let Ok(value) = HeaderValue::from_str(&etag) {
+                response.headers_mut().insert(ETAG, value);
+            }
+        }
+        "api" => {
+            response.headers_mut().insert(
+                CACHE_CONTROL,
+                HeaderValue::from_static("public, max-age=60"),
+            );
+        }
+        _ => {
+            response.headers_mut().insert(
+                CACHE_CONTROL,
+                HeaderValue::from_static("no-store"),
+            );
+        }
+    }
     response
 }
 ```
@@ -16395,7 +16465,7 @@ web:
 | Admin routes (`/server/{admin_path}/**`) | No | Not for external agents |
 | Internal routes (`/internal/**`) | No | Server-to-server only |
 | Health (`/server/healthz`) | Yes | Useful for monitoring agents |
-| Metrics (`/metrics`) | No | Operator-only diagnostics; not for AI agents |
+| Metrics (`/server/metrics`) | No | Operator-only diagnostics; not for AI agents |
 
 **Well-Known Support Matrix Update:**
 
@@ -19830,11 +19900,11 @@ All settings above MUST be configurable via admin panel:
 
 ### Global vs App-Specific
 
-**This template defines the COMPLETE global structure. Projects extend with app-specific data. ALL fields MUST be public-safe.**
+**This specification defines the COMPLETE global structure. Projects extend with app-specific data. ALL fields MUST be public-safe.**
 
 | Type | Description | Defined Where |
 |------|-------------|---------------|
-| **Global (this template)** | Complete structure: project, status, version, build, runtime, cluster, features, checks, stats | Below (comprehensive) |
+| **Global (this specification)** | Complete structure: project, status, version, build, runtime, cluster, features, checks, stats | Below (comprehensive) |
 | **App-specific (extend)** | Additional features, stats, checks relevant to your app | IDEA.md |
 
 **How to extend:**
@@ -19951,7 +20021,7 @@ pub struct ClusterInfo {
     pub role: Option<String>,
 }
 
-/// FeaturesInfo - PUBLIC features only (no /metrics - PART 21 is internal)
+/// FeaturesInfo - PUBLIC features only (no /server/metrics - PART 21 is internal)
 /// Only shows NON-NEGOTIABLE features.
 /// If project uses optional features (PARTS 34, 35, 36), they become
 /// non-negotiable FOR THAT PROJECT and show actual enabled/disabled status.
@@ -20073,7 +20143,7 @@ pub struct StatsInfo {
 | Rust version | `<code>` | No | `<code>{{rust_version}}</code>` |
 | Build commit | `<code>` | Optional | `<code>abc1234</code>` |
 | Build date | `<time>` | No | `<time datetime="2024-01-10">Jan 10, 2024</time>` |
-| Uptime | plain text | No | `2d 5h 30m` |
+| Uptime | plain text | No | `2 days 5 hours` |
 | Mode | `.badge` | No | `<span class="badge badge-production">Production</span>` (class is badge-{mode}: badge-production / badge-development / badge-debug) |
 | Timestamp | `<time>` | No | `<time datetime="...">Jan 15, 2024 10:30 AM</time>` |
 | Cluster status | `.status` | No | `<span class="status status-ok">✅ Connected</span>` |
@@ -20097,7 +20167,7 @@ pub struct StatsInfo {
 | Project description (from branding) | API keys or tokens |
 | Status: "healthy"/"unhealthy" | Passwords or secrets |
 | Version: "1.0.0" | Internal IP addresses |
-| Uptime: "2d 5h" | File paths on server |
+| Uptime: "2 days 5 hours" | File paths on server |
 | Mode: "production" | Environment variables |
 | Checks: "ok"/"error" | Config file contents |
 | Node ID (opaque) | |
@@ -20166,7 +20236,7 @@ pub struct StatsInfo {
         <dd><code>abc1234</code> (2024-01-10)</dd>
 
         <dt>⏱️ Uptime</dt>
-        <dd>2d 5h 30m</dd>
+        <dd>2 days 5 hours</dd>
 
         <dt>🚀 Mode</dt>
         <dd><span class="badge badge-production">Production</span></dd>
@@ -20261,7 +20331,7 @@ pub struct StatsInfo {
     <section class="section-card">
       <h2>📈 Server Statistics</h2>
       <!-- NOTE: Public-safe aggregate stats only.
-           /metrics endpoint (PART 21) is internal/authenticated, not shown here. -->
+           /server/metrics endpoint (PART 21) is internal/authenticated, not shown here. -->
       <dl class="info-list stats-grid">
         <dt>📥 Total Requests</dt>
         <dd>1,234,567</dd>
@@ -20420,15 +20490,15 @@ These rules apply to the health payload in every format and on every health rout
 | **Email** | SMTP host, admin emails | Phishing/spam target |
 | **Secrets** | Encryption keys, session secrets | Cryptographic breach |
 | **Debug** | Stack traces, detailed errors | Exploitation info |
-| **Internal endpoints** | /metrics status, internal service endpoints | Internal infrastructure info |
+| **Internal endpoints** | /server/metrics status, internal service endpoints | Internal infrastructure info |
 
 **Safe to include:**
 
 | Category | OK to Include | Example |
 |----------|---------------|---------|
 | **Version** | App version, Rust version, build info | `1.0.0`, `<rustc version>` |
-| **Status** | Health status, uptime | `healthy`, `2d 5h` |
-| **Features** | Enabled PUBLIC features only (not /metrics) | `multi_user: true` |
+| **Status** | Health status, uptime | `healthy`, `2 days 5 hours` |
+| **Features** | Enabled PUBLIC features only (not /server/metrics) | `multi_user: true` |
 | **Checks** | Service status (ok/error only) | `database: ok` |
 | **Cluster** | Public node URLs | `https://node1.example.com` |
 | **Stats** | Aggregate counts only | `requests_total: 12345` |
@@ -22303,7 +22373,13 @@ Need additional compatible endpoints?"
 | `/healthz` | GET | None | Optional direct alias to `/server/healthz` when `server.healthz.root.enabled` is `true` |
 | `/server/docs/swagger` | GET | None | Swagger UI (interactive REST explorer; fetches spec from `/api/swagger`) |
 | `/server/docs/graphql` | GET | None | GraphiQL UI (interactive GraphQL explorer; POSTs to `/api/graphql`) |
-| `/metrics` | GET | Optional | Prometheus metrics |
+| `/server/metrics` | GET | Bearer token (`prometheus`) | Prometheus text exposition (same handler as `/server/metrics/prometheus`) |
+| `/server/metrics/prometheus` | GET | Bearer token (`prometheus`) | Complete Prometheus text exposition — every exported metric |
+| `/server/metrics/grafana` | GET | Bearer token (`grafana`) | Complete importable Grafana dashboard JSON covering every exported metric |
+| `/server/metrics/loki` | GET | Bearer token (`loki`) | Recent structured log entries in Loki-compatible JSON streams |
+| `/api/{api_version}/server/metrics[/{service}]` | GET | Same per-service token | Versioned API path — same handlers |
+| `/api/metrics[/{service}]` | GET | Same per-service token | Unversioned machine-friendly alias for current `{api_version}` — same handlers |
+| `/metrics[/{service}]` | GET | Same per-service token | Root alias, gated on `server.metrics.root.enabled: true` (default **true**); same handler, NEVER a redirect |
 | `/server/{admin_path}` | GET | Session | Admin panel login |
 | `/server/{admin_path}/*` | ALL | Session | Admin panel pages |
 | `/api/autodiscover` | GET | None | Server settings, config schema, and options for CLI/agent (non-versioned) |
@@ -23347,6 +23423,8 @@ This token will only be shown ONCE.
 | **Interactive console** | ✅ Yes | ✅ Yes | ✅ Yes | Pretty |
 | **Log files** | ❌ Never | ❌ Never | ❌ Never | Raw text |
 | **Log output (stdout)** | ❌ Never | ❌ Never | ❌ Never | Raw text |
+| **Background tasks / scheduler** | ❌ Never | ❌ Never | ❌ Never | Log files only — never console |
+| **Health checks / probes** | ❌ Never | ❌ Never | ❌ Never | Log files only — never console |
 
 **Note:** Startup banner adapts to terminal width. ASCII art only shown at ≥80 columns. Icons reduced at <60 columns. See "Responsive Startup Banner" section.
 
@@ -23363,6 +23441,20 @@ This token will only be shown ONCE.
 ✅ Server started    <- NO icons in logs
 🔧 Development mode  <- NO icons in logs
 ```
+
+### Runtime Console Silence
+
+**After the startup banner, the console (stdout) stays silent during normal operation.**
+
+| Never printed to console | Where it goes instead |
+|--------------------------|----------------------|
+| Scheduler / background task activity (started, completed, skipped, failed, next run) | Log files only |
+| `healthcheck_self` results and all incoming health probe requests (Docker/compose healthchecks, k8s probes, uptime monitors) | Log files only (successful health hits are already excluded from `access.log` by default) |
+| Recurring internal work — cache maintenance, metrics collection, certificate renewal checks, heartbeats, cleanup tasks | Log files only |
+
+**The console after the banner shows ONLY:** WARN/ERROR conditions, direct responses
+to interactive commands, and shutdown messages. Everything else is log-file material
+at the appropriate level — a healthy server prints nothing.
 
 ### Certificate Lookup Order
 
@@ -24334,7 +24426,7 @@ document.addEventListener('click', function(e) {
   <dd><code>1.2.3</code></dd>
 
   <dt>⏱️ Uptime</dt>
-  <dd>2d 5h 30m</dd>
+  <dd>2 days 5 hours</dd>
 
   <dt>🧅 Tor Address</dt>
   <dd>
@@ -25424,7 +25516,9 @@ if ('serviceWorker' in navigator) {
 
 ```javascript
 // /sw.js - Service Worker
-const CACHE_VERSION = 'v1.0.0';
+// Cache name MUST embed {project_version} so activate can delete
+// every cache from other versions (see Asset Version-Busting, PART 9)
+const CACHE_VERSION = '{project_version}';
 const CACHE_NAME = `{app_name}-cache-${CACHE_VERSION}`;
 
 // Assets to pre-cache on install
@@ -26252,14 +26346,14 @@ if (new URLSearchParams(window.location.search).get('source') === 'pwa') {
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="{app_name}">
-  <link rel="apple-touch-icon" href="/static/icons/icon-180.png">
+  <link rel="apple-touch-icon" href="{{ asset("icons/icon-180.png") }}">
 
   <!-- iOS splash screens -->
   <link rel="apple-touch-startup-image"
-        href="/static/splash/iphone-1179x2556.png"
+        href="{{ asset("splash/iphone-1179x2556.png") }}"
         media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)">
   <link rel="apple-touch-startup-image"
-        href="/static/splash/iphone-1284x2778.png"
+        href="{{ asset("splash/iphone-1284x2778.png") }}"
         media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)">
 </head>
 ```
@@ -26327,9 +26421,9 @@ async function requestPersistentStorage() {
   <link rel="manifest" href="/manifest.json">
 
   <!-- Icons -->
-  <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/favicon-16.png">
-  <link rel="apple-touch-icon" href="/static/icons/icon-180.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ asset("icons/favicon-32.png") }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ asset("icons/favicon-16.png") }}">
+  <link rel="apple-touch-icon" href="{{ asset("icons/icon-180.png") }}">
 
   <!-- iOS specific -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -26337,7 +26431,7 @@ async function requestPersistentStorage() {
   <meta name="apple-mobile-web-app-title" content="{app_name}">
 
   <title>{App Name}</title>
-  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="{{ asset("css/app.css") }}">
 </head>
 <body>
   <!-- Offline indicator -->
@@ -26346,7 +26440,7 @@ async function requestPersistentStorage() {
   <!-- App content -->
   <div id="app"></div>
 
-  <script src="/static/js/app.js"></script>
+  <script src="{{ asset("js/app.js") }}"></script>
 </body>
 </html>
 ```
@@ -33399,7 +33493,7 @@ Do not reply to this email.
 
 ### breach_notification
 
-**Compliance-Aware Template:** This template automatically adjusts content based on enabled compliance standards.
+**Compliance-Aware Template:** This email template automatically adjusts content based on enabled compliance standards.
 
 | Variable | Description |
 |----------|-------------|
@@ -34216,6 +34310,8 @@ Execute task
            Schedule retry (if retryable)
 ```
 
+Task activity is logged to log files only — the scheduler NEVER prints to the console (see Console vs Logs → Runtime Console Silence).
+
 ### Retry Policy
 
 | Setting | Default | Description |
@@ -34504,28 +34600,50 @@ server:
 
 | Feature | Description |
 |---------|-------------|
-| Format | Prometheus text exposition format |
-| Endpoint | `/metrics` (configurable) |
-| Authentication | Optional bearer token |
+| Format | Prometheus text exposition format (plus Grafana/Loki JSON services) |
+| Endpoint | `/server/metrics` + `/server/metrics/{prometheus\|grafana\|loki}` (root alias `/metrics[/{service}]` gated on `server.metrics.root.enabled`) |
+| Authentication | Mandatory per-service bearer tokens (`prometheus`, `grafana`, `loki`) |
 | Crate | `metrics` + `metrics-exporter-prometheus` |
+
+## Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/server/metrics` | GET | Bearer token (`prometheus`) | Prometheus text exposition (same handler as `/server/metrics/prometheus`) |
+| `/server/metrics/prometheus` | GET | Bearer token (`prometheus`) | Complete Prometheus text exposition — every exported metric |
+| `/server/metrics/grafana` | GET | Bearer token (`grafana`) | Complete importable Grafana dashboard JSON covering every exported metric |
+| `/server/metrics/loki` | GET | Bearer token (`loki`) | Recent structured log entries in Loki-compatible JSON streams |
+| `/api/{api_version}/server/metrics[/{service}]` | GET | Same per-service token | Versioned API path — same handlers |
+| `/api/metrics[/{service}]` | GET | Same per-service token | Unversioned machine-friendly alias for current `{api_version}` — same handlers |
+| `/metrics[/{service}]` | GET | Same per-service token | Root alias, gated on `server.metrics.root.enabled: true` (default **true** — Prometheus scrapers default to `/metrics`); same handler, NEVER a redirect |
+
+- All alias routes invoke the SAME handler — never redirect (redirects break scrapers), same rule as the healthz root alias.
+- The correct product spelling is **Grafana** — endpoint and config key are `grafana`.
 
 ## Access Control
 
-**`/metrics` is INTERNAL ONLY. See TERMINOLOGY > Monitoring Endpoints for /server/healthz vs /metrics distinction.**
+**`/server/metrics` is INTERNAL ONLY. See TERMINOLOGY > Monitoring Endpoints for /server/healthz vs /server/metrics distinction.**
 
 | Deployment | Access Method | Recommendation |
 |------------|---------------|----------------|
-| **Single server** | Firewall rules | Block external access to `/metrics` port/path |
-| **Behind reverse proxy** | Proxy config | Do NOT proxy `/metrics` to public |
+| **Single server** | Firewall rules | Block external access to the `/server/metrics` and `/metrics` port/paths |
+| **Behind reverse proxy** | Proxy config | Do NOT proxy `/server/metrics` or `/metrics` to public |
 | **Kubernetes** | NetworkPolicy | Restrict to monitoring namespace |
 | **Cloud** | Security groups | Allow only from Prometheus IP |
 
-**Authentication options:**
+### Authentication
 
-| Method | Config | Use When |
-|--------|--------|----------|
-| **None** | `token: ""` | Firewalled, internal network only |
-| **Bearer token** | `token: "secret123"` | Additional layer, or when firewall not possible |
+**Every metrics route requires a bearer token. There is no unauthenticated default.**
+
+| Rule | Detail |
+|------|--------|
+| **Per-service tokens** | Each service (`prometheus`, `grafana`, `loki`) has its own token in `server.yml` — rotating one service's token never breaks the others |
+| **Header only** | `Authorization: Bearer {token}` — query-string tokens are FORBIDDEN (they leak into access logs and proxies) |
+| **Constant-time compare** | Token comparison uses constant-time equality |
+| **Empty token = service disabled** | An empty token disables that service's endpoints → `403` with an empty body; the reason is logged once at startup (log files, not console) |
+| **Never logged, always redacted** | Tokens never appear in logs, error messages, `/server/healthz`, or any config dump — display as `xxxxx` |
+| **Firewalled escape hatch** | `auth.allow_unauthenticated: true` (default `false`) skips token checks for ALL metrics services — for firewalled internal networks only; setting it while the server is reachable publicly is a deployment bug |
+| **Still INTERNAL** | Metrics remain internal/operational endpoints — never advertised, never in FeaturesInfo, firewall/proxy rules still apply as defense in depth |
 
 **Token authentication header:**
 ```
@@ -34538,8 +34656,11 @@ scrape_configs:
   - job_name: '{project_name}'
     static_configs:
       - targets: ['app.internal:8080']
+    # Root alias (server.metrics.root.enabled: true) - or use /server/metrics
+    metrics_path: /metrics
     authorization:
-      credentials: 'your-metrics-token-here'
+      # The prometheus service token from server.metrics.auth.tokens
+      credentials: 'your-prometheus-token-here'
 ```
 
 ## Configuration
@@ -34548,7 +34669,22 @@ scrape_configs:
 server:
   metrics:
     enabled: true
-    endpoint: /metrics
+
+    # Root aliases /metrics and /metrics/{service}
+    # (default true - Prometheus scrapers expect /metrics)
+    root:
+      enabled: true
+
+    auth:
+      # true skips token checks for ALL metrics services
+      # ONLY for firewalled internal networks - never on a public server
+      allow_unauthenticated: false
+
+      # Per-service bearer tokens - empty disables that service (403)
+      tokens:
+        prometheus: ""
+        grafana: ""
+        loki: ""
 
     # Include system metrics (CPU, memory, disk, async tasks)
     include_system: true
@@ -34556,8 +34692,10 @@ server:
     # Include Tokio runtime metrics
     include_runtime: true
 
-    # Optional Bearer token for authentication
-    token: ""
+    # Loki service - how much recent log to serve
+    loki:
+      max_entries: 1000
+      max_age: 1h
 
     # Histogram buckets for request duration (seconds)
     duration_buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
@@ -34565,6 +34703,14 @@ server:
     # Histogram buckets for request size (bytes)
     size_buckets: [100, 1000, 10000, 100000, 1000000, 10000000]
 ```
+
+## Service Semantics
+
+| Service | Content-Type | Body |
+|---------|--------------|------|
+| `prometheus` | `text/plain; version=0.0.4` | Full Prometheus text exposition — all required + project metrics |
+| `grafana` | `application/json` | A complete, importable Grafana dashboard definition (schema-current JSON) with panels covering every metric category this specification requires (HTTP, database, cache, scheduler, system, business); datasource left as a template variable so it imports against any Prometheus datasource |
+| `loki` | `application/json` | Recent structured log entries in Loki push-API stream format: `{"streams":[{"stream":{labels},"values":[["<ns-timestamp>","<line>"],...]}]}` — bounded by `loki.max_entries`/`loki.max_age`, same sanitization as log files (credentials ALWAYS redacted) |
 
 ## Metrics Categories
 
@@ -34660,7 +34806,7 @@ server:
 
 ## Complete Metrics Reference
 
-**Every metric exported by `/metrics`. All prefixed with `{project_name}_`.**
+**Every metric exported by `/server/metrics`. All prefixed with `{project_name}_`.**
 
 ### Application Metrics (REQUIRED)
 
@@ -34835,7 +34981,7 @@ server:
 
 ## Metrics Output Example
 
-**Sample `/metrics` output (Prometheus text format):**
+**Sample `/server/metrics` output (Prometheus text format):**
 
 ```
 # HELP {project_name}_app_info Application information
@@ -34972,7 +35118,7 @@ use metrics::{counter, describe_counter, describe_gauge, describe_histogram, gau
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
 
 // Returns the PrometheusHandle — store it in AppState so the
-// /metrics handler can render() the current snapshot.
+// /server/metrics handler can render() the current snapshot.
 pub fn init_metrics(duration_buckets: Vec<f64>, size_buckets: Vec<f64>) -> PrometheusHandle {
     let handle = PrometheusBuilder::new()
         .set_buckets_for_metric(
@@ -35544,25 +35690,77 @@ use std::sync::Arc;
 
 use crate::state::AppState;
 
-/// MetricsHandler returns the Prometheus metrics endpoint with optional bearer token auth.
-pub async fn metrics_handler(
+/// Per-service bearer-token gate for the metrics endpoints.
+/// Every metrics route requires a token - there is no unauthenticated default.
+/// Header only (Authorization: Bearer {token}) - query-string tokens are FORBIDDEN.
+fn metrics_auth(state: &AppState, service: &str, headers: &HeaderMap) -> Result<(), Response> {
+    // Firewalled escape hatch - skips token checks for ALL metrics services
+    if state.config.metrics.auth.allow_unauthenticated {
+        return Ok(());
+    }
+
+    let token = state.config.metrics.auth.token_for(service);
+
+    // Empty token = service disabled (403, empty body)
+    // The reason is logged once at startup - log files, never console
+    if token.is_empty() {
+        return Err((StatusCode::FORBIDDEN, "").into_response());
+    }
+
+    let auth = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    let expected = format!("Bearer {token}");
+
+    // Constant-time comparison - never a plain == on secrets
+    if bool::from(subtle::ConstantTimeEq::ct_eq(
+        auth.as_bytes(),
+        expected.as_bytes(),
+    )) {
+        Ok(())
+    } else {
+        Err((StatusCode::UNAUTHORIZED, "Unauthorized").into_response())
+    }
+}
+
+/// Serves /server/metrics and /server/metrics/prometheus (plus the /api and root
+/// aliases - all alias routes mount this SAME handler, never a redirect).
+pub async fn metrics_prometheus_handler(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Response {
-    let token = &state.config.metrics.token;
-
-    if !token.is_empty() {
-        let auth = headers
-            .get("authorization")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-        if auth != format!("Bearer {}", token) {
-            return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
-        }
+    if let Err(resp) = metrics_auth(&state, "prometheus", &headers) {
+        return resp;
     }
 
     // metrics_handle is the PrometheusHandle returned by init_metrics()
     (StatusCode::OK, state.metrics_handle.render()).into_response()
+}
+
+/// Serves /server/metrics/grafana - complete importable Grafana dashboard JSON.
+pub async fn metrics_grafana_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(resp) = metrics_auth(&state, "grafana", &headers) {
+        return resp;
+    }
+
+    (StatusCode::OK, state.grafana_dashboard_json()).into_response()
+}
+
+/// Serves /server/metrics/loki - recent structured log entries as Loki JSON streams.
+/// Bounded by loki.max_entries / loki.max_age; same sanitization as log files.
+pub async fn metrics_loki_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(resp) = metrics_auth(&state, "loki", &headers) {
+        return resp;
+    }
+
+    (StatusCode::OK, state.loki_streams_json()).into_response()
 }
 ```
 
@@ -35797,10 +35995,13 @@ groups:
 | Element | Type | Description |
 |---------|------|-------------|
 | Enable metrics | Toggle | Turn metrics on/off |
-| Endpoint | Text input | Metrics endpoint path (default: /metrics) |
+| Root alias | Toggle | Serve `/metrics[/{service}]` root aliases (default: on) |
 | Include system metrics | Toggle | Include CPU/memory/disk |
 | Include runtime metrics | Toggle | Include tokio task/worker stats |
-| Authentication token | Text input | Bearer token (empty = no auth) |
+| Allow unauthenticated | Toggle | Skip token checks for ALL metrics services (firewalled internal networks only) |
+| Prometheus token | Text input | Bearer token for `prometheus` endpoints (empty = service disabled, shown as `xxxxx` once set) |
+| Grafana token | Text input | Bearer token for `grafana` endpoint (empty = service disabled, shown as `xxxxx` once set) |
+| Loki token | Text input | Bearer token for `loki` endpoint (empty = service disabled, shown as `xxxxx` once set) |
 | Prometheus URL | Info | Display scrape URL for Prometheus config |
 
 ---
@@ -50910,7 +51111,7 @@ pub fn validate_tor_config(config: &TorConfig) -> Vec<ValidationError> {
 │ Tor Hidden Service                                                  │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│ Status: ● Connected              Uptime: 2d 5h 32m                  │
+│ Status: ● Connected              Uptime: 2 days 5 hours             │
 │ Binary: /usr/bin/tor             Version: 0.4.8.9                   │
 │                                                                     │
 │ .onion Address:                                                     │
@@ -51166,7 +51367,7 @@ $ myapp --status
 Server Status: Running
   Port: 8080
   Mode: production
-  Uptime: 2d 5h 30m
+  Uptime: 2 days 5 hours
 
 Node: standalone
 Cluster: disabled
@@ -51183,7 +51384,7 @@ $ myapp --status
 Server Status: Running
   Port: 8080
   Mode: production
-  Uptime: 2d 5h 30m
+  Uptime: 2 days 5 hours
 
 Node: node-abc123
   Hostname: server-1.example.com
@@ -58487,7 +58688,7 @@ PATCH /api/{api_version}/users/settings
 |-------|--------|------|-------|
 | `/server/healthz` | GET | None | Frontend health (PART 13) |
 | `/healthz` | GET | None | Only when `server.healthz.root.enabled: true`; same handler as `/server/healthz`, never a redirect |
-| `/metrics` | GET | Optional | Prometheus (may be IP-restricted in config) |
+| `/metrics[/{service}]` | GET | Bearer (per-service token) | Root alias for `/server/metrics[/{service}]` when `server.metrics.root.enabled: true` (default true); same handler, never a redirect |
 | `/sitemap.xml`, `/robots.txt`, `/favicon.ico`, `/manifest.json`, `/.well-known/*` | GET | None | Conventional web files; `/.well-known/*` is limited to documented allowlisted entries only |
 | `/server/docs/swagger`, `/server/docs/graphql` | GET | None | Public API docs (HTML) |
 | `/api/swagger`, `/api/{api_version}/server/swagger` | GET | None | Public OpenAPI JSON spec |
@@ -62921,11 +63122,11 @@ make docker
 - [ ] Graceful degradation if unavailable
 
 **PART 21: Metrics**
-- [ ] Prometheus metrics at `/metrics` (metrics-exporter-prometheus)
+- [ ] Prometheus metrics at `/server/metrics` (metrics-exporter-prometheus), with `/metrics` root alias when `server.metrics.root.enabled: true`
 - [ ] Request count, latency, errors
 - [ ] System metrics (memory, tokio tasks)
 - [ ] Custom business metrics
-- [ ] Metrics endpoint authentication option
+- [ ] Per-service metrics bearer-token auth (`prometheus`, `grafana`, `loki`) — mandatory, no unauthenticated default
 
 **PART 22: Backup & Restore**
 - [ ] Automatic daily backups (backup_daily task at 02:00)
@@ -64326,8 +64527,8 @@ Implement the required client, then any project-specific optional features:
    - Copy patterns that match the spec
    - Adapt to your project's needs
 
-2. **Leverage templates:**
-   - Use spec templates for Docker, CI/CD, configs
+2. **Leverage this specification:**
+   - Use this specification's Docker, CI/CD, and config definitions
    - Don't reinvent - copy and customize
 
 3. **Build iteratively:**

@@ -526,7 +526,7 @@ Update these when their subject changes:
 
 ## ⚠️ CRITICAL: One Coherent Product — Application AND Server, One Binary
 
-This template defines **one Rust project, one deliverable binary per target**, that is simultaneously:
+This specification defines **one Rust project, one deliverable binary per target**, that is simultaneously:
 - a native application with shared core logic and up to three presentation layers — GUI (preferred when available), TUI (fallback for interactive terminals), CLI (fallback for non-interactive/plain execution); and
 - a **full server** — frontend (HTML/PWA web UI) AND backend (JSON API, database, scheduler, email, metrics, etc.) — reachable over the network by browsers, the PWA, API clients, and the dedicated CLI client.
 
@@ -629,7 +629,7 @@ The single binary contains **everything the app and the server need to function*
 - Network/CDN fetches at first run to "download missing assets" are forbidden
 - A new install on an air-gapped machine MUST work end-to-end with only the binary present, EXCEPT for the narrow, explicitly-declared exception below
 
-**Exception — security intelligence data is never embedded.** GeoIP databases, IP/domain blocklists, CVE feeds, and similar security intelligence data (PART 18, PART 19) change too frequently to embed and are downloaded on first run, then kept current by the built-in scheduler (never cron). If a download fails, the server logs a warning and degrades gracefully (features depending on that data are disabled, core functionality is unaffected) rather than failing to start. This is the only category of runtime fetch permitted by this template.
+**Exception — security intelligence data is never embedded.** GeoIP databases, IP/domain blocklists, CVE feeds, and similar security intelligence data (PART 18, PART 19) change too frequently to embed and are downloaded on first run, then kept current by the built-in scheduler (never cron). If a download fails, the server logs a warning and degrades gracefully (features depending on that data are disabled, core functionality is unaffected) rather than failing to start. This is the only category of runtime fetch permitted by this specification.
 
 ## ⚠️ CRITICAL: Full Web Application Architecture — Never "API Server"
 
@@ -686,7 +686,7 @@ Every server-side feature MUST work via:
 
 **AI MUST verify its own work with real tools before reporting a task as done. Do not rely on "the code looks right."**
 
-**This rule applies to EVERY change type covered by this template — shared core logic, GUI/TUI/CLI binaries, backend/API logic, frontend, database, single-static-binary build, asset embedding, Docker, CI/CD, configuration, security, observability, i18n, documentation — not only one category.** Whatever you touched, you verify. All execution goes through the project's containerised targets — never bare host `cargo`.
+**This rule applies to EVERY change type covered by this specification — shared core logic, GUI/TUI/CLI binaries, backend/API logic, frontend, database, single-static-binary build, asset embedding, Docker, CI/CD, configuration, security, observability, i18n, documentation — not only one category.** Whatever you touched, you verify. All execution goes through the project's containerised targets — never bare host `cargo`.
 
 | Change type | How to verify |
 |-------------|----------------|
@@ -908,8 +908,8 @@ When the specification is unclear: 1) check if it's clarified elsewhere in the s
 
 | File | Purpose | Update When |
 |------|---------|-------------|
-| **AI.md** | Implementation spec (HOW) - SOURCE OF TRUTH, readonly template copy | No — use SPEC.md for project-specific rule overrides |
-| **SPEC.md** | Project-specific rule overrides (optional, may be empty) | When a project rule must contradict the template or global |
+| **AI.md** | Implementation spec (HOW) - SOURCE OF TRUTH, readonly | No — use SPEC.md for project-specific rule overrides |
+| **SPEC.md** | Project-specific rule overrides (optional, may be empty) | When a project rule must contradict this specification or global |
 | **IDEA.md** | Project plan (WHAT) — must follow AI.md | Features or variables change |
 | **TODO.AI.md** | Task tracking (AI-owned, required for 3+ tasks) | Tasks added/completed |
 | **TODO.md** | Task tracking (human-owned) | AI may mark done; never delete/empty |
@@ -926,7 +926,7 @@ When the specification is unclear: 1) check if it's clarified elsewhere in the s
 | **.dockerignore** | Build-context exclusions; Rust-specific entries: `target/`. `docker/`, `src/`, `Cargo.toml`, `Cargo.lock`, `build.rs`, `release.txt` are NEVER excluded | Build-context surface changes |
 | **renovate.json** | Single Renovate config covering Cargo deps, GitHub Actions SHAs, and Docker digests across all providers. Dependabot forbidden | Update-policy changes |
 
-**Hierarchy:** `SPEC.md` > `AI.md` > global `CLAUDE.md`. `AI.md` is ALWAYS the source of truth for the template baseline; `SPEC.md` overrides it for project-specific rules only; `IDEA.md` is the project PLAN and must be spec-compliant.
+**Hierarchy:** `SPEC.md` > `AI.md` > global `CLAUDE.md`. `AI.md` is ALWAYS the source of truth for the specification baseline; `SPEC.md` overrides it for project-specific rules only; `IDEA.md` is the project PLAN and must be spec-compliant.
 
 ## Mandatory Compliance Schedule
 
@@ -6167,7 +6167,7 @@ test:
 
 # =============================================================================
 # Coverage gates by project type:
-#   - SERVER template projects: 60% minimum
+#   - SERVER specification projects: 60% minimum
 #   - All other Rust projects: 60% minimum; override upward in IDEA.md
 #     (## Project variables -> coverage_minimum: 60) when appropriate.
 #     Never override downward.
@@ -9650,7 +9650,7 @@ async fn build_health_response(state: &AppState) -> HealthResponse {
             date: env!("BUILD_DATE").to_string(),
         },
 
-        // Features (PUBLIC only - do NOT include /metrics)
+        // Features (PUBLIC only - do NOT include /server/metrics)
         features: FeaturesInfo {
             geoip: state.config.features.geoip.enabled,
             tor: TorInfo {
@@ -10016,6 +10016,26 @@ volumes:
 | Never show | `0.0.0.0`, `127.0.0.1`, `localhost` |
 | Always show | Valid FQDN, host, or IP |
 | Show only | One address, the most relevant |
+
+## Human-Readable Values (Frontend)
+
+**Every value shown on a user-facing surface — web pages, `/server/healthz` HTML,
+admin panel, error pages, TUI/GUI, pretty console output — MUST be human-readable.
+Raw machine values belong to JSON/API responses, Prometheus metrics, and logs only.**
+
+| Kind | Rule | Examples |
+|------|------|----------|
+| **Durations** | Largest fitting unit, at most two units, correct singular/plural: <60 s → seconds · ≥60 s → minutes · ≥60 min → hours · ≥24 h → days | `1 second` · `45 seconds` · `3 minutes` · `2 minutes 5 seconds` · `2 hours` · `1 hour 30 minutes` · `3 days 4 hours` |
+| **Sizes** | 1024 boundaries, full unit names, singular/plural, at most one decimal (drop `.0`): bytes → kilobytes → megabytes → gigabytes → terabytes | `1 byte` · `512 bytes` · `1 kilobyte` · `2.5 megabytes` · `5 gigabytes` · `1.2 terabytes` |
+| **Counts** | Locale-aware thousands separators | `12,847` |
+| **Timestamps** | Footer/display format `%B %d, %Y at %H:%M:%S %Z` (zero-padded day) as already specified | `January 05, 2026 at 14:03:07 UTC` |
+
+| Rule | Detail |
+|------|--------|
+| **Shared helpers** | One implementation: `format::duration()` / `format::size()` / `format::count()` in the shared/common formatting module — never per-page ad-hoc formatting |
+| **i18n** | Unit names go through translation keys (`format.seconds_one`, `format.seconds_other`, …) with per-language plural rules — never hardcoded English unit strings |
+| **Raw value preserved** | HTML MAY carry the machine value in a `title=`/`data-` attribute for tooltips; the visible text is always the human form |
+| **Machine surfaces unchanged** | JSON API fields, Prometheus metrics, and log files keep raw base units (seconds, bytes) — formatting is a presentation concern only |
 
 ## URL & FQDN Detection
 
@@ -14072,20 +14092,40 @@ pub async fn get_user_with_version(
 
 | Content Type | Cache-Control Header | Description |
 |--------------|---------------------|-------------|
-| Static assets (JS/CSS/images) | `public, max-age=31536000, immutable` | 1 year, fingerprinted files |
+| Static assets with matching `?v=` build stamp | `public, max-age=31536000, immutable` | 1 year — URL changes every release, so this can never go stale |
+| Static assets without / with mismatched `?v=` | `no-cache` + `ETag` | Always revalidated — never trusted across updates |
 | HTML pages | `no-store` | Always fetch fresh |
 | API responses (public) | `public, max-age=60` | Short cache for CDN |
 | API responses (private) | `private, no-store` | User-specific data |
 | Authenticated pages | `private, no-store` | Never cache |
 | Error pages | `no-store` | Don't cache errors |
 
+### Asset Version-Busting (REQUIRED)
+
+**A stale browser cache must never survive an update.** Assets are embedded in the
+binary, so every release changes their content but not their paths — long-lived
+caching on bare paths is exactly how an old frontend keeps rendering after an
+update. The fix is mandatory URL stamping:
+
+| Rule | Detail |
+|------|--------|
+| **`asset()` template helper** | Every static asset reference in every template goes through a shared helper that appends the build stamp: `/static/app.css?v={project_version}-{short_commit}`. Hand-written bare `/static/...` URLs in templates are a bug. |
+| **`immutable` only on a matching stamp** | The static handler sends `public, max-age=31536000, immutable` ONLY when the request's `?v=` equals the running build's stamp. Missing or mismatched stamp → `no-cache` + `ETag` (the bytes still serve — cached HTML from an old version never breaks, it just revalidates). |
+| **HTML is never cached** | All HTML documents: `Cache-Control: no-store` plus an `ETag` derived from the build stamp, so any intermediary that ignores `no-store` still revalidates. |
+| **Service worker (if the project adds one)** | Cache name MUST embed `{project_version}`; `activate` deletes all caches from other versions. |
+
+**Result:** deploying a new version changes every asset URL, so browsers fetch the
+new frontend on the first page load after an update — no manual cache clearing, ever.
+
 ```rust
 pub fn set_cache_headers(
     headers: &mut axum::http::HeaderMap,
     content_type: &str,
     is_authenticated: bool,
+    // The request's ?v= query value, if any
+    version_stamp: Option<&str>,
 ) {
-    use axum::http::header::CACHE_CONTROL;
+    use axum::http::header::{CACHE_CONTROL, ETAG};
 
     if is_authenticated {
         headers.insert(CACHE_CONTROL, "private, no-store".parse().expect("invariant: valid cache-control header value"));
@@ -14094,7 +14134,13 @@ pub fn set_cache_headers(
 
     match content_type {
         "static" => {
-            headers.insert(CACHE_CONTROL, "public, max-age=31536000, immutable".parse().expect("invariant: valid cache-control header value"));
+            // asset_stamp() = {project_version}-{short_commit}
+            if version_stamp == Some(build_info::asset_stamp()) {
+                headers.insert(CACHE_CONTROL, "public, max-age=31536000, immutable".parse().expect("invariant: valid cache-control header value"));
+            } else {
+                headers.insert(CACHE_CONTROL, "no-cache".parse().expect("invariant: valid cache-control header value"));
+                headers.insert(ETAG, format!("\"{}\"", build_info::asset_stamp()).parse().expect("invariant: valid etag header value"));
+            }
         }
         "api" => {
             headers.insert(CACHE_CONTROL, "public, max-age=60".parse().expect("invariant: valid cache-control header value"));
@@ -15517,7 +15563,7 @@ web:
 | Public API (`/api/**`) | Yes | AI agents can use these |
 | Authenticated API (`/api/**` + auth) | Yes | Note auth requirement |
 | Health (`/server/healthz`) | Yes | Useful for monitoring agents |
-| Metrics (`/metrics`) | No | Operator-only diagnostics; not for AI agents |
+| Metrics (`/server/metrics`) | No | Operator-only diagnostics; not for AI agents |
 
 **Well-Known Support Matrix Update:**
 
@@ -18053,11 +18099,11 @@ All settings above are configured via config file:
 
 ### Global vs App-Specific
 
-**This template defines the COMPLETE global structure. Projects extend with app-specific data. ALL fields MUST be public-safe.**
+**This specification defines the COMPLETE global structure. Projects extend with app-specific data. ALL fields MUST be public-safe.**
 
 | Type | Description | Defined Where |
 |------|-------------|---------------|
-| **Global (this template)** | Complete structure: project, status, version, build, runtime, features, checks, stats | Below (comprehensive) |
+| **Global (this specification)** | Complete structure: project, status, version, build, runtime, features, checks, stats | Below (comprehensive) |
 | **App-specific (extend)** | Additional features, stats, checks relevant to your app | IDEA.md |
 
 **How to extend:**
@@ -18090,7 +18136,7 @@ All settings above are configured via config file:
 
 #### Backend Structure (Rust)
 
-**Based on template PARTS: branding (PART 15), modes (PART 4), database (PART 10), features (PARTS 18, 26), scheduler (PART 17).**
+**Based on specification PARTS: branding (PART 15), modes (PART 4), database (PART 10), features (PARTS 18, 26), scheduler (PART 17).**
 
 ```rust
 // HealthResponse - canonical field order for /server/healthz
@@ -18159,7 +18205,7 @@ pub struct BuildInfo {
     pub date: String,
 }
 
-// FeaturesInfo - PUBLIC features only (no /metrics - PART 19 is internal)
+// FeaturesInfo - PUBLIC features only (no /server/metrics - PART 19 is internal)
 // Only shows NON-NEGOTIABLE features.
 // For project-specific optional features, add fields here when implemented.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18271,7 +18317,7 @@ pub struct StatsInfo {
 | Rust version | `<code>` | No | `<code>{{ rust_version }}</code>` |
 | Build commit | `<code>` | Optional | `<code>abc1234</code>` |
 | Build date | `<time>` | No | `<time datetime="2024-01-10">Jan 10, 2024</time>` |
-| Uptime | plain text | No | `2d 5h 30m` |
+| Uptime | plain text | No | `2 days 5 hours` |
 | Mode | `.badge` | No | `<span class="badge badge-production">Production</span>` (class is badge-{mode}: badge-production / badge-development / badge-debug) |
 | Timestamp | `<time>` | No | `<time datetime="...">Jan 15, 2024 10:30 AM</time>` |
 | Tor address | `.code-block` | **Yes** | 56-char v3 onion, copy button, horizontal scroll |
@@ -18291,7 +18337,7 @@ pub struct StatsInfo {
 | Project description (from branding) | API keys or tokens |
 | Status: "healthy"/"unhealthy" | Passwords or secrets |
 | Version: "1.0.0" | Internal IP addresses |
-| Uptime: "2d 5h" | File paths on server |
+| Uptime: "2 days 5 hours" | File paths on server |
 | Mode: "production" | Environment variables |
 | Checks: "ok"/"error" | Config file contents |
 
@@ -18358,7 +18404,7 @@ pub struct StatsInfo {
         <dd><code>abc1234</code> (2024-01-10)</dd>
 
         <dt>⏱️ Uptime</dt>
-        <dd>2d 5h 30m</dd>
+        <dd>2 days 5 hours</dd>
 
         <dt>🚀 Mode</dt>
         <dd><span class="badge badge-production">Production</span></dd>
@@ -18404,7 +18450,7 @@ pub struct StatsInfo {
     <section class="section-card">
       <h2>📈 Server Statistics</h2>
       <!-- NOTE: Public-safe aggregate stats only.
-           /metrics endpoint (PART 19) is internal/authenticated, not shown here. -->
+           /server/metrics endpoint (PART 19) is internal/authenticated, not shown here. -->
       <dl class="info-list stats-grid">
         <dt>📥 Total Requests</dt>
         <dd>1,234,567</dd>
@@ -18494,7 +18540,7 @@ pub struct StatsInfo {
 
 **Envelope exception:** health responses are BARE — no `{ "ok": ..., "data": ... }` wrapper, on any health route, in any state. Kubernetes probes, uptime monitors, and load balancers expect a flat body; the HTTP status code plus the top-level `status` field carry the health state.
 
-**Fields in canonical order (see "Field Order & Structure" above). References template PARTS.**
+**Fields in canonical order (see "Field Order & Structure" above). References specification PARTS.**
 
 **Note:** Only non-negotiable features shown with actual status (true/false, enabled/disabled). If project uses project-specific optional features, those become non-negotiable for that project and show their actual enabled/disabled status.
 
@@ -18554,15 +18600,15 @@ These rules apply to the health payload in every format and on every health rout
 | **Email** | SMTP host, operator/contact emails | Phishing/spam target |
 | **Secrets** | Encryption keys, session secrets | Cryptographic breach |
 | **Debug** | Stack traces, detailed errors | Exploitation info |
-| **Internal endpoints** | /metrics status, internal service endpoints | Internal infrastructure info |
+| **Internal endpoints** | /server/metrics status, internal service endpoints | Internal infrastructure info |
 
 **Safe to include:**
 
 | Category | OK to Include | Example |
 |----------|---------------|---------|
 | **Version** | App version, Rust version, build info | `1.0.0`, `<rustc version>` |
-| **Status** | Health status, uptime | `healthy`, `2d 5h` |
-| **Features** | Enabled PUBLIC features only (not /metrics) | `tor: enabled` |
+| **Status** | Health status, uptime | `healthy`, `2 days 5 hours` |
+| **Features** | Enabled PUBLIC features only (not /server/metrics) | `tor: enabled` |
 | **Checks** | Service status (ok/error only) | `database: ok` |
 | **Stats** | Aggregate counts only | `requests_total: 12345` |
 | **Mode** | Production/development/debug | `production` |
@@ -18575,7 +18621,7 @@ These rules apply to the health payload in every format and on every health rout
 
 #### Plain Text (Accept: text/plain)
 
-**Fields in canonical order, flattened with dot notation. References template PARTS.**
+**Fields in canonical order, flattened with dot notation. References specification PARTS.**
 
 ```
 # 1. Project (PART 15: branding)
@@ -20397,7 +20443,9 @@ Need additional compatible endpoints?"
 | `/healthz` | GET | None | Optional direct alias to `/server/healthz` when `server.healthz.root.enabled` is `true` |
 | `/server/docs/swagger` | GET | None | Swagger UI (interactive REST explorer; fetches spec from `/api/swagger`) |
 | `/server/docs/graphql` | GET | None | GraphiQL UI (interactive GraphQL explorer; POSTs to `/api/graphql`) |
-| `/metrics` | GET | Optional | Prometheus metrics |
+| `/server/metrics[/{service}]` | GET | Bearer token (per service) | Prometheus/Grafana/Loki metrics (PART 19) |
+| `/metrics[/{service}]` | GET | Bearer token (per service) | Root alias to `/server/metrics[/{service}]` when `server.metrics.root.enabled` is `true` (default true); same handler, never a redirect |
+| `/api/metrics[/{service}]` | GET | Bearer token (per service) | Metrics — direct alias for current `{api_version}` |
 | `/api/autodiscover` | GET | None | Server settings, config schema, and options for CLI (non-versioned) |
 | `/api/swagger` | GET | None | OpenAPI JSON spec — direct alias for current `{api_version}` |
 | `/api/graphql` | POST | None | GraphQL queries — direct alias for current `{api_version}` |
@@ -21420,6 +21468,8 @@ Started: {startup_datetime}
 | **Interactive console** | ✅ Yes | ✅ Yes | ✅ Yes | Pretty |
 | **Log files** | ❌ Never | ❌ Never | ❌ Never | Raw text |
 | **Log output (stdout)** | ❌ Never | ❌ Never | ❌ Never | Raw text |
+| **Background tasks / scheduler** | ❌ Never | ❌ Never | ❌ Never | Log files only — never console |
+| **Health checks / probes** | ❌ Never | ❌ Never | ❌ Never | Log files only — never console |
 
 **Note:** Startup banner adapts to terminal width. ASCII art only shown at ≥80 columns. Icons reduced at <60 columns. See "Responsive Startup Banner" section.
 
@@ -21436,6 +21486,20 @@ Started: {startup_datetime}
 ✅ Server started    <- NO icons in logs
 🔧 Development mode  <- NO icons in logs
 ```
+
+### Runtime Console Silence
+
+**After the startup banner, the console (stdout) stays silent during normal operation.**
+
+| Never printed to console | Where it goes instead |
+|--------------------------|----------------------|
+| Scheduler / background task activity (started, completed, skipped, failed, next run) | Log files only |
+| `healthcheck_self` results and all incoming health probe requests (Docker/compose healthchecks, k8s probes, uptime monitors) | Log files only (successful health hits are already excluded from `access.log` by default) |
+| Recurring internal work — cache maintenance, metrics collection, certificate renewal checks, heartbeats, cleanup tasks | Log files only |
+
+**The console after the banner shows ONLY:** WARN/ERROR conditions, direct responses
+to interactive commands, and shutdown messages. Everything else is log-file material
+at the appropriate level — a healthy server prints nothing.
 
 ### Certificate Lookup Order
 
@@ -22440,7 +22504,8 @@ if ('serviceWorker' in navigator) {
 
 ```javascript
 // static/sw.js
-const CACHE_NAME = 'app-v1';
+// Cache name MUST embed the running version - activate below deletes all other-version caches
+const CACHE_NAME = 'app-{project_version}';
 const PRECACHE_URLS = [
   '/',
   '/static/css/main.css',
@@ -22650,8 +22715,8 @@ Maskable icons must have a safe zone of 40% (20% on each side). The icon artwork
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="App">
-<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
-<link rel="apple-touch-startup-image" href="/static/splash/launch-2048x2732.png"
+<link rel="apple-touch-icon" href="{{ asset(path="icons/apple-touch-icon.png") }}">
+<link rel="apple-touch-startup-image" href="{{ asset(path="splash/launch-2048x2732.png") }}"
   media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)">
 ```
 
@@ -22802,7 +22867,7 @@ pub fn write_text(text: impl Into<String>) -> impl axum::response::IntoResponse 
 | Include `X-Request-ID` | Echo the request ID in every response header |
 | Sanitize error messages | Never leak stack traces or internal paths to clients |
 | Consistent envelope | All JSON responses use the `ApiResponse` struct |
-| Set `Cache-Control` | Static assets: `immutable, max-age=31536000`; HTML: `no-store` |
+| Set `Cache-Control` | Static assets with matching `?v=` build stamp: `public, max-age=31536000, immutable`; missing/mismatched stamp: `no-cache` + `ETag`; HTML: `no-store` (see PART 9 → Asset Version-Busting) |
 
 ---
 
@@ -25296,7 +25361,7 @@ Shutdown complete
 1. **Use tokio-cron-scheduler** - Async task scheduling with cron syntax support
 2. **Database-backed state** - All state in server.db, survives restarts
 3. **Graceful shutdown** - Complete running tasks before exit
-4. **Audit logging** - All task executions logged
+4. **Audit logging** - All task executions logged. Task activity is logged to log files only — the scheduler NEVER prints to the console (see Console vs Logs → Runtime Console Silence).
 5. **Notifications** - Failed tasks trigger notifications (if configured)
 
 ---
@@ -25428,27 +25493,55 @@ server:
 | Feature | Description |
 |---------|-------------|
 | Format | Prometheus text exposition format |
-| Endpoint | `/metrics` (configurable) |
-| Authentication | None (restrict by IP/network or firewall rule) |
+| Endpoint | `/server/metrics` (+ per-service sub-endpoints and aliases below) |
+| Authentication | Mandatory per-service bearer tokens (`server.yml`) |
 | Library | `prometheus` |
+
+## Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/server/metrics` | GET | Bearer token (`prometheus`) | Prometheus text exposition (same handler as `/server/metrics/prometheus`) |
+| `/server/metrics/prometheus` | GET | Bearer token (`prometheus`) | Complete Prometheus text exposition — every exported metric |
+| `/server/metrics/grafana` | GET | Bearer token (`grafana`) | Complete importable Grafana dashboard JSON covering every exported metric |
+| `/server/metrics/loki` | GET | Bearer token (`loki`) | Recent structured log entries in Loki-compatible JSON streams |
+| `/api/{api_version}/server/metrics[/{service}]` | GET | Same per-service token | Versioned API path — same handlers |
+| `/api/metrics[/{service}]` | GET | Same per-service token | Unversioned machine-friendly alias for current `{api_version}` — same handlers |
+| `/metrics[/{service}]` | GET | Same per-service token | Root alias, gated on `server.metrics.root.enabled: true` (default **true** — Prometheus scrapers default to `/metrics`); same handler, NEVER a redirect |
+
+- All alias routes invoke the SAME handler — never redirect (redirects break scrapers), same rule as the healthz root alias.
+- The correct product spelling is **Grafana** — endpoint and config key are `grafana`.
+
+## Service Semantics
+
+| Service | Content-Type | Body |
+|---------|--------------|------|
+| `prometheus` | `text/plain; version=0.0.4` | Full Prometheus text exposition — all required + project metrics |
+| `grafana` | `application/json` | A complete, importable Grafana dashboard definition (schema-current JSON) with panels covering every metric category this specification requires (HTTP, database, cache, scheduler, system, business); datasource left as a template variable so it imports against any Prometheus datasource |
+| `loki` | `application/json` | Recent structured log entries in Loki push-API stream format: `{"streams":[{"stream":{labels},"values":[["<ns-timestamp>","<line>"],...]}]}` — bounded by `loki.max_entries`/`loki.max_age`, same sanitization as log files (credentials ALWAYS redacted) |
 
 ## Access Control
 
-**`/metrics` is INTERNAL ONLY. See TERMINOLOGY > Monitoring Endpoints for /server/healthz vs /metrics distinction.**
+**`/server/metrics` is INTERNAL ONLY — internal/operational endpoints, never advertised, never in FeaturesInfo. Token auth is mandatory; the network controls below are additional defense in depth, never a substitute.**
 
 | Deployment | Access Method | Recommendation |
 |------------|---------------|----------------|
-| **Single server** | Firewall rules | Block external access to `/metrics` port/path |
-| **Behind reverse proxy** | Proxy config | Do NOT proxy `/metrics` to public |
+| **Single server** | Firewall rules | Block external access to the `/server/metrics` port/path |
+| **Behind reverse proxy** | Proxy config | Do NOT proxy `/server/metrics` (or its aliases) to public |
 | **Kubernetes** | NetworkPolicy | Restrict to monitoring namespace |
 | **Cloud** | Security groups | Allow only from Prometheus IP |
 
-**Authentication options:**
+**Every metrics route requires a bearer token. There is no unauthenticated default.**
 
-| Method | Config | Use When |
-|--------|--------|----------|
-| **None** | `token: ""` | Firewalled, internal network only |
-| **Bearer token** | `token: "secret123"` | Additional layer, or when firewall not possible |
+| Rule | Detail |
+|------|--------|
+| **Per-service tokens** | Each service (`prometheus`, `grafana`, `loki`) has its own token in `server.yml` — rotating one service's token never breaks the others |
+| **Header only** | `Authorization: Bearer {token}` — query-string tokens are FORBIDDEN (they leak into access logs and proxies) |
+| **Constant-time compare** | Token comparison uses constant-time equality |
+| **Empty token = service disabled** | An empty token disables that service's endpoints → `403` with an empty body; the reason is logged once at startup (log files, not console) |
+| **Never logged, always redacted** | Tokens never appear in logs, error messages, `/server/healthz`, or any config dump — display as `xxxxx` |
+| **Firewalled escape hatch** | `auth.allow_unauthenticated: true` (default `false`) skips token checks for ALL metrics services — for firewalled internal networks only; setting it while the server is reachable publicly is a deployment bug |
+| **Still INTERNAL** | Metrics remain internal/operational endpoints — never advertised, never in FeaturesInfo, firewall/proxy rules still apply as defense in depth |
 
 **Token authentication header:**
 ```
@@ -25461,8 +25554,11 @@ scrape_configs:
   - job_name: '{project_name}'
     static_configs:
       - targets: ['app.internal:8080']
+    # Root alias (default); use /server/metrics if root.enabled is false
+    metrics_path: /metrics
     authorization:
-      credentials: 'your-metrics-token-here'
+      # The prometheus service token from server.metrics.auth.tokens
+      credentials: 'your-prometheus-token-here'
 ```
 
 ## Configuration
@@ -25471,7 +25567,22 @@ scrape_configs:
 server:
   metrics:
     enabled: true
-    endpoint: /metrics
+
+    # Root aliases /metrics and /metrics/{service}
+    # (default true - Prometheus scrapers expect /metrics)
+    root:
+      enabled: true
+
+    auth:
+      # true skips token checks for ALL metrics services
+      # ONLY for firewalled internal networks - never on a public server
+      allow_unauthenticated: false
+
+      # Per-service bearer tokens - empty disables that service (403)
+      tokens:
+        prometheus: ""
+        grafana: ""
+        loki: ""
 
     # Include system metrics (CPU, memory, disk, async tasks)
     include_system: true
@@ -25479,8 +25590,10 @@ server:
     # Include Rust runtime metrics
     include_runtime: true
 
-    # Optional Bearer token for authentication
-    token: ""
+    # Loki service - how much recent log to serve
+    loki:
+      max_entries: 1000
+      max_age: 1h
 
     # Histogram buckets for request duration (seconds)
     duration_buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
@@ -25583,7 +25696,7 @@ server:
 
 ## Complete Metrics Reference
 
-**Every metric exported by `/metrics`. All prefixed with `{project_name}_`.**
+**Every metric exported by `/server/metrics`. All prefixed with `{project_name}_`.**
 
 ### Application Metrics (REQUIRED)
 
@@ -25728,7 +25841,7 @@ server:
 
 ## Metrics Output Example
 
-**Sample `/metrics` output (Prometheus text format):**
+**Sample `/server/metrics/prometheus` output (Prometheus text format):**
 
 ```
 # HELP {project_name}_app_info Application information
@@ -26458,7 +26571,9 @@ use axum::response::{IntoResponse, Response};
 use prometheus::{Encoder, Registry, TextEncoder};
 
 /// MetricsHandler returns the Prometheus metrics response.
-/// Restrict access by network/firewall rule — do not expose /metrics to the internet.
+/// Mounted at /server/metrics, /server/metrics/prometheus, and their API/root aliases.
+/// Requires the `prometheus` bearer token (see Access Control) — network/firewall rules
+/// are additional defense in depth, never a substitute for token auth.
 pub async fn metrics_handler(registry: axum::extract::Extension<Registry>) -> Response {
     let encoder = TextEncoder::new();
     let metric_families = registry.gather();
@@ -26619,6 +26734,8 @@ groups:
 
 ## Grafana Dashboard
 
+**This is the dashboard definition served by `/server/metrics/grafana` — a complete, importable Grafana dashboard JSON covering every exported metric category, with the datasource left as a template variable so it imports against any Prometheus datasource.**
+
 ```json
 {
   "title": "{project_name} Metrics",
@@ -26698,10 +26815,11 @@ groups:
 | Element | Config Key | Description |
 |---------|------------|-------------|
 | Enable metrics | `metrics.enabled` | Turn metrics on/off |
-| Endpoint | `metrics.path` | Metrics endpoint path (default: /metrics) |
+| Root alias | `metrics.root.enabled` | Enable `/metrics[/{service}]` root alias (default: true) |
 | Include system metrics | `metrics.system` | Include CPU/memory/disk |
 | Include runtime metrics | `metrics.runtime` | Include Rust runtime stats |
-| Authentication token | `metrics.token` | Bearer token (empty = no auth) |
+| Unauthenticated access | `metrics.auth.allow_unauthenticated` | Skip token checks for ALL services (firewalled networks only; default: false) |
+| Per-service tokens | `metrics.auth.tokens.{prometheus,grafana,loki}` | Mandatory bearer tokens — empty disables that service (403) |
 
 ---
 
@@ -36496,7 +36614,7 @@ $ myapp --status
 Server Status: Running
   Port: 8080
   Mode: production
-  Uptime: 2d 5h 30m
+  Uptime: 2 days 5 hours
 
 Tor Hidden Service: Connected
   Address: abcd1234...wxyz.onion
@@ -36523,7 +36641,7 @@ Tor Hidden Service: Connected
 - [ ] `IDEA.md` has `## Project variables`
 - [ ] `IDEA.md` has `## Business logic`
 - [ ] `project_name`, `project_org`, `internal_name`, and `internal_org` exist
-- [ ] If pre-template `CLAUDE.md` or `.claude/CLAUDE.md` existed, project-specific content was migrated into IDEA.md
+- [ ] If a pre-existing `CLAUDE.md` or `.claude/CLAUDE.md` existed, project-specific content was migrated into IDEA.md
 - [ ] `CLAUDE.md` / `.claude/CLAUDE.md` are short loaders, not duplicate specs
 - [ ] `release.txt` exists if the project is using explicit release versioning
 - [ ] `site.txt` exists only if there is a real official site URL
@@ -36627,9 +36745,9 @@ All gates run inside the project Docker image — never on the host.
 
 ## Success Criteria
 
-A compliant Rust project created from this template:
+A compliant Rust project following this specification:
 - is driven by `IDEA.md` project variables while `AI.md` stays read-only
-- preserves the governance/documentation discipline of the original template
+- preserves the governance/documentation discipline of this specification
 - ships one statically linked binary per target that is simultaneously the full server (web frontend, REST API, GraphQL API) and, alongside its companion client binary, the CLI/TUI surface — never described as merely an "API server"
 - ships exclusively Rust source code (small Docker shell helpers excepted)
 - produces one statically linked binary per target with all assets (frontend, locales, schemas, default config) embedded
@@ -36735,7 +36853,7 @@ maintainer_email: {maintainer@example.com — or empty; used only if set}
 
 - No hardcoded routes — say "Get random joke", not `/api/v1/jokes/random`. AI.md PART 13 defines route patterns.
 - No implementation details — describe behavior, not algorithms or libraries. AI.md PARTs 0–28 define HOW; this PART verifies compliance is covered in PART 27.
-- This template targets the HYBRID model: a single static Rust binary that is both a full server (web frontend + REST + GraphQL) and, together with its companion client, a CLI/TUI surface (PART 2 → "Application & Server Model").
+- This specification targets the HYBRID model: a single static Rust binary that is both a full server (web frontend + REST + GraphQL) and, together with its companion client, a CLI/TUI surface (PART 2 → "Application & Server Model").
 - Cross-reference AI.md PARTs by number for any pattern that already exists there (database → PART 10, security → PART 11, scheduler → PART 17, license exceptions → PART 24, etc.).
 - `internal_name` and `internal_org` are immutable after first set (see "IDEA.md Required Layout" → Project variables rules).
 - Never describe the project as an "API server" in IDEA.md — always "server".
