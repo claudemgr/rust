@@ -1,3 +1,257 @@
+# {PROJECT_NAME} Specification
+
+**Name**: {project_name}
+
+**Note:** `{PROJECT_NAME}` and `{project_name}` in this file are reference tokens, not setup-time text replacements. Their values are resolved from `IDEA.md ## Project variables` while `AI.md` remains read-only.
+
+---
+
+# 🆕 FIRST-TIME PROJECT SETUP
+
+**`AI.md` is a read-only specification. Project-specific values live in `IDEA.md ## Project variables`, and the placeholders in this file are resolved from there.**
+
+## Detecting Unconfigured Project Setup
+
+```bash
+# Project is not configured until IDEA.md exists and has required variables
+[ ! -f IDEA.md ] && echo "SETUP NEEDED - IDEA.md missing"
+
+have_name=$(grep -cE '^project_name:[[:space:]]*.+$' IDEA.md 2>/dev/null || true)
+have_org=$(grep -cE '^project_org:[[:space:]]*.+$' IDEA.md 2>/dev/null || true)
+have_internal=$(grep -cE '^internal_name:[[:space:]]*.+$' IDEA.md 2>/dev/null || true)
+
+[ "$have_name" -eq 0 ] || [ "$have_org" -eq 0 ] || [ "$have_internal" -eq 0 ] && \
+  echo "SETUP NEEDED - IDEA.md project variables incomplete"
+```
+
+## Auto-Detecting Project Values
+
+**Project name and org can be inferred automatically:**
+
+| Value | Primary Source | Fallback |
+|-------|----------------|----------|
+| `{project_name}` | IDEA.md `## Project variables` | Existing long-form `CLAUDE.md` / `.claude/CLAUDE.md` project details, then `basename "$PWD"` |
+| `{project_org}` | IDEA.md `## Project variables` | Existing long-form `CLAUDE.md` / `.claude/CLAUDE.md` project details, then `basename "$(dirname "$PWD")"` |
+| `{internal_name}` | IDEA.md `## Project variables` (always — set once at first run, never edited after) | Existing long-form `CLAUDE.md` / `.claude/CLAUDE.md` project details, then first-time setup: copy from `{project_name}` |
+| `{internal_org}` | IDEA.md `## Project variables` (always — set once at first run, never edited after) | Existing long-form `CLAUDE.md` / `.claude/CLAUDE.md` project details, then first-time setup: copy from `{project_org}` |
+| `{plist_name}` | **Derived (not stored)**: `io.github.{project_org}.{internal_name}` | — |
+
+**Detection commands (use commands — never guess):**
+```bash
+# Project name: current directory name
+project_name=$(basename "$PWD")
+
+# Project org: parent directory name (assumes ~/org/project structure)
+project_org=$(basename "$(dirname "$PWD")")
+
+# Internal name: same as project_name on first run, frozen forever after
+internal_name="$project_name"
+
+# Internal org: same as project_org on first run, frozen forever after
+internal_org="$project_org"
+
+# Plist name: derived from project_org and internal_name (macOS Bundle ID convention)
+plist_name="io.github.${project_org}.${internal_name}"
+
+# Example: /home/user/github/myorg/myproject
+#   project_name  = myproject
+#   project_org   = myorg
+#   internal_name = myproject  (same as project_name on first run)
+#   internal_org  = myorg      (same as project_org on first run)
+#   plist_name    = io.github.myorg.myproject  (always derived)
+```
+
+**Why a separate `{internal_name}`:** if a project renames itself later (`{project_name}` changes from `myproject` to `myproject2`), the new name applies to user-visible places (binary command, docs, repo). But `{internal_name}` stays `myproject` forever, keeping `{config_dir}`, `{data_dir}`, `{log_dir}`, `{cache_dir}`, the systemd service unit, the macOS Bundle ID, and every other on-disk identifier stable. No data migration, no orphaned plists, no broken systemd dependencies.
+
+**Rule:** `{internal_name}` is set ONCE at first-time setup and is immutable for the life of the project. Editing it after the project is in production is a bug — the only sanctioned way to change it is a coordinated migration of every directory, service, and plist on every host.
+
+## First-Time Setup Flow
+
+```
+AI reads AI.md for the first time
+│
+├─► Check: Does IDEA.md exist with required `## Project variables` entries?
+│   │
+│   ├─► NO (setup needed)
+│   │   │
+│   │   ├─► 1. Check if IDEA.md exists
+│   │   │   ├─► YES: Read `## Project variables`; if incomplete, fill only the missing required values
+│   │   │   └─► NO: Check existing `CLAUDE.md` and `.claude/CLAUDE.md` for valid project-specific details, then fall back to directory structure commands — never guess
+│   │   │
+│   │   ├─► 2. Confirm with user: "Project: {project_name}, Org: {project_org} - correct?"
+│   │   │
+│   │   ├─► 3. Create IDEA.md if it doesn't exist
+│   │   │   - If a long-form/project-specific `CLAUDE.md` or `.claude/CLAUDE.md` already exists, MIGRATE its valid project description, project variables, and business logic into IDEA.md first
+│   │   │   - Do NOT copy loader-only instructions, duplicated AI.md rules, or stale implementation text into IDEA.md
+│   │   │   - On creation, write `internal_name: <project_name>` and `internal_org: <project_org>` to `## Project variables` and warn the user both are frozen forever
+│   │   │
+│   │   └─► 4. Create or update IDEA.md `## Project variables`:
+│   │       - project_name  → actual project name (lowercase)
+│   │       - project_org   → actual org name (lowercase)
+│   │       - internal_name → on first run = project_name; afterwards read from IDEA.md, IMMUTABLE
+│   │       - internal_org  → on first run = project_org; afterwards read from IDEA.md, IMMUTABLE
+│   │       - Derived UPPERCASE placeholders are computed from these values when referenced
+│   │       - {plist_name} is derived as io.github.{project_org}.{internal_name} and is NOT stored
+│   │
+│   └─► YES (already configured)
+│       └─► Proceed with normal operation - read PART 0 first and resolve placeholders from IDEA.md as needed
+```
+
+## Placeholder Reference
+
+**These placeholders are reference tokens used by the spec. They are resolved from `IDEA.md ## Project variables` and are not meant to be manually rewritten throughout `AI.md` during project setup.**
+
+| Placeholder | Case | Mutability | Example |
+|-------------|------|------------|---------|
+| `{project_name}` | lowercase | Mutable (project may rename) | `myapp` |
+| `{PROJECT_NAME}` | UPPERCASE | Mutable | `MYAPP` |
+| `{project_org}` | lowercase | Mutable | `myorg` |
+| `{PROJECT_ORG}` | UPPERCASE | Mutable | `MYORG` |
+| `{internal_name}` | lowercase | **Frozen** at first-time setup | `myapp` |
+| `{INTERNAL_NAME}` | UPPERCASE | **Frozen** | `MYAPP` |
+| `{internal_org}` | lowercase | **Frozen** at first-time setup | `myorg` |
+| `{INTERNAL_ORG}` | UPPERCASE | **Frozen** | `MYORG` |
+| `{plist_name}` | derived | Derived from `{project_org}` + `{internal_name}` | `io.github.myorg.myapp` |
+
+**`{internal_name}` rule:** set ONCE on first run (initial value = `{project_name}`), then immutable for the project's lifetime. Used for every on-disk identifier (`{config_dir}`, `{data_dir}`, `{log_dir}`, `{cache_dir}`, systemd unit, `{plist_name}`) so a project rename does not orphan paths or services.
+
+**After setup, this section remains reference-only. The placeholders above are resolved from `IDEA.md ## Project variables`; `AI.md` itself stays read-only.**
+
+---
+
+# PROJECT DESCRIPTION
+
+**See `IDEA.md` for project-specific details.**
+
+---
+
+# PROJECT-SPECIFIC FEATURES
+
+**See `IDEA.md` for features, data models, and business rules.**
+
+IDEA.md is the project PLAN. AI.md (this file) is the SOURCE OF TRUTH.
+
+| File | Role | Update When |
+|------|------|-------------|
+| **AI.md** | SOURCE OF TRUTH - implementation rules (readonly template copy) | No — use SPEC.md for project-specific rule overrides |
+| **SPEC.md** | Project-specific rule overrides — created only when a rule must contradict the template or global. May be empty. SPEC.md wins over AI.md. | When a project rule must differ from the template or global |
+| **IDEA.md** | PROJECT PLAN - must follow AI.md | Features change, project variables change |
+
+**Rule hierarchy:** SPEC.md > AI.md > global CLAUDE.md. If SPEC.md and AI.md conflict, SPEC.md wins — that is its purpose.
+**Rule:** If AI.md and IDEA.md conflict, AI.md wins. Fix IDEA.md.
+
+## IDEA.md Required Layout
+
+**Every IDEA.md MUST have exactly these three top-level sections, in this order:**
+
+```markdown
+## Project description
+
+(Full project description — what the project is, who uses it, what problem it solves.
+Free-form prose. This is the human-readable elevator pitch.)
+
+## Project variables
+
+(All project variables in `key: value` form. Values are the canonical source used to
+resolve placeholders referenced in AI.md. Required keys at minimum: `project_name`, `project_org`,
+`internal_name`, `internal_org`. Add more as the project needs — `app_name`, `official_site`,
+`maintainer_name`, `maintainer_email`, etc. Use lower_snake_case for keys.)
+
+Example:
+
+    project_name:  jokes
+    project_org:   casjay
+    internal_name: jokes        # FROZEN — set once at first-time setup, never edit
+    # FROZEN — set once at first-time setup, never edit
+    internal_org:  casjay
+    app_name:      jokes
+    official_site: jokes.example.com
+
+**`{plist_name}` is NOT stored** — it is derived at substitution time as
+`io.github.{project_org}.{internal_name}`.
+
+**`internal_name` rules:**
+
+- Required.
+- On first-time setup, initial value MUST equal `project_name`.
+- Once a project ships (any host has touched a `{config_dir}`, `{data_dir}`, systemd
+  unit, or plist named after `internal_name`), the value is frozen forever. Editing
+  it later is a bug — there is no migration path short of a coordinated rename of
+  every directory, service, and plist on every host.
+- A project rename changes `project_name` only. `internal_name` stays.
+- `internal_org` follows the same freeze rule: initial value MUST equal `project_org`, frozen once the project ships, and an org rename changes `project_org` only.
+
+## Business logic
+
+(Full business spec — the WHAT, not the HOW. Features, data models, user flows,
+permission rules, business invariants. The HOW lives in AI.md PARTS 0-30; PART 31 is reference-only.)
+```
+
+**Why three sections, in this order:**
+
+| Section | Why |
+|---------|-----|
+| `## Project description` | Top — anyone opening IDEA.md sees the project pitch first |
+| `## Project variables` | Middle — extraction tools (and the FIRST-TIME PROJECT SETUP flow above) parse this section to resolve `{project_name}`, `{PROJECT_NAME}`, `{project_org}`, etc. when AI.md references them |
+| `## Business logic` | Bottom — the bulk of the file, the actual product spec |
+
+**Rules for `## Project variables`:**
+
+- One variable per line: `key: value`
+- Keys are **lower_snake_case** only — they match the lowercase placeholders in AI.md
+- The setup flow renders `{KEY_UPPER}` automatically by uppercasing the lowercase key — do NOT list both forms
+- Never guess values: use commands (`basename "$PWD"`, `git config user.email`, `date`, etc.) and confirm with the user
+- If a placeholder referenced by AI.md has no entry in `## Project variables`, the setup flow MUST stop and ask, not invent a value
+
+**Rules for `## Business logic`:**
+
+- `## Business logic` MUST define the actual product scope, roles, flows, and constraints for THIS project - not generic web-app boilerplate
+- The following subsections are REQUIRED inside `## Business logic` for every project:
+  - `### Product scope & non-goals`
+  - `### Roles & permissions`
+  - `### Data model & sensitivity`
+  - `### Trust boundaries & external services`
+  - `### Threat model & abuse cases`
+  - `### Security decisions & exceptions`
+- `### Threat model & abuse cases` MUST name:
+  - the primary assets being protected
+  - which inputs and integrations are trusted vs untrusted
+  - the main attacker/abuser goals for this project
+  - project-specific abuse cases (spam, scraping, privilege escalation, malicious uploads, SSRF, credential stuffing, etc. as applicable)
+  - the required defenses or explicit non-goals for each meaningful threat
+- If the project depends on an external service, API, webhook, identity provider, payment processor, or network source, `## Business logic` MUST state the trust assumption and failure mode - AI MUST NOT invent one later in code
+- If a security-sensitive choice is intentionally allowed (for example permanent root/admin runtime, external route compatibility, remote fetches, public uploads, or third-party embeds), the reason MUST be documented in `### Security decisions & exceptions`
+
+## Migrating Existing `CLAUDE.md` Into `IDEA.md`
+
+**If a repository already has a pre-template `CLAUDE.md` or `.claude/CLAUDE.md` with real project details, those project details MUST be migrated into `IDEA.md`.**
+
+**What belongs in `IDEA.md`:**
+- project description / elevator pitch
+- project-specific terminology
+- project variables that can be expressed as `key: value`
+- business logic, roles, flows, constraints, trust boundaries, abuse cases, and security exceptions
+
+**What does NOT belong in `IDEA.md`:**
+- generic Claude/Copilot usage instructions
+- loader boilerplate whose job is only to point at `AI.md`
+- duplicated global implementation rules that already live in `AI.md`
+- stale code snippets, one-off notes, or tool-specific chatter with no business/spec value
+
+**Migration rules:**
+1. **Read existing `CLAUDE.md` and `.claude/CLAUDE.md` first** - never overwrite blindly
+2. Extract valid project-specific content and reorganize it into the required `IDEA.md` layout:
+   - `## Project description`
+   - `## Project variables`
+   - `## Business logic`
+3. Normalize discovered variables into lower_snake_case `key: value` entries
+4. If `internal_name` / `internal_org` cannot be proven from the existing project state, initialize them to `project_name` / `project_org` on first migration and treat them as frozen after that
+5. If statements from `CLAUDE.md` or `.claude/CLAUDE.md` conflict with `AI.md`, `AI.md` wins; either fix the migrated text or ask the user if the intent is unclear
+6. After migration, keep root `CLAUDE.md` and/or `.claude/CLAUDE.md` only as short efficient loaders and keep the real project plan/spec in `IDEA.md`
+7. Never silently discard meaningful project-specific content; migrate it, trim it, or ask the user where it belongs
+
+---
+
 # PART 0: CRITICAL RULES — READ FIRST
 
 ## THIS IS A STRICT SPECIFICATION - NOT GUIDELINES
@@ -27,7 +281,7 @@
 
 | Section | Purpose | Modify? |
 |---------|---------|---------|
-| **AI.md (PARTS 0-28 + PART 28 reference)** | Implementation patterns, standards, rules, and reference material | **NEVER** |
+| **AI.md (PARTS 0-28 + PART 31 reference)** | Implementation patterns, standards, rules, and reference material | **NEVER** |
 | **IDEA.md** | Your project's business logic, features | **YES** - update as project evolves |
 
 **Rules:**
@@ -168,7 +422,7 @@ Before I proceed, can you confirm [specific question]?
 | **AI.md is source of truth** | ALWAYS read the relevant PART before implementing. NEVER guess. |
 | **Read relevant spec before each task** | Spec drift is the #1 cause of violations. Read only the PARTs relevant to the current task — do not pre-load speculatively |
 | **IDEA.md = WHAT** | Business logic, data models, features |
-| **AI.md (PARTS 0-28 = HOW; PART 28 = reference)** | Implementation patterns, standards |
+| **AI.md (PARTS 0-28 = HOW; PART 31 = reference)** | Implementation patterns, standards |
 | **No report files** | Fix issues directly. No AUDIT.md, COMPLIANCE.md, SUMMARY.md, etc. Temporary `AUDIT.AI.md` is allowed only for explicit audits and must be deleted when resolved |
 
 ### Mandatory Workflow
@@ -204,12 +458,12 @@ Before I proceed, can you confirm [specific question]?
 | `project-rules.md` | Application & Server Model, Project Structure & OS-Specific Paths, Runtime Mode Selection & Privilege Escalation (PARTs 2, 3, 4) |
 | `config-rules.md` | Configuration, Toolchain/Build & Packaging, Version/Site & Build Metadata (PARTs 5, 6, 7) |
 | `binary-rules.md` | Server Binary CLI & Client (PART 8) |
-| `backend-rules.md` | Error Handling & Caching, Database, Security/Logging & Privacy, Tor Hidden Service (PARTs 9, 10, 11, 26) |
+| `backend-rules.md` | Error Handling & Caching, Database, Security/Logging & Privacy, Tor Hidden Service (PARTs 9, 10, 11, 27) |
 | `api-rules.md` | Server Configuration/Health/Versioning, API Structure, SSL/TLS & Let's Encrypt (PARTs 12, 13, 14) |
 | `frontend-rules.md` | Web Frontend (PART 15) |
 | `features-rules.md` | Email & Notifications, Scheduler, GeoIP, Metrics, Backup & Restore, Update Command (PARTs 16-21) |
-| `testing-rules.md` | Testing/Quality & Debugging, Documentation/License/ReadTheDocs, I18N & A11Y, Checklists, IDEA.md Reference (PARTs 22, 24, 25, 27, 28) |
-| `cicd-rules.md` | CI/CD, Releases & Automation (PART 23) |
+| `testing-rules.md` | Testing/Quality & Debugging, Documentation/License/ReadTheDocs, I18N & A11Y, Checklists, IDEA.md Reference (PARTs 23, 25, 26, 30, 31) |
+| `cicd-rules.md` | CI/CD, Releases & Automation (PART 24) |
 
 **Trigger conditions:** `.claude/rules/` missing → create all files. AI.md modified more recently than rule files → update all files. User explicitly requests regeneration → update all files. **This is NOT optional** — rule files enable efficient context loading without re-reading the entire AI.md every session.
 
@@ -220,11 +474,11 @@ Before I proceed, can you confirm [specific question]?
 | Operator token (`server.token`) | — | PART 11 |
 | Frontend/UI | IDEA.md | PART 15 |
 | API endpoints | IDEA.md | PART 13 |
-| Tests | IDEA.md | PART 22 |
+| Tests | IDEA.md | PART 23 |
 | Docker | — | PART 6 |
 | Config | IDEA.md | PART 5 |
 | CLI | — | PART 8 |
-| Translation/i18n | — | PART 25 |
+| Translation/i18n | — | PART 26 |
 
 ### Prohibited Actions
 
@@ -315,7 +569,7 @@ fi
 | JavaScript UI text | Use `translations[key]` from the loaded locale |
 | Modifying `<html>` | Use `lang="{{ lang }}" dir="{{ dir }}"` — never hardcoded `lang="en"` |
 
-**After adding translation keys:** add the key to the Spanish (`es.json`) example (PART 25); note all other language files need the same key; ensure the key exists in the English base file.
+**After adding translation keys:** add the key to the Spanish (`es.json`) example (PART 26); note all other language files need the same key; ensure the key exists in the English base file.
 
 **If unsure whether text is user-facing → treat it as user-facing and translate it.**
 
@@ -406,7 +660,7 @@ README.md, Swagger/OpenAPI, GraphQL schema, docs/ (ReadTheDocs), IDEA.md, and CL
 
 ### Step 6: Check Against FINAL CHECKPOINT
 
-Read the FINAL CHECKPOINT section (PART 27) and verify ALL items.
+Read the FINAL CHECKPOINT section (PART 30) and verify ALL items.
 
 ### Step 7: FIX Issues (Don't Document Them)
 
@@ -571,7 +825,7 @@ make test    # Run unit tests
 cargo build --release -o binary/{project_name} ./src
 ```
 
-**See PART 22: TESTING, QUALITY & DEBUGGING for full containerized build/test procedures.**
+**See PART 23: TESTING, QUALITY & DEBUGGING for full containerized build/test procedures.**
 
 ## ⚠️ CRITICAL: X11 AND Wayland Are Both Required
 
@@ -667,7 +921,7 @@ Every server-side feature MUST work via:
 | Rule | Description |
 |------|-------------|
 | **MIT License** | All project code is MIT licensed unless IDEA.md explicitly states an additional compatible license policy |
-| **3rd party attribution** | All third-party licenses are listed in `LICENSE.md` (PART 24 → "License Compliance") |
+| **3rd party attribution** | All third-party licenses are listed in `LICENSE.md` (PART 25 → "License Compliance") |
 | **GPL / AGPL / LGPL denied by default** | Static linking would relicense the distributed binary away from MIT. Allowed only via a documented IDEA.md exception |
 | **Free & open source** | No paid tiers, enterprise gating, or artificial feature segmentation |
 | **No premium features** | GUI, TUI, CLI, and web/API surfaces expose the same core product capabilities where applicable |
@@ -946,7 +1200,7 @@ When the specification is unclear: 1) check if it's clarified elsewhere in the s
 
 **During:** read the relevant spec PART(s) before each implementation; follow spec exactly, no unrequested "improvements"; check yourself every 3-5 changes; update TODO.AI.md/TODO.md as tasks complete; test changes before moving on; keep changes focused (one feature/fix per task); if uncertain, stop, re-read, or ask.
 
-**After:** update IDEA.md if features changed; never modify AI.md; update TODO.AI.md with newly discovered tasks; verify against the FINAL CHECKPOINT (PART 27); update COMMIT_MESS only if files changed.
+**After:** update IDEA.md if features changed; never modify AI.md; update TODO.AI.md with newly discovered tasks; verify against the FINAL CHECKPOINT (PART 30); update COMMIT_MESS only if files changed.
 
 ## TODO.AI.md Completion
 
@@ -1122,6 +1376,12 @@ A HYBRID project is **one statically linked Rust binary per supported target** t
 These are not two different build targets or two different binaries — they are two facets of the same binary, distinguished by how it is invoked and what mode it resolves to at startup (PART 4 has the full runtime-mode-selection rules; this section states the architectural model those rules operate on and does not repeat them).
 
 **Distribution model:** one statically linked binary per supported target. Everything needed at runtime — UI assets, fonts, icons, default config, schemas, templates, locales, and the entire web/PWA frontend — is embedded inside that binary (PART 0 → "Single Static Binary" and "Self-Contained Assets"). The only data ever fetched at runtime is the narrowly-scoped, explicitly-declared security intelligence data in PART 0's Self-Contained Assets exception (GeoIP, blocklists, CVE feeds — PART 18/19).
+
+**The mental model is VS Code and code-server as ONE product** (or a native SSH client and its web twin): the server persona serves the application's own UI over the web — the same workspace reached through a browser, not a separate website bolted onto an app. A user who starts the native GUI, a TUI in a terminal, and the web UI is looking at one product three ways. Three core mechanisms make that real:
+
+1. **Instance registry** — every running instance registers on a per-user Unix socket registry (PART 4 → "Instance Registry & Per-User Sockets")
+2. **Instance switcher** — the web UI lists the authenticated system user's running instances and switches between them like a desktop window switcher (PART 15 → "Instance Switcher")
+3. **Per-system-user tokens** — web access is authenticated per OS user (PART 8 → "Per-System-User Tokens"); logging in with a user's token lands in that user's instances and context only
 
 ## Architectural Rule
 
@@ -1496,6 +1756,23 @@ panic = "abort"
 
 When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead. See PART 6 for the full pure-Rust library stack and cross-target build matrix.
 
+## Optional Server Features (Disabled by Default)
+
+The server persona has two optional feature blocks. **Both are DISABLED by default** — a HYBRID project ships with neither unless `IDEA.md` `## Business logic` explicitly enables them. When a feature is not enabled, its PART is inert: its routes MUST NOT exist, its tables MUST NOT be created, and its UI MUST NOT appear.
+
+| Feature | PART | Requires | Default |
+|---|---|---|---|
+| Server admin (admin user + admin routes) | PART 28 | — | Disabled |
+| Client & agent support | PART 29 | — | Disabled |
+
+Gate rules:
+
+- **Server admin is one switch** — the server admin user and the server admin routes are a single feature: enabling either enables both. The main server admin account is provisioned through the same token-based setup wizard that provisions the server token (PART 8).
+- **Token auth is the baseline and always present.** Per-system-user `sys_` tokens (PART 8 → "Per-System-User Tokens") are core and map 1:1 to system user accounts. With server admin enabled, the admin token maps to (authenticates as) the main server admin account — it is not a separate credential with its own identity.
+- **IDEA.md is the only enable mechanism** — no runtime flag, env var, or config key may turn on a feature block that IDEA.md has not declared in scope.
+
+There is deliberately no application-level multi-user account system, no organizations/teams, no custom-domain hosting, and no clustering in a HYBRID project: HYBRID targets desktop-class applications where the operating system's user accounts ARE the accounts. Identity is always a system user, proven by socket ownership/peer credentials (PART 4 → "Instance Registry & Per-User Sockets") or a `sys_` token (PART 8). A project that needs app-level accounts, orgs, or multi-node clustering is a SERVER project, not a HYBRID project.
+
 ---
 
 # PART 3: PROJECT STRUCTURE & OS-SPECIFIC PATHS
@@ -1669,12 +1946,12 @@ PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+
 │       ├── project-rules.md    # PART 2, 3, 4: Application & Server Model, Project Structure & OS-Specific Paths, Runtime Mode Selection & Privilege Escalation
 │       ├── config-rules.md     # PART 5, 6, 7: Configuration, Toolchain/Build & Packaging, Version/Site & Build Metadata
 │       ├── binary-rules.md     # PART 8: Server Binary CLI & Client
-│       ├── backend-rules.md    # PART 9, 10, 11, 26: Error Handling & Caching, Database, Security/Logging/Privacy, Tor Hidden Service
+│       ├── backend-rules.md    # PART 9, 10, 11, 27: Error Handling & Caching, Database, Security/Logging/Privacy, Tor Hidden Service
 │       ├── api-rules.md        # PART 12, 13, 14: Server Configuration/Health/Versioning, API Structure, SSL/TLS & Let's Encrypt
 │       ├── frontend-rules.md   # PART 15: Web Frontend
 │       ├── features-rules.md   # PART 16-21: Email & Notifications, Scheduler, GeoIP, Metrics, Backup & Restore, Update Command
-│       ├── testing-rules.md    # PART 22, 24, 25, 27, 28: Testing/Quality/Debugging, Documentation/License/ReadTheDocs, I18N & A11Y, Checklists, IDEA.md Reference
-│       └── cicd-rules.md       # PART 23: CI/CD, Releases & Automation
+│       ├── testing-rules.md    # PART 23, 25, 26, 30, 31: Testing/Quality/Debugging, Documentation/License/ReadTheDocs, I18N & A11Y, Checklists, IDEA.md Reference
+│       └── cicd-rules.md       # PART 24: CI/CD, Releases & Automation
 ├── .cursor/                # Cursor AI configuration (optional)
 │   ├── rules/              # Same groupings as .claude/rules/ but .mdc extension
 │   │   ├── ai-rules.mdc
@@ -3386,327 +3663,105 @@ fn install_windows_service() -> anyhow::Result<()> {
 
 **Note:** Home directory must exist before user creation. Create directories first, then user, then set ownership.
 
----
+## Instance Registry & Per-User Sockets
 
-## Built-in Service Support
+**Core to every HYBRID project.** The application and server personas are one product (PART 2). So the web UI can list and attach to a system user's running instances, every instance — GUI, TUI, long-running CLI, or server-spawned — registers on a per-user Unix domain socket registry at startup.
 
-**ALL projects MUST have built-in service support for ALL service managers.**
-
-**Binary handles everything internally:**
-- Detects running as root/admin vs regular user
-- Binds configured ports (any port when root/admin)
-- Drops privileges after binding (Unix-like systems)
-- Creates service user if needed
-
-| Run Mode | Who Runs Binary | Port Restriction | Privilege Drop |
-|----------|-----------------|------------------|----------------|
-| **Service (escalated)** | root/admin | Any port | Yes (after binding) |
-| **User mode ($USER)** | Calling user | >1024 only | No (already unprivileged) |
-
-**See above for user creation, privilege escalation, and installation logic.**
-
-## Service Templates
-
-**Unix default:** service starts elevated only for privileged startup, then drops to `{internal_name}` user after port binding.
-**Windows: Service runs as Virtual Service Account (`NT SERVICE\{internal_name}`).**
-
-This allows any port configuration without service file changes.
-
-**Exception:** if IDEA.md explicitly requires permanent root, the service file and documentation MUST say so and explain why privilege drop is not possible.
-
-### systemd (Linux)
-
-**Installation path:** `/etc/systemd/system/{internal_name}.service`
-
-```ini
-[Unit]
-Description={project_name} service
-Documentation=https://{project_org}.github.io/{project_name}
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/{project_name}
-Restart=on-failure
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-
-# Security hardening (binary drops privileges after port binding)
-ProtectSystem=strict
-ProtectHome=yes
-PrivateTmp=yes
-ReadWritePaths=/etc/{internal_org}/{internal_name}
-ReadWritePaths=/var/lib/{internal_org}/{internal_name}
-ReadWritePaths=/var/cache/{internal_org}/{internal_name}
-ReadWritePaths=/var/log/{internal_org}/{internal_name}
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### OpenRC (Alpine, Gentoo, Devuan)
-
-**Installation path:** `/etc/init.d/{internal_name}` (executable shell script)
-
-```sh
-#!/sbin/openrc-run
-# Service identity comes from {internal_name} so config_dir/data_dir paths stay
-# stable across binary renames (see PART 0 → "Why `{internal_name}` exists separately from `{project_name}`").
-
-name="{internal_name}"
-description="{app_name}"
-# actual binary (may differ from {internal_name} after rename)
-command="/usr/local/bin/{project_name}"
-command_args=""
-command_user="{internal_name}:{internal_name}"
-pidfile="/var/run/{internal_org}/{internal_name}.pid"
-command_background=true
-output_log="/var/log/{internal_org}/{internal_name}/server.log"
-error_log="/var/log/{internal_org}/{internal_name}/error.log"
-
-depend() {
-    need net
-    after firewall
-    use dns logger
-}
-
-start_pre() {
-    checkpath -d -m 0755 -o {internal_name}:{internal_name} /var/run/{internal_org}
-    checkpath -d -m 0755 -o {internal_name}:{internal_name} /var/log/{internal_org}/{internal_name}
-}
-```
-
-**Commands:**
-```bash
-# Enable at boot
-sudo rc-update add {internal_name} default
-
-# Start / stop / restart / status
-sudo rc-service {internal_name} start
-sudo rc-service {internal_name} stop
-sudo rc-service {internal_name} restart
-sudo rc-service {internal_name} status
-
-# Disable at boot
-sudo rc-update del {internal_name} default
-```
-
-### SysVinit (legacy Linux, init.d)
-
-**Installation path:** `/etc/init.d/{internal_name}` (executable shell script — same path as OpenRC; only one of the two is installed per host based on detection)
-
-**Detection:** the binary picks SysVinit only when `/sbin/openrc-run` is absent, `systemctl` is absent, and `/etc/init.d/` exists with a working `update-rc.d` or `chkconfig`.
-
-```sh
-#!/bin/sh
-### BEGIN INIT INFO
-# Provides:          {internal_name}
-# Required-Start:    $network $remote_fs $syslog
-# Required-Stop:     $network $remote_fs $syslog
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
-# Short-Description: {app_name}
-# Description:       {app_name} daemon
-### END INIT INFO
-
-NAME={internal_name}
-DAEMON=/usr/local/bin/{project_name}
-DAEMON_USER={internal_name}
-PIDFILE=/var/run/{internal_org}/{internal_name}.pid
-LOGFILE=/var/log/{internal_org}/{internal_name}/server.log
-
-case "$1" in
-    start)
-        echo "Starting $NAME..."
-        mkdir -p $(dirname $PIDFILE) $(dirname $LOGFILE)
-        chown -R $DAEMON_USER:$DAEMON_USER $(dirname $PIDFILE) $(dirname $LOGFILE)
-        start-stop-daemon --start --quiet --background --make-pidfile \
-            --pidfile $PIDFILE --chuid $DAEMON_USER --exec $DAEMON \
-            --no-close >> $LOGFILE 2>&1
-        ;;
-    stop)
-        echo "Stopping $NAME..."
-        start-stop-daemon --stop --quiet --pidfile $PIDFILE --retry 30
-        rm -f $PIDFILE
-        ;;
-    restart)
-        $0 stop
-        sleep 1
-        $0 start
-        ;;
-    status)
-        if [ -f $PIDFILE ] && kill -0 $(cat $PIDFILE) 2>/dev/null; then
-            echo "$NAME is running (pid $(cat $PIDFILE))"
-            exit 0
-        else
-            echo "$NAME is stopped"
-            exit 3
-        fi
-        ;;
-    *)
-        echo "Usage: $0 {start|stop|restart|status}"
-        exit 1
-        ;;
-esac
-exit 0
-```
-
-**Commands:**
-
-```bash
-# Enable at boot (Debian-style)
-sudo update-rc.d {internal_name} defaults
-
-# Enable at boot (RHEL-style)
-sudo chkconfig --add {internal_name}
-sudo chkconfig {internal_name} on
-
-# Start / stop / restart / status
-sudo /etc/init.d/{internal_name} start
-sudo /etc/init.d/{internal_name} stop
-sudo /etc/init.d/{internal_name} restart
-sudo /etc/init.d/{internal_name} status
-
-# Or via service(8)
-sudo service {internal_name} start
-```
-
-### runit (Linux)
-
-**Installation path:** `/etc/sv/{internal_name}/`
+### Socket Layout
 
 ```
-/etc/sv/{internal_name}/
-├── run           # Main service script
-├── log/
-│   └── run       # Logging script
-└── supervise/    # Auto-created by runit
+{data_dir}/sockets/
+  alice/            # 0700, owned by alice
+    main.sock       # broker/registry socket
+    a1b2c3.sock     # per-instance socket (GUI session)
+    d4e5f6.sock     # per-instance socket (TUI session)
+  bob/              # 0700, owned by bob
+    main.sock
+    9f8e7d.sock
 ```
 
-**run script:**
-```bash
-#!/bin/sh
-exec /usr/local/bin/{project_name} 2>&1
-```
+| Rule | Detail |
+|---|---|
+| Parent directory | `{data_dir}/sockets/` — 0755, owned by root or the service user, sticky bit set (like `/tmp`) so users cannot remove each other's directories |
+| Per-user directory | `{data_dir}/sockets/$USER/` — 0700, owned by that user; created by the first instance that user starts (or by the server on that user's first web enrollment) |
+| Broker socket | `main.sock` — one per user, bound by the first instance that user starts (first-to-bind wins); when the broker instance exits, the next surviving instance re-binds it |
+| Instance sockets | `{instance_id}.sock` — one per running instance; `{instance_id}` is a random lowercase hex ID (6+ chars) generated at instance start |
+| Windows | Named pipes replace Unix sockets: `\\.\pipe\{internal_name}-{username}-main` and `\\.\pipe\{internal_name}-{username}-{instance_id}`, each with a per-user DACL restricting access to that user and SYSTEM |
 
-**log/run script:**
-```bash
-#!/bin/sh
-exec svlogd -tt /var/log/{internal_org}/{internal_name}
-```
+### Registration Protocol
 
-### rc.d (FreeBSD)
+Each instance registers with the broker at startup and maintains its record:
 
-**Installation path:** `/usr/local/etc/rc.d/{internal_name}`
+| Field | Content |
+|---|---|
+| `instance_id` | The random ID matching the instance's socket filename |
+| `surface` | `gui` / `tui` / `cli` / `server` |
+| `pid` | Process ID |
+| `started_at` | RFC 3339 start timestamp |
+| `title` | Human-readable label (active document/workspace/session name; falls back to the surface name) |
+| `socket` | Absolute path to the instance socket |
+| `version` | Binary version string |
 
-```bash
-#!/bin/sh
+Lifecycle: heartbeat to the broker every 30 seconds; deregister on clean exit; the broker prunes stale records (dead PID or failed socket connect) on every enumeration and unlinks orphaned socket files. A crashed broker loses no durable state — the registry is rebuilt from live instance sockets on re-bind.
 
-# PROVIDE: {internal_name}
-# REQUIRE: NETWORKING
-# KEYWORD: shutdown
+### Identity & Trust (Kernel Peer Credentials)
 
-. /etc/rc.subr
+Every connection on any socket in `{data_dir}/sockets/$USER/` is verified with kernel peer credentials — `SO_PEERCRED` (Linux), `LOCAL_PEERCRED` (macOS/BSD), pipe security descriptors (Windows). The broker accepts registration, enumeration, and token operations only from processes whose UID matches the socket directory owner (or root/the service user for the server's read paths). **Ownership of the per-user socket IS the OS identity proof — no password or token is ever exchanged over local sockets.**
 
-# Service identity comes from {internal_name} so config_dir/data_dir paths stay stable across binary renames
-name="{internal_name}"
-rcvar="{internal_name}_enable"
-command="/usr/local/bin/{project_name}"
+### Web UI Attachment
 
-load_rc_config $name
-run_rc_command "$1"
-```
+The server persona connects to a user's broker only after the web session has authenticated as that system user (PART 8 → "Per-System-User Tokens"). It enumerates instances via `main.sock` and attaches to individual instance sockets to render/relay that instance in the web UI (PART 15 → "Instance Switcher"). The server NEVER crosses users: a web session authenticated as `alice` can enumerate and attach to `alice`'s sockets only.
 
-### launchd (macOS)
+## System Service Mode (Root Service, Single/Dual Port Bind)
 
-**Installation path:** `/Library/LaunchDaemons/{plist_name}.plist`
+The server persona runs in exactly one of two deployment modes, selected automatically by the effective UID at server startup — there is no flag or config key for it:
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>{plist_name}</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/local/bin/{project_name}</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>/var/log/{internal_org}/{internal_name}/stdout.log</string>
-    <key>StandardErrorPath</key>
-    <string>/var/log/{internal_org}/{internal_name}/stderr.log</string>
-</dict>
-</plist>
-```
+| Mode | Who starts it | Network binding | Serves |
+|---|---|---|---|
+| **Per-user mode** | A regular user runs the server persona themselves (interactive `serve`, user-level service) | That user's own port (loopback by default) — one port per user | Only the starting user's instances and `sys_` token |
+| **System service mode** | The system service manager starts the binary as root per PART 22's service rules | ONE shared listener for the whole machine: a single port, or dual ports when TLS redirect is enabled (HTTP redirect port + HTTPS port, per PART 14) | Every enrolled system user on the machine |
 
-**Commands:**
-```bash
-# Load and start service
-sudo launchctl load /Library/LaunchDaemons/{plist_name}.plist
+System service mode exists precisely so a multi-user machine does not need per-user port binds: the root-started service is the only process that binds TCP, and every user reaches their own instances through it.
 
-# Unload service
-sudo launchctl unload /Library/LaunchDaemons/{plist_name}.plist
+### Request Flow (System Service Mode)
 
-# Check status
-sudo launchctl list | grep {internal_name}
-```
+1. A browser or API client connects to the shared port and presents a `sys_` token (PART 8 → "Per-System-User Tokens")
+2. The service hashes the token (SHA-256) and looks it up in `system_users` → resolves exactly one system user; unknown/revoked tokens get `401` with no hint of which users exist
+3. The service connects to that user's broker at `{data_dir}/sockets/{username}/main.sock` — root traverses the 0700 directory; kernel peer credentials still verify the instance side of every socket
+4. The broker enumerates that user's instances; the web UI's Instance Switcher (PART 15) and all attach/relay traffic flow over the per-instance sockets
+5. The response returns through the same path — the service relays instance traffic opaquely and never interprets it as its own commands
 
-### Windows Service
+In system service mode, per-user instances MUST NOT bind TCP ports — Unix sockets/named pipes are their only transport. The socket registry above is the complete contract between the root listener and every user's instances; system service mode adds no second protocol.
 
-**Windows uses Virtual Service Account (VSA).** No privilege dropping needed - VSA is already a minimal-privilege isolated account.
+### Spawning Instances as a User
 
-| Account | Description |
-|---------|-------------|
-| `NT SERVICE\{internal_name}` | Virtual Service Account - auto-managed by Windows |
+The web UI may offer "start a new instance." In system service mode the service launches it AS the target user, never as root:
 
-Use the `windows-service` crate for Windows service integration:
+1. Authorize first: the requesting web session's `sys_` token must resolve to the same system user the instance will run as — the service never starts an instance for any other user
+2. Fork, then fully drop privileges in the child before exec: `setgroups` (supplementary groups) → `setgid` → `setuid` to the target user, in that order, verifying each call succeeded and that privileges cannot be re-acquired
+3. Reset the environment to the target user's: `HOME`, `USER`, `LOGNAME`, `SHELL`, `PATH`, and XDG base dirs; working directory = the user's home
+4. Exec the same binary with the requested surface; the child registers on the user's socket registry like any other instance
+5. Windows: the service uses `CreateProcessAsUser` with a token for the target user; macOS/BSD: same fork/drop/exec sequence with `setgroups`/`setgid`/`setuid`
 
-```rust
-// #[cfg(target_os = "windows")]
+If privilege drop fails at any step, the spawn is aborted and audited — the service NEVER falls back to running an instance with elevated privileges. In per-user mode, spawning is a plain fork/exec (already the right user).
 
-use windows_service::{define_windows_service, service_dispatcher};
-use windows_service::service::{ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus, ServiceType};
-use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
+### Privilege Model (Exception to PART 22's Drop Rule)
 
-define_windows_service!(ffi_service_main, service_main);
+PART 22's default — bind, then drop to the `{internal_name}` service user — CANNOT apply in system service mode: traversing each user's 0700 socket directory and spawning instances as arbitrary users both require root. System service mode therefore follows the **sshd model** and is the spec-level exception to PART 22's privilege-drop rule (no IDEA.md declaration needed — it is inherent to HYBRID):
 
-pub fn run_as_service() -> anyhow::Result<()> {
-    service_dispatcher::start("{internal_name}", ffi_service_main)?;
-    Ok(())
-}
+- The listener/relay process retains root for its whole lifetime
+- Work that does not need root never runs as root: spawned instances always fully drop privileges (above), and request parsing is defensive, size-limited, and free of user-controlled code paths
+- In per-user mode nothing changes — the server runs as the invoking user and PART 22's table applies as written
 
-fn service_main(_arguments: Vec<std::ffi::OsString>) {
-    let event_handler = move |control_event| -> ServiceControlHandlerResult {
-        match control_event {
-            ServiceControl::Stop | ServiceControl::Shutdown => {
-                // Clean shutdown
-                ServiceControlHandlerResult::NoError
-            }
-            _ => ServiceControlHandlerResult::NotImplemented,
-        }
-    };
+### Security Invariants (System Service Mode)
 
-    let status_handle = service_control_handler::register("{internal_name}", event_handler)
-        .expect("invariant: service control handler registration succeeds at startup");
+- The root process only ever: binds the shared port(s), terminates TLS (PART 14), verifies tokens, relays socket traffic, and spawns-with-privilege-drop — it executes no application/business logic on behalf of a user as root
+- Token → system user resolution is the ONLY authorization input; no header, query parameter, or client claim can select a target user
+- A session authenticated as `alice` can never enumerate, attach to, spawn, or signal `bob`'s instances — enforced at the service before any socket connect, and again by socket ownership
+- All data read from user sockets is untrusted input to the service: parsed defensively, size-limited, never evaluated
+- Everything else about the server persona (config, health, API, TLS, logging) is unchanged between the two modes — PARTs 5, 11, 12, 13, 14 apply identically; only who binds the port and how requests reach instances differs
 
-    status_handle.set_service_status(ServiceStatus {
-        service_type: ServiceType::OWN_PROCESS,
-        current_state: ServiceState::Running,
-        controls_accepted: ServiceControlAccept::STOP | ServiceControlAccept::SHUTDOWN,
-        exit_code: ServiceExitCode::Win32(0),
-        checkpoint: 0,
-        wait_hint: std::time::Duration::default(),
-        process_id: None,
-    }).expect("invariant: set_service_status succeeds immediately after registration");
-}
-```
+PART 22 owns the service unit definitions; its units start the server persona as root, which is what activates this mode.
 
 ---
 
@@ -5602,6 +5657,7 @@ Before proceeding, confirm you understand:
 - [ ] Non-server modes (GUI/TUI/CLI) respect `NO_COLOR`, `TERM=dumb`, and layer CLI > env > config > defaults exactly like server mode
 
 ---
+
 # PART 6: TOOLCHAIN, BUILD & PACKAGING
 
 ## Toolchain Rules
@@ -6433,7 +6489,7 @@ Every production image MUST satisfy:
 | Runtime stage | `alpine:latest` |
 | Meta labels | None in the Dockerfile — CI applies OCI labels/annotations at build time |
 | Required packages | git, curl, bash, tini, tor |
-| Tor handling | Installed but **binary controls** startup (see PART 26: TOR HIDDEN SERVICE) |
+| Tor handling | Installed but **binary controls** startup (see PART 27: TOR HIDDEN SERVICE) |
 | Binary location | `/usr/local/bin/{project_name}` |
 | Entrypoint script | `/usr/local/bin/entrypoint.sh` |
 | Init system | **tini** |
@@ -7338,6 +7394,8 @@ pub const OFFICIAL_SITE: &str = option_env!("APP_OFFICIAL_SITE").unwrap_or("");
 pub const COMMIT_ID: &str = option_env!("APP_COMMIT_ID").unwrap_or("N/A");
 pub const BUILD_DATE: &str = option_env!("APP_BUILD_DATE").unwrap_or("N/A");
 ```
+
+---
 
 # PART 8: SERVER BINARY CLI & CLIENT
 
@@ -8341,7 +8399,7 @@ PHASE 5: Server startup (actual server start)
     │   └─ ... and others (see PART 17)
     └─ Start scheduler async task
 
-17. Start Tor (if tor binary available and not already spawned in step 8g) - see PART 26:
+17. Start Tor (if tor binary available and not already spawned in step 8g) - see PART 27:
     ├─ Root mode → Tor already running (spawned in step 8g with {internal_name}:{internal_name} setuid credentials before the drop); skip
     ├─ tor not found in PATH → log INFO "Tor not available", skip
     ├─ tor found:
@@ -9477,6 +9535,21 @@ The server generates the token, stores `SHA-256(token)` in `api_tokens` with `re
 {project_name} token list
 ```
 Token revocation is operator-only via CLI: `{project_name} token revoke <prefix>`
+
+### Per-System-User Tokens (Core HYBRID Auth)
+
+**Every system user who runs the product gets their own token — web/API access is scoped per OS user. The mapping follows the same rule as the server admin: the global `server.token` maps to the operator (and, when the admin panel is enabled, to the main server admin account — PART 28); each per-user token maps to exactly one OS account.**
+
+| Aspect | Rule |
+|---|---|
+| Format | `sys_` + 36 random characters (distinct from `tok_` operator/resource tokens and, when PART 29 is enabled, agent tokens) |
+| Generation | On a user's first run of any persona, generate the token and write it raw to `{user_config_dir}/user.token` (0600, owned by that user) |
+| Server-side storage | Only `SHA-256(token)` is stored, in the `system_users` table (`username`, `uid`, `token_hash`, `created_at`, `rotated_at`, `last_used_at`, `status`) — the raw token is never stored server-side and never logged |
+| Enrollment | Over the user's own broker socket: the instance submits the hash via `main.sock`, and the kernel peer credential (UID) is the identity proof (PART 4 → "Identity & Trust") — the server process never reads user home directories |
+| Web login | The user presents the token (Bearer header, or login form → session cookie); hash lookup maps it to its `system_users` row and the web session is scoped to that OS user's instances, preferences, and resources |
+| Rotation | Self-service: web UI → user settings → "Rotate token" (new token shown ONCE; old hash invalid immediately) or `{project_name} token rotate` from the user's own shell (peer-credential-verified over `main.sock`, rewrites `user.token`). The operator can force-rotate or disable any user via `--maintenance` |
+| Scope | Never operator-scope — a `sys_` token grants access to its own user's context only; `server.token` remains the sole operator credential |
+| Relation to accounts | There is no application-level account system in HYBRID (PART 2) — system user accounts ARE the accounts, and `sys_` tokens are the only per-user credential. In System Service Mode the shared listener resolves every request's `sys_` token to its system user before touching any socket (PART 4 → "System Service Mode") |
 
 **Config Load/Save Helpers:**
 
@@ -13247,7 +13320,7 @@ make build
 
 ```bash
 # CI/CD runs inside `casjaysdev/rust:latest` (or uses `docker run ... casjaysdev/rust:latest`), NOT `actions/setup-rust`
-# See PART 23: CI/CD WORKFLOWS for complete examples
+# See PART 24: CI/CD WORKFLOWS for complete examples
 cargo build --release --target x86_64-unknown-linux-musl
 ```
 
@@ -13745,8 +13818,6 @@ Is your target user comfortable in a terminal?
 
 ---
 
----
-
 # PART 9: ERROR HANDLING & CACHING
 
 ## Error Handling
@@ -14213,12 +14284,24 @@ pub async fn warm_cache(cache: &redis::Client, db: &sqlx::SqlitePool) -> anyhow:
 
 See **Database Schema for Configuration** section in PART 5 for full table definitions.
 
+### Feature-Gated Tables
+
+**Core tables are created unconditionally on every startup. Tables that exist only for optional features are created ONLY when the corresponding feature is enabled via IDEA.md — all optional features are disabled by default.**
+
+| Table group | Created when | Defined in |
+|-------------|--------------|------------|
+| Core: settings/config, cache, `rate_limits`, `audit_log`, `app_secrets`, `learned_origins`, `system_users` | Always | PART 5, PART 8 → "Per-System-User Tokens" |
+| Admin panel tables (admin sessions, panel state) | Admin panel enabled | PART 28 |
+| Agent tables (agents, agent tokens, agent check-ins) | Agents enabled | PART 29 |
+
+**Rule:** each optional PART defines its own `CREATE TABLE IF NOT EXISTS` statements. `ensure_schema` includes those statements in `CREATE_STATEMENTS` only when the feature's IDEA.md flag is enabled. A disabled feature MUST leave zero tables behind — never pre-create tables "just in case".
+
 ### Schema Updates (Idempotent Approach)
 
 **No migration files. No version tracking. All schema changes are idempotent and run on every startup.**
 
 ```rust
-// EnsureSchema runs on startup - creates tables and applies updates
+// ensure_schema runs on startup - creates tables and applies updates
 // Safe to run multiple times (idempotent)
 pub async fn ensure_schema(pool: &sqlx::SqlitePool) -> anyhow::Result<()> {
     // 1. Create tables (idempotent)
@@ -14299,7 +14382,7 @@ impl Paste {
     }
 }
 
-// Step 3: After server upgraded, old column ignored (v1.5.0+)
+// Step 3: After the deployment is upgraded, old column ignored (v1.5.0+)
 // Old column stays in DB (never drop), just unused
 ```
 
@@ -14323,6 +14406,20 @@ match sqlx::query("ALTER TABLE pastes ADD COLUMN slug TEXT DEFAULT ''")
     Err(e) => return Err(e.into()),
 }
 ```
+
+## Deployment Model
+
+**Every app runs as a single instance. There is no clustering, no replication between instances, and no failover.**
+
+| Aspect | Behavior |
+|--------|----------|
+| Instances | One server process per deployment |
+| Database | Local SQLite by default; remote libsql/Turso optional |
+| Scheduled work | Cron jobs, GeoIP/blocklist updates, and cleanup run in-process in the one binary |
+| State | Sessions, config, and locks live in the one database — no cross-instance sync |
+| Upgrades | Stop the binary, replace it, start it; schema updates apply idempotently on startup |
+
+A native GUI/TUI/CLI session on a workstation (PART 2, PART 4) and the server deployment follow the same model — one instance of the ONE binary.
 
 ---
 
@@ -14360,9 +14457,13 @@ server:
 | Deployment | max_open | max_idle | Reason |
 |------------|----------|----------|--------|
 | Development | 5 | 2 | Minimal resources |
-| Small | 25 | 5 | Default, works for most |
-| Medium | 50 | 10 | More concurrent requests |
-| Large | 100 | 20 | High concurrency |
+| Small (low traffic) | 25 | 5 | Default for remote, works for most |
+| Medium (moderate traffic) | 50 | 10 | More concurrent requests |
+| Large (high traffic) | 100 | 20 | High concurrency |
+
+**Rule (remote/libsql):** keep `max_open` at or below 80% of the connection limit the remote database allows the instance.
+
+Local SQLite always uses the single-writer model regardless of deployment size — the pool tiers above apply to libsql/remote only.
 
 ### Implementation
 
@@ -15024,12 +15125,12 @@ web:
     # short-burst allowance
     rate_limit_per_ip_burst: 10
 
-  # CSRF config lives under server.csrf — see PART 15 → "CSRF Protection" for full schema.
+  # CSRF config lives under web.csrf — see PART 15 → "CSRF Protection" for full schema.
 
   csp:
     # See "Content Security Policy" below for full schema.
 
-  # CORS config lives under server.cors — see PART 15 → CORS for full schema.
+  # CORS config lives under web.cors — see PART 15 → CORS for full schema.
 
   headers:
     # Modern / privacy / cross-origin headers — see subsections below.
@@ -16681,7 +16782,7 @@ Plugin downloads are an additional case and apply only when IDEA.md defines a ha
 - **Renovate is the only supported dependency-update tool** — covers Cargo deps, GitHub Actions SHAs, and Docker image digests from a single `renovate.json` at the repo root. Works on GitHub, GitLab, Gitea, Forgejo, and Bitbucket.
 - **Dependabot is forbidden** — GitHub-only, duplicates Renovate's work on GitHub, and cannot serve the other four providers. Never enable both.
 - Public repos MUST ship `renovate.json` so Cargo / Actions / Docker updates land as PRs automatically; Renovate uses `pinDigests: true` to keep all `uses:` lines pinned to immutable SHAs
-- Renovate only updates the SHA; the **runtime-still-supported** verification (e.g., node24 vs deprecated runtimes) remains a manual check on every SHA bump (PART 23 → "Third-party Action Pinning")
+- Renovate only updates the SHA; the **runtime-still-supported** verification (e.g., node24 vs deprecated runtimes) remains a manual check on every SHA bump (PART 24 → "Third-party Action Pinning")
 - Security advisories are blockers until triaged
 
 ## Telemetry Rule
@@ -16689,6 +16790,7 @@ Plugin downloads are an additional case and apply only when IDEA.md defines a ha
 No hidden telemetry. Any analytics, crash reporting, or update pings must be documented and controllable.
 
 ---
+
 # PART 12: SERVER CONFIGURATION, HEALTH & VERSIONING
 
 ## Config Validation Rule
@@ -16927,7 +17029,7 @@ Expires: {expiry_date}
 - `Preferred-Languages:` line is **omitted** (locale fingerprinting risk on Tor)
 - Served per-request via `build_url(headers, path)`; never cached or frozen at startup
 
-> **Full Tor implementation:** The above covers request detection, `build_url` integration, and privacy rules only. For Tor binary lifecycle, hidden service setup, outbound routing, and external tor binary integration, see **PART 26 → "Tor Hidden Service"**.
+> **Full Tor implementation:** The above covers request detection, `build_url` integration, and privacy rules only. For Tor binary lifecycle, hidden service setup, outbound routing, and external tor binary integration, see **PART 27 → "Tor Hidden Service"**.
 
 ## Rate Limiting
 
@@ -18210,7 +18312,7 @@ pub struct BuildInfo {
 // For project-specific optional features, add fields here when implemented.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeaturesInfo {
-    // PART 26: Tor Hidden Service
+    // PART 27: Tor Hidden Service
     pub tor: TorInfo,
 
     // PART 18: GeoIP
@@ -18220,7 +18322,7 @@ pub struct FeaturesInfo {
     // APP-SPECIFIC: Add your app's features with enabled/disabled status
 }
 
-// TorInfo - from Tor manager (PART 26)
+// TorInfo - from Tor manager (PART 27)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TorInfo {
     // Tor binary found and running
@@ -18245,7 +18347,7 @@ pub struct ChecksInfo {
     // PART 17: "ok" or "error"
     pub scheduler: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    // PART 26: "ok" or "error" (if enabled)
+    // PART 27: "ok" or "error" (if enabled)
     pub tor: Option<String>,
     // APP-SPECIFIC: Add your checks here
     // Example: pub storage: Option<String>,
@@ -19311,7 +19413,7 @@ fn get_api_response_format(req: &Request) -> &'static str {
 **Testing:** Test scripts MUST verify:
 - API `.txt` extension works
 - Frontend smart detection works (browser → HTML, CLI → formatted text)
-- Accept headers work on both API and frontend (see PART 22: TESTING, QUALITY & DEBUGGING)
+- Accept headers work on both API and frontend (see PART 23: TESTING, QUALITY & DEBUGGING)
 
 ### Content Negotiation Priority
 
@@ -21578,207 +21680,333 @@ Startup (for configured FQDN)
 - `{config_dir}/ssl/local/{fqdn}/` → app uses but does NOT auto-renew (user manages)
 
 ---
+
 # PART 15: WEB FRONTEND
 
----
+## Single-Binary Embedding
 
-**Single-binary embedding:** this entire frontend — Tera templates, CSS, JavaScript, icons, fonts, the web manifest, and all other `static/` assets — is compiled into the same static server binary via `rust-embed` (see "Embedding Templates" below). There is no separate frontend build artifact, no CDN dependency, and no runtime filesystem read for these assets: `cargo build` (or the project's cross/musl build) produces one binary that is both the server and the complete web UI. Deploying, copying, or running that one file is sufficient to serve the full site.
+**This is not an optional add-on frontend bolted onto an API — the frontend below IS part of the single static server binary.** There is no separate deploy step, no separate web server, no separate build artifact to ship: every template, stylesheet, script, image, font, and manifest file described in this PART is embedded into the same binary as the server (via `rust-embed`, see "Embedding Templates" below) and served by the same process that answers `/api/*`. One binary, one process, one deployment — frontend and server are inseparable at build and runtime.
+
+## Optional-Feature Gating
+
+**The server admin panel (PART 28) and the standalone client & agent (PART 29) are the ONLY optional features — disabled by default and enabled per-project via IDEA.md.** Everything in this PART that references the admin panel or its routes (`/server/{admin_path}/*`) applies ONLY when PART 28 is enabled. When disabled (the default), those routes, templates, and UI elements do not exist and MUST NOT be built. **Exception (core, never gated):** per-system-user token authentication and the Instance Switcher (below) are core HYBRID — the token-entry login surface for `sys_` tokens (PART 8 → "Per-System-User Tokens") exists in every HYBRID project regardless of PART 28.
 
 ## Requirements
 
-| Requirement | Details |
+**ALL PROJECTS MUST HAVE A PROFESSIONAL, WELL-DESIGNED, FULLY FUNCTIONAL FRONTEND.**
+
+| Requirement | Description |
+|-------------|-------------|
+| **Fully Functional** | ALL features work in browser - not just API |
+| **Professional UI/UX** | Clean, modern, polished design |
+| **Mobile Support** | Full responsive design with touch-friendly targets |
+| **HTML5** | Full web standards compliance |
+| **Accessibility** | WCAG 2.1 AA compliant, screen reader friendly |
+| **UX** | Readable, navigable, intuitive, user-friendly, self-explanatory |
+| **PWA Support** | Progressive Web App - installable, offline-capable |
+| **CORS** | Resolved allow-list (config → DOMAIN → proxy-learned; `*` only as fallback) — see "CORS Allow-list Resolution Order" |
+
+## Instance Switcher (Core)
+
+**The web UI is a door into the same product as the native surfaces (PART 2).** After a web session authenticates as a system user (PART 8 → "Per-System-User Tokens"), the header exposes an instance switcher that lists that user's running instances — discovered live via the user's broker socket (PART 4 → "Instance Registry & Per-User Sockets") — and switches between them like a desktop window switcher.
+
+| Rule | Detail |
 |---|---|
-| Template engine | Tera (`tera` crate) |
-| Router | `axum` + `tower` + `tower-http` |
-| Static files | `tower-http::services::ServeDir` |
-| JSON | `serde_json` |
-| Logging | `tracing` + `tracing-subscriber` |
-| HTTP client | `reqwest` |
-| HTML sanitizer | `ammonia` |
-| Embed | `rust-embed` |
+| Placement | Header widget next to the theme toggle; keyboard shortcut cycles instances |
+| Listing | One row per registered instance: title, surface badge (GUI/TUI/CLI/server), started time (human-readable, e.g. "2 hours 15 minutes ago"), and a live/stale indicator |
+| Switching | Selecting an instance attaches the web session to that instance's socket and renders/relays it in the browser; the previous attachment detaches cleanly |
+| New instance | The switcher offers "New instance" which spawns a server-hosted instance for the user |
+| Isolation | The switcher shows ONLY the authenticated system user's instances — never another user's (enforced server-side via peer-credential-scoped enumeration, PART 4) |
+| Empty state | With no running instances, the switcher shows a clear empty state with the "New instance" action — never an error |
 
----
+## Frontend Consumes Backend
 
-## Frontend Route Structure
+**API is the source of truth. Frontend fully integrates with relevant API endpoints.**
 
-Routes are registered with `axum::Router`. All frontend routes are public — there is no admin web UI, no dashboard, and no settings pages (no auth, no user accounts). Auth is bearer-token only (operator token or resource owner token) and applies to `/api/` routes, never to HTML pages.
+| Rule | Description |
+|------|-------------|
+| **API first** | Backend API works standalone, frontend consumes it |
+| **User features in browser** | All user-facing API features accessible via frontend |
+| **Same validation** | Frontend validates same rules as backend |
+| **Real-time feedback** | Frontend shows success/error from backend responses |
 
-```rust
-// Public frontend routes (no auth required)
-router.route("/", get(home_handler))
-router.route("/search", get(search_handler))
+**User-facing features work in browser. System/agent endpoints are API-only (see PART 13).**
 
-// Server info pages (public)
-router.route("/server/about", get(about_handler))
-router.route("/server/privacy", get(privacy_handler))
-router.route("/server/contact", get(contact_handler))
-router.route("/server/help", get(help_handler))
-router.route("/server/terms", get(terms_handler))
+### Frontend Route Structure
+
+| API Route | Frontend Route | Page Type |
+|-----------|----------------|-----------|
+| `GET /api/{api_version}/instances` | `GET /instances` | Instance list (Instance Switcher data) |
+| `GET /api/{api_version}/server/about` | `GET /server/about` | About page |
+
+**Route Priority (NON-NEGOTIABLE):**
+
+```
+1. /api/{api_version}/*          → API routes (highest priority)
+2. /server/{admin_path}/*     → Admin panel (PART 28, when enabled)
+3. /server/healthz           → Health check
+4. /static/*          → Static assets
+5. /*                 → Page routes (lowest priority)
 ```
 
----
+### URL Normalization Middleware
 
-## Vanity URLs / Slug Routes
-
-Project-specific catch-all (lowest priority — registered last). Only implement if the project needs slug/short-code routes.
+**ALL routes MUST normalize URLs before processing. Apply this middleware FIRST in the chain.**
 
 ```rust
-// Project-specific catch-all (lowest priority - registered last)
-// Only implement if the project needs slug/short-code routes
-router.route("/:slug", get(slug_handler))
-router.route("/:slug/:sub", get(slug_handler))
-```
+// url_normalize normalizes URLs for consistent routing:
+// - Removes trailing slashes (except for root "/")
+// - Redirects to canonical URL with 301 if normalization changed path
+pub fn url_normalize_layer() -> impl Layer<
+    axum::routing::Route,
+    Service = impl tower::Service<Request<Body>>,
+> {
+    axum::middleware::from_fn(url_normalize_middleware)
+}
 
----
-
-## Reserved Names
-
-Names that must never be used as user-supplied slugs:
-
-```rust
-let reserved_names: Vec<&str> = vec![
-    "api", "server", "static", "assets", "healthz", "metrics",
-    "webhook", "webhooks",
-    "search", "explore", "discover", "trending",
-    "help", "support", "docs", "documentation",
-    "about", "contact", "terms", "privacy", "legal", "security",
-    "graphql", "swagger", "rest", "rpc", "ws", "websocket",
-    "cdn", "media", "uploads", "files", "images",
-    ".well-known", "robots.txt", "sitemap.xml", "favicon.ico",
-    // Project-specific (add yours in IDEA.md)
-];
-```
-
----
-
-## URL Normalization Middleware
-
-Strips trailing slashes and redirects to canonical URL (301). Does not strip trailing slash when the path segment contains a dot (file extension).
-
-```rust
 async fn url_normalize_middleware(
-    uri: axum::http::Uri,
-    request: axum::extract::Request,
+    req: Request<Body>,
     next: axum::middleware::Next,
-) -> axum::response::Response {
-    let path = uri.path();
+) -> impl IntoResponse {
+    let path = req.uri().path().to_owned();
+
+    // Root path "/" stays as-is
     if path == "/" {
-        return next.run(request).await;
+        return next.run(req).await.into_response();
     }
+
+    // Remove trailing slash (canonical form: no trailing slash)
     if path.ends_with('/') {
-        let last_slash = path.rfind('/').unwrap_or(0);
-        if !path[last_slash..].contains('.') {
+        let last_segment = &path[path.rfind('/').unwrap_or(0)..];
+        // Exception: explicit file requests (e.g., /dir/index.html)
+        if !last_segment.contains('.') {
             let canonical = path.trim_end_matches('/');
-            let location = if let Some(query) = uri.query() {
-                format!("{}?{}", canonical, query)
-            } else {
-                canonical.to_string()
+            let query = req.uri().query();
+            let location = match query {
+                Some(q) => format!("{}?{}", canonical, q),
+                None => canonical.to_owned(),
             };
-            return axum::response::Redirect::permanent(&location).into_response();
+            return Redirect::permanent(&location).into_response();
         }
     }
-    next.run(request).await
+
+    next.run(req).await.into_response()
 }
 ```
 
-Middleware execution order (outer → inner):
+**Normalization Rules:**
 
-1. `url_normalize_middleware` — canonical URL enforcement
-2. `request_id_middleware` — attach `X-Request-ID`
-3. `real_ip_middleware` — resolve client IP behind proxies
-4. `rate_limit_middleware` — per-IP throttle
-5. `csrf_middleware` — verify CSRF token on mutating browser form requests (see "CSRF Protection")
-6. Handler
+| Input | Output | Action |
+|-------|--------|--------|
+| `/instances/` | `/instances` | 301 redirect |
+| `/server/about/` | `/server/about` | 301 redirect |
+| `/api/{api_version}/instances/` | `/api/{api_version}/instances` | 301 redirect |
+| `/instances` | `/instances` | No redirect (canonical) |
+| `/` | `/` | No redirect (root exception) |
+| `/static/css/style.css` | `/static/css/style.css` | No redirect (file) |
+| `/dir/index.html` | `/dir/index.html` | No redirect (file) |
 
----
+**Why No Trailing Slash:**
+- SEO: Search engines treat `/page` and `/page/` as different URLs (duplicate content)
+- Consistency: One canonical URL per resource
+- Simplicity: Route matching is simpler without optional trailing slashes
 
-## detectClientType
-
-Determines whether the client expects HTML, plain text, or JSON based on request headers.
+**Middleware Execution Order (see PART 5 for full setup_middleware):**
 
 ```rust
-fn detect_client_type(headers: &axum::http::HeaderMap) -> &'static str {
-    let accept = headers.get("accept").and_then(|v| v.to_str().ok()).unwrap_or("");
-    if accept.contains("text/html") { return "html"; }
-    if accept.contains("text/plain") { return "text"; }
-    if accept.contains("application/json") { return "json"; }
-    let ua = headers.get("user-agent").and_then(|v| v.to_str().ok()).unwrap_or("");
-    let browsers = ["Mozilla/", "Chrome/", "Safari/", "Edge/", "Firefox/", "Opera/", "MSIE", "Trident/"];
-    for browser in &browsers {
-        if ua.contains(browser) { return "html"; }
+// Execution order (request flows top to bottom):
+// 1. url_normalize_middleware    - normalize URLs (trailing slash, etc.)
+// 2. request_id_middleware       - attach request ID (must run before Logging so logs include it)
+// 3. path_security_middleware    - validate paths, block traversal
+// 4. security_headers_middleware - add security headers
+// 5. allowlist_middleware        - set allowlisted flag (bypasses blocklist/ratelimit/geoip, NOT auth)
+// 6. blocklist_middleware        - IP/domain blocklist check
+// 7. rate_limit_middleware       - rate limiting
+// 8. geoip_middleware            - country blocking
+// 9. auth_middleware             - authentication
+// 10. logging_middleware         - log requests (after request_id so logs carry the request_id)
+```
+
+### No JavaScript-Disabled Broken State
+
+**Frontend MUST work without JavaScript for core functionality:**
+
+| Feature | Without JS | With JS |
+|---------|------------|---------|
+| **Navigation** | Works (links) | Works (maybe enhanced) |
+| **Forms** | Work (submit) | Enhanced validation |
+| **Content** | Visible | Maybe enhanced |
+| **CRUD** | Works via forms | AJAX enhanced |
+
+**JavaScript enhances, it does not enable.**
+
+## Smart Content Detection
+
+**Frontend routes (`/**`) MUST automatically detect request type and respond appropriately.**
+
+### Detection Logic (MUST Support Full CRUD)
+
+**ALL frontend routes with CRUD operations MUST work in BOTH modes:**
+
+```rust
+fn detect_client_type(headers: &HeaderMap) -> &'static str {
+    // 1. Check Accept header first (explicit preference)
+    if let Some(accept) = headers.get(header::ACCEPT).and_then(|v| v.to_str().ok()) {
+        if accept.contains("text/html") {
+            return "html";
+        }
+        if accept.contains("text/plain") {
+            return "text";
+        }
+        if accept.contains("application/json") {
+            // Rare for frontend, but support it
+            return "json";
+        }
     }
-    let cli_tools = ["curl/", "Wget/", "HTTPie/", "python-requests/", "reqwest/", "node-fetch/"];
-    for tool in &cli_tools {
-        if ua.contains(tool) { return "text"; }
+
+    // 2. Check User-Agent for browser detection
+    if let Some(ua) = headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok()) {
+        // Browser User-Agents (common patterns)
+        let browsers = [
+            "Mozilla/", "Chrome/", "Safari/", "Edge/", "Firefox/",
+            "Opera/", "MSIE", "Trident/",
+        ];
+        if browsers.iter().any(|b| ua.contains(b)) {
+            return "html";
+        }
+
+        // CLI tools (curl, wget, httpie, etc.)
+        let cli_tools = [
+            "curl/", "Wget/", "HTTPie/", "python-requests/",
+            "reqwest/", "node-fetch/",
+        ];
+        if cli_tools.iter().any(|t| ua.contains(t)) {
+            return "text";
+        }
+
+        // 4. Empty or unknown User-Agent: default to text for programmatic access
+        if ua.is_empty() {
+            return "text";
+        }
+    } else {
+        // No User-Agent header at all
+        return "text";
     }
-    if ua.is_empty() { return "text"; }
+
+    // 5. Default: HTML (safest fallback)
     "html"
 }
 ```
 
----
+### Response by Client Type
 
-## CRUD Operations
+**Frontend routes MUST respond differently based on client:**
 
-All CRUD handlers follow this pattern:
+| Route | Browser | curl/CLI | Accept: text/plain | Accept: text/html | Accept: application/json |
+|-------|---------|----------|-------------------|-------------------|--------------------------|
+| `/` | HTML page | Text | Text | HTML | JSON |
+| `/items` | HTML list | Text list | Text list | HTML list | JSON array |
+| `/items/123` | HTML detail | Text (item name) | Text | HTML detail | JSON object |
+| `/jokes/random` | HTML joke page | Just the joke | Just the joke | HTML page | JSON object |
 
-**Create**
+### CRUD Operations MUST Work in All Modes
 
-```rust
-async fn create_handler(
-    State(state): State<AppState>,
-    Form(form): Form<CreateForm>,
-) -> impl axum::response::IntoResponse {
-    // validate
-    // call service layer
-    // return redirect or error page
+**ALL CRUD operations must be accessible via:**
+
+1. **HTML Forms** (browser users):
+   ```html
+   <form action="/items" method="POST">...</form>
+   <form action="/items/123" method="POST">
+     <input type="hidden" name="_method" value="PUT">
+   </form>
+   ```
+
+2. **API Endpoints** (programmatic):
+   ```bash
+   curl -q -LSsf -X POST /api/{api_version}/items -d '{"name":"test"}'
+   curl -q -LSsf -X PATCH /api/{api_version}/items/123 -d '{"name":"renamed"}'
+   curl -q -LSsf -X DELETE /api/{api_version}/items/123
+   ```
+
+3. **Frontend Direct** (CLI/scripting):
+   ```bash
+   # Form-encoded
+   curl -q -LSsf -X POST /items -d 'name=test'
+   # Returns text (auto-detected)
+   curl -q -LSsf /items/123
+   ```
+
+**Rule:** CRUD must work for browsers (HTML forms), APIs (JSON), and CLI (text/form-encoded).
+
+### Frontend Testing Best Practice
+
+**For automated testing, use text responses (much simpler than HTML parsing):**
+
+```bash
+# Easy: Test text output (no HTML parsing needed)
+# Auto-detects CLI, returns text
+curl -q -LSsf /items/123
+# Explicitly request text
+curl -q -LSsf -H "Accept: text/plain" /items/123
+
+# Hard: Testing HTML requires parsing
+# Fragile
+curl -q -LSsf -H "Accept: text/html" /items/123 | grep "<title>"
+```
+
+**Recommended testing approach:**
+- ✓ Use Accept: text/plain for frontend route testing
+- ✓ Or rely on CLI auto-detection (curl returns text automatically)
+- ✓ Verify text output contains expected data
+- ✗ Avoid parsing HTML in test scripts (complex and fragile)
+
+**Test scripts should:**
+```bash
+# Test frontend returns text for CLI
+RESULT=$(curl -q -LSsf http://localhost:80/items/123)
+if echo "$RESULT" | grep -q "testitem"; then
+    echo "✓ Frontend returns item data"
+else
+    echo "✗ FAILED: Item data not returned"
+fi
+
+# Test frontend returns HTML for browser (optional, just check Content-Type)
+CONTENT_TYPE=$(curl -q -LSsfI -H "Accept: text/html" http://localhost:80/items/123 | grep -i "content-type")
+if echo "$CONTENT_TYPE" | grep -q "text/html"; then
+    echo "✓ Frontend serves HTML to browsers"
+fi
+```
+
+## Mobile-First Responsive Design
+
+**ALL frontend CSS MUST be mobile-first: base styles for mobile, media queries for larger screens.**
+
+### Core Principle
+
+```css
+/* CORRECT: Mobile-first */
+.element {
+  /* Base styles = mobile */
+  padding: 0.75rem;
+  font-size: 1rem;
+}
+@media (min-width: 768px) {
+  .element {
+    /* Enhanced for tablet+ */
+    padding: 1.5rem;
+  }
+}
+
+/* WRONG: Desktop-first (do NOT do this) */
+.element {
+  padding: 1.5rem;
+}
+@media (max-width: 767px) {
+  .element { padding: 0.75rem; }
 }
 ```
 
-**Read (list)**
-
-```rust
-async fn list_handler(
-    State(state): State<AppState>,
-    Query(params): Query<ListParams>,
-) -> impl axum::response::IntoResponse {
-    // query db
-    // render template
-}
-```
-
-**Update**
-
-```rust
-async fn update_handler(
-    State(state): State<AppState>,
-    Path(id): Path<u64>,
-    Form(form): Form<UpdateForm>,
-) -> impl axum::response::IntoResponse {
-    // validate ownership
-    // update record
-    // return redirect or error page
-}
-```
-
-**Delete**
-
-```rust
-async fn delete_handler(
-    State(state): State<AppState>,
-    Path(id): Path<u64>,
-) -> impl axum::response::IntoResponse {
-    // validate ownership
-    // soft-delete or hard-delete
-    // return redirect
-}
-```
-
----
-
-## Mobile-First Design
-
-All UI is designed mobile-first. Breakpoints:
+### Breakpoints
 
 | Breakpoint | Target | CSS |
 |------------|--------|-----|
@@ -21787,34 +22015,42 @@ All UI is designed mobile-first. Breakpoints:
 | `min-width: 1024px` | Desktops and up | `@media (min-width: 1024px)` |
 | `min-width: 1280px` | Large desktops (optional) | `@media (min-width: 1280px)` |
 
+### Container
+
 ```css
-/* Mobile-first: base styles target mobile, media queries add larger */
+/* Mobile-first container */
 .container {
   width: 100%;
-  padding-inline: var(--space-4);
-  margin-inline: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  margin: 0 auto;
 }
-@media (min-width: 768px)  { .container { width: 90%; max-width: 1400px; padding-inline: var(--space-6); } }
-@media (min-width: 1024px) { .container { padding-inline: var(--space-8); } }
-```
 
-
----
-
-## CSS — Long Strings
-
-Use CSS custom properties for repeated or long strings. Never hardcode them inline.
-
-```css
-:root {
-  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace,
-    SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
-    monospace;
-  --font-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif;
-  --font-serif: "Lora", Georgia, "Times New Roman", Times, serif;
+@media (min-width: 768px) {
+  .container {
+    width: 90%;
+    padding-left: 0;
+    padding-right: 0;
+    max-width: 1400px;
+  }
 }
 ```
+
+### Responsive Behavior by Element
+
+| Element | Mobile (base) | Tablet+ (768px) | Desktop+ (1024px) |
+|---------|---------------|-----------------|-------------------|
+| **Container** | 100% width, 1rem padding | 90% width, centered | max-width: 1400px |
+| **Admin Sidebar (PART 28)** | Hidden, hamburger toggle | Visible, collapsible | Expanded by default |
+| **Public Nav** | Hamburger menu | Horizontal links | Horizontal links |
+| **Tables** | Horizontal scroll | Full table | Full table |
+| **Modals** | Full-width (100% - 1rem) | Centered, max-width 600px | Same |
+| **Forms** | Single column, full-width | Multi-column where appropriate | Same |
+| **Grid layouts** | 1 column | 2 columns | 3-4 columns |
+| **Touch Targets** | Minimum 44x44px | Standard sizing | Standard sizing |
+| **Font Size** | Base 16px minimum | Base 16px | Base 16px |
+
+### Long Strings (IPv6, Tor, Tokens, Hashes)
 
 **Long unbreakable strings WILL break mobile layouts if not handled properly.**
 
@@ -21827,7 +22063,7 @@ Use CSS custom properties for repeated or long strings. Never hardcode them inli
 | UUID | 36 chars | `550e8400-e29b-41d4-a716-446655440000` |
 | Base64 data | Variable | Long encoded strings |
 
-Every element that may render one of these MUST break the string so it can never overflow its container:
+**Required CSS for ALL elements that may contain long strings:**
 
 ```css
 /* Apply to elements containing: IPs, URLs, hashes, tokens, codes */
@@ -21841,10 +22077,12 @@ Every element that may render one of these MUST break the string so it can never
   /* Break long strings to prevent overflow */
   word-break: break-all;
   overflow-wrap: break-word;
-  /* Monospace for readability */
-  font-family: var(--font-mono);
-  /* Smaller font keeps long values on-screen on mobile */
-  font-size: var(--font-size-sm);
+
+  /* Ensure monospace for readability */
+  font-family: monospace;
+
+  /* Optional: smaller font on mobile */
+  font-size: 0.875rem;
 }
 
 /* Alternative: horizontal scroll for code blocks */
@@ -21855,6 +22093,8 @@ Every element that may render one of these MUST break the string so it can never
 }
 ```
 
+**Where to apply:**
+
 | Context | CSS Class | Behavior |
 |---------|-----------|----------|
 | Inline display (tables, lists) | `.long-string` | Word-break to wrap |
@@ -21863,144 +22103,651 @@ Every element that may render one of these MUST break the string so it can never
 
 **NEVER let long strings overflow their container or break mobile layouts.**
 
+### Footer (Mobile-First)
+
+```css
+/* Footer always at bottom - mobile-first */
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1;
+}
+
+footer {
+  text-align: center;
+  padding: 1rem;
+  font-size: 0.875rem;
+}
+
+/* Tight row spacing - rows are consecutive <p> elements, never <br /> spacers */
+footer p {
+  margin: 0.25rem 0;
+}
+
+@media (min-width: 768px) {
+  footer {
+    padding: 1.5rem;
+  }
+}
+```
+
+---
+
+## Semantic HTML Elements
+
+**Use correct HTML elements for content type. This ensures accessibility, SEO, and proper styling.**
+
+### When to Use Each Element
+
+| Element | Use For | Example |
+|---------|---------|---------|
+| `<code>` | Inline code, values, identifiers | Usernames, versions, short values |
+| `<pre><code>` | Multi-line code blocks | Configuration, scripts |
+| `<kbd>` | Keyboard input | `Ctrl+C`, `Enter` |
+| `<samp>` | Sample output | Command output, logs |
+| `<var>` | Variables, placeholders | `{username}`, `$PATH` |
+| `<span>` | Inline styling hook | Status badges, icons |
+| `<div>` | Block-level container | Sections, wrappers |
+| `<time>` | Dates and times | Timestamps, durations |
+| `<mark>` | Highlighted text | Search matches |
+| `<abbr>` | Abbreviations | `<abbr title="Application Programming Interface">API</abbr>` |
+
+### Code Elements
+
+#### Inline Code (`<code>`)
+
+**Use for short, inline technical values:**
+
+| Use For | Example HTML | Renders As |
+|---------|--------------|------------|
+| Version numbers | `<code>v1.2.3</code>` | `v1.2.3` |
+| Usernames | `<code>@johndoe</code>` | `@johndoe` |
+| Short commands | `<code>git status</code>` | `git status` |
+| Config values | `<code>true</code>` | `true` |
+| File names | `<code>config.yml</code>` | `config.yml` |
+| Environment vars | `<code>$HOME</code>` | `$HOME` |
+
+```css
+/* Inline code styling */
+code {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.875em;
+  padding: 0.125rem 0.375rem;
+  background: var(--color-code-bg);
+  border-radius: 4px;
+  word-break: break-word;
+}
+```
+
+#### Code Blocks with Copy Button
+
+**For values users need to copy (URLs, tokens, addresses, etc.):**
+
+```html
+<div class="code-block">
+  <code class="code-content">abc123xyz789.onion</code>
+  <button type="button" class="copy-btn" data-copy="abc123xyz789.onion" data-copied-label="Copied!" aria-label="Copy to clipboard">
+    <span class="copy-icon">📋</span>
+    <span class="copy-text" aria-live="polite">Copy</span>
+  </button>
+</div>
+```
+
+**CSS (Mobile-First):**
+
+```css
+/* Code block with copy button - mobile-first */
+.code-block {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  margin: 0.25rem 0;
+}
+
+.code-content {
+  display: block;
+  flex: 1;
+  min-width: 0; /* Allow shrinking */
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-code-bg);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.875rem;
+  -webkit-overflow-scrolling: touch; /* Smooth scroll on iOS */
+}
+
+.copy-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg-secondary);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.copy-btn:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-hover);
+}
+
+.copy-btn:active,
+.copy-btn.copied {
+  background: var(--color-success-bg);
+  border-color: var(--color-success);
+}
+
+/* Hide "Copy" text on mobile, show only icon */
+.copy-text {
+  display: none;
+}
+
+/* The "Copied!" feedback is always visible, even on mobile */
+.copy-btn.copied .copy-text {
+  display: inline;
+}
+
+@media (min-width: 768px) {
+  .copy-text {
+    display: inline;
+  }
+}
+```
+
+**JavaScript:**
+
+```javascript
+// Copy button handler - every copy button MUST show visible "Copied!" feedback
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.copy-btn');
+  if (!btn) return;
+
+  const text = btn.dataset.copy || btn.previousElementSibling?.textContent;
+  if (!text) return;
+
+  navigator.clipboard.writeText(text).then(() => {
+    // Swap to checkmark + translated "Copied!" label, revert after 2s
+    const icon = btn.querySelector('.copy-icon');
+    const label = btn.querySelector('.copy-text');
+    const copied = btn.dataset.copiedLabel || 'Copied!';
+    const restore = [];
+    if (icon) {
+      restore.push([icon, icon.textContent]);
+      icon.textContent = '✓';
+    }
+    if (label) {
+      restore.push([label, label.textContent]);
+      label.textContent = copied;
+    }
+    if (!icon && !label) {
+      restore.push([btn, btn.textContent]);
+      btn.textContent = '✓ ' + copied;
+    }
+    btn.classList.add('copied');
+
+    setTimeout(() => {
+      restore.forEach(([el, t]) => {
+        el.textContent = t;
+      });
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+});
+```
+
+**Copy feedback is mandatory:** every copy button MUST show a visible "Copied!" confirmation on success — checkmark icon plus the translated label (i18n key `copied`, rendered server-side into `data-copied-label`), `.copied` class for the success colors (CSS custom properties only), reverting after 2 seconds. The `aria-live="polite"` region announces the change to screen readers. Icon-only buttons (e.g. the footer 📋) swap their own content and carry `aria-live="polite"` on the button itself.
+
+#### When to Use Copy Buttons
+
+| Content Type | Copy Button? | Reason |
+|--------------|--------------|--------|
+| Tor .onion addresses | **Yes** | Long, complex, users need to copy |
+| API tokens | **Yes** | Users need to paste elsewhere |
+| Node URLs | **Yes** | Users may need to copy for config |
+| Git clone URLs | **Yes** | Users copy to terminal |
+| Build commit hash | Optional | May be useful for bug reports |
+| Version numbers | No | Short, rarely copied |
+| Usernames | No | Short, rarely copied |
+| Boolean values | No | Not useful to copy |
+
+#### Multi-line Code Blocks (`<pre><code>`)
+
+**For configuration, scripts, or multi-line output:**
+
+```html
+<div class="code-block-multi">
+  <div class="code-header">
+    <span class="code-lang">yaml</span>
+    <button type="button" class="copy-btn" data-copy-target="config-example">📋 Copy</button>
+  </div>
+  <pre><code id="config-example">server:
+  host: 0.0.0.0
+  port: 8080</code></pre>
+</div>
+```
+
+```css
+/* Multi-line code block - mobile-first */
+.code-block-multi {
+  margin: 1rem 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.75rem;
+}
+
+.code-lang {
+  color: var(--color-muted);
+  text-transform: uppercase;
+}
+
+.code-block-multi pre {
+  margin: 0;
+  padding: 0.75rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.code-block-multi code {
+  display: block;
+  padding: 0;
+  background: none;
+  white-space: pre;
+}
+
+@media (min-width: 768px) {
+  .code-header {
+    padding: 0.5rem 1rem;
+  }
+  .code-block-multi pre {
+    padding: 1rem;
+  }
+}
+```
+
+### Status & Badge Elements
+
+**Use `<span>` with semantic classes for status indicators:**
+
+```html
+<!-- Status badges -->
+<span class="status status-ok">✅ Healthy</span>
+<span class="status status-error">❌ Error</span>
+<span class="status status-warning">⚠️ Degraded</span>
+
+<!-- Feature badges -->
+<span class="badge badge-enabled">Enabled</span>
+<span class="badge badge-disabled">Disabled</span>
+
+<!-- Role badges -->
+<span class="badge badge-primary">Primary</span>
+<span class="badge badge-member">Member</span>
+```
+
+```css
+/* Status indicators - mobile-first */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-ok { background: var(--color-success-bg); color: var(--color-success); }
+.status-error { background: var(--color-error-bg); color: var(--color-error); }
+.status-warning { background: var(--color-warning-bg); color: var(--color-warning); }
+
+.badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Mode badges (badge-{mode}) */
+.badge-production { background: var(--color-success-bg); color: var(--color-success); }
+.badge-development { background: var(--color-warning-bg); color: var(--color-warning); }
+.badge-debug { background: var(--color-error-bg); color: var(--color-error); }
+
+@media (min-width: 768px) {
+  .badge {
+    font-size: 0.875rem;
+  }
+}
+```
+
+### Data Display Patterns
+
+#### Key-Value Lists (Definition Lists)
+
+**Use `<dl>` for labeled data:**
+
+```html
+<dl class="info-list">
+  <dt>🏷️ Version</dt>
+  <dd><code>1.2.3</code></dd>
+
+  <dt>⏱️ Uptime</dt>
+  <dd>2 days 5 hours</dd>
+
+  <dt>🧅 Tor Address</dt>
+  <dd>
+    <div class="code-block">
+      <code class="code-content">abc123xyz789.onion</code>
+      <button class="copy-btn" data-copy="abc123xyz789.onion">📋</button>
+    </div>
+  </dd>
+</dl>
+```
+
+```css
+/* Info list - mobile-first (stacked) */
+.info-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.info-list dt {
+  font-weight: 600;
+  margin-top: 0.75rem;
+}
+
+.info-list dt:first-child {
+  margin-top: 0;
+}
+
+.info-list dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+/* Tablet+: side-by-side */
+@media (min-width: 768px) {
+  .info-list {
+    grid-template-columns: auto 1fr;
+    gap: 0.5rem 1rem;
+  }
+
+  .info-list dt {
+    margin-top: 0;
+  }
+}
+```
+
+#### Tables (Mobile-First)
+
+**Tables get horizontal scroll on mobile:**
+
+```html
+<div class="table-wrapper">
+  <table class="data-table">
+    <thead>
+      <tr><th>Component</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Database</td><td class="status-ok">✅ OK</td></tr>
+    </tbody>
+  </table>
+</div>
+```
+
+```css
+/* Table wrapper for horizontal scroll - mobile-first */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 1rem 0;
+}
+
+.data-table {
+  width: 100%;
+  min-width: 400px; /* Force scroll on narrow screens */
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .data-table {
+    min-width: 0; /* Allow natural width */
+    font-size: 1rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 0.75rem;
+    white-space: normal;
+  }
+}
+```
+
+#### Cards/Sections
+
+```css
+/* Section cards - mobile-first */
+.section-card {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-card);
+}
+
+.section-card h2,
+.section-card h3 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 1rem;
+}
+
+@media (min-width: 768px) {
+  .section-card {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+  }
+
+  .section-card h2,
+  .section-card h3 {
+    font-size: 1.25rem;
+  }
+}
+```
+
+### Feature Lists
+
+**For listing features/capabilities:**
+
+```html
+<ul class="feature-list">
+  <li class="feature-enabled">📡 Metrics</li>
+  <li class="feature-enabled">🔔 Webhooks</li>
+  <li class="feature-enabled">
+    🧅 Tor:
+    <span class="status status-ok">✅ healthy</span>
+    <div class="code-block">
+      <code class="code-content">abc123xyz789.onion</code>
+      <button class="copy-btn" data-copy="abc123xyz789.onion">📋</button>
+    </div>
+  </li>
+  <li class="feature-disabled">📊 GeoIP</li>
+</ul>
+```
+
+```css
+/* Feature list - mobile-first (stacked) */
+.feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.feature-enabled {
+  color: var(--color-text);
+}
+
+.feature-disabled {
+  color: var(--color-muted);
+  text-decoration: line-through;
+}
+
+/* Tablet+: horizontal wrap */
+@media (min-width: 768px) {
+  .feature-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+  }
+
+  /* Unless feature has sub-content (like Tor address) */
+  .feature-list li:has(.code-block) {
+    flex-basis: 100%;
+  }
+}
+```
+
+### Endpoint/URL Lists
+
+**For endpoints, mirror URLs, listen addresses, etc.:**
+
+```html
+<ul class="endpoint-list">
+  <li>
+    <div class="code-block">
+      <code class="code-content">https://app.example.com</code>
+      <button class="copy-btn" data-copy="https://app.example.com">📋</button>
+    </div>
+    <span class="badge badge-primary">👑 Primary</span>
+  </li>
+  <li>
+    <div class="code-block">
+      <code class="code-content">https://mirror.example.com</code>
+      <button class="copy-btn" data-copy="https://mirror.example.com">📋</button>
+    </div>
+    <span class="status status-ok">✅</span>
+  </li>
+</ul>
+```
+
+```css
+/* Endpoint list - mobile-first */
+.endpoint-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.endpoint-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.endpoint-list .code-block {
+  flex: 1;
+  min-width: 0;
+}
+```
+
 ---
 
 ## CSS Variable Reference
 
-Full `:root` block — copy verbatim into your `static/css/variables.css`:
+**All components use these CSS variables for consistent theming:**
 
 ```css
-:root {
-  /* --- Colors (dark theme defaults; overridden by .theme-light) --- */
-  --color-bg:          #282a36;
-  --color-fg:          #f8f8f2;
-  --color-primary:     #bd93f9;
-  --color-secondary:   #50fa7b;
-  --color-accent:      #ff79c6;
-  --color-success:     #50fa7b;
-  --color-warning:     #ffb86c;
-  --color-error:       #ff5555;
-  --color-info:        #8be9fd;
-  /* Status banner/tint pairs (background + readable text) */
-  --color-success-bg:  rgba(80, 250, 123, 0.15);
-  --color-success-text:#50fa7b;
-  --color-warning-bg:  rgba(255, 184, 108, 0.15);
-  --color-warning-text:#ffb86c;
-  --color-error-bg:    rgba(255, 85, 85, 0.15);
-  --color-error-text:  #ff5555;
-  --color-info-bg:     rgba(139, 233, 253, 0.15);
-  --color-info-text:   #8be9fd;
-  --color-surface:     #2b2d3a;
-  --color-surface-alt: #21222c;
-  --color-border:      #44475a;
-  --color-muted:       #6272a4;
+html.theme-dark {
+  /* Backgrounds — dark palette */
+  --color-bg: #282a36;
+  --color-bg-secondary: #21222c;
+  --color-bg-card: #2b2d3a;
+  --color-bg-hover: #343746;
+  --color-bg-active: #44475a;
+  --color-code-bg: rgba(255, 255, 255, 0.1);
 
-  /* --- Typography --- */
-  --font-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace,
-    SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
-    monospace;
-  --font-serif: "Lora", Georgia, "Times New Roman", Times, serif;
-  --font-size-xs:   0.75rem;
-  --font-size-sm:   0.875rem;
-  --font-size-base: 1rem;
-  --font-size-lg:   1.125rem;
-  --font-size-xl:   1.25rem;
-  --font-size-2xl:  1.5rem;
-  --font-size-3xl:  1.875rem;
-  --font-size-4xl:  2.25rem;
-  --line-height-tight:  1.25;
-  --line-height-normal: 1.5;
-  --line-height-relaxed: 1.75;
-  --font-weight-normal:   400;
-  --font-weight-medium:   500;
-  --font-weight-semibold: 600;
-  --font-weight-bold:     700;
+  /* Text */
+  --color-text: #f8f8f2;
+  --color-muted: #6272a4;
 
-  /* --- Spacing (4 px base) --- */
-  --space-0:  0;
-  --space-px: 1px;
-  --space-1:  0.25rem;
-  --space-2:  0.5rem;
-  --space-3:  0.75rem;
-  --space-4:  1rem;
-  --space-5:  1.25rem;
-  --space-6:  1.5rem;
-  --space-7:  1.75rem;
-  --space-8:  2rem;
-  --space-10: 2.5rem;
-  --space-12: 3rem;
-  --space-16: 4rem;
-  --space-20: 5rem;
-  --space-24: 6rem;
+  /* Borders */
+  --color-border: #44475a;
+  --color-border-hover: #6272a4;
 
-  /* --- Border radius --- */
-  --radius-none: 0;
-  --radius-sm:   0.125rem;
-  --radius-base: 0.25rem;
-  --radius-md:   0.375rem;
-  --radius-lg:   0.5rem;
-  --radius-xl:   0.75rem;
-  --radius-2xl:  1rem;
-  --radius-3xl:  1.5rem;
-  --radius-full: 9999px;
-
-  /* --- Shadows --- */
-  --shadow-sm:  0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-base: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  --shadow-md:  0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg:  0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl:  0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
-
-  /* --- Z-index layers --- */
-  --z-below:   -1;
-  --z-base:     0;
-  --z-raised:   10;
-  --z-dropdown: 100;
-  --z-sticky:   200;
-  --z-overlay:  300;
-  --z-modal:    400;
-  --z-toast:    500;
-  --z-tooltip:  600;
-
-  /* --- Transitions --- */
-  --transition-fast:   150ms ease;
-  --transition-base:   250ms ease;
-  --transition-slow:   400ms ease;
-  --transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
-
-  /* --- Focus ring --- */
-  --focus-ring: 0 0 0 3px var(--color-primary);
-  --focus-ring-offset: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-primary);
+  /* Status colors */
+  --color-success: #50fa7b;
+  --color-success-bg: rgba(80, 250, 123, 0.15);
+  --color-error: #ff5555;
+  --color-error-bg: rgba(255, 85, 85, 0.15);
+  --color-warning: #ffb86c;
+  --color-warning-bg: rgba(255, 184, 108, 0.15);
+  --color-primary: #bd93f9;
+  --color-primary-bg: rgba(189, 147, 249, 0.15);
 }
 
-/* Light theme overrides */
-.theme-light {
-  /* based on GitHub Light */
-  --color-bg:          #ffffff;
-  --color-fg:          #1f2328;
-  --color-primary:     #0969da;
-  --color-secondary:   #1a7f37;
-  --color-accent:      #8250df;
-  --color-success:     #1a7f37;
-  --color-warning:     #9a6700;
-  --color-error:       #d1242f;
-  --color-info:        #0969da;
-  /* Status banner/tint pairs (background + readable text) */
-  --color-success-bg:  rgba(26, 127, 55, 0.12);
-  --color-success-text:#1a7f37;
-  --color-warning-bg:  rgba(154, 103, 0, 0.12);
-  --color-warning-text:#9a6700;
-  --color-error-bg:    rgba(209, 36, 47, 0.12);
-  --color-error-text:  #d1242f;
-  --color-info-bg:     rgba(9, 105, 218, 0.12);
-  --color-info-text:   #0969da;
-  --color-surface:     #f6f8fa;
-  --color-surface-alt: #eff2f5;
-  --color-border:      #d1d9e0;
-  --color-muted:       #59636e;
+/* Light theme overrides — light palette, based on GitHub Light */
+html.theme-light {
+  --color-bg: #ffffff;
+  --color-bg-secondary: #f6f8fa;
+  --color-bg-card: #ffffff;
+  --color-bg-hover: #eff2f5;
+  --color-bg-active: #e6eaef;
+  --color-code-bg: rgba(0, 0, 0, 0.05);
+  --color-text: #1f2328;
+  --color-muted: #59636e;
+  --color-border: #d1d9e0;
+  --color-border-hover: #818b98;
+  --color-success: #1a7f37;
+  --color-success-bg: rgba(26, 127, 55, 0.12);
+  --color-error: #d1242f;
+  --color-error-bg: rgba(209, 36, 47, 0.12);
+  --color-warning: #9a6700;
+  --color-warning-bg: rgba(154, 103, 0, 0.12);
+  --color-primary: #0969da;
+  --color-primary-bg: rgba(9, 105, 218, 0.12);
 }
 ```
 
@@ -22008,244 +22755,360 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
 
 ## Technology Stack
 
-| Layer | Technology |
-|---|---|
-| Language | Rust |
-| Web framework | `axum` |
-| Middleware | `tower` / `tower-http` |
-| Template engine | Tera templates (`tera` crate) |
-| CSS | Custom properties + BEM |
-| JavaScript | Vanilla ES modules (no bundler required) |
-| Static files | `tower-http::services::ServeDir` |
-| Embedded assets | `rust-embed` |
-| Fonts | System UI stack + optional Google Fonts |
-| Icons | Inline SVG |
-
----
+| Rule | Description | Details |
+|------|-------------|---------|
+| **Askama Templates** | ALL HTML uses Askama (type-safe, compiled) | See Template Rules below |
+| **Pure Vanilla JS** | NO frameworks | See JavaScript Rules below |
+| **CSS-First** | Prefer CSS over JS | See CSS Rules below |
+| **NO JS Alerts** | Use custom modals/toasts | See UI Components below |
+| **NO Inline CSS/JS** | External files only | See CSS/JS Rules below |
 
 ## UI Components
 
 ### Buttons
 
+| Type | Use For | Style |
+|------|---------|-------|
+| Primary | Main actions (Save, Submit, Create) | Filled, brand color |
+| Secondary | Alternative actions (Cancel, Back) | Outlined or muted |
+| Danger | Destructive actions (Delete, Remove) | Red, requires confirmation |
+| Icon | Compact actions (Edit, Copy, Refresh) | Icon only with tooltip |
+
+**Button States:** Normal, Hover, Active, Disabled, Loading
+
+**Submit Button Behavior:**
+
+| Rule | Implementation |
+|------|----------------|
+| **Single submit only** | Disable button immediately on click (prevent double-submit) |
+| **Show action state** | Change text to indicate action (Saving..., Searching..., Loading...) |
+| **Re-enable on complete** | Re-enable button after success OR error response |
+| **Preserve width** | Button width should not change when text changes |
+
+**Loading Text Examples:**
+
+| Original | Loading State |
+|----------|---------------|
+| Save | Saving... |
+| Search | Searching... |
+| Submit | Submitting... |
+| Create | Creating... |
+| Delete | Deleting... |
+| Send | Sending... |
+| Login | Logging in... |
+| Register | Registering... |
+| Upload | Uploading... |
+| Download | Downloading... |
+
 ```html
-<!-- Primary -->
-<button type="button" class="btn btn-primary">Save</button>
-
-<!-- Secondary -->
-<button type="button" class="btn btn-secondary">Cancel</button>
-
-<!-- Danger -->
-<button type="button" class="btn btn-danger">Delete</button>
-
-<!-- Ghost -->
-<button type="button" class="btn btn-ghost">More</button>
-
-<!-- Icon button -->
-<button type="button" class="btn btn-icon" aria-label="Edit">
-  <svg>…</svg>
-</button>
-
-<!-- Loading state -->
-<button type="button" class="btn btn-primary" aria-busy="true" disabled>
-  <span class="spinner" aria-hidden="true"></span>
-  Saving…
+<!-- Submit button - loading state applied by app.js on form submit (no inline JS; CSP-safe) -->
+<button type="submit" id="save-btn" data-loading-text="Saving...">
+  Save
 </button>
 ```
 
-```css
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast),
-    box-shadow var(--transition-fast);
-  border: 1px solid transparent;
-}
-.btn:focus-visible { box-shadow: var(--focus-ring-offset); outline: none; }
-.btn-primary   { background: var(--color-primary);   color: var(--color-bg); }
-.btn-secondary { background: var(--color-surface);   color: var(--color-fg); border-color: var(--color-border); }
-.btn-danger    { background: var(--color-error);     color: #fff; }
-.btn-ghost     { background: transparent;            color: var(--color-fg); border-color: var(--color-border); }
-.btn[disabled], .btn[aria-busy="true"] { opacity: 0.6; cursor: not-allowed; }
-```
+```javascript
+// static/js/app.js - disable submit buttons when their form submits.
+// Progressive enhancement: the plain form POST works without this.
+document.addEventListener('submit', (e) => {
+  const btn = e.target.querySelector('button[type="submit"]');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = btn.dataset.loadingText || btn.textContent;
+  }
+});
 
+// Re-enable after response
+fetch('/api/save', { method: 'POST', body: data })
+  .then(response => { /* handle success */ })
+  .catch(error => { /* handle error */ })
+  .finally(() => {
+    btn.disabled = false;
+    btn.textContent = 'Save';
+  });
+```
 
 ### Toggle Switches
 
+**CSS-only toggle using hidden checkbox:**
+
 ```html
 <label class="toggle">
-  <input type="checkbox" role="switch" aria-checked="false">
-  <span class="toggle-track">
-    <span class="toggle-thumb"></span>
-  </span>
-  <span class="toggle-label">Enable notifications</span>
+  <input type="checkbox" name="setting">
+  <span class="slider"></span>
+  Enable Feature
 </label>
-```
-
-```css
-.toggle { display: inline-flex; align-items: center; gap: var(--space-3); cursor: pointer; }
-.toggle-track {
-  position: relative;
-  width: 2.5rem;
-  height: 1.5rem;
-  background: var(--color-surface-alt);
-  border-radius: var(--radius-full);
-  border: 1px solid var(--color-border);
-  transition: background var(--transition-fast);
-}
-.toggle input:checked + .toggle-track { background: var(--color-primary); border-color: var(--color-primary); }
-.toggle-thumb {
-  position: absolute;
-  top: 2px; left: 2px;
-  width: calc(1.5rem - 6px);
-  height: calc(1.5rem - 6px);
-  background: #fff;
-  border-radius: var(--radius-full);
-  transition: transform var(--transition-fast);
-}
-.toggle input:checked + .toggle-track .toggle-thumb { transform: translateX(1rem); }
-.toggle input:focus-visible + .toggle-track { box-shadow: var(--focus-ring-offset); }
 ```
 
 ### Modals
 
+**Modal Behavior:**
+
+| Action | Modal Behavior |
+|--------|----------------|
+| Success (Save, Submit, Create) | Close automatically after success |
+| Error | Stay open, display error message |
+| Cancel button clicked | Close immediately |
+| Escape key pressed | Close immediately |
+| Backdrop clicked | Close immediately |
+| Form with unsaved changes | Warn before closing |
+
+**Modal Features:**
+- Focus trap (Tab stays within modal)
+- Escape key closes modal
+- Backdrop click closes modal
+- Body scroll locked while open
+- Centered vertically and horizontally
+- Responsive (full-width on mobile)
+
+**Accessibility:**
+
+| Requirement | Implementation |
+|-------------|----------------|
+| **Focus trap** | Tab/Shift+Tab cycles through modal elements only |
+| **Initial focus** | First focusable element OR primary action button |
+| **Return focus** | Restore focus to trigger element on close |
+| **ARIA attributes** | `role="dialog"`, `aria-modal="true"`, `aria-labelledby` |
+| **Escape key** | Close modal (unless confirmation required) |
+| **Screen reader** | Announce modal title on open |
+
 ```html
-<dialog class="modal" id="confirm-delete-modal" aria-labelledby="modal-title" aria-modal="true">
-  <div class="modal-content">
-    <header class="modal-header">
-      <h2 id="modal-title" class="modal-title">Confirm Delete</h2>
-      <form method="dialog">
-        <button class="btn btn-icon modal-close" aria-label="Close dialog">
-          <svg>…</svg>
-        </button>
-      </form>
-    </header>
-    <div class="modal-body">
-      <p>Are you sure you want to delete this item? This action cannot be undone.</p>
-    </div>
-    <footer class="modal-footer">
-      <form method="dialog">
-        <button class="btn btn-secondary">Cancel</button>
-      </form>
-      <button type="submit" class="btn btn-danger" form="delete-form">Delete</button>
-    </footer>
-  </div>
+<!-- Modal structure using native <dialog> -->
+<dialog id="confirm-modal" aria-labelledby="modal-title">
+  <header>
+    <h2 id="modal-title">Modal Title</h2>
+    <!-- form method="dialog" closes the dialog natively - no JS needed -->
+    <form method="dialog">
+      <button aria-label="Close">✕</button>
+    </form>
+  </header>
+  <main>Modal content here</main>
+  <footer>
+    <form method="dialog">
+      <button value="cancel">Cancel</button>
+      <button value="confirm" autofocus>Confirm</button>
+    </form>
+  </footer>
 </dialog>
 ```
 
-The Cancel and X buttons close the dialog natively via `<form method="dialog">` — zero JavaScript, and `Esc` closes it as well. Only opening the modal uses JS (`showModal()` has no HTML equivalent for `<dialog>`), which is a permitted enhancement: without JS the triggering action falls back to its plain-page flow.
+**Note:** Native `<dialog>` element handles focus trap, backdrop, and Escape-to-close automatically. Use `showModal()` to open with backdrop (the opener is JS). Closing needs NO JavaScript — `<form method="dialog">` closes the dialog and sets `dialog.returnValue` to the clicked button's `value`; read it in the dialog's `close` event to run the confirmed action. Never use inline `onclick` handlers to close dialogs.
 
+### Toast vs Modal: When to Use Which
+
+**Toasts and modals serve DIFFERENT purposes. Do NOT use them interchangeably.**
+
+**Quick Reference:**
+
+| Scenario | Use | Reason |
+|----------|-----|--------|
+| "Settings saved" | **Toast** | Non-blocking confirmation |
+| "Are you sure you want to delete?" | **Modal** | Requires user decision |
+| "File uploaded successfully" | **Toast** | Non-blocking confirmation |
+| "Rename this instance" | **Modal** | Requires user input |
+| "Network error, try again" | **Toast** | Informational, user can retry |
+| "Session expired, please login" | **Modal** | Blocking, requires action |
+| "Item added to cart" | **Toast** | Non-blocking confirmation |
+| "Select shipping address" | **Modal** | Requires user selection |
+| "Email sent" | **Toast** | Non-blocking confirmation |
+| "Confirm your email address" | **Modal** | Requires user input/action |
+
+**Use TOAST When:**
+
+| Criteria | Examples |
+|----------|----------|
+| **Confirmation of action** | "Saved", "Deleted", "Copied", "Sent" |
+| **Non-blocking information** | "New update available", "You have 3 notifications" |
+| **Transient feedback** | "Loading...", "Processing..." |
+| **Errors that don't need input** | "Network error", "Rate limited, try again" |
+| **User can continue working** | Any message that doesn't require immediate attention |
+
+**Use MODAL When:**
+
+| Criteria | Examples |
+|----------|----------|
+| **Requires user decision** | "Delete this item?", "Discard unsaved changes?" |
+| **Requires user input** | Forms, token entry, settings that need confirmation |
+| **Destructive action confirmation** | Delete, remove, revoke, disconnect |
+| **Blocking workflow** | Must complete before continuing (login, terms acceptance) |
+| **Complex information** | Details that need space (error details, help text) |
+| **Multi-step process** | Wizards, setup flows, guided processes |
+
+**NEVER Do This:**
+
+| Wrong | Right |
+|-------|-------|
+| Toast: "Are you sure?" | Modal: "Are you sure?" (needs decision) |
+| Modal: "Settings saved" | Toast: "Settings saved" (just confirmation) |
+| Toast with buttons | Modal with buttons (toasts should auto-dismiss) |
+| Modal for every error | Toast for simple errors (modal for blocking errors) |
+| Stacking modals | One modal at a time (queue if needed) |
+| Toast requiring action | Modal if action required |**Decision Flowchart:**
+```
+Does user need to make a decision or provide input?
+├── YES → Use MODAL
+└── NO → Does user need to acknowledge before continuing?
+         ├── YES → Use MODAL
+         └── NO → Is it destructive action confirmation?
+                  ├── YES → Use MODAL
+                  └── NO → Use TOAST
+```
+
+**Code Pattern:**
 ```javascript
-// Open — the only JS the modal needs; closing is native <form method="dialog">
-document.getElementById('confirm-delete-modal').showModal();
-// Close on backdrop click (enhancement)
-modal.addEventListener('click', e => { if (e.target === modal) modal.close(); });
+// TOAST - Non-blocking feedback
+async function saveItem(data) {
+    const result = await api.post('/items', data);
+    if (result.ok) {
+        // Non-blocking, auto-dismiss
+        showToast('Item saved', 'success');
+    } else {
+        // Non-blocking error
+        showToast('Failed to save item', 'error');
+    }
+}
+
+// MODAL - Blocking decision required
+function deleteItem(itemId) {
+    showModal({
+        title: 'Delete Item',
+        message: 'Are you sure you want to delete this item? This cannot be undone.',
+        confirmText: 'Delete',
+        confirmStyle: 'danger',
+        onConfirm: async () => {
+            await api.delete(`/items/${itemId}`);
+            // Confirmation after action
+            showToast('Item deleted', 'success');
+        }
+    });
+}
+
+// MODAL - User input required
+function renameInstance(instanceId) {
+    showModal({
+        title: 'Rename Instance',
+        form: true,
+        fields: ['title'],
+        onSubmit: async (data) => {
+            await api.patch(`/instances/${instanceId}`, data);
+            // Confirmation after action
+            showToast('Instance renamed', 'success');
+        }
+    });
+}
 ```
 
 ### Toast Notifications
 
+**In-app notifications for immediate feedback. Follows common patterns (GitHub, GitLab, Slack).**
+
+**Toast Behavior Rules:**
+
+| Rule | Value | Description |
+|------|-------|-------------|
+| **Position** | Top-right corner | Fixed position, doesn't scroll with page |
+| **Stacking** | Vertical, newest on top | Multiple toasts stack without overlapping |
+| **Max visible** | 5 toasts | Older toasts queue until space available |
+| **Auto-dismiss** | 3 seconds (default) | Countdown visible, can be paused on hover |
+| **Click to dismiss** | Always | User can click X or entire toast to dismiss |
+| **Keyboard dismiss** | Escape key | Dismisses topmost toast |
+| **Animation** | Slide in from right | Fade out on dismiss |
+| **Pause on hover** | Yes | Hovering pauses auto-dismiss countdown |
+
+**Toast Types:**
+
+| Type | Icon | Auto-dismiss | Use For |
+|------|------|--------------|---------|
+| **Success** | ✓ (checkmark) | 3 seconds | Action completed successfully |
+| **Error** | ✗ (X) | No auto-dismiss | Action failed, needs attention |
+| **Warning** | ⚠ (triangle) | 5 seconds | Caution needed, action may have issues |
+| **Info** | ℹ (info) | 3 seconds | General information, tips |
+
+**Toast Structure:**
 ```html
-<div class="toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
+<div class="toast toast-success" role="alert" aria-live="polite">
+  <span class="toast-icon">✓</span>
+  <span class="toast-message">Settings saved successfully</span>
+  <button class="toast-close" aria-label="Dismiss">&times;</button>
+  <div class="toast-progress"></div>
+</div>
 ```
 
-```javascript
-// Auto-dismiss defaults: success/info 3s, warning 5s, error never (duration 0 = manual dismiss)
-function showToast(message, type = 'info', duration = 3000) {
-  const container = document.querySelector('.toast-container');
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
-  toast.textContent = message;
-  toast.setAttribute('role', 'alert');
-  container.appendChild(toast);
-  requestAnimationFrame(() => toast.classList.add('toast-visible'));
-  if (duration > 0) {
-    setTimeout(() => {
-      toast.classList.remove('toast-visible');
-      toast.addEventListener('transitionend', () => toast.remove(), { once: true });
-    }, duration);
-  }
-}
+**Toast Container (for stacking):**
+```html
+<div id="toast-container" aria-label="Notifications">
+  <!-- Toasts inserted here, newest first -->
+</div>
 ```
 
-Toasts are a JS enhancement for AJAX actions. Non-AJAX form POSTs get a server-rendered flash message instead: the redirect target renders the message in the same toast styling (auto-fade via CSS animation), so action feedback works without JavaScript — no dead ends.
+**Server-rendered flash messages (no-JS baseline):** JS-driven toasts are an enhancement for AJAX submissions only. Plain (non-AJAX) form POSTs MUST get feedback via a server-rendered flash message: the handler stores the message in the session (or a short-lived flash cookie), redirects (POST/redirect/GET), and the next page render displays it using the same toast markup (`role="status"`). This keeps form feedback working without JavaScript.
 
+**CSS for Stacking:**
 ```css
-.toast-container {
+#toast-container {
   position: fixed;
-  bottom: var(--space-6);
-  right: var(--space-6);
-  z-index: var(--z-toast);
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 0.5rem;
+  max-height: calc(100vh - 2rem);
+  overflow: hidden;
 }
+
 .toast {
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  background: var(--color-surface);
-  color: var(--color-fg);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-lg);
-  opacity: 0;
-  transform: translateY(var(--space-4));
-  transition: opacity var(--transition-base), transform var(--transition-base);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  animation: slideIn 0.3s ease-out;
+  position: relative;
+  min-width: 300px;
+  max-width: 400px;
 }
-.toast-visible { opacity: 1; transform: none; }
-.toast-success { border-color: var(--color-success); }
-.toast-warning { border-color: var(--color-warning); }
-.toast-error   { border-color: var(--color-error);   }
+
+.toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.5);
+  animation: countdown linear forwards;
+}
+
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } }
+@keyframes countdown { from { width: 100%; } to { width: 0%; } }
 ```
 
-### Announcements
+**JavaScript Toast API:**
+```javascript
+// Show toast - returns toast ID for programmatic control
+// 3s auto-dismiss
+const toastId = showToast("Settings saved", "success");
+// No auto-dismiss
+const toastId = showToast("Save failed", "error");
+// 5s auto-dismiss
+const toastId = showToast("Check your input", "warning", 5000);
+// 3s auto-dismiss
+const toastId = showToast("Tip: Use shortcuts", "info");
 
-**Operator messages (configured in `server.yml`) shown in UI for downtime notices, updates, etc.**
+// Dismiss programmatically
+dismissToast(toastId);
 
-Active announcements are rendered by the Site Banner (below) — multiple active announcements stack in config order.
-
-```yaml
-web:
-  announcements:
-    enabled: true
-    # List of announcement messages
-    messages: []
+// Dismiss all
+dismissAllToasts();
 ```
 
-**Announcement structure:**
+**Server-Rendered Flash Messages (no-JS fallback):**
 
-```yaml
-messages:
-  - id: "maintenance-2025-01"
-    type: warning
-    # warning, info, error, success
-    title: "Scheduled Maintenance"
-    message: "The server will be down for maintenance on Jan 15, 2025 from 2-4 AM UTC."
-    start: "2025-01-14T00:00:00Z"
-    # When to start showing
-    end: "2025-01-15T04:00:00Z"
-    # When to stop showing
-    dismissible: true
-    # User can dismiss
-```
-
-| Element | Config Key | Description |
-|---|---|---|
-| Enable announcements | `announcements.enabled` | Turn announcements on/off |
-| Type | `announcements[].type` | warning, info, error, success |
-| Title | `announcements[].title` | Short title |
-| Message | `announcements[].message` | Full message content |
-| Start date | `announcements[].start` | When to start showing (ISO 8601) |
-| End date | `announcements[].end` | When to stop showing (ISO 8601) |
-| Dismissible | `announcements[].dismissible` | Allow users to dismiss |
+Toasts require JavaScript. For standard (non-AJAX) form POSTs, the server MUST use the POST-redirect-GET pattern with a one-shot flash message (stored in the session or a short-lived cookie, cleared after render) and display it as a static dismissible alert at the top of the next page. Toasts are the JS enhancement layered on top of this - never the only feedback channel.
 
 ### Site Banner
 
-**Site-wide announcements (scheduled maintenance, service notices) are a server-rendered banner — the FIRST element inside `<body>`, before `<main>`. No notification center, no bell icon — API projects have no user accounts and no server-side notification storage (see PART 16 → "Notification Storage"). The banner renders without JavaScript, and dismissal works without JavaScript too — the X button is a tiny POST form; JS only removes the reload.**
+**Site-wide announcements (scheduled maintenance, service notices) are a server-rendered banner — the FIRST element inside `<body>`, before `<main>`. It is the ONLY announcements surface: there are no user accounts and no server-side notification storage (see PART 16 → "Notification Storage"), so there is no notification center and no bell icon. The banner renders and dismisses without JavaScript; JS only makes dismissal reload-free.**
 
 **Banner Behavior:**
 
@@ -22255,20 +23118,20 @@ messages:
 | **Placement** | Immediately after `<body>`, before `<main>` — rendered server-side in the base template, so there is no layout shift and no JS dependency |
 | **Types** | `info`, `warning`, `error`, `success` |
 | **ARIA** | `role="status"` for `info` and `success`; `role="alert"` for `warning` and `error` |
-| **Dismissal** | X button (only when `dismissible: true`) — a tiny `<form method="post" action="/announcements/dismiss">`; the server appends the announcement `id` to the `dismissed_announcements` cookie (comma-separated ids) and redirects back, so dismissal works with zero JS. The cookie is keyed on the announcement `id`, so changing the `id` reshows the banner for everyone |
-| **Storage** | `dismissed_announcements` cookie — server-readable, so the server skips rendering dismissed announcements entirely; no flash of a dismissed banner and no JS dependency |
+| **Dismissal** | X button (only when `dismissible: true`) is a tiny POST form — the server appends the announcement `id` to the `dismissed_announcements` cookie (comma-separated ids), redirects back, and skips rendering dismissed announcements entirely; changing the `id` reshows the banner for everyone. Works with zero JS; external JS intercepts to dismiss without reload |
 | **Expiry** | Per-announcement `start`/`end` (ISO 8601, UTC); outside the window = banner not rendered |
 | **Stacking** | Multiple active announcements stack in config order; cookie consent and the PWA update banner share the slot, ordered: cookie consent → announcements → PWA update |
 
+**HTML Structure:**
 ```html
 <body>
+  <!-- Rendered only when the id is absent from the dismissed_announcements cookie -->
   <div class="site-banner site-banner-warning" role="alert" data-announcement-id="maintenance-2025-01">
     <span class="site-banner-icon" aria-hidden="true">⚠</span>
     <span class="site-banner-text">Scheduled maintenance: 2026-07-06 02:00–04:00 UTC</span>
-    <form method="post" action="/announcements/dismiss">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <!-- Dismissal works with zero JS - the server appends the id to the cookie and redirects back -->
+    <form method="post" action="/announcements/dismiss" class="site-banner-dismiss">
       <input type="hidden" name="id" value="maintenance-2025-01">
-      <input type="hidden" name="return_to" value="{{ current_path }}">
       <button type="submit" class="site-banner-close" aria-label="Dismiss announcement">&times;</button>
     </form>
   </div>
@@ -22279,222 +23142,424 @@ messages:
 </body>
 ```
 
-The server only renders banners whose `id` is absent from the `dismissed_announcements` cookie; `POST /announcements/dismiss` appends the submitted `id` to that cookie and redirects back to `return_to` (same-site relative paths only, as with `/consent`).
-
+**CSS:**
 ```css
 .site-banner {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  font-size: var(--font-size-sm);
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
   background: var(--color-info-bg);
   color: var(--color-info-text);
 }
+
 .site-banner-warning, .site-banner-error {
   background: var(--color-warning-bg);
   color: var(--color-warning-text);
 }
-.site-banner-text { flex: 1; text-align: center; }
+
+.site-banner-text {
+  flex: 1;
+  text-align: center;
+}
+
 .site-banner-close {
   background: none;
   border: none;
   cursor: pointer;
   color: inherit;
-  font-size: var(--font-size-lg);
+  font-size: 1.25rem;
   line-height: 1;
 }
 ```
 
+**Dismissal JavaScript (enhancement only — the form POST works without it):**
 ```javascript
-// No-reload enhancement — the POST /announcements/dismiss fallback always works.
-// Dismissal is keyed on the announcement id — changing the id resets dismissals.
-document.querySelectorAll(".site-banner form").forEach((form) => {
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const id = form.elements.id.value;
+// Intercept the dismiss form to skip the reload; the cookie stays
+// server-readable so dismissed announcements are never rendered again.
+// Dismissal is keyed on the announcement id — changing the id resets dismissals
+document.querySelectorAll(".site-banner .site-banner-dismiss").forEach((form) => {
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const banner = form.closest(".site-banner");
     const match = document.cookie.match(/(?:^|;\s*)dismissed_announcements=([^;]*)/);
-    const ids = match ? decodeURIComponent(match[1]).split(",").filter(Boolean) : [];
-    if (!ids.includes(id)) ids.push(id);
-    const value = encodeURIComponent(ids.join(","));
-    document.cookie = `dismissed_announcements=${value}; path=/; max-age=${60*60*24*365}; SameSite=Lax; Secure`;
-    form.closest(".site-banner").remove();
+    const ids = match ? decodeURIComponent(match[1]).split(",") : [];
+    if (!ids.includes(banner.dataset.announcementId)) {
+      ids.push(banner.dataset.announcementId);
+    }
+    document.cookie = "dismissed_announcements=" + encodeURIComponent(ids.join(",")) +
+      "; path=/; max-age=31536000; SameSite=Lax";
+    banner.remove();
   });
 });
 ```
 
 ### Theme Toggle
 
+**Theme toggle button in header — the default header action, always present.**
+
+**Theme Toggle Behavior:**
+
+| Feature | Description |
+|---------|-------------|
+| **Position** | Header, right side, last item |
+| **Options** | Dark / Light / Auto (follows OS preference) |
+| **Persistence** | `theme` cookie (`light` \| `dark` \| `auto`) — server-readable, so the theme class is rendered on `<html>` with no init JS and no FOUC |
+| **Keyboard** | Enter/Space cycles modes |
+| **No-JS fallback** | Auto theming works from pure CSS (`prefers-color-scheme`); switching without JS uses a small `<noscript>` form POSTing to the theme endpoint |
+
+**HTML Structure:**
 ```html
-<button type="button" class="btn btn-icon theme-toggle" aria-label="Toggle theme" aria-pressed="false">
-  <svg class="icon-sun"  aria-hidden="true">…</svg>
-  <svg class="icon-moon" aria-hidden="true">…</svg>
-</button>
+<div class="theme-toggle" aria-label="Theme toggle">
+  <button class="theme-button" aria-label="Switch theme">
+    <svg class="icon-dark"><!-- moon --></svg>
+    <svg class="icon-light"><!-- sun --></svg>
+    <svg class="icon-auto"><!-- circle-half --></svg>
+  </button>
+</div>
 ```
 
-Theme preference is a `theme=light|dark|auto` COOKIE — server-readable, so `detect_theme()` (see "System Theme Detection") renders the correct class on `<html>` before the first byte of CSS applies: no FOUC, and theme selection works without JavaScript. `auto` (or no cookie) renders no override class; pure CSS `@media (prefers-color-scheme: light)` overrides the dark-default custom properties, so a no-JS visitor gets correct auto theming purely from CSS. There is no client-side init and no `matchMedia` script — the only JS is the toggle click handler (external file):
+**CSS for Header Actions:**
+```css
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
 
-```javascript
-// static/js/theme.js — enhancement only; the server already rendered the
-// correct theme class from the theme cookie, so there is no init code
-const toggle = document.querySelector('.theme-toggle');
-const root   = document.documentElement;
-
-toggle?.addEventListener('click', () => {
-  const next = root.classList.contains('theme-light') ? 'dark' : 'light';
-  root.classList.remove('theme-dark', 'theme-light');
-  root.classList.add(`theme-${next}`);
-  toggle.setAttribute('aria-pressed', next === 'light' ? 'true' : 'false');
-  document.cookie = `theme=${next}; path=/; max-age=${60*60*24*365}; SameSite=Lax; Secure`;
-});
+.theme-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
 ```
 
+### User Menu
+
+**Dropdown accessible via user icon in header — shown after `sys_` token login (core) and for the admin session (PART 28). Follows GitHub/GitLab patterns.**
+
+**User Menu Behavior:**
+
+| Feature | Description |
+|---------|-------------|
+| **Position** | Header, right side, last item |
+| **Icon** | Default user icon (no uploaded avatars — identity is the system user) |
+| **Size** | 32x32px, circular |
+| **Click** | Opens dropdown menu below icon |
+| **Keyboard** | Enter/Space opens dropdown, Escape closes |
+
+**Dropdown Menu Items:**
+
+| Item | Link | Description |
+|------|------|-------------|
+| **Username** | - | Display authenticated system username (not clickable, header) |
+| *(divider)* | - | - |
+| **Help** | `/server/help` | Help documentation |
+| **Sign out** | `/server/auth/logout` | End the token session |
+
+**HTML Structure:**
+```html
+<div class="profile-menu" aria-label="User menu">
+  <button class="profile-button" aria-haspopup="true" aria-expanded="false">
+    <svg class="avatar" aria-hidden="true"><!-- default user icon --></svg>
+    <svg class="dropdown-arrow"><!-- chevron --></svg>
+  </button>
+  <div class="profile-dropdown" role="menu" hidden>
+    <div class="dropdown-header">
+      <span class="username">johndoe</span>
+    </div>
+    <div class="dropdown-divider" role="separator"></div>
+    <a href="/server/help" class="dropdown-item" role="menuitem">Help</a>
+    <form action="/server/auth/logout" method="POST">
+      <button type="submit" class="dropdown-item logout" role="menuitem">Sign out</button>
+    </form>
+  </div>
+</div>
+```
+
+**CSS for Header Actions:**
+```css
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.profile-menu {
+  position: relative;
+}
+
+.profile-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.5rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 1000;
+}
+
+.dropdown-item {
+  display: block;
+  padding: 0.5rem 1rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.dropdown-item:hover {
+  background: var(--color-bg-hover);
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 0.5rem 0;
+}
+```
+
+- See PART 16: EMAIL & NOTIFICATIONS for full notification specification
 
 ### Empty States
 
+**Every list, table, and data view MUST have a proper empty state - NEVER show blank space.**
+
+| Scenario | Display | Call to Action |
+|----------|---------|----------------|
+| No search results | "No results found for '{query}'" | Suggest clearing filters or different search |
+| Empty list | "No {items} yet" | "Create your first {item}" button |
+| Empty table | Friendly message in table body | Action button or instructions |
+| No notifications | "No notifications" | - |
+| Failed to load | Error message | "Retry" button |
+| No permissions | "You don't have access to this" | Link to request access or go back |
+
+**Empty State Structure:**
 ```html
 <div class="empty-state">
-  <svg class="empty-state-icon" aria-hidden="true">…</svg>
-  <h3 class="empty-state-title">No results found</h3>
-  <p class="empty-state-body">Try adjusting your search or filters.</p>
-  <a href="/new" class="btn btn-primary">Create one</a>
+  <svg class="empty-state-icon"><!-- relevant icon --></svg>
+  <h3 class="empty-state-title">No items yet</h3>
+  <p class="empty-state-message">Create your first item to get started.</p>
+  <a href="/items/new" class="btn btn-primary">Create Item</a>
 </div>
 ```
 
-```css
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-16) var(--space-8);
-  text-align: center;
-}
-.empty-state-icon { width: 3rem; height: 3rem; color: var(--color-muted); }
-.empty-state-title { font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold); }
-.empty-state-body  { color: var(--color-muted); max-width: 40ch; }
-```
+**Rules:**
+- Always include an icon or illustration
+- Title should be short and clear
+- Message should explain what to do next
+- Include action button when user can fix the state
+- Center vertically and horizontally in the container
 
 ### Form Validation
 
+**All forms MUST provide clear, inline validation feedback.**
+
+| Rule | Implementation |
+|------|----------------|
+| **HTML5 first** | Use `required`, `pattern`, `type="email"`, `minlength`, `min`/`max` — the browser enforces these with zero JS |
+| **Validate on blur** | Show error when user leaves field (not while typing) — CSS `:user-invalid` fires exactly then, no blur handler needed |
+| **Inline errors** | Error message directly below the field, not in alert/modal |
+| **Highlight field** | Red border via CSS `:user-invalid` (green via `:user-valid`, optional) — no JS class toggling |
+| **Clear on fix** | Remove error immediately when user corrects input |
+| **Submit validation** | Re-validate all fields on submit, focus first error |
+| **Accessible errors** | Use `aria-describedby` to link error to field |
+| **Trim whitespace** | Trim leading/trailing whitespace on all text inputs before validation |
+| **Token whitespace** | Reject token inputs with leading/trailing whitespace (show error, don't trim) |
+
+**Error Message Style:**
 ```html
-<div class="field">
-  <label class="label" for="email">Email</label>
-  <input
-    type="email"
-    id="email"
-    name="email"
-    class="input"
-    aria-describedby="email-hint email-error"
-    aria-invalid="false"
-    required
-  >
-  <p id="email-hint"  class="field-hint">We'll never share your email.</p>
-  <p id="email-error" class="field-error" role="alert" hidden></p>
+<div class="form-group error">
+  <label for="email">Email</label>
+  <input type="email" id="email" name="email"
+         aria-describedby="email-error" aria-invalid="true">
+  <span id="email-error" class="field-error" role="alert">
+    Please enter a valid email address
+  </span>
 </div>
 ```
 
-Error-after-interaction styling is pure CSS via `:user-invalid` (baseline 2023) — it matches only after the user has interacted with the field, so there is no blur-handler JS toggling `aria-invalid` classes and native validation blocks submission without any script (see "HTML5/CSS over JavaScript"). JS is optional and only mirrors the browser's `validationMessage` into the styled message element:
+**Validation Timing:**
 
+| Event | Action |
+|-------|--------|
+| Field blur | Validate that field only |
+| Field input (after error shown) | Clear error when valid |
+| Form submit | Validate all fields, focus first error |
+| Field focus | Do NOT validate (let user type) |
+
+**Error Message Content:**
+
+| Field Type | Error Message |
+|------------|---------------|
+| Required empty | "{Field name} is required" |
+| Invalid email | "Please enter a valid email address" |
+| Token has whitespace | "Token cannot start or end with spaces" |
+| Invalid URL | "Please enter a valid URL" |
+| Number out of range | "Value must be between {min} and {max}" |
+
+**CSS for Validation States:**
 ```css
-.input:user-invalid {
+/* Native HTML5 validation styling - :user-invalid fires only after the user
+   has interacted with the field (blur), so no JS blur handler is needed */
+input:user-invalid,
+select:user-invalid,
+textarea:user-invalid {
   border-color: var(--color-error);
 }
-.input:user-invalid ~ .field-error {
+
+/* Server-rendered errors (no-JS baseline) use the .error class from the handler */
+.form-group.error input,
+.form-group.error select,
+.form-group.error textarea {
+  border-color: var(--color-error);
+}
+
+.field-error {
+  color: var(--color-error);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
   display: block;
 }
-```
 
-```javascript
-// Optional enhancement: mirror the native validationMessage into the styled
-// error element — styling and submit-blocking already work without this
-document.querySelectorAll('.field input, .field select, .field textarea').forEach(el => {
-  el.addEventListener('invalid', () => {
-    const error = document.getElementById(`${el.id}-error`);
-    if (!error) return;
-    error.hidden = false;
-    error.textContent = el.validationMessage;
-  });
-});
-```
-
-```css
-.field       { display: flex; flex-direction: column; gap: var(--space-1); }
-.label       { font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
-.input {
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-fg);
-  font-size: var(--font-size-base);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+.form-group.success input {
+  border-color: var(--color-success);
 }
-.input:focus         { border-color: var(--color-primary); box-shadow: var(--focus-ring); outline: none; }
-.input[aria-invalid="true"] { border-color: var(--color-error); }
-.field-hint  { font-size: var(--font-size-xs); color: var(--color-muted); }
-.field-error { font-size: var(--font-size-xs); color: var(--color-error); }
 ```
 
----
+**JavaScript's only validation job** is mirroring the browser's `validationMessage` into the inline `.field-error` element (and setting `aria-invalid`); the styling comes from CSS `:user-invalid` and the authoritative check is always server-side.
 
-## Accessibility (WCAG 2.1 AA)
+## Accessibility
+
+**WCAG 2.1 AA Compliance Required:**
 
 | Requirement | Implementation |
-|---|---|
-| Color contrast | Minimum 4.5:1 for normal text, 3:1 for large text |
-| Focus indicators | Visible `:focus-visible` ring on all interactive elements |
-| Keyboard navigation | All interactive elements reachable and operable by keyboard |
-| Skip link | `<a href="#main-content" class="skip-link">Skip to main content</a>` |
-| ARIA landmarks | `<header>`, `<nav>`, `<main>`, `<aside>`, `<footer>` |
-| ARIA live regions | `role="status"` / `role="alert"` / `aria-live` for dynamic content |
-| Image alt text | All `<img>` elements have descriptive `alt`; decorative images use `alt=""` |
-| Form labels | All form controls have a visible `<label>` or `aria-label` |
-| Error messages | Associated with the field via `aria-describedby` and `aria-invalid` |
-| Reduced motion | `@media (prefers-reduced-motion: reduce)` removes all non-essential transitions |
+|-------------|----------------|
+| **Keyboard Navigation** | All interactive elements focusable and operable via keyboard |
+| **Focus Indicators** | Visible focus ring on all focusable elements |
+| **ARIA Labels** | Proper `aria-label`, `aria-describedby`, `role` attributes |
+| **Color Contrast** | Minimum 4.5:1 for normal text, 3:1 for large text |
+| **Alt Text** | All images have descriptive `alt` attributes |
+| **Form Labels** | All inputs have associated `<label>` elements |
+| **Error Messages** | Announced to screen readers via `aria-live` |
+| **Skip Links** | "Skip to content" link for keyboard users |
+| **Semantic HTML** | Proper heading hierarchy (h1 → h2 → h3) |
+| **Reduced Motion** | Respect `prefers-reduced-motion` preference |
 
 ```css
-/* Skip link */
-.skip-link {
-  position: absolute;
-  top: var(--space-4);
-  left: var(--space-4);
-  z-index: var(--z-tooltip);
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-primary);
-  color: var(--color-bg);
-  border-radius: var(--radius-md);
-  transform: translateY(-200%);
-  transition: transform var(--transition-fast);
-}
-.skip-link:focus { transform: none; }
-
-/* Reduced motion */
+/* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
   }
 }
 ```
 
----
-
 ## PWA Support
+
+**Progressive Web App = Native-like web app (installable, offline, GPS)**
+
+**Goal: Indistinguishable from native app** - same UX, capabilities, and performance.
+
+| Feature | Implementation | Notes |
+|---------|----------------|-------|
+| **Manifest** | `/manifest.json` with app metadata | Required for install |
+| **Icons** | Multiple sizes including maskable | For all platforms |
+| **Service Worker** | Cache, background sync, offline | Core of PWA |
+| **Installable** | Meets PWA install criteria | Add to home screen |
+| **HTTPS** | Required for service workers | Non-negotiable |
+| **Geolocation** | GPS access via Geolocation API | User permission required |
+| **User Sessions** | HttpOnly session cookie (server-side) | Persists across restarts |
+| **Background Sync** | Queue actions when offline, sync when online | Seamless offline |
+| **App Updates** | Detect new SW version, prompt user | Keep app current |
+
+The axum server serves the manifest and service worker as static files via `tower_http::services::ServeDir` or embedded with `rust-embed`. The `/manifest.json` and `/sw.js` routes are registered on the router:
+
+```rust
+use axum::{Router, routing::get};
+use rust_embed::RustEmbed;
+
+#[derive(RustEmbed)]
+#[folder = "static/"]
+struct StaticAssets;
+
+pub fn pwa_routes() -> Router {
+    Router::new()
+        .route("/manifest.json", get(serve_manifest))
+        .route("/sw.js", get(serve_service_worker))
+}
+
+async fn serve_manifest() -> impl axum::response::IntoResponse {
+    match StaticAssets::get("manifest.json") {
+        Some(content) => (
+            [(axum::http::header::CONTENT_TYPE, "application/manifest+json")],
+            content.data,
+        ).into_response(),
+        None => axum::http::StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn serve_service_worker() -> impl axum::response::IntoResponse {
+    match StaticAssets::get("sw.js") {
+        Some(content) => (
+            [
+                (axum::http::header::CONTENT_TYPE, "application/javascript"),
+                (axum::http::header::CACHE_CONTROL, "no-cache"),
+            ],
+            content.data,
+        ).into_response(),
+        None => axum::http::StatusCode::NOT_FOUND.into_response(),
+    }
+}
+```
 
 ### Service Worker Registration
 
+**Register service worker on app load:**
+
 ```javascript
-// static/js/sw-register.js
+// /static/js/app.js - Service Worker Registration
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
-      const reg = await navigator.serviceWorker.register('/static/sw.js', { scope: '/' });
-      console.log('SW registered:', reg.scope);
-    } catch (err) {
-      console.warn('SW registration failed:', err);
+      const registration = await navigator.serviceWorker.register('/sw.js', {
+        scope: '/'
+      });
+      console.log('SW registered:', registration.scope);
+
+      // Check for updates
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // New version available
+            showUpdateNotification();
+          }
+        });
+      });
+    } catch (error) {
+      console.error('SW registration failed:', error);
     }
   });
 }
@@ -22502,623 +23567,1367 @@ if ('serviceWorker' in navigator) {
 
 ### Service Worker Lifecycle
 
+**The service worker has three main lifecycle events:**
+
+| Event | When | Purpose |
+|-------|------|---------|
+| **install** | First registration or new version | Pre-cache static assets |
+| **activate** | After install, when no old SW controlling pages | Clean old caches |
+| **fetch** | Every network request from controlled pages | Serve from cache or network |
+
 ```javascript
-// static/sw.js
-// Cache name MUST embed the running version - activate below deletes all other-version caches
-const CACHE_NAME = 'app-{project_version}';
-const PRECACHE_URLS = [
+// /sw.js - Service Worker
+// Cache name MUST embed {project_version} so activate can delete
+// every cache from other versions (see Asset Version-Busting, PART 9)
+const CACHE_VERSION = '{project_version}';
+const CACHE_NAME = `{app_name}-cache-${CACHE_VERSION}`;
+
+// Assets to pre-cache on install
+const PRECACHE_ASSETS = [
   '/',
-  '/static/css/main.css',
-  '/static/js/main.js',
+  '/static/css/app.css',
+  '/static/js/app.js',
   '/static/icons/icon-192.png',
-  '/offline',
+  '/static/icons/icon-512.png',
+  '/offline.html'
 ];
 
+// INSTALL - Pre-cache static assets
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_URLS))
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(PRECACHE_ASSETS))
+      // Activate immediately
+      .then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
+// ACTIVATE - Clean old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
+    caches.keys()
+      .then(keys => Promise.all(
+        keys
+          .filter(key => key.startsWith('{app_name}-cache-') && key !== CACHE_NAME)
+          .map(key => caches.delete(key))
+      ))
+      // Take control immediately
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
+// FETCH - Serve from cache or network
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Skip non-GET requests
+  if (request.method !== 'GET') return;
+
+  // Skip API calls (network-only)
+  if (url.pathname.startsWith('/api/')) {
+    // Let browser handle normally
+    return;
+  }
+
+  // Static assets: cache-first
+  if (url.pathname.startsWith('/static/')) {
+    event.respondWith(
+      caches.match(request)
+        .then(cached => cached || fetch(request)
+          .then(response => {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+            return response;
+          })
+        )
+    );
+    return;
+  }
+
+  // HTML pages: network-first, cache fallback
+  if (request.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+          return response;
+        })
+        .catch(() => caches.match(request)
+          .then(cached => cached || caches.match('/offline.html'))
+        )
+    );
+    return;
+  }
+
+  // Default: network-first
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      const network = fetch(event.request).then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        return response;
-      });
-      return cached || network.catch(() => caches.match('/offline'));
-    })
+    fetch(request).catch(() => caches.match(request))
   );
 });
 ```
 
+### Cache Versioning & Updates
 
-### Cache Versioning
+**Cache version strategy:**
 
-Increment `CACHE_NAME` on every deploy. Use the git commit SHA or build timestamp:
+| Change Type | Action | Example |
+|-------------|--------|---------|
+| **Bug fix** | Increment patch | `v1.0.0` → `v1.0.1` |
+| **New feature** | Increment minor | `v1.0.1` → `v1.1.0` |
+| **Breaking change** | Increment major | `v1.1.0` → `v2.0.0` |
 
-```javascript
-const CACHE_NAME = `app-${__BUILD_HASH__}`;
+**Cache naming convention:** `{app_name}-cache-v{major}.{minor}.{patch}`
+
+**Update flow:**
+```
+1. User visits app
+2. Browser checks for new sw.js
+3. If changed → install event fires
+4. New SW waits until old SW's pages close (or skipWaiting)
+5. activate event fires → clean old caches
+6. New SW controls all pages
 ```
 
-Inject `__BUILD_HASH__` at build time via a build script or template variable.
+**Force update check:**
+```javascript
+// Check for updates every hour when app is active
+setInterval(() => {
+  navigator.serviceWorker.ready.then(reg => reg.update());
+}, 60 * 60 * 1000);
+```
 
 ### App Update Notification
 
+**Notify user when new version is available:**
+
 ```javascript
-// Notify user when a new SW is waiting
-navigator.serviceWorker.ready.then(reg => {
-  reg.addEventListener('updatefound', () => {
-    const newWorker = reg.installing;
-    newWorker.addEventListener('statechange', () => {
-      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-        showToast('A new version is available. Refresh to update.', 'info', 0);
-        document.querySelector('.update-refresh-btn')?.addEventListener('click', () => {
-          newWorker.postMessage({ type: 'SKIP_WAITING' });
-          window.location.reload();
-        });
-      }
-    });
+// Show update banner
+function showUpdateNotification() {
+  const banner = document.createElement('div');
+  banner.className = 'update-banner';
+  const label = document.createElement('span');
+  label.textContent = 'A new version is available';
+  const updateBtn = document.createElement('button');
+  updateBtn.textContent = 'Update Now';
+  updateBtn.addEventListener('click', updateApp);
+  const laterBtn = document.createElement('button');
+  laterBtn.textContent = 'Later';
+  laterBtn.addEventListener('click', () => banner.remove());
+  banner.append(label, updateBtn, laterBtn);
+  document.body.appendChild(banner);
+}
+
+// Apply update
+function updateApp() {
+  navigator.serviceWorker.ready.then(reg => {
+    if (reg.waiting) {
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
   });
+  // Reload when new SW takes over
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
+```
+
+**In service worker - handle skip waiting message:**
+```javascript
+// sw.js
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 ```
 
 ### App Install Prompt
 
+**Capture and control the install prompt:**
+
 ```javascript
 let deferredPrompt;
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  deferredPrompt = e;
-  document.querySelector('.install-btn')?.removeAttribute('hidden');
+
+// Capture the install prompt
+window.addEventListener('beforeinstallprompt', event => {
+  // Don't show automatically
+  event.preventDefault();
+  deferredPrompt = event;
+  // Show custom install UI
+  showInstallButton();
 });
 
-document.querySelector('.install-btn')?.addEventListener('click', async () => {
+// Custom install button handler
+function installApp() {
   if (!deferredPrompt) return;
+
   deferredPrompt.prompt();
-  const { outcome } = await deferredPrompt.userChoice;
-  console.log('Install prompt outcome:', outcome);
+  deferredPrompt.userChoice.then(result => {
+    if (result.outcome === 'accepted') {
+      console.log('App installed');
+    }
+    deferredPrompt = null;
+    hideInstallButton();
+  });
+}
+
+// Detect if already installed
+window.addEventListener('appinstalled', () => {
+  console.log('App was installed');
+  hideInstallButton();
   deferredPrompt = null;
-  document.querySelector('.install-btn')?.setAttribute('hidden', '');
 });
+
+// Check if running as installed PWA
+function isInstalledPWA() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    // iOS
+    || window.navigator.standalone === true;
+}
 ```
+
+**Install button visibility rules:**
+
+| Condition | Show Install Button |
+|-----------|---------------------|
+| `beforeinstallprompt` fired | Yes |
+| Already installed (standalone mode) | No |
+| iOS Safari (no prompt event) | Yes (manual instructions) |
+| Desktop browser | Yes (if supported) |
 
 ### Background Sync
 
-```javascript
-async function queueAction(tag, payload) {
-  const reg = await navigator.serviceWorker.ready;
-  await localforage.setItem(`sync-${tag}`, payload);
-  await reg.sync.register(tag);
-}
+**Queue actions when offline, automatically sync when back online:**
 
+```javascript
+// Register sync when offline action fails
+async function saveDataWithSync(data) {
+  try {
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch (error) {
+    // Network failed - queue for background sync
+    await saveToIndexedDB('pending-sync', data);
+    const registration = await navigator.serviceWorker.ready;
+    await registration.sync.register('sync-data');
+  }
+}
+```
+
+**Service Worker - handle sync:**
+```javascript
+// sw.js
 self.addEventListener('sync', event => {
-  if (event.tag.startsWith('submit-')) {
-    event.waitUntil(flushQueue(event.tag));
+  if (event.tag === 'sync-data') {
+    event.waitUntil(syncPendingData());
   }
 });
-```
 
-### Geolocation
+async function syncPendingData() {
+  const db = await openIndexedDB();
+  const pending = await getAllFromStore(db, 'pending-sync');
 
-Only request if the feature requires it — never on page load. Always present a clear prompt explaining why.
-
-```javascript
-async function requestLocation() {
-  if (!('geolocation' in navigator)) return null;
-  return new Promise((resolve, reject) =>
-    navigator.geolocation.getCurrentPosition(
-      pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      err => reject(err),
-      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 }
-    )
-  );
+  for (const item of pending) {
+    try {
+      await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item.data)
+      });
+      await deleteFromStore(db, 'pending-sync', item.id);
+    } catch (error) {
+      // Will retry on next sync event
+      throw error;
+    }
+  }
 }
 ```
 
-### API Token Storage
+**Sync retry behavior:**
 
-Resource owner tokens use **dual delivery** in the browser (see PART 8 → API Token Model): the raw token is shown once at creation (copy button), only its SHA-256 hash is stored server-side, and the create response also sets an `owner_token` cookie (HttpOnly + Secure + SameSite=Strict, Max-Age matching the token lifetime). WEB management routes authenticate via that cookie as plain POST forms, so every owner flow works with JS disabled. API routes accept the `Authorization: Bearer` header only and ignore cookies. No dedicated forget/revoke route: the cookie expires via its Max-Age, and clearing site data (or uninstalling the PWA) removes it along with any local copies.
+| Attempt | Delay | Notes |
+|---------|-------|-------|
+| 1st | Immediate | When connection restored |
+| 2nd | ~5 minutes | If first fails |
+| 3rd | ~15 minutes | Exponential backoff |
+| Final | ~1 hour | Browser may give up |
 
-`localStorage` holds an optional JS convenience copy (pre-fill, copy button) — never load-bearing:
+### Geolocation (GPS Access)
 
-```javascript
-// Write - the literal key name comes from IDEA.md (owner_token: ...)
-localStorage.setItem('{project_name}_owner_token_XXXXXX', token);
-// Read
-const token = localStorage.getItem('{project_name}_owner_token_XXXXXX');
-// Remove
-localStorage.removeItem('{project_name}_owner_token_XXXXXX');
-```
-
-The operator token is never stored in the browser — not in localStorage and not in a cookie; it lives in the server config and is used from CLI tools or API clients only.
-
-### Client-Side Preferences
-
-This helper is for pure client-only state the server must never receive automatically. Server-relevant preferences (theme, language, consent, announcement dismissals) are cookies — the server reads them to render the correct page (see the "Client-Side Preferences" storage table in PART 0).
+**Access device GPS like a native app:**
 
 ```javascript
-const prefs = {
-  get(key, fallback = null) {
-    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
-    catch { return fallback; }
-  },
-  set(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); }
-    catch (e) { console.warn('prefs.set failed:', e); }
-  },
-  remove(key) { localStorage.removeItem(key); },
-};
+// Check if geolocation is available
+function hasGeolocation() {
+  return 'geolocation' in navigator;
+}
+
+// Get current position (one-time)
+async function getCurrentLocation() {
+  if (!hasGeolocation()) {
+    throw new Error('Geolocation not supported');
+  }
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      position => resolve({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        altitude: position.coords.altitude,
+        heading: position.coords.heading,
+        speed: position.coords.speed,
+        timestamp: position.timestamp
+      }),
+      error => reject(handleGeolocationError(error)),
+      {
+        // Use GPS if available
+        enableHighAccuracy: true,
+        // 10 second timeout
+        timeout: 10000,
+        // Accept cached position up to 1 minute old
+        maximumAge: 60000
+      }
+    );
+  });
+}
+
+// Watch position (continuous tracking)
+function watchLocation(callback, errorCallback) {
+  if (!hasGeolocation()) {
+    errorCallback(new Error('Geolocation not supported'));
+    return null;
+  }
+
+  return navigator.geolocation.watchPosition(
+    position => callback({
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      accuracy: position.coords.accuracy,
+      altitude: position.coords.altitude,
+      heading: position.coords.heading,
+      speed: position.coords.speed,
+      timestamp: position.timestamp
+    }),
+    error => errorCallback(handleGeolocationError(error)),
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      // Always get fresh position
+      maximumAge: 0
+    }
+  );
+}
+
+// Stop watching
+function stopWatchingLocation(watchId) {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+  }
+}
+
+// Handle errors
+function handleGeolocationError(error) {
+  switch (error.code) {
+    case error.PERMISSION_DENIED:
+      return new Error('Location permission denied');
+    case error.POSITION_UNAVAILABLE:
+      return new Error('Location unavailable');
+    case error.TIMEOUT:
+      return new Error('Location request timed out');
+    default:
+      return new Error('Unknown location error');
+  }
+}
 ```
+
+**Geolocation options:**
+
+| Option | Value | Purpose |
+|--------|-------|---------|
+| `enableHighAccuracy` | `true` | Use GPS (slower, battery drain) |
+| `enableHighAccuracy` | `false` | Use network location (faster, less accurate) |
+| `timeout` | milliseconds | How long to wait for position |
+| `maximumAge` | milliseconds | Accept cached position if newer than this |
+
+**Permission UX best practices:**
+
+| Bad | Good |
+|-----|------|
+| Request on page load | Request when user taps "Find nearby" |
+| No explanation | Explain why location is needed first |
+| Silent failure | Show clear error if denied |
+| Always high accuracy | Use low accuracy when approximate is fine |
+
+**Location permission states:**
+```javascript
+// Check permission without prompting
+async function checkLocationPermission() {
+  if (!navigator.permissions) return 'unknown';
+
+  const result = await navigator.permissions.query({ name: 'geolocation' });
+  // 'granted', 'denied', or 'prompt'
+  return result.state;
+}
+```
+
+### User Sessions in PWA
+
+**PWA maintains user login across app restarts — via the server-side session cookie, never JS-held tokens.**
+
+**(A session is created by the core `sys_` token login (PART 8) and by the admin token login when the admin panel is enabled (PART 28) — both use the same session mechanism below.)**
+
+The session lives in an `HttpOnly` + `Secure` + `SameSite` cookie. The browser sends it automatically on every request, it persists across app restarts natively, and JS cannot read it — no token-handling JavaScript exists. Session tokens NEVER go in localStorage or IndexedDB: anything XSS-readable is not a place for credentials.
+
+| Storage | Use Case | Cleared |
+|---------|----------|---------|
+| **Cookie (HttpOnly + Secure + SameSite)** | Session — sent automatically; unreadable by JS | Expiry/logout |
+| **IndexedDB** | Offline data, cached responses | Manual/logout |
+| **localStorage** | Pure client-only state only (e.g. collapsed-panel state) — never session or auth data | Manual |
+
+**Session persists when:**
+- App is closed and reopened
+- Device is restarted
+- Switching between browser and installed PWA
+
+The cookie must set `Max-Age`/`Expires` (persistent cookie) — a session-scoped cookie is dropped when the app closes and login would not survive a restart.
+
+**Logout is a plain `POST /server/auth/logout` form — works with zero JS.** The server destroys the session and expires the cookie. External JS enhances logout by also clearing client-side offline data:
+
+```javascript
+// Logout enhancement - the server already destroyed the session and expired the
+// cookie via POST /server/auth/logout; this only clears client-side offline data
+async function clearClientData() {
+  // Clear client-only state (the session was never stored here)
+  localStorage.clear();
+
+  // Clear IndexedDB
+  const databases = await indexedDB.databases();
+  for (const db of databases) {
+    indexedDB.deleteDatabase(db.name);
+  }
+
+  // Clear service worker cache (user data only)
+  const cacheKeys = await caches.keys();
+  for (const key of cacheKeys) {
+    if (key.includes('user-data')) {
+      await caches.delete(key);
+    }
+  }
+
+  // Redirect to login
+  window.location.href = '/server/auth/login';
+}
+```
+
+### Client-Side Preferences (cookies)
+
+**Guest/UI preferences are stored in cookies — the server reads them to render pages (theme class, language) with zero server persistence and zero user account needed. localStorage holds only optional JS convenience copies; nothing stored there is load-bearing.**
+
+| Cookie | Values | Default |
+|--------|--------|---------|
+| `theme` | `dark` \| `light` \| `auto` | `dark` |
+| `lang` | BCP 47 tag: `en`, `es`, `fr`, … | `Accept-Language` header |
+| `cookie_consent` | JSON: granular categories + timestamp | unset (banner shown) |
+| `ccpa_opt_out` | `true` | unset |
+
+**Preference writes (JS enhancement — the server sets the same cookies on its POST endpoints):**
+```javascript
+// Write - the server reads these on the next request
+document.cookie = "theme=light; path=/; max-age=31536000; SameSite=Lax";
+document.cookie = "lang=fr; path=/; max-age=31536000; SameSite=Lax";
+```
+
+**Rules:**
+- Preferences survive logout and session expiry — they are UI state, not account data
+- Never persist preferences server-side — the server reads the cookie per request
+- Never store PII in cookies or localStorage
+- Always fall back to a safe default when a cookie is missing or invalid
 
 ### Offline Behavior
 
-- Serve the pre-cached `/offline` page for navigation requests when the network is unavailable.
-- Queue mutating actions (POST/PUT/DELETE) via Background Sync when offline; flush on reconnect.
-- Display an offline banner using the `online`/`offline` events:
+| Resource Type | Cache Strategy | Offline Behavior |
+|---------------|----------------|------------------|
+| **Static assets** (CSS, JS, images) | Cache-first | Served from cache |
+| **HTML pages** | Network-first, cache fallback | Show cached version if offline |
+| **API calls** | Network-only + queue | Show offline indicator, queue for retry |
+| **Fonts** | Cache-first | Served from cache |
+| **User data** | IndexedDB | Full offline access |
 
+**Service Worker Caching Limits:**
+
+| Limit | Value | Notes |
+|-------|-------|-------|
+| Max cache size | 50MB | Browser may evict if exceeded |
+| Cache expiration | 7 days | For static assets |
+| Never cache | API responses | Except explicit offline-first data |
+| Quota check | Before large caches | `navigator.storage.estimate()` |
+
+**Offline detection:**
 ```javascript
-window.addEventListener('offline', () => showToast('You are offline', 'warning', 0));
-window.addEventListener('online',  () => showToast('Back online', 'success'));
-```
+// Check online status
+function isOnline() {
+  return navigator.onLine;
+}
 
+// Listen for connectivity changes
+window.addEventListener('online', () => {
+  hideOfflineIndicator();
+  triggerPendingSync();
+});
 
-### Web App Manifest
+window.addEventListener('offline', () => {
+  showOfflineIndicator();
+});
 
-```json
-{
-  "name": "App Name",
-  "short_name": "App",
-  "description": "One sentence describing the app.",
-  "start_url": "/?source=pwa",
-  "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#282a36",
-  "theme_color": "#bd93f9",
-  "icons": [
-    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/static/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ],
-  "screenshots": [
-    { "src": "/static/screenshots/desktop.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide" },
-    { "src": "/static/screenshots/mobile.png",  "sizes": "390x844",  "type": "image/png", "form_factor": "narrow" }
-  ],
-  "categories": ["productivity"],
-  "lang": "en"
+// Offline indicator UI
+function showOfflineIndicator() {
+  const indicator = document.getElementById('offline-indicator');
+  indicator.textContent = 'You are offline. Some features may be unavailable.';
+  indicator.classList.add('visible');
+}
+
+function hideOfflineIndicator() {
+  const indicator = document.getElementById('offline-indicator');
+  indicator.classList.remove('visible');
 }
 ```
 
-Serve at `/manifest.json` with `Content-Type: application/manifest+json`.
+### Manifest Configuration
+
+**Complete manifest.json:**
+```json
+{
+  "name": "{App Name}",
+  "short_name": "{app_name}",
+  "description": "{App description}",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "categories": ["utilities"],
+  "icons": [
+    {
+      "src": "/static/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/static/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/dashboard?source=shortcut",
+      "icons": [{ "src": "/static/icons/shortcut-dashboard.png", "sizes": "96x96" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/static/screenshots/desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/static/screenshots/mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ]
+}
+```
+
+**Manifest fields explained:**
+
+| Field | Purpose | Required |
+|-------|---------|----------|
+| `name` | Full app name (install dialog) | Yes |
+| `short_name` | Abbreviated name (home screen) | Yes |
+| `start_url` | URL when launched | Yes |
+| `scope` | URL scope SW controls | Recommended |
+| `display` | `standalone`, `fullscreen`, `minimal-ui`, `browser` | Yes |
+| `icons` | App icons (multiple sizes) | Yes |
+| `theme_color` | Browser toolbar color | Recommended |
+| `background_color` | Splash screen background | Recommended |
+| `orientation` | `any`, `portrait`, `landscape` | Optional |
+| `shortcuts` | Quick actions (right-click/long-press) | Optional |
+| `screenshots` | Install dialog preview | Optional |
+
+### Scope and Start URL
+
+**Understanding PWA scope:**
+
+| Concept | Description |
+|---------|-------------|
+| **scope** | URLs the service worker can control |
+| **start_url** | URL opened when app launches |
+| **Rule** | `start_url` must be within `scope` |
+
+```
+Example:
+  scope: "/app/"
+  start_url: "/app/dashboard"
+
+  Controlled: /app/*, /app/settings, /app/items/123
+  Not controlled: /server/auth/*, /api/*, /server/{admin_path}/*
+```
+
+**Tracking PWA launches:**
+
+```javascript
+// start_url: "/?source=pwa"
+// Analytics can track PWA vs browser usage
+if (new URLSearchParams(window.location.search).get('source') === 'pwa') {
+  analytics.track('pwa_launch');
+}
+```
 
 ### Maskable Icons
 
-Maskable icons must have a safe zone of 40% (20% on each side). The icon artwork must be fully contained within the inner 60% of the image. Generate with [maskable.app](https://maskable.app).
+**Maskable icons adapt to different Android launcher shapes:**
 
-### iOS Considerations
+| Icon Type | Purpose | Safe Zone |
+|-----------|---------|-----------|
+| **Regular** | Standard icon with transparency | Full canvas |
+| **Maskable** | Adaptive icon (Android) | Inner 80% circle |
 
-```html
-<!-- Add to <head> -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="App">
-<link rel="apple-touch-icon" href="{{ asset(path="icons/apple-touch-icon.png") }}">
-<link rel="apple-touch-startup-image" href="{{ asset(path="splash/launch-2048x2732.png") }}"
-  media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)">
+**Design rules for maskable icons:**
+- Important content in center 80% (safe zone)
+- Background extends to full canvas
+- No transparency (use solid background)
+- Same icon, different padding
+
+```
+┌─────────────────────┐
+│                     │
+│   ┌───────────┐     │
+│   │           │     │  ← Safe zone (80%)
+│   │   LOGO    │     │
+│   │           │     │
+│   └───────────┘     │
+│                     │
+└─────────────────────┘   ← Full canvas
 ```
 
-iOS Safari does not support the Web App Manifest for install flow — `apple-mobile-web-app-capable` is required.
+**Testing maskable icons:** https://maskable.app/editor
 
-### Lighthouse Audit Targets
+### iOS-Specific Considerations
 
-| Category | Target |
-|---|---|
-| Performance | ≥ 90 |
-| Accessibility | 100 |
-| Best Practices | ≥ 95 |
-| SEO | ≥ 95 |
-| PWA | All checks pass |
+**iOS Safari has PWA limitations:**
+
+| Feature | Android | iOS |
+|---------|---------|-----|
+| Background sync | Yes | No |
+| `beforeinstallprompt` | Yes | No |
+| Persistent storage | Yes | Limited (7 days without use) |
+| Badging API | Yes | No |
+| Web Share Target | Yes | No |
+
+**iOS-specific meta tags:**```html
+<head>
+  <!-- Standard manifest -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#000000">
+
+  <!-- iOS-specific -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="{app_name}">
+  <link rel="apple-touch-icon" href="{{ asset("icons/icon-180.png") }}">
+
+  <!-- iOS splash screens -->
+  <link rel="apple-touch-startup-image"
+        href="{{ asset("splash/iphone-1179x2556.png") }}"
+        media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)">
+  <link rel="apple-touch-startup-image"
+        href="{{ asset("splash/iphone-1284x2778.png") }}"
+        media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)">
+</head>
+```
+
+**iOS install instructions (no beforeinstallprompt):**
+```javascript
+function showIOSInstallInstructions() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isInStandalone = window.navigator.standalone === true;
+
+  if (isIOS && !isInStandalone) {
+    showModal({
+      title: 'Install {App Name}',
+      content: `
+        <ol>
+          <li>Tap the Share button <img src="/static/icons/ios-share.svg" alt="Share"></li>
+          <li>Scroll down and tap "Add to Home Screen"</li>
+          <li>Tap "Add" in the top right</li>
+        </ol>
+      `
+    });
+  }
+}
+```
+
+**iOS storage eviction workaround:**
+```javascript
+// Request persistent storage (iOS may still evict)
+async function requestPersistentStorage() {
+  if (navigator.storage && navigator.storage.persist) {
+    const granted = await navigator.storage.persist();
+    console.log('Persistent storage:', granted ? 'granted' : 'denied');
+  }
+}
+```
+
+### Lighthouse PWA Audit
+
+**Lighthouse checks these PWA criteria:**
+
+| Category | Requirement | How to Pass |
+|----------|-------------|-------------|
+| **Installable** | Valid manifest | All required fields present |
+| **Installable** | Service worker | Registered and controlling |
+| **Installable** | HTTPS | Served over HTTPS |
+| **Installable** | Icons | 192x192 and 512x512 minimum |
+| **Optimized** | Redirects HTTP→HTTPS | Server config |
+| **Optimized** | Splash screen | `theme_color`, `background_color`, icons |
+| **Optimized** | Theme color | `<meta name="theme-color">` and manifest |
+| **Optimized** | Viewport | `<meta name="viewport" content="width=device-width">` |
+| **Optimized** | Content sized | No horizontal scroll at mobile width |
+| **Optimized** | Maskable icon | At least one with `purpose: maskable` |
+
+**Full HTML head for PWA compliance:**
+```html
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="{App description}">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ asset("icons/favicon-32.png") }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ asset("icons/favicon-16.png") }}">
+  <link rel="apple-touch-icon" href="{{ asset("icons/icon-180.png") }}">
+
+  <!-- iOS specific -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="{app_name}">
+
+  <title>{App Name}</title>
+  <link rel="stylesheet" href="{{ asset("css/app.css") }}">
+</head>
+<body>
+  <!-- Offline indicator -->
+  <div id="offline-indicator" aria-live="polite"></div>
+
+  <!-- App content -->
+  <div id="app"></div>
+
+  <script src="{{ asset("js/app.js") }}"></script>
+</body>
+</html>
+```
+
+**Run Lighthouse audit:**
+1. Chrome DevTools → Lighthouse tab
+2. Select "Progressive Web App" category
+3. Click "Analyze page load"
+4. Fix any failures before deployment
 
 ### PWA File Structure
 
+**Required files for full PWA:**
+
 ```
-static/
-  icons/
-    icon-192.png
-    icon-512.png
-    icon-maskable-512.png
-    apple-touch-icon.png
-    favicon.ico
-  splash/
-    launch-2048x2732.png   ← iOS 12.9" iPad Pro
-    launch-1668x2388.png   ← iOS 11" iPad Pro
-    launch-1242x2688.png   ← iPhone XS Max
-    launch-828x1792.png    ← iPhone XR
-    launch-750x1334.png    ← iPhone 8
-  js/
-    sw.js
-    sw-register.js
-  manifest.json
+/
+├── manifest.json                 # App manifest
+├── sw.js                         # Service worker
+├── offline.html                  # Offline fallback page
+├── static/
+│   ├── css/
+│   │   └── app.css
+│   ├── js/
+│   │   └── app.js                # Includes SW registration
+│   ├── icons/
+│   │   ├── favicon-16.png
+│   │   ├── favicon-32.png
+│   │   ├── icon-72.png
+│   │   ├── icon-96.png
+│   │   ├── icon-128.png
+│   │   ├── icon-144.png
+│   │   ├── icon-152.png
+│   │   ├── icon-180.png          # Apple touch icon
+│   │   ├── icon-192.png
+│   │   ├── icon-384.png
+│   │   ├── icon-512.png
+│   │   ├── icon-maskable-192.png # Maskable (Android adaptive)
+│   │   ├── icon-maskable-512.png
+│   │   └── badge-72.png          # Notification badge
+│   ├── splash/                   # iOS splash screens
+│   │   ├── iphone-1179x2556.png
+│   │   └── iphone-1284x2778.png
+│   └── screenshots/              # Install dialog previews
+│       ├── desktop.png
+│       └── mobile.png
+└── index.html                    # With all meta tags
 ```
 
 ### PWA Checklist
 
-- [ ] `manifest.json` served at `/manifest.json`
-- [ ] `<link rel="manifest">` in `<head>`
-- [ ] Service worker registered
-- [ ] HTTPS enforced (or `localhost`)
-- [ ] Offline page at `/offline`
-- [ ] Maskable icon provided
-- [ ] `apple-touch-icon` provided
-- [ ] `theme-color` meta tag present
-- [ ] `start_url` works offline
-- [ ] Lighthouse PWA score passes
-
----
+| Item | Status | Notes |
+|------|--------|-------|
+| HTTPS enabled | ◻️ | Required for SW |
+| manifest.json valid | ◻️ | All required fields |
+| Service worker registered | ◻️ | Controls all pages |
+| Offline page exists | ◻️ | `/offline.html` |
+| Icons all sizes | ◻️ | 72 to 512px |
+| Maskable icon included | ◻️ | For Android |
+| Apple meta tags | ◻️ | For iOS |
+| Theme color set | ◻️ | Meta + manifest |
+| Viewport meta | ◻️ | Responsive |
+| Install prompt handled | ◻️ | Custom UI |
+| Update notification | ◻️ | New SW prompt |
+| Offline indicator | ◻️ | Connection status |
+| Background sync | ◻️ | If needed |
+| Geolocation | ◻️ | If needed |
+| Lighthouse score 100 | ◻️ | All audits pass |
 
 ## HTTP Status Codes
 
-| Code | Meaning | When to use |
-|---|---|---|
+**Use standard RFC 7231 HTTP status codes consistently:**
+
+| Code | Meaning | Use For |
+|------|---------|---------|
 | 200 | OK | Successful GET, PUT, PATCH |
-| 201 | Created | Successful POST that creates a resource |
-| 204 | No Content | Successful DELETE, or PUT with no body |
-| 301 | Moved Permanently | Canonical redirect (URL normalize, old → new URL) |
-| 302 | Found | Temporary redirect (post-form) |
+| 201 | Created | Successful POST creating resource |
+| 204 | No Content | Successful DELETE |
+| 301 | Moved Permanently | Permanent redirects |
+| 302 | Found | Temporary redirects |
 | 304 | Not Modified | Conditional GET cache hit |
-| 400 | Bad Request | Malformed request, validation failure |
+| 400 | Bad Request | Invalid input, validation errors |
 | 401 | Unauthorized | Not authenticated |
 | 403 | Forbidden | Authenticated but not authorized |
-| 404 | Not Found | Resource does not exist |
-| 405 | Method Not Allowed | Wrong HTTP verb |
-| 409 | Conflict | Duplicate resource, edit conflict |
+| 404 | Not Found | Resource doesn't exist |
+| 405 | Method Not Allowed | Wrong HTTP method |
+| 409 | Conflict | Duplicate resource, version conflict |
 | 410 | Gone | Resource permanently deleted |
-| 422 | Unprocessable Entity | Semantic validation failure |
-| 429 | Too Many Requests | Rate limited |
-| 500 | Internal Server Error | Unexpected server error |
+| 422 | Unprocessable Entity | Semantic validation errors |
+| 429 | Too Many Requests | Rate limit exceeded |
+| 500 | Internal Server Error | Server-side errors |
 | 502 | Bad Gateway | Upstream service failure |
-| 503 | Service Unavailable | Maintenance mode or overload |
-
----
+| 503 | Service Unavailable | Maintenance mode |
 
 ## Unified Response Format
 
-All API endpoints return the same JSON envelope:
+**ALL responses (server → client/agent) use this exact format. Simple to parse everywhere.**
+
+### Success Response
 
 ```json
 {
   "ok": true,
-  "data": { … },
-  "error": null,
-  "message": null
+  "data": {}
 }
 ```
 
-On error:
+### Error Response
+
+Canonical shape is defined in PART 13 — this is a summary, not a re-definition.
 
 ```json
 {
   "ok": false,
-  "data": null,
-  "error": "not_found",
-  "message": "The requested resource does not exist."
+  "error": "ERROR_CODE",
+  "message": "Human readable message"
 }
 ```
 
+### Standard Error Codes (server sends, client/agent parses)
+
+| Error Code | HTTP | Message | Client/Agent Display |
+|------------|------|---------|---------------------|
+| `BAD_REQUEST` | 400 | "Invalid request format" | Invalid request |
+| `VALIDATION_FAILED` | 400 | "Validation failed: {field}" | Check input: {field} |
+| `UNAUTHORIZED` | 401 | "Authentication required" | Please log in |
+| `TOKEN_EXPIRED` | 401 | "Token has expired" | Session expired, log in again |
+| `TOKEN_INVALID` | 401 | "Invalid token" | Invalid session |
+| `FORBIDDEN` | 403 | "Permission denied" | Access denied |
+| `ACCOUNT_LOCKED` | 403 | "Account locked" | Account locked, try later |
+| `NOT_FOUND` | 404 | "Resource not found" | Not found |
+| `METHOD_NOT_ALLOWED` | 405 | "Method not allowed" | Invalid operation |
+| `CONFLICT` | 409 | "Resource already exists" | Already exists |
+| `RATE_LIMITED` | 429 | "Too many requests" | Slow down, try later |
+| `SERVER_ERROR` | 500 | "Internal server error" | Something went wrong |
+| `MAINTENANCE` | 503 | "Service unavailable" | Maintenance, try later |
+
+### Parsing Rules
+
+**All consumers (client binary, agent binary, WebUI, external tools) parse the same way:**
+
 ```rust
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+// Universal API response parser - works for server, client, agent
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiResponse {
     pub ok: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<serde_json::Value>,
+    pub data: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
+
 pub fn parse_api_response(body: &[u8]) -> Result<ApiResponse, serde_json::Error> {
     serde_json::from_slice(body)
 }
-// Usage in client
-let resp = parse_api_response(body)?;
-if !resp.ok {
-    return Err(anyhow::anyhow!("{}: {}", resp.error.unwrap_or_default(), resp.message.unwrap_or_default()));
-}
-```
 
-```rust
-pub fn write_json<T: Serialize>(data: T) -> impl axum::response::IntoResponse {
-    axum::response::Json(data)
-}
-pub fn write_text(text: impl Into<String>) -> impl axum::response::IntoResponse {
-    let mut t = text.into();
-    if !t.ends_with('\n') {
-        t.push('\n');
+// Usage in client/agent
+fn handle_response(body: &[u8]) -> anyhow::Result<Value> {
+    let resp = parse_api_response(body)?;
+    if !resp.ok {
+        let error = resp.error.as_deref().unwrap_or("UNKNOWN");
+        let message = resp.message.as_deref().unwrap_or("unknown error");
+        return Err(anyhow::anyhow!("{}: {}", error, message));
     }
-    (axum::http::StatusCode::OK,
-     [(axum::http::header::CONTENT_TYPE, "text/plain")],
-     t)
+    // Success: use resp.data
+    Ok(resp.data.unwrap_or(Value::Null))
 }
 ```
 
+### Client/Agent Message Display
 
----
+| Context | What to Show |
+|---------|--------------|
+| Terminal (CLI/TUI) | `resp.message` directly |
+| WebUI | `resp.message` in toast/alert |
+| Logging | `resp.error: resp.message` |
+| Machine parsing | Check `resp.error` code |
+
+### Examples
+
+**Success - List items:**
+```json
+{
+  "ok": true,
+  "data": {
+    "items": [],
+    "total": 42
+  }
+}
+```
+
+**Success - Create item:**
+```json
+{
+  "ok": true,
+  "data": {
+    "id": 123,
+    "name": "new-item"
+  }
+}
+```
+
+**Error - Not authenticated:**
+```json
+{
+  "ok": false,
+  "error": "UNAUTHORIZED",
+  "message": "Authentication required"
+}
+```
+
+**Error - Validation:**
+```json
+{
+  "ok": false,
+  "error": "VALIDATION_FAILED",
+  "message": "Validation failed: email must be valid"
+}
+```
+
+**Error - Rate limit:**
+```json
+{
+  "ok": false,
+  "error": "RATE_LIMITED",
+  "message": "Too many requests, retry after 60 seconds"
+}
+```
+
+### Why This Format
+
+| Benefit | Explanation |
+|---------|-------------|
+| **Simple** | Just check `ok` field first |
+| **Consistent** | Same structure everywhere |
+| **Parseable** | One parser for all responses |
+| **Human-friendly** | `message` always displayable |
+| **Machine-friendly** | `error` code for programmatic handling |
+| **Minimal** | No nested complexity for simple cases |
+
+## Text Response Format
+
+**CLI/agent text output uses standardized format. Easy to parse with grep/awk/cut.**
+
+### Success Response (text/plain)
+
+```
+OK: {message}
+{data lines...}
+```
+
+### Error Response (text/plain)
+
+```
+ERROR: {code}: {message}
+```
+
+### Text Response Examples
+
+**Success - Single value:**
+```
+OK: Retrieved successfully
+value: 42
+```
+
+**Success - List:**
+```
+OK: 3 items found
+item-1
+item-2
+item-3
+```
+
+**Error:**
+```
+ERROR: NOT_FOUND: Resource not found
+```
+
+**Error with details:**
+```
+ERROR: VALIDATION_FAILED: email must be valid
+```
 
 ## Server Response Rules
 
-| Rule | Detail |
-|---|---|
-| Always return `Content-Type` | Include charset for text types: `text/html; charset=utf-8` |
-| Never return 200 on error | Use the correct 4xx or 5xx code |
-| Redirect after POST | Always redirect (302) after a successful POST mutation |
-| Include `X-Request-ID` | Echo the request ID in every response header |
-| Sanitize error messages | Never leak stack traces or internal paths to clients |
-| Consistent envelope | All JSON responses use the `ApiResponse` struct |
-| Set `Cache-Control` | Static assets with matching `?v=` build stamp: `public, max-age=31536000, immutable`; missing/mismatched stamp: `no-cache` + `ETag`; HTML: `no-store` (see PART 9 → Asset Version-Busting) |
+**These rules apply SERVER-WIDE to ALL responses (API, frontend AJAX, CLI, agent, webhooks).**
 
----
+### Content-Type Detection
+
+| Source | Content-Type | Format |
+|--------|--------------|--------|
+| API routes (`/api/{api_version}/*`) | `application/json` | JSON |
+| `.txt` suffix (API only) | `text/plain` | Text |
+| `Accept: application/json` | `application/json` | JSON |
+| `Accept: text/plain` | `text/plain` | Text |
+| CLI/Agent (auto-detected) | `text/plain` | Text |
+| Browser (no Accept header) | `text/html` | HTML |
+| Frontend AJAX/fetch | Auto-detect from `Accept` | JSON/Text |
+
+**Notes:**
+- `.txt` suffix only works on API routes (`/api/{api_version}/*.txt`)
+- No `.json` suffix exists - JSON is the default for API
+- Frontend uses `Accept` header for format negotiation (set by fetch/XMLHttpRequest)
+
+### Newline Rules
+
+**ALL non-HTML responses MUST end with a single newline (`\n`).**
+
+| Format | Rule | Example |
+|--------|------|---------|
+| JSON | Single `\n` after closing `}` or `]` | `{"ok": true}\n` |
+| Text | Single `\n` after last line | `OK: done\n` |
+| HTML | No trailing newline requirement | `</html>` |
+
+**Why:** Ensures consistent parsing, clean terminal output, proper file concatenation.
+
+```rust
+use axum::{
+    response::{IntoResponse, Response},
+    http::{header, StatusCode},
+    Json,
+};
+use serde::Serialize;
+
+// Server response helper — JSON with trailing newline
+pub fn write_json<T: Serialize>(data: T) -> Response {
+    // axum's Json extractor serializes with trailing newline via serde_json
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "application/json")],
+        Json(data),
+    )
+        .into_response()
+}
+
+// Server response helper — plain text with trailing newline
+pub fn write_text(text: impl Into<String>) -> Response {
+    let mut body = text.into();
+    if !body.ends_with('\n') {
+        body.push('\n');
+    }
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        body,
+    )
+        .into_response()
+}
+```
+
+### JSON Rules
+
+| Rule | Correct | Wrong |
+|------|---------|-------|
+| No comments | `{"key": "value"}` | `{"key": "value" // comment}` |
+| No trailing commas | `{"a": 1, "b": 2}` | `{"a": 1, "b": 2,}` |
+| Double quotes only | `{"key": "value"}` | `{'key': 'value'}` |
+| No undefined | `{"key": null}` | `{"key": undefined}` |
+| 2-space indentation | `  "key": "value"` | `    "key"` or `\t"key"` |
+| Trailing newline | `}\n` | `}` (no newline) |
+
+### Text Rules
+
+| Rule | Correct | Wrong |
+|------|---------|-------|
+| Lines end with `\n` | `line1\nline2\n` | `line1\nline2` |
+| No trailing spaces | `value\n` | `value  \n` |
+| UTF-8 encoding | Always UTF-8 | Other encodings |
+| Unix line endings | `\n` | `\r\n` (Windows) |
 
 ## CORS Configuration
 
-Enable only for `/api/` routes. Never enable for HTML page routes.
+**See "CORS" section below for complete configuration and behavior.**
 
-**Default CORS policy allows all origins (`*`) unless configured.**
+Quick reference: Default allows all origins (`*`). Configure via `web.cors` in server.yml.
 
-### Configuration
+### HTML5 & CSS Over JavaScript
 
-```rust
-use tower_http::cors::{CorsLayer, Any};
+**Priority Order: HTML5 first → CSS second → JavaScript last resort.**
 
-let cors = CorsLayer::new()
-    .allow_origin(cfg.server.cors.allowed_origins.iter().filter_map(|o| o.parse().ok()).collect::<Vec<_>>())
-    .allow_methods([
-        axum::http::Method::GET,
-        axum::http::Method::POST,
-        axum::http::Method::PUT,
-        axum::http::Method::PATCH,
-        axum::http::Method::DELETE,
-        axum::http::Method::OPTIONS,
-    ])
-    // Never AllowHeaders::any() — the `*` wildcard does NOT cover Authorization and is
-    // invalid with credentials; list every supported auth header by name.
-    // Keep in sync with PART 8 → "Auth Token Headers (All Headers Supported)".
-    .allow_headers([
-        axum::http::header::CONTENT_TYPE,
-        axum::http::header::ACCEPT,
-        axum::http::header::AUTHORIZATION,
-        axum::http::HeaderName::from_static("x-requested-with"),
-        axum::http::HeaderName::from_static("x-api-key"),
-        axum::http::HeaderName::from_static("api-key"),
-        axum::http::HeaderName::from_static("apikey"),
-        axum::http::HeaderName::from_static("x-auth-token"),
-        axum::http::HeaderName::from_static("x-access-token"),
-        axum::http::HeaderName::from_static("x-token"),
-        axum::http::HeaderName::from_static("token"),
-        axum::http::HeaderName::from_static("x-csrf-token"),
-        axum::http::HeaderName::from_static("x-xsrf-token"),
-        axum::http::HeaderName::from_static("x-session-id"),
-        axum::http::HeaderName::from_static("x-service-token"),
-        axum::http::HeaderName::from_static("x-internal-token"),
-    ])
-    .allow_credentials(true)
-    .max_age(std::time::Duration::from_secs(86400));
+| Priority | Technology | Use For |
+|----------|------------|---------|
+| **1st** | HTML5 | Structure, forms, validation, semantic content, `<details>`, `<dialog>` |
+| **2nd** | CSS | Styling, layout, themes, animations, hover states, responsive design |
+| **3rd** | JavaScript | ONLY when HTML5/CSS cannot achieve the functionality |
+
+**JavaScript is the exception, not the rule. Every JS line must be justified.**
+
+| Use Case | Use HTML5/CSS | Use JavaScript Only When |
+|----------|---------------|--------------------------|
+| Form validation | HTML5 `required`, `pattern`, `min`, `max`, `type="email"` | Complex cross-field validation |
+| Collapsible sections | `<details>/<summary>` | Need animation or programmatic control |
+| Tabs | CSS `:target` or radio button hack | Need deep linking or state management |
+| Tooltips | CSS `::after` with `data-tooltip` | Need dynamic positioning |
+| Modals | CSS `:target` selector | Need focus trap, escape key, backdrop click |
+| Hover effects | CSS `:hover`, `:focus`, `:active` | Never - always CSS |
+| Animations | CSS `@keyframes`, `transition` | Complex sequenced animations |
+| Responsive design | CSS media queries | Never - always CSS |
+| Toggle switches | CSS with hidden checkbox | Need state persistence |
+| Dropdowns/menus | CSS `:focus-within` | Complex multi-level menus |
+| Progress bars | HTML5 `<progress>` | Need dynamic updates |
+| Sliders | HTML5 `<input type="range">` | Complex custom styling |
+| Date pickers | HTML5 `<input type="date">` | Need custom calendar UI |
+| Color pickers | HTML5 `<input type="color">` | Need swatches or advanced features |
+| Accordions | `<details>/<summary>` | Need single-open behavior |
+
+**JavaScript Guidelines:**
+- **Last resort** - only when HTML5/CSS cannot achieve the functionality
+- **Progressive enhancement** - features must work without JS where possible
+- **No JS for styling** - unless it cannot be done in HTML5 and CSS
+- **No JS for simple interactions** - hover, focus, basic toggles are CSS-only
+
+**HTML5 Required:**
+- ALL HTML MUST be valid HTML5
+- Use `<!DOCTYPE html>` declaration
+- Use semantic HTML5 elements: `<header>`, `<nav>`, `<main>`, `<footer>`, `<article>`, `<section>`, `<aside>`
+- Use HTML5 form elements: `<input type="email">`, `<input type="date">`, `<input type="number">`, etc.
+- Use HTML5 attributes: `required`, `pattern`, `placeholder`, `autofocus`, `autocomplete`
+- NO deprecated elements: `<center>`, `<font>`, `<marquee>`, `<blink>`, etc.
+- NO deprecated attributes: `align`, `bgcolor`, `border`, `cellpadding`, etc.
+- **Required for**: API calls, dynamic content loading, complex state, WebSockets
+- **Size matters** - keep JS minimal, no large libraries for simple tasks
+
+**Native HTML5 first — these need NO JavaScript at all:**
+```html
+<!-- Reset form: native reset button, NOT onclick + form.reset() -->
+<button type="reset">Reset Form</button>
+
+<!-- Back to top: anchor link + CSS `html { scroll-behavior: smooth; }`, NOT window.scrollTo() -->
+<a href="#top" class="btn">Back to Top</a>
+
+<!-- Close a <dialog>: method="dialog" form, NOT onclick + dialog.close() -->
+<form method="dialog"><button>Close</button></form>
 ```
 
-**Query param bypass:** `?token=` auth (last in the PART 8 priority order) travels in the URL, not a header — it never triggers a CORS preflight and works from any origin regardless of the allow_headers list.
+**Inline JavaScript - Allowed only for one-liners with no HTML5/CSS equivalent:**
+```html
+<!-- Navigation -->
+<button onclick="history.back()">Go Back</button>
+<button onclick="history.forward()">Go Forward</button>
+<button onclick="location.reload()">Refresh</button>
 
-```yaml
-server:
-  cors:
-    allowed_origins:
-      - "https://app.example.com"
-    allow_credentials: true
-    max_age: 86400
+<!-- Print -->
+<button onclick="window.print()">Print</button>
+
+<!-- Form helpers -->
+<button onclick="document.getElementById('field').select()">Select All</button>
 ```
 
-### CORS Headers
+**Rule:** Inline JS is fine for one-liner operations that cannot be done with CSS/HTML5.
+Move to `static/js/app.js` if logic needs feedback, reuse, or exceeds one statement.
+See **JavaScript Rules** section below for `app.js` structure.
 
-| Header | Value |
-|--------|-------|
-| `Access-Control-Allow-Origin` | Configured origin(s) or `*` |
-| `Access-Control-Allow-Methods` | `GET, POST, PUT, PATCH, DELETE, OPTIONS` |
-| `Access-Control-Allow-Headers` | `Content-Type, Accept, X-Requested-With, Authorization, X-API-Key, X-Api-Key, API-Key, ApiKey, X-Auth-Token, X-Access-Token, X-Token, Token, X-CSRF-Token, X-XSRF-Token, X-Session-ID, X-Service-Token, X-Internal-Token` |
-| `Access-Control-Allow-Credentials` | `true` (only when specific origin, not `*`) |
-| `Access-Control-Max-Age` | `86400` (24 hours) |
-
-**Never `*` here:** the Fetch spec's `Access-Control-Allow-Headers: *` wildcard does NOT cover `Authorization`, and wildcards are invalid when credentials are allowed. Every supported auth header is listed by name — keep in sync with PART 8 → "Auth Token Headers (All Headers Supported)".
-
-### Behavior
-
-| Scenario | Behavior |
-|----------|----------|
-| `allowed_origins: ["*"]` | Allow all origins, credentials NOT allowed |
-| `allowed_origins: ["https://example.com"]` | Allow single origin, credentials allowed |
-| `allowed_origins: ["https://a.com", "https://b.com"]` | Allow listed origins, credentials allowed |
-| `allowed_origins: [""]` | No CORS headers (same-origin only) |
-| Preflight (OPTIONS) | Return CORS headers, 204 No Content |
-
-### CORS Allow-list Resolution Order
-
-The effective CORS allow-list is resolved from these sources in order; the request `Origin` is matched against the combined list:
-
-1. **Explicit config** — origins listed in `server.cors.allowed_origins`. A single `""` entry disables CORS entirely and stops resolution.
-2. **DOMAIN env entries** — every hostname from the `DOMAIN` environment variable is added as an `https://` origin.
-3. **Reverse-proxy-learned hosts** — hostnames observed via `X-Forwarded-Host` from trusted proxies only (gated on `trusted_proxies` — see PART 12 → "Trusted Proxies") are appended at runtime.
-4. **Default** — if no source produced a list, fall back to `*` (credentials NOT allowed).
-
-Credentials (`Access-Control-Allow-Credentials: true`) are sent only when the resolved list is explicit — never with `*`. CSP `connect-src` `{learned_origins}` (PART 11 → "Content Security Policy") uses this same resolved list.
-
-### Mode-Specific Behavior
-
-| Mode | Default | Behavior |
-|------|---------|----------|
-| Production | `*` | Allow all origins by default (configure if needed) |
-| Development | `*` | Allow all origins |
-
----
-
-## CSRF Protection
-
-Use the stateless double-submit cookie pattern — there are no sessions, so the token is never stored server-side. The server sets a `csrf_token` cookie (`SameSite=Strict`, `Secure`, NOT `HttpOnly` — JavaScript must read it) and every mutating browser request must echo the same value in the `X-CSRF-Token` header or a `csrf_token` form field. The middleware compares the two in constant time.
-
-Validation applies only to POST/PUT/PATCH/DELETE requests. Requests authenticated with a `Bearer` token bypass CSRF entirely (a bearer header cannot be sent cross-site by a form), as do safe methods and paths listed in `server.csrf.exempt_paths`.
-
-```rust
-// Generate a random token for the double-submit cookie
-pub fn generate_csrf_token() -> String {
-    use rand::Rng;
-    rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
-        .take(32)
-        .map(char::from)
-        .collect()
-}
-
-// Middleware
-async fn csrf_middleware(
-    cookies: axum_extra::extract::CookieJar,
-    request: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> Result<axum::response::Response, axum::http::StatusCode> {
-    let method = request.method().clone();
-    if matches!(method, axum::http::Method::POST | axum::http::Method::PUT |
-                axum::http::Method::PATCH | axum::http::Method::DELETE) {
-        // Bearer-authenticated API requests bypass CSRF
-        let is_bearer = request
-            .headers()
-            .get(axum::http::header::AUTHORIZATION)
-            .and_then(|v| v.to_str().ok())
-            .map(|v| v.starts_with("Bearer "))
-            .unwrap_or(false);
-        // Paths listed in server.csrf.exempt_paths bypass CSRF
-        let exempt = config::csrf_exempt_paths()
-            .iter()
-            .any(|p| request.uri().path() == p);
-        if !is_bearer && !exempt {
-            let cookie_token = cookies.get("csrf_token").map(|c| c.value().to_string());
-            // Prefer the X-CSRF-Token header (AJAX requests)
-            let header_token = request
-                .headers()
-                .get("X-CSRF-Token")
-                .and_then(|v| v.to_str().ok())
-                .map(|s| s.to_string());
-            // Fall back to the csrf_token form field (no-JS form posts)
-            let (request, submitted) = match header_token {
-                Some(t) => (request, Some(t)),
-                None => extract_form_csrf_token(request).await,
-            };
-            return match (cookie_token, submitted) {
-                (Some(c), Some(s)) if constant_time_eq(c.as_bytes(), s.as_bytes()) => {
-                    Ok(next.run(request).await)
-                }
-                _ => Err(axum::http::StatusCode::FORBIDDEN),
-            };
-        }
-    }
-    Ok(next.run(request).await)
-}
-
-// extract_form_csrf_token buffers a urlencoded form body, reads csrf_token,
-// and rebuilds the request so downstream extractors still see the body
-async fn extract_form_csrf_token(
-    request: axum::extract::Request,
-) -> (axum::extract::Request, Option<String>) {
-    let is_form = request
-        .headers()
-        .get(axum::http::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .map(|ct| ct.starts_with("application/x-www-form-urlencoded"))
-        .unwrap_or(false);
-    if !is_form {
-        return (request, None);
-    }
-    let (parts, body) = request.into_parts();
-    let bytes = match axum::body::to_bytes(body, 64 * 1024).await {
-        Ok(b) => b,
-        Err(_) => {
-            let rebuilt = axum::extract::Request::from_parts(parts, axum::body::Body::empty());
-            return (rebuilt, None);
-        }
-    };
-    let token = url::form_urlencoded::parse(&bytes)
-        .find(|(k, _)| k == "csrf_token")
-        .map(|(_, v)| v.into_owned());
-    let rebuilt = axum::extract::Request::from_parts(parts, axum::body::Body::from(bytes));
-    (rebuilt, token)
-}
-```
-
-**Validation failure logging:** every CSRF rejection (the `_ => Err(...)` arm above) is logged to `audit.log` as `security.csrf_failure` (IP, endpoint, reason — see PART 11 → "Audit Log Events").
-
-Include the CSRF token in every HTML form:
+**CSS-First Patterns (use these instead of JS):**
 
 ```html
-<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<!-- Collapsible section - use <details>/<summary> NOT JS -->
+<details>
+  <summary>Click to expand</summary>
+  <p>Hidden content revealed when clicked.</p>
+</details>
+
+<!-- Toggle menu - use checkbox hack NOT JS -->
+<label for="menu-toggle" class="menu-btn">☰ Menu</label>
+<input type="checkbox" id="menu-toggle" hidden>
+<nav class="menu">
+  <a href="/">Home</a>
+  <a href="/server/about">About</a>
+</nav>
+
+<style>
+.menu { display: none; }
+#menu-toggle:checked ~ .menu { display: block; }
+</style>
+
+<!-- Dropdown - use :focus-within NOT JS -->
+<div class="dropdown">
+  <button>Options</button>
+  <div class="dropdown-content">
+    <a href="#">Option 1</a>
+    <a href="#">Option 2</a>
+  </div>
+</div>
+
+<style>
+.dropdown-content { display: none; }
+.dropdown:focus-within .dropdown-content { display: block; }
+</style>
 ```
 
-And in every AJAX request header:
+### Askama Templates
 
-```javascript
-headers: { 'X-CSRF-Token': document.cookie.match(/csrf_token=([^;]+)/)?.[1] ?? '' }
+**ALL frontend HTML MUST use the `askama` crate for type-safe templating.**
+
+**Untrusted-content rule:** pasted text, repo blobs, markdown files, and any user-submitted file content are data, not templates. Follow PART 11 "Untrusted File / Rich Content Handling" and NEVER pass user-controlled content as raw HTML unless it came from a sanitizer for an explicitly approved field.
+
+**`markdown_to_html` requirements:**
+- Disable raw HTML passthrough from the markdown source
+- Sanitize the rendered output with an allow-list policy before returning safe HTML
+- Escape code fences/source text before syntax-highlighting wrappers are added
+- Add safe link attributes for external URLs (`rel="noopener noreferrer nofollow ugc"`)
+
+| Location | Purpose |
+|----------|---------|
+| `src/server/templates/` | All `.html` askama template files |
+| `src/server/templates/partials/` | Reusable template partials |
+| `src/server/templates/layouts/` | Base layouts |
+| `src/server/templates/pages/` | Page-specific templates |
+| `src/server/static/` | Static assets (CSS, JS, images) |
+
+**Template Structure (all files use `.html` extension with askama):**
 ```
-
----
-
-## HTML5/CSS over JavaScript
-
-Prefer native HTML5 and CSS for UI features where possible. Use JavaScript only for behavior that HTML/CSS cannot provide.
-
-| Feature | Native solution |
-|---|---|
-| Dropdown menus | `<details>` + `<summary>` |
-| Modals | `<dialog>` |
-| Form validation | `required`, `type`, `pattern`, `minlength`, `maxlength`; error styling via CSS `:user-invalid` |
-| Tooltips | `title` attribute + CSS `[title]::after` |
-| Accordions | `<details>` + `<summary>` |
-| Progress | `<progress>` |
-| Meter | `<meter>` |
-| Date picker | `<input type="date">` |
-| Color picker | `<input type="color">` |
-| Range slider | `<input type="range">` |
-
----
-
-## Tera Templates
-
-### Template Structure
-
+src/server/templates/
+├── layouts/
+│   ├── public.html         # Public-facing layout (/, /server/auth/*, /server/*)
+│   └── admin.html          # Admin panel layout (/server/{admin_path}/*) - PART 28 only
+├── partials/
+│   ├── public/
+│   │   ├── header.html     # Public header (logo, nav, login)
+│   │   ├── nav.html        # Public navigation
+│   │   └── footer.html     # Public footer (about, privacy, etc.)
+│   ├── admin/              # PART 28 only
+│   │   ├── header.html     # Admin header (logo, search, notifications, logout)
+│   │   ├── sidebar.html    # Admin sidebar navigation
+│   │   └── footer.html     # Admin footer (version, docs)
+│   ├── head.html           # <head> contents (meta, CSS)
+│   └── scripts.html        # JavaScript includes
+├── pages/
+│   ├── index.html          # Home page
+│   ├── healthz.html        # Health check page
+│   └── error.html          # Error pages (404, 500, 502, 503, etc.) - MUST use site theme
+├── auth/
+│   └── login.html          # Token-entry login page (core `sys_` tokens; admin token when PART 28 enabled)
+├── admin/                  # PART 28 only
+│   ├── dashboard.html      # Admin dashboard
+│   ├── settings.html       # Settings page
+│   └── ...
+└── components/
+    ├── modal.html          # Reusable modal component
+    ├── toast.html          # Toast notifications
+    └── ...
 ```
-template/
-  layout/
-    base.html.tera
-    public.html.tera
-  partial/
-    public/
-      header.html.tera
-      footer.html.tera
-      nav.html.tera
-      head.html.tera
-      scripts.html.tera
-  page/
-    home.html.tera
-    search.html.tera
-    error.html.tera        # Error pages (404, 500, 502, 503, etc.) - MUST use site theme
-    offline.html.tera
-```
-
 
 ## Error Pages (MUST Match Theme)
 
@@ -23135,17 +24944,17 @@ template/
 | 503 | Service Unavailable | ✅ Yes |
 
 **Error page requirements:**
-- Use `error.html.tera` template (extends `public.html.tera` layout)
+- Use `error.html` template (extends `layouts/public.html`)
 - Respect user's theme preference (dark/light/auto)
 - Include navigation (user can navigate away)
 - Show appropriate error message (not stack traces in production)
 - Provide helpful action (go home, go back, contact support)
 - NO generic browser error pages - always render themed template
 
-**Error page structure:**
-```
-{# Extends public layout #}
-{% extends "public.html.tera" %}
+**Error page structure (askama):**
+```html
+{% extends "layouts/public.html" %}
+
 {% block content %}
 <div class="error-page">
   <h1>{{ status_code }}</h1>
@@ -23156,991 +24965,828 @@ template/
 {% endblock %}
 ```
 
-### Layout Separation
+## Layout Separation
 
-| Layout | Purpose |
-|---|---|
-| `base.html.tera` | Root shell: `<html>`, `<head>`, `<body>` wrapper |
-| `public.html.tera` | All pages (header, footer, no sidebar) — every page is public; there is no auth or admin layout |
+**Public and Admin routes use DIFFERENT layouts (the admin layout exists only when the server admin panel is enabled — PART 28):**
+
+| Layout | Routes | Design Philosophy |
+|--------|--------|-------------------|
+| `public.html` | `/`, `/server/auth/*`, `/server/*` | Clean, marketing-friendly, top navigation |
+| `admin.html` | `/server/{admin_path}/*` | Dashboard-style, sidebar navigation, data-dense — PART 28 only |
+
+### Public Layout (`public.html`)
+
+**For end-users and public-facing pages:**
 
 ```
-{# base.html.tera #}
+┌─────────────────────────────────────────────────────────────────┐
+│  [Logo]              Home  API  Docs                [Theme]     │  ← Header + Top Nav
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│                                                                 │
+│                         <main>                                  │  ← Page content
+│                     (centered, clean)                           │
+│                                                                 │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│        About · Privacy · Contact · GitHub · {project_version}   │  ← Footer (centered)
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Public Layout Characteristics:**
+- Top horizontal navigation bar
+- Clean, minimal design with whitespace
+- Centered content area
+- Marketing/product-focused styling
+- Simple footer with links
+
+**Public Navigation Rules:**
+
+| Rule | Description |
+|------|-------------|
+| **App-focused** | Navigation reflects the application's features and purpose |
+| **NO admin links** | NEVER link to `/server/{admin_path}` from public pages |
+| **NO admin hints** | Do not advertise that an admin panel exists |
+| **Direct access only** | Admin panel accessed by navigating directly to `{fqdn}/server/{admin_path}` |
+
+**Public nav contains (project-specific):**
+- Home (`/`)
+- App-specific feature pages (e.g., API docs, features, pricing)
+- Login — the token-entry login page (core, `sys_` tokens)
+- User menu (if logged in): Help, Logout
+
+**Public nav NEVER contains:**
+- ❌ Admin link
+- ❌ Dashboard link (unless user dashboard)
+- ❌ Settings link to admin settings
+- ❌ Any hint of `/server/{admin_path}/*` routes
+
+### Admin Layout (`admin.html`)
+
+Admin-panel-only — the full admin layout specification (header with search and notifications, collapsible sidebar, dashboard mockups, breadcrumbs, compact footer) lives in PART 28. When the admin panel is disabled (the default), `admin.html` and the `partials/admin/*` partials are not built.
+
+### Shared Theme Classes
+
+**Both `public.html` and `admin.html` use the SAME theme CSS classes. No conflicts, no ambiguities.**
+
+| Rule | Description |
+|------|-------------|
+| **Same theme classes** | Both layouts use `theme-dark`, `theme-light` on `<html>` |
+| **Same CSS variables** | Theme colors defined once in `common.css`, used everywhere |
+| **Same color schemes** | `dark.css` and `light.css` apply to both public and admin |
+| **No layout-specific themes** | Do NOT create `admin-dark.css` or `public-light.css` |
+| **No class conflicts** | Theme class names are global and consistent |
+| **No ambiguity** | One set of theme rules for the entire project |
+
+**Both layouts start with:**
+```html
 <!DOCTYPE html>
-<html lang="{{ lang }}" dir="{{ dir }}">
-<head>{% include "head.html" %}</head>
-<body>
-  {% include "header.html" %}
-  {% include "nav.html" %}
-  <main>{% block content %}{% endblock %}</main>
-  {% include "footer.html" %}
-  {% include "scripts.html" %}
-</body>
-</html>
+<html lang="{{ lang }}" dir="{{ dir }}" class="theme-dark">  <!-- or theme-light -->
+<head>
+  {% include "partials/head.html" %}
+</head>
 ```
+
+**Theme class on `<html>` element (NOT `<body>`):**
+```html
+<!-- CORRECT -->
+<html class="theme-dark">
+
+<!-- WRONG - do not put theme class on body -->
+<body class="theme-dark">
+```
+
+**CSS variable inheritance:**
+```css
+/* common.css - theme variables */
+html.theme-dark {
+  --color-bg: #282a36;
+  --color-text: #f8f8f2;
+  --color-border: #44475a;
+  /* ... all theme colors ... */
+}
+
+html.theme-light {
+  --color-bg: #ffffff;
+  --color-text: #1f2328;
+  --color-border: #d1d9e0;
+  /* ... all theme colors ... */
+}
+
+/* public.css and admin.css use the SAME variables */
+.sidebar { background: var(--color-bg); }
+.header { color: var(--color-text); }
+```
+
+**Theme preference source:**
+| Context | Preference Source | Fallback |
+|---------|-------------------|----------|
+| Public (guest) | `theme` cookie (server-readable) | `dark` |
+| Public (user) | `user_preferences.theme` | `dark` |
+| Admin | `admin_preferences.theme` | `dark` |
+
+**Theme switching (shared):**
+
+**Note:** Per "HTML5 & CSS Over JavaScript" rules - CSS does all theming via variables. The SERVER reads the `theme` cookie and renders the class on `<html>` — no FOUC, no JS required to load the correct theme. `auto` renders no explicit class; pure CSS `prefers-color-scheme` handles it — no `matchMedia` needed. Without JS the toggle is a small POST form (server sets the cookie and redirects back). JavaScript ONLY makes the toggle apply without a page reload:
+
+```javascript
+// Same function works for both public and admin - progressive enhancement only.
+// JS only swaps the class and stores the cookie; the server renders the class
+// on the next full page load. `auto` = no class, CSS prefers-color-scheme rules apply.
+function setTheme(theme) {
+  document.documentElement.className = theme === 'auto' ? '' : `theme-${theme}`;
+  document.cookie = `theme=${theme}; path=/; max-age=31536000; SameSite=Lax`;
+}
+```
+
+### Layout Partials
+
+| Partial | Public | Admin | Purpose |
+|---------|:------:|:-----:|---------|
+| `partials/public/header.html` | ✓ | | Logo + top nav + login/user menu |
+| `partials/public/nav.html` | ✓ | | Horizontal navigation links |
+| `partials/public/footer.html` | ✓ | | About, Privacy, Contact links |
+| `partials/admin/header.html` | | ✓ | Logo + search + bell + admin menu |
+| `partials/admin/sidebar.html` | | ✓ | Collapsible sidebar navigation |
+| `partials/admin/footer.html` | | ✓ | Version, docs, status |
+| `partials/head.html` | ✓ | ✓ | Shared `<head>` contents |
+| `partials/scripts.html` | ✓ | ✓ | Shared JavaScript includes |
+
+`partials/admin/*` partials exist only when the admin panel is enabled (PART 28).
 
 ### Static Assets Organization
 
 ```
-static/
-  css/
-    variables.css    ← CSS custom properties only
-    reset.css        ← Normalize / reset
-    base.css         ← Typography, body defaults
-    layout.css       ← Grid, flexbox utilities
-    components.css   ← Buttons, forms, modals, etc.
-    themes.css       ← .theme-light overrides
-    utilities.css    ← Single-purpose helpers
-    main.css         ← @import all of the above
-  js/
-    main.js          ← ES module entry point
-    sw.js            ← Service worker
-    sw-register.js   ← SW registration
-    components/      ← Per-component JS modules
-  icons/             ← SVG icons (inline-able)
-  fonts/             ← Self-hosted fonts (woff2)
-  images/            ← Static images
-  manifest.json
+src/server/static/
+├── css/
+│   ├── common.css      # Reset, variables, utilities (loaded first)
+│   ├── public.css      # Public layout styles
+│   ├── admin.css       # Admin layout styles (PART 28 only)
+│   └── components.css  # Shared components (modals, buttons, toasts)
+├── js/
+│   └── app.js          # ALL JavaScript in ONE file (minimal)
+├── images/
+│   ├── logo.svg        # App logo (SVG preferred)
+│   ├── favicon.ico     # Favicon
+│   └── icons/          # UI icons (SVG preferred)
+└── fonts/              # Self-hosted fonts (if any)
 ```
 
 ### CSS Rules
 
-- One `variables.css` file per project — all custom properties live there.
-- Never use `!important` except for utility overrides (`.sr-only`, `.hidden`).
-- Component styles are scoped with a BEM block class (`.card`, `.btn`, `.modal`).
-- Media queries are co-located with the component they modify, not in a separate file.
-- Dark theme is the default; `.theme-light` overrides colors only.
+| Rule | Description |
+|------|-------------|
+| **One file per context** | `common.css`, `public.css`, `admin.css`, `components.css` |
+| **Load order matters** | common → components → public/admin |
+| **CSS variables** | Define in `common.css` `:root {}` for theming |
+| **NO inline styles** | All styles in CSS files, never in HTML |
+| **NO `!important`** | Exception: print styles only |
+| **BEM-like naming** | `.component`, `.component-element`, `.component--modifier` |
+| **Mobile-first** | Base styles for mobile, `@media (min-width)` for larger |
+
+**CSS Variables (common.css):**
+```css
+:root {
+  /* Colors — reuse the --color-* variables from the CSS Variable Reference
+     above (defined once in html.theme-dark / html.theme-light); never
+     redefine them here with different names or values. */
+
+  /* Typography */
+  --font-family: system-ui, -apple-system, sans-serif;
+  --font-size-base: 1rem;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 2rem;
+
+  /* Borders */
+  --border-radius: 0.25rem;
+}
+```
 
 ### JavaScript Rules
 
-- Vanilla ES modules. No bundler required for development; optional esbuild for production.
-- `type="module"` on all `<script>` tags.
-- No global state — use module-scoped variables or `CustomEvent` for cross-component communication.
-- Progressive enhancement: all core functionality works without JavaScript.
-- `defer` is implicit with `type="module"` — do not add it redundantly.
+| Rule | Description |
+|------|-------------|
+| **ONE file only** | All JS in `static/js/app.js` - no multiple files |
+| **Minimal JS** | CSS-first, JS only when absolutely necessary |
+| **No frameworks** | No React, Vue, Alpine, jQuery, etc. |
+| **No bundlers** | No webpack, vite, rollup - plain JS only |
+| **No transpilers** | No TypeScript, Babel - browser-native JS only |
+| **No npm/node** | No package.json for frontend |
+
+**app.js Structure:**
+```js
+// static/js/app.js - Keep this file SMALL
+
+// ============================================================================
+// Clipboard (with feedback)
+// ============================================================================
+function copyToClipboard(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const original = btn.textContent;
+    btn.textContent = btn.dataset.copiedLabel || 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+// ============================================================================
+// Toast notifications
+// ============================================================================
+function showToast(message, type = 'info', duration = 3000) {
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  setTimeout(() => toast.remove(), duration);
+}
+
+// ============================================================================
+// Modal helpers (for native <dialog>)
+// ============================================================================
+function openModal(id) {
+  document.getElementById(id).showModal();
+}
+
+function closeModal(id) {
+  document.getElementById(id).close();
+}
+
+// ============================================================================
+// Form helpers
+// ============================================================================
+// Destructive-action confirmation - native <dialog>, NEVER confirm()
+// (see Frontend UI Elements: alert()/confirm()/prompt() are forbidden).
+// No-JS baseline: the form POSTs directly and the server renders a
+// confirmation page before performing the destructive action.
+function confirmDelete(form, dialogId) {
+  const dialog = document.getElementById(dialogId);
+  dialog.addEventListener('close', () => {
+    if (dialog.returnValue === 'confirm') form.submit();
+  }, { once: true });
+  dialog.showModal();
+}
+```
+
+**What goes in app.js:**
+- Clipboard with feedback
+- Toast notifications
+- Modal helpers
+- Form validation (complex only)
+- Dynamic content loading (AJAX)
+- WebSocket connections
+
+**What stays inline (simple one-liners):**
+- `onclick="history.back()"`
+- `onclick="window.print()"`
+
+**What needs NO JS at all:** closing a `<dialog>` uses `<form method="dialog"><button>Close</button></form>` — never an `onclick` close handler.
 
 ### Template Rules
 
-- Templates are HTML-first — no logic beyond conditionals and loops.
-- All user-supplied data is auto-escaped by Tera (`{{ var }}` escapes; `{{ var | safe }}` opts out — use only for pre-sanitized HTML).
-- Partials receive only the variables they need — pass explicit context, not a god-object.
-- Template files use `.html.tera` extension.
+| Rule | Description |
+|------|-------------|
+| **Askama templates only** | `askama` crate, `.html` extension |
+| **Layouts for structure** | `layouts/public.html`, `layouts/admin.html` |
+| **Partials for reuse** | Header, nav, footer, components |
+| **Pages for content** | One `.html` per page/route |
+| **No logic in templates** | Minimal `{% if %}`, `{% for %}` - logic in handlers |
+
+**Template Inheritance (askama):**
+```
+layouts/public.html
+  └── includes partials/head.html
+  └── includes partials/public/header.html
+  └── includes partials/public/nav.html
+  └── yields to page content ({% block content %}{% endblock %})
+  └── includes partials/public/footer.html
+  └── includes partials/scripts.html
+```
 
 ### Partials Rules
 
-- A partial may not include another partial more than one level deep.
-- Each partial documents its required variables in a comment at the top.
-- Partials are stateless — they render only what they receive.
+| Rule | Description |
+|------|-------------|
+| **Shared partials** | `partials/head.html`, `partials/scripts.html` |
+| **Context partials** | `partials/public/*`, `partials/admin/*` |
+| **Component partials** | Reusable UI: `partials/toast.html`, `partials/modal.html` |
+| **No page-specific partials** | If used once, it's not a partial |
+| **Self-contained** | Partials include their own styles/scripts if needed |
 
-### Embedding Templates
-
-```rust
-use rust_embed::RustEmbed;
-#[derive(RustEmbed)]
-#[folder = "template/"]
-#[include = "*.html.tera"]
-struct TemplateAssets;
-#[derive(RustEmbed)]
-#[folder = "static/"]
-struct StaticAssets;
+**Mandatory Partials:**
+```
+partials/
+├── head.html           # <head> - meta, CSS links (REQUIRED)
+├── scripts.html        # JS includes before </body> (REQUIRED)
+├── public/
+│   ├── header.html     # Public header (REQUIRED)
+│   ├── nav.html        # Public nav (REQUIRED)
+│   └── footer.html     # Public footer (REQUIRED)
+└── admin/              # PART 28 only
+    ├── header.html     # Admin header (REQUIRED when admin panel enabled)
+    ├── sidebar.html    # Admin sidebar (REQUIRED when admin panel enabled)
+    └── footer.html     # Admin footer (REQUIRED when admin panel enabled)
 ```
 
-Load templates into Tera at startup:
+**Optional Component Partials:**
+```
+partials/
+├── toast.html          # Toast notification container
+├── modal.html          # Reusable modal structure
+├── pagination.html     # Pagination controls
+├── search.html         # Search form
+└── {project}/          # Project-specific partials
+    └── *.html
+```
 
-```rust
-use tera::Tera;
+**Page Structure - Public:**
 
-pub fn build_tera() -> Result<Tera> {
-    let mut tera = Tera::default();
-    for file in TemplateAssets::iter() {
-        let content = TemplateAssets::get(&file)
-            .ok_or_else(|| anyhow::anyhow!("missing template: {}", file))?;
-        let src = std::str::from_utf8(content.data.as_ref())?;
-        tera.add_raw_template(&file, src)?;
-    }
-    Ok(tera)
+```
+┌─────────────────────────────────────┐
+│              <header>               │  ← public/header.html
+├─────────────────────────────────────┤
+│               <nav>                 │  ← public/nav.html (TOP)
+├─────────────────────────────────────┤
+│                                     │
+│              <main>                 │  ← Page content
+│                                     │
+├─────────────────────────────────────┤
+│              <footer>               │  ← public/footer.html (BOTTOM)
+└─────────────────────────────────────┘
+```
+
+**Page Structure - Admin (PART 28 only):**
+
+```
+┌─────────────────────────────────────┐
+│              <header>               │  ← admin/header.html
+├──────────┬──────────────────────────┤
+│          │                          │
+│  <aside> │         <main>           │  ← admin/sidebar.html + content
+│          │                          │
+├──────────┴──────────────────────────┤
+│              <footer>               │  ← admin/footer.html
+└─────────────────────────────────────┘
+```
+
+**Nav vs Footer:**
+
+| Element | Position | Purpose | Contents |
+|---------|----------|---------|----------|
+| `<nav>` | TOP | Navigation | Links to app sections, user menu |
+| `<footer>` | BOTTOM | Information | About, Privacy, Contact, Help, GitHub, version |
+
+**Nav contains (app navigation):**
+- Home link
+- App-specific sections (project-defined)
+- User menu (right side):
+  - If logged in: Username dropdown → Help, Logout
+  - If logged out: Login link
+
+**Nav does NOT contain:**
+- API link (users access via `/server/docs/swagger` if needed)
+- Admin link (don't advertise - admins know where it is)
+- Help link (belongs in footer)
+
+**Default Navigation (nav.html):**
+
+```
+Desktop:
+┌─────────────────────────────────────────────────────────────────┐
+│  {project_name}                                          [Theme] │  ← Header
+├─────────────────────────────────────────────────────────────────┤
+│  Home  |  [App Section 1]  |  [App Section 2]  |  ...           │  ← Nav
+└─────────────────────────────────────────────────────────────────┘
+
+Mobile:
+┌─────────────────────────────────────────────────────────────────┐
+│  {project_name}                                          [Theme] │  ← Header
+├─────────────────────────────────────────────────────────────────┤
+│                                                      [☰ Menu]   │  ← Nav row
+└─────────────────────────────────────────────────────────────────┘
+                                              ┌───────────────────┐
+                                              │  Home             │
+                                              │  App Section 1    │  ← Slide-in
+                                              │  App Section 2    │     from right
+                                              │  ...              │
+                                              └───────────────────┘
+```
+
+```html
+<!-- Header bar: site name + user icon -->
+<header class="header">
+  <a href="/" class="site-brand">{project_name}</a>
+
+  <!-- User icon (always visible, far right) -->
+  <div class="user-menu">
+    {% if let Some(user) = user %}
+      <!-- Logged in: user icon dropdown -->
+      <div class="dropdown">
+        <button class="dropdown-toggle user-icon" aria-label="User menu">
+          <svg>...</svg>
+        </button>
+        <div class="dropdown-menu">
+          <span class="dropdown-header">{{ user.username }}</span>
+          <a href="/server/help">Help</a>
+          <hr />
+          <form action="/server/auth/logout" method="POST">
+            <button type="submit" class="dropdown-item logout">Logout</button>
+          </form>
+        </div>
+      </div>
+    {% else %}
+      <!-- Logged out: login icon -->
+      <a href="/server/auth/login" class="user-icon" aria-label="Login">
+        <svg>...</svg>
+      </a>
+    {% endif %}
+  </div>
+</header>
+
+<!-- Nav bar: separate row below header (CSS-only mobile menu) -->
+<nav class="nav">
+  <!-- Hidden checkbox controls menu state - NO JavaScript -->
+  <input type="checkbox" id="nav-toggle" class="nav-checkbox" hidden>
+
+  <!-- Desktop: inline links | Mobile: hamburger only -->
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <!-- App-specific sections (project-defined) -->
+  </div>
+
+  <!-- Mobile: hamburger toggle (checkbox label) -->
+  <label for="nav-toggle" class="nav-toggle" aria-label="Toggle navigation">☰</label>
+
+  <!-- Slide-in panel for mobile -->
+  <div class="nav-panel">
+    <label for="nav-toggle" class="nav-close" aria-label="Close menu">✕</label>
+    <a href="/">Home</a>
+    <!-- App-specific sections (project-defined) -->
+  </div>
+
+  <!-- Overlay - clicking label unchecks checkbox, closing menu -->
+  <label for="nav-toggle" class="nav-overlay"></label>
+</nav>
+```
+
+**Mobile Menu Behavior:**
+- Menu slides in from RIGHT edge
+- Slides LEFT to open (right-to-left)
+- Slides RIGHT to close (left-to-right)
+- Overlay dims background, click to close
+- User icon stays in header (NOT in menu) - keeps menu clean
+
+**Smart Menu:**
+- If all nav links fit on screen → show inline links, NO hamburger
+- If nav links overflow → show hamburger menu
+- Detect dynamically on load and resize
+- Don't show hamburger if not needed
+
+**CSS-Only Mobile Menu (NO JavaScript) - Mobile-First:**
+```css
+/* Base: Mobile styles (no media query) */
+.nav-toggle { display: block; cursor: pointer; }
+.nav-links { display: none; }
+
+/* Slide-in panel (mobile) */
+.nav-panel {
+  position: fixed;
+  top: 0;
+  right: -280px;           /* Hidden off-screen right */
+  width: 280px;
+  height: 100vh;
+  background: var(--color-bg);
+  transition: right 0.3s ease;
+  z-index: 1001;
+}
+
+/* Overlay (hidden by default) */
+.nav-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  cursor: pointer;
+}
+
+/* When checkbox is checked: show menu and overlay */
+.nav-checkbox:checked ~ .nav-panel {
+  right: 0;                /* Slide in from right */
+}
+
+.nav-checkbox:checked ~ .nav-overlay {
+  display: block;
+}
+
+/* Desktop: show inline links, hide hamburger */
+@media (min-width: 768px) {
+  .nav-toggle, .nav-panel, .nav-overlay { display: none; }
+  .nav-links { display: flex; }
 }
 ```
 
-#### Usage in page templates
+**Mobile Responsive Rules:**
+- Nav row below header: inline links or hamburger
+- User icon ALWAYS in header (never in menu)
+- Menu slides from right edge
+- Touch-friendly: minimum 44x44px tap targets
+- Overlay closes menu on tap (CSS label toggles checkbox - no JS)
 
-```
-{% block content %}
-<div class="search-section">
-  {% include "search-box.html" %}
-</div>
-<div class="results">
-  {% for result in results %}
-    {% include "result-card.html" %}
-  {% endfor %}
-</div>
-{% include "pagination.html" %}
-{% endblock %}
-```
+**No Fixed/Pinned Page Chrome:**
+- Header, nav, footer all scroll with page
+- No page chrome (header/nav/footer) pinned/fixed to viewport
+- User scrolls down → header/nav scroll away
+- User scrolls to bottom → footer appears
+- Transient overlays are the ONLY exception: toasts (fixed top-right) and the cookie consent banner (fixed bottom) are required fixed elements
 
----
-
-## Unified Color Palette
-
-// src/common/theme/colors.rs
-
-```rust
-// src/common/theme/colors.rs
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ThemePalette {
-    pub background: String,
-    pub foreground: String,
-    pub primary: String,
-    pub secondary: String,
-    pub accent: String,
-    pub success: String,
-    pub warning: String,
-    pub error: String,
-    pub info: String,
-    pub surface: String,
-    pub surface_alt: String,
-    pub border: String,
-    pub muted: String,
-}
-pub fn theme_palette_dark() -> ThemePalette {
-    ThemePalette {
-        background: "#282a36".into(), foreground: "#f8f8f2".into(),
-        primary: "#bd93f9".into(), secondary: "#50fa7b".into(), accent: "#ff79c6".into(),
-        success: "#50fa7b".into(), warning: "#ffb86c".into(), error: "#ff5555".into(), info: "#8be9fd".into(),
-        surface: "#2b2d3a".into(), surface_alt: "#21222c".into(), border: "#44475a".into(), muted: "#6272a4".into(),
-    }
-}
-pub fn theme_palette_light() -> ThemePalette {
-    ThemePalette {
-        background: "#ffffff".into(), foreground: "#1f2328".into(),
-        primary: "#0969da".into(), secondary: "#1a7f37".into(), accent: "#8250df".into(),
-        success: "#1a7f37".into(), warning: "#9a6700".into(), error: "#d1242f".into(), info: "#0969da".into(),
-        surface: "#f6f8fa".into(), surface_alt: "#eff2f5".into(), border: "#d1d9e0".into(), muted: "#59636e".into(),
-    }
-}
-```
-
-### System Theme Detection
-
-```rust
-// Resolve the theme cookie: explicit light/dark wins; "auto" (or no cookie) defers to CSS
-pub fn detect_theme(headers: &axum::http::HeaderMap, cookies: &CookieJar) -> &'static str {
-    if let Some(c) = cookies.get("theme") {
-        match c.value() {
-            "light" => return "light",
-            "dark"  => return "dark",
-            _ => {}
-        }
-    }
-    "auto"
-}
-```
-
-The base template renders `<html class="theme-light">` or `<html class="theme-dark">` for an explicit choice, and no theme class for `auto`. No client-side mirror is needed — system-preference detection is pure CSS:
+**Footer Position:**
+- Footer ALWAYS at bottom of page (not floating in middle)
+- If content is short → footer still at bottom of viewport
+- If content is long → footer below content (scroll to see)
+- Use min-height layout to push footer down
 
 ```css
-/* Auto theme: dark-default custom properties, overridden when the OS prefers light */
-@media (prefers-color-scheme: light) {
-  html:not(.theme-dark):not(.theme-light) {
-    /* light palette custom properties */
+/* Footer at bottom, no fixed elements */
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1;  /* Grows to push footer to bottom */
+}
+
+/* NO position: fixed or position: sticky on header/nav/footer */
+```
+
+**Print Styles:**
+
+```css
+@media print {
+  /* Hide non-essential elements */
+  header,
+  nav,
+  footer,
+  .nav-toggle,
+  .nav-panel,
+  .nav-overlay,
+  .no-print,
+  button:not(.print-include),
+  .toast,
+  .modal {
+    display: none !important;
+  }
+
+  /* Reset backgrounds for ink saving */
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Ensure content is full width */
+  main, .container {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Show URLs after links */
+  a[href^="http"]:after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666;
+  }
+
+  /* Avoid page breaks inside elements */
+  pre, blockquote, table, img {
+    page-break-inside: avoid;
+  }
+
+  /* Start new sections on new page */
+  h1, h2 {
+    page-break-after: avoid;
   }
 }
 ```
 
+**Print utility classes:**
+- `.no-print` - Hide element when printing
+- `.print-only` - Show element only when printing (use `display: none` normally)
+- `.print-include` - Exception for buttons that should print
 
-### Theme Implementation Location
+**Footer contains (informational links):**
+- Standard pages: About, Privacy, Contact, Help
+- External links: GitHub
+- Branding: project name, version, copyright
 
-| File | Purpose |
-|---|---|
-| `src/common/theme/colors.rs` | `ThemePalette` struct + `theme_palette_dark/light` functions |
-| `src/server/theme.rs` | Server-side theme detection and injection into template context |
-| `src/swagger/theme.rs` | Swagger UI theme configuration |
-| `src/graphql/theme.rs` | GraphQL playground theme configuration |
-| `src/client/tui/styles.rs` | TUI color scheme |
-| `src/client/cli/output.rs` | CLI color output helpers |
-| `src/client/gui/theme_*.rs` | GUI theme variants |
+**Rule:** Every page template MUST include header, nav, and footer partials. No page may define its own.
 
----
+**App-Specific Partials (Optional):**
 
-## Branding & SEO
+Projects can create additional partials for functionality unique to that application. Place these in `partials/` alongside the mandatory ones.
 
-### Meta Tags
+| Example Partial | Project | Purpose |
+|-----------------|---------|---------|
+| `search-box.html` | airports, jokes | Reusable search form component |
+| `airport-card.html` | airports | Airport info display card |
+| `joke-card.html` | jokes | Joke display with copy button |
+| `map.html` | airports | Embedded map component |
+| `passphrase-generator.html` | wordList | Generator form and output |
+| `geoip-result.html` | airports | GeoIP lookup result display |
+| `code-block.html` | gitignore | Syntax-highlighted code display |
+| `pagination.html` | any | Reusable pagination controls |
+| `filters.html` | any | Search/filter form for lists |
+| `stats-card.html` | any | Statistics display card |
 
-All pages include:
+**App-Specific Partials (add to existing structure):**
 
+See **Template Structure** above for mandatory partials (`partials/public/`, `partials/admin/`, `partials/head.html`, `partials/scripts.html`).
+
+Projects add app-specific partials alongside the mandatory ones:
+```
+src/server/templates/partials/
+├── public/                  # MANDATORY (see Template Structure)
+├── admin/                   # MANDATORY when admin panel enabled (PART 28)
+├── head.html                # MANDATORY
+├── scripts.html             # MANDATORY
+├── search-box.html          # APP-SPECIFIC - search component
+├── result-card.html         # APP-SPECIFIC - result display
+└── pagination.html          # APP-SPECIFIC - pagination controls
+```
+
+**Usage in Askama page templates:**
 ```html
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="{{ page_description }}">
-<meta name="robots" content="{{ robots_directive }}">
-
-<!-- Open Graph -->
-<meta property="og:title"       content="{{ og_title }}">
-<meta property="og:description" content="{{ og_description }}">
-<meta property="og:image"       content="{{ og_image }}">
-<meta property="og:url"         content="{{ canonical_url }}">
-<meta property="og:type"        content="{{ og_type | default(value='website') }}">
-<meta property="og:site_name"   content="{{ site_name }}">
-
-<!-- Twitter Card -->
-<meta name="twitter:card"        content="summary_large_image">
-<meta name="twitter:title"       content="{{ og_title }}">
-<meta name="twitter:description" content="{{ og_description }}">
-<meta name="twitter:image"       content="{{ og_image }}">
-
-<!-- Canonical -->
-<link rel="canonical" href="{{ canonical_url }}">
-```
-
-### Site Verification Meta Tags
-
-Add only if the project requires search console verification:
-
-```html
-<meta name="google-site-verification" content="{{ site_verification.google }}">
-<meta name="msvalidate.01"            content="{{ site_verification.bing }}">
-```
-
-### Static Files
-
-```
-static/
-  robots.txt
-  sitemap.xml
-  favicon.ico
-  icons/
-    icon-192.png
-    icon-512.png
-    icon-maskable-512.png
-    apple-touch-icon.png
-```
-
-Serve with `tower-http::services::ServeDir`:
-
-```rust
-use tower_http::services::ServeDir;
-router.nest_service("/static", ServeDir::new("static"))
-```
-
-### Sitemap.xml
-
-Generate dynamically and serve at `/sitemap.xml`:
-
-```rust
-async fn sitemap_handler(State(state): State<AppState>) -> impl axum::response::IntoResponse {
-    let urls = state.db.list_public_urls().await.unwrap_or_default();
-    let body = render_sitemap(&urls);
-    (
-        axum::http::StatusCode::OK,
-        [(axum::http::header::CONTENT_TYPE, "application/xml; charset=utf-8")],
-        body,
-    )
-}
-```
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://example.com/</loc>
-    <lastmod>2024-01-01</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-</urlset>
-```
-
----
-
-## Branding Configuration
-
-```yaml
-server:
-  branding:
-    # Display name (e.g., "Jokes API")
-    title: "{project_name}"
-    # Short slogan (e.g., "The best jokes API")
-    tagline: ""
-    # Longer description for SEO/about
-    description: ""
-    # empty = use embedded default
-    favicon: ""
-    # empty = use embedded default
-    logo: ""
-
-  seo:
-    # Project-specific - define per app
-    # e.g., ["jokes", "api", "humor", "free api"]
-    keywords: []
-    # Author/organization name
-    author: ""
-    # OpenGraph image URL for social sharing
-    og_image: ""
-    # Twitter @handle for cards
-    twitter_handle: ""
-```
-
----
-
-## Remote URL Fetching
-
-```rust
-// src/common/urlutil/fetch.rs
-use std::time::Duration;
-use anyhow::{anyhow, Result};
-use url::Url;
-use reqwest::Client;
-
-pub struct FetchRemoteImageConfig {
-    pub max_size: u64,
-    pub timeout: Duration,
-    pub allowed_types: Vec<String>,
-    pub allowed_schemes: Vec<String>,
-}
-pub fn default_fetch_remote_image_config() -> FetchRemoteImageConfig {
-    FetchRemoteImageConfig {
-        max_size: 10 * 1024 * 1024,
-        timeout: Duration::from_secs(30),
-        allowed_types: vec![
-            "image/png".into(), "image/jpeg".into(), "image/gif".into(),
-            "image/webp".into(), "image/x-icon".into(),
-        ],
-        allowed_schemes: vec!["https".into()],
-    }
-}
-
-pub async fn validate_remote_url(raw_url: &str, cfg: &FetchRemoteImageConfig) -> Result<()> {
-    let parsed = Url::parse(raw_url).map_err(|e| anyhow!("invalid URL: {}", e))?;
-    if !cfg.allowed_schemes.contains(&parsed.scheme().to_string()) {
-        return Err(anyhow!("URL scheme not allowed: {}", parsed.scheme()));
-    }
-    let host = parsed.host_str().ok_or_else(|| anyhow!("URL has no host"))?;
-    validate_not_private_ip(host).await?;
-    Ok(())
-}
-
-async fn validate_not_private_ip(hostname: &str) -> Result<()> {
-    use std::net::ToSocketAddrs;
-    let addrs: Vec<_> = format!("{}:443", hostname)
-        .to_socket_addrs()
-        .map_err(|e| anyhow!("DNS resolution failed: {}", e))?
-        .collect();
-    for addr in addrs {
-        let ip = addr.ip();
-        if ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified() {
-            return Err(anyhow!("private or loopback IP not allowed: {}", ip));
-        }
-    }
-    Ok(())
-}
-
-pub async fn fetch_remote_image(raw_url: &str, cfg: &FetchRemoteImageConfig) -> Result<(Vec<u8>, String)> {
-    validate_remote_url(raw_url, cfg).await?;
-    let client = Client::builder()
-        .timeout(cfg.timeout)
-        .user_agent(format!("reqwest/{}", env!("CARGO_PKG_VERSION")))
-        .build()?;
-    let response = client.get(raw_url).send().await?;
-    if !response.status().is_success() {
-        return Err(anyhow!("remote returned HTTP {}", response.status()));
-    }
-    let content_type = response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .split(';')
-        .next()
-        .unwrap_or("")
-        .trim()
-        .to_string();
-    if !cfg.allowed_types.contains(&content_type) {
-        return Err(anyhow!("content type not allowed: {}", content_type));
-    }
-    let content_length = response.content_length().unwrap_or(0);
-    if content_length > cfg.max_size {
-        return Err(anyhow!("remote image too large: {} bytes", content_length));
-    }
-    let bytes = response.bytes().await?;
-    if bytes.len() as u64 > cfg.max_size {
-        return Err(anyhow!("remote image too large after download: {} bytes", bytes.len()));
-    }
-    Ok((bytes.to_vec(), content_type))
-}
-```
-
-Usage:
-
-```rust
-let cfg = default_fetch_remote_image_config();
-match fetch_remote_image(logo_url, &cfg).await {
-    Ok((data, content_type)) => Ok((data, content_type)),
-    Err(e) => {
-        tracing::warn!(url = %logo_url, error = %e, "failed to fetch remote logo");
-        Ok((embedded_default_logo(), "image/png".to_string()))
-    }
-}
-```
-
-
----
-
-## Footer Customization
-
-### Configuration
-
-**Note:** Analytics tracking → `server.tracking` (PART 12). Privacy/consent → `server.privacy` (PART 12).
-
-```yaml
-web:
-  footer:
-    # Custom branding HTML above the Application Footer
-    # - Not set or "": Use default branding (built-in)
-    # - " " (space): Disable branding, show only Application Footer
-    # - Custom HTML: Use your own branding (SANITIZED - no scripts)
-    custom_html: ""
-```
-
-### SanitizeFooterHTML
-
-```rust
-use ammonia::Builder;
-
-pub fn sanitize_footer_html(html: &str) -> String {
-    if html.is_empty() || html == " " { return html.to_string(); }
-    Builder::new()
-        .tags(["p", "br", "span", "div", "strong", "b", "em", "i", "u", "s", "small",
-               "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "a", "img"]
-              .iter().cloned().collect())
-        .clean(html).to_string()
-}
-
-pub fn validate_footer_html(html: &str) -> Result<String> {
-    let sanitized = sanitize_footer_html(html);
-    if !html.is_empty() && sanitized.is_empty() {
-        return Err(anyhow::anyhow!("custom HTML contained only disallowed elements"));
-    }
-    if html != sanitized && !html.is_empty() && html != " " {
-        tracing::warn!("footer custom_html was sanitized: removed potentially dangerous content");
-    }
-    Ok(sanitized)
-}
-```
-
-### Footer HTML — Valid Examples
-
-```html
-<!-- Minimal: single paragraph -->
-<p>© 2024 Acme Corp. All rights reserved.</p>
-
-<!-- Links row -->
-<p>
-  <a href="/terms">Terms</a> ·
-  <a href="/privacy">Privacy</a> ·
-  <a href="https://status.example.com">Status</a>
-</p>
-
-<!-- Multi-line with emphasis -->
-<p>Made with ❤️ in NYC.</p>
-<p><small>© 2024 Acme Corp</small></p>
-
-<!-- Ordered list -->
-<ul>
-  <li><a href="/blog">Blog</a></li>
-  <li><a href="/changelog">Changelog</a></li>
-  <li><a href="/api">API</a></li>
-</ul>
-```
-
-### Footer HTML — Invalid Examples (stripped by sanitizer)
-
-```html
-<!-- INVALID: script tags are stripped -->
-<script>alert('xss')</script>
-
-<!-- INVALID: inline event handlers are stripped -->
-<a href="#" onclick="evil()">Click me</a>
-
-<!-- INVALID: style tags are stripped -->
-<style>body { display: none; }</style>
-
-<!-- INVALID: iframe is stripped -->
-<iframe src="https://evil.com"></iframe>
-```
-
-### Footer Template Variables
-
-| Variable | Type | Description |
-|---|---|---|
-| `footer_custom_html` | `String` | Pre-sanitized custom branding HTML rendered above the Application Footer (`web.footer.custom_html`) |
-| `tor_enabled` | `bool` | Tor is configured |
-| `tor_running` | `bool` | Tor process is active |
-| `tor_address` | `String` | `.onion` hostname |
-| `app_name` | `String` | Application name |
-| `app_version` | `String` | Semver string |
-
-### Default Application Footer (Always Shown)
-
-```html
-<footer class="footer">
-  {# Custom branding HTML (sanitized) rendered above the Application Footer #}
-  {% if footer_custom_html %}
-    {{ footer_custom_html | safe }}
-  {% endif %}
-  {% if tor_enabled and tor_running and tor_address %}
-    <p class="footer-onion">
-      <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
-      <code class="onion-address">{{ tor_address }}</code>
-      <button type="button" class="copy-btn" data-copy="{{ tor_address }}" aria-live="polite" aria-label="Copy onion address">📋</button>
-    </p>
-  {% endif %}
-  <p class="footer-links">
-    <a href="/server/about">About</a>
-    <span aria-hidden="true">•</span>
-    <a href="/server/privacy">Privacy</a>
-    <span aria-hidden="true">•</span>
-    <a href="/server/contact">Contact</a>
-    <span aria-hidden="true">•</span>
-    <a href="/server/help">Help</a>
-  </p>
-  <p class="footer-meta">
-    <a href="{PLATFORM_REPO_URL}" target="_blank">Made with</a> ❤️
-    <span aria-hidden="true">•</span>
-    <span>{{ app_version }}</span>
-  </p>
-  <p class="footer-build">
-    <a href="/server/healthz">Last update: {{ build_datetime }}</a>
-  </p>
-</footer>
-```
-
-**No `<br />` spacers between rows** — rows are consecutive `<p>` elements; vertical rhythm comes from CSS (`footer p { margin: 0.25rem 0; }`), kept tight. Row order is fixed: onion address (Tor only) → page links → branding → last update. A disabled feature drops its row entirely without leaving a gap.
-
----
-
-## Cookie Consent Banner
-
-### Implementation
-
-The cookie consent banner blocks all optional scripts/embeds until the user grants consent. Consent is stored in a cookie and re-read on every page load — the server must be able to read it, so consent state NEVER lives in `localStorage`. The banner is fully server-rendered: when no valid consent cookie exists (or its version is stale), the server renders the banner visible; once a valid cookie is present, the server omits it entirely. Accept/Reject/Save are plain form submits to `POST /consent`, so consent works with zero JavaScript.
-
-```rust
-// src/server/consent.rs
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ConsentPreferences {
-    pub analytics: bool,
-    pub preferences: bool,
-    pub marketing: bool,
-}
-
-pub fn get_consent_from_request(headers: &axum::http::HeaderMap) -> Option<ConsentPreferences> {
-    let cookie_header = headers.get("cookie")?.to_str().ok()?;
-    for pair in cookie_header.split(';') {
-        let (k, v) = pair.trim().split_once('=')?;
-        if k.trim() == "consent" {
-            return serde_json::from_str(
-                &urlencoding::decode(v.trim()).ok()?
-            ).ok();
-        }
-    }
-    None
-}
-```
-
-**Banner visibility is decided server-side.** The base template renders the banner when `get_consent_from_request` returns `None` (no cookie, or stale `version`) — or when the request carries `?consent=manage`, which re-opens the banner for a visitor who wants to change their choices. There is no `hidden` attribute and no JS `init()` reveal: a no-JS visitor sees the banner exactly when the server decides they should.
-
-```rust
-// src/server/consent.rs
-// Bump to re-prompt every visitor after a policy change
-pub const CONSENT_VERSION: u32 = 1;
-
-#[derive(Debug, Deserialize)]
-pub struct ConsentForm {
-    pub action: String,
-    pub analytics: Option<String>,
-    pub preferences: Option<String>,
-    pub marketing: Option<String>,
-    pub return_to: Option<String>,
-}
-
-// POST /consent — sets the consent cookie and redirects back to the originating page
-pub async fn post_consent(
-    axum::Form(form): axum::Form<ConsentForm>,
-) -> impl axum::response::IntoResponse {
-    let prefs = match form.action.as_str() {
-        "accept_all" => ConsentPreferences { analytics: true,  preferences: true,  marketing: true },
-        "reject_all" => ConsentPreferences { analytics: false, preferences: false, marketing: false },
-        _ => ConsentPreferences {
-            analytics:   form.analytics.is_some(),
-            preferences: form.preferences.is_some(),
-            marketing:   form.marketing.is_some(),
-        },
-    };
-    let value = urlencoding::encode(
-        &serde_json::json!({
-            "analytics": prefs.analytics,
-            "preferences": prefs.preferences,
-            "marketing": prefs.marketing,
-            "version": CONSENT_VERSION,
-        }).to_string()
-    ).into_owned();
-    let cookie = format!(
-        "consent={value}; Path=/; Max-Age={}; SameSite=Lax; Secure",
-        60 * 60 * 24 * 365
-    );
-    // Only same-site relative paths are accepted for the redirect target
-    let target = form.return_to
-        .filter(|p| p.starts_with('/') && !p.starts_with("//"))
-        .unwrap_or_else(|| "/".to_string());
-    (
-        [(axum::http::header::SET_COOKIE, cookie)],
-        axum::response::Redirect::to(&target),
-    )
-}
-```
-
-A request carrying `Sec-GPC: 1` is still handled by the compliance layer (see "Privacy Signal Headers") — the GPC opt-out overrides any affirmative consent for data-sale/sharing categories regardless of what this form submits.
-
-```html
-{% if show_consent_banner %}
-<div id="consent-banner" class="consent-banner" role="dialog"
-     aria-label="Cookie preferences" aria-modal="false">
-  <form method="post" action="/consent" class="consent-banner-inner">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <input type="hidden" name="return_to" value="{{ current_path }}">
-    <div class="consent-text">
-      <h2 class="consent-title">Cookie Preferences</h2>
-      <p>{{ consent_message }}</p>
-    </div>
-    <div class="consent-options">
-      <label class="toggle">
-        <input type="checkbox" id="consent-analytics" name="analytics" value="1">
-        <span class="toggle-track"><span class="toggle-thumb"></span></span>
-        <span class="toggle-label">Analytics</span>
-      </label>
-      <label class="toggle">
-        <input type="checkbox" id="consent-preferences" name="preferences" value="1">
-        <span class="toggle-track"><span class="toggle-thumb"></span></span>
-        <span class="toggle-label">Preferences</span>
-      </label>
-      <label class="toggle">
-        <input type="checkbox" id="consent-marketing" name="marketing" value="1">
-        <span class="toggle-track"><span class="toggle-thumb"></span></span>
-        <span class="toggle-label">Marketing</span>
-      </label>
-    </div>
-    <div class="consent-actions">
-      <button type="submit" name="action" value="reject_all" class="btn btn-secondary">Reject All</button>
-      <button type="submit" name="action" value="save"       class="btn btn-secondary">Save Preferences</button>
-      <button type="submit" name="action" value="accept_all" class="btn btn-primary">Accept All</button>
-    </div>
-  </form>
+{% extends "layouts/public.html" %}
+
+{% block content %}
+<div class="search-section">
+  {% include "partials/search-box.html" %}
 </div>
-{% endif %}
+
+<div class="results">
+  {% for result in results %}
+    {% include "partials/result-card.html" %}
+  {% endfor %}
+</div>
+
+{% include "partials/pagination.html" %}
+{% endblock %}
 ```
 
-**Progressive enhancement (external file, optional):** the consent module in `static/js/app.js` may intercept the form's `submit` event, write the same `consent` cookie from the submitted values, and remove the banner from the DOM without a page reload. The server-side `POST /consent` path remains the source of truth; the script only removes the round trip.
+**Guidelines for app-specific partials:**
+- Create a partial when the same HTML is used in 2+ places
+- Keep partials focused on one component/purpose
+- Pass only the data the partial needs
+- Name clearly: `{thing}-{purpose}.html` (e.g., `airport-card.html`, `joke-list.html`)
 
-```javascript
-// static/js/app.js — consent module; no-reload enhancement; the POST /consent fallback always works
-const CONSENT_VERSION = 1;
+**Embedding Templates:**
 
-document.getElementById('consent-banner')?.querySelector('form')
-  ?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const action = e.submitter?.value ?? 'save';
-    const all = action === 'accept_all';
-    const none = action === 'reject_all';
-    const prefs = {
-      analytics:   all || (!none && e.target.elements.analytics.checked),
-      preferences: all || (!none && e.target.elements.preferences.checked),
-      marketing:   all || (!none && e.target.elements.marketing.checked),
-      version: CONSENT_VERSION,
-    };
-    const value = encodeURIComponent(JSON.stringify(prefs));
-    document.cookie = `consent=${value}; path=/; max-age=${60*60*24*365}; SameSite=Lax; Secure`;
-    document.getElementById('consent-banner').remove();
-  });
-```
+All templates and static assets MUST be embedded in the binary:
 
 ```rust
-pub fn check_tracking_allowed(headers: &axum::http::HeaderMap, cfg: &Config) -> bool {
-    let consent = get_consent_from_request(headers);
-    match consent {
-        None => false,
-        Some(c) if !c.analytics => false,
-        _ => !cfg.server.tracking.tracking_type.is_empty(),
-    }
-}
-pub fn tracking_script(headers: &axum::http::HeaderMap, cfg: &Config) -> String {
-    if !check_tracking_allowed(headers, cfg) { return String::new(); }
-    generate_tracking_script()
-}
+use rust_embed::RustEmbed;
+
+#[derive(RustEmbed)]
+#[folder = "templates/"]
+#[include = "*.html"]
+pub struct TemplateAssets;
+
+#[derive(RustEmbed)]
+#[folder = "static/"]
+pub struct StaticAssets;
 ```
 
-In templates:
-
+**Template Usage with Askama:**
 ```html
-{% if tracking_allowed %}
-  {{ tracking_script | safe }}
-{% endif %}
-{% if not preferences_allowed %}
-<div class="embed-blocked">
-  <p>Enable Preferences cookies to see this content.</p>
-  <a href="?consent=manage" class="btn btn-secondary">Manage Cookies</a>
-</div>
-{% else %}
-<!-- Actual embed -->
-{% endif %}
+<!-- src/server/templates/layouts/public.html -->
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>{% include "partials/head.html" %}</head>
+<body>
+  {% include "partials/public/header.html" %}
+  {% include "partials/public/nav.html" %}
+  <main>{% block content %}{% endblock %}</main>
+  {% include "partials/public/footer.html" %}
+  {% include "partials/scripts.html" %}
+</body>
+</html>
 ```
 
-The Manage Cookies link navigates with `?consent=manage`; the server answers by re-rendering the page with the banner shown. No inline handler — the CSP blocks inline event handlers, and this path works without JavaScript.
+### Embedded vs External Assets
 
-Dynamic consent message selection:
+| Type | Embedded in Binary | External (Downloaded) |
+|------|-------------------|----------------------|
+| Templates (`.html`) | YES | NO |
+| CSS files | YES | NO |
+| JavaScript files | YES | NO |
+| Images/Icons | YES | NO |
+| Fonts | YES | NO |
+| Application data (JSON) | YES | NO |
+| GeoIP databases | NO | YES - downloaded on first run, updated weekly |
+| IP/Domain Blocklists | NO | YES - downloaded on first run, updated daily |
+| CVE databases | NO | YES - downloaded on first run, updated daily |
+| SSL certificates | NO | YES - only when using ports 80,443 |
 
-```rust
-let message = cfg.privacy.get_consent_message();
-```
+**External Data Rules:**
+- Security-related data that needs frequent updates is NEVER embedded
+- Downloaded automatically on first run if not present
+- Updated automatically via built-in scheduler (see PART 17: SCHEDULER)
+- All scheduler tasks configurable via the API (and the admin panel when enabled — PART 28)
+- Graceful degradation if download fails (continues without data)
+- SSL certificates only generated/managed when running on ports `80,443`
 
+**Benefits:**
+- Single static binary deployment
+- No external file dependencies at runtime
+- Consistent layout across all pages
+- Reusable components (DRY principle)
+- Auto-escaping for security (XSS prevention)
 
----
+### CSS Rules
 
-## Standard Pages
+| Bad | Good |
+|-----|------|
+| `<div style="color: red;">` | `<div class="error-text">` |
+| `style="margin: 10px;"` | `class="spacing-sm"` |
 
-### /server/about
+**All styles MUST be in CSS files, not HTML elements.**
 
-Displays server information, software version, and operator contact.
+### Frontend UI Elements
 
-**Template variables:**
+**NEVER use default JavaScript UI elements. ALWAYS use custom styled components.**
 
-| Variable | Type | Description |
-|---|---|---|
-| `app_name` | `String` | Application name |
-| `app_version` | `String` | Semver version string |
-| `app_description` | `String` | Short description |
-| `operator_name` | `String` | Server operator name |
-| `operator_url` | `String` | Operator website URL |
-| `source_url` | `String` | Source code URL |
-| `license` | `String` | SPDX license identifier |
-| `uptime` | `String` | Human-readable uptime |
-| `rust_version` | `String` | Rust version (from `rustc --version`) |
-| `build_date` | `String` | ISO 8601 build timestamp |
+| NEVER Use | ALWAYS Use Instead |
+|-----------|---------------------|
+| `alert()` | Custom modal with CSS classes |
+| `confirm()` | Custom confirmation modal |
+| `prompt()` | Custom input modal or inline form |
+| Plain text inputs for options | Dropdowns (`<select>`) |
+| Plain text for yes/no | Checkboxes or toggle switches |
+| Plain text for multiple options | Radio buttons or dropdown |
+| Inline text entry | Only when truly needed (search, names, etc.) |
 
-### /server/privacy
+**UI Element Guidelines:**
 
-Renders the privacy policy. Content is loaded from configuration or a markdown file.
+| Element | When to Use |
+|---------|-------------|
+| **Dropdown (`<select>`)** | Selecting from predefined options |
+| **Checkbox** | Boolean on/off, enable/disable |
+| **Toggle Switch** | Boolean with visual feedback |
+| **Radio Buttons** | Mutually exclusive options (2-5 choices) |
+| **Dropdown** | Mutually exclusive options (>5 choices) |
+| **Multi-select** | Multiple selections from list |
+| **Text Input** | Free-form text (names, URLs, search) |
+| **Textarea** | Multi-line free-form text |
+| **Number Input** | Numeric values with spin buttons |
+| **Date/Time Picker** | Date and time selection |
+| **Color Picker** | Color selection |
+| **File Upload** | File selection with drag-drop |
 
-**Template variables:**
+**Modal Requirements:**
+- Custom CSS-styled modals (no browser defaults)
+- Backdrop overlay
+- Close button (X) in corner
+- Click outside to close (optional, configurable)
+- Escape key to close
+- Focus trap (tab stays within modal)
+- Animated entrance/exit
+- **Auto-close on action** - clicking any action button (OK, Yes, No, Cancel, Save, Delete, Submit, etc.) automatically closes the modal after performing the action. User should never need to click an action then manually close.
 
-| Variable | Type | Description |
-|---|---|---|
-| `privacy` | `PrivacyPolicy` | Structured privacy policy data |
-| `privacy.content.data_collection` | `String` | Markdown; rendered via `markdown_to_html` filter |
-| `privacy.data.sold` | `bool` | Whether data is sold to third parties |
-| `privacy.data.sharing` | `Vec<DataSharingEntry>` | Third-party sharing entries |
-| `last_updated` | `String` | ISO 8601 date |
+**Toast/Notification Requirements:**
+- Non-blocking notifications (never use JS alerts)
+- Stackable - multiple toasts display vertically (max 5 visible)
+- Auto-dismiss: 3 seconds (success/info), 5 seconds (warning), never (error)
+- Click to dismiss - user can click X or toast body to dismiss early
+- Pause on hover - hovering pauses auto-dismiss countdown
+- Position: top-right corner, fixed position
+- Animation: slide in from right, fade out on dismiss
+- Types: success (✓), error (✗), warning (⚠), info (ℹ)
+- Progress bar shows remaining time before auto-dismiss
+- See "Toast Notifications" section in PART 15 for full implementation
 
-```html
-{% if privacy.data.sold %}
-<div class="key-point key-point-warning">
-  <strong>Your data may be sold.</strong>
-</div>
-{% else %}
-<div class="key-point">
-  <strong>Your data is never sold.</strong>
-</div>
-{% endif %}
-{% for sharing in privacy.data.sharing %}
-<li>
-  <strong>{{ sharing.condition | title }}:</strong>
-  {{ sharing.when }} — {{ sharing.data }}
-</li>
-{% endfor %}
-{{ privacy.content.data_collection | markdown_to_html | safe }}
-```
+## Layout
 
-### /server/contact
+| Screen Size | Width |
+|-------------|-------|
+| ≥ 768px | 90% (5% margins) |
+| < 768px | 98% (1% margins) |
+| Footer | Always centered, always at bottom |
 
-Displays operator contact information and/or a contact form.
-
-**Template variables:**
-
-| Variable | Type | Description |
-|---|---|---|
-| `contact_email` | `String` | Public contact email |
-| `contact_form_enabled` | `bool` | Whether the contact form is active |
-| `contact_message` | `String` | Optional introductory message |
-| `csrf_token` | `String` | CSRF token for the form |
-
-**Below the form, the page MUST render exactly two informational sections — the content is spec'd here; never improvise it:**
-
-| Section | Content |
-|---------|---------|
-| Security Issues | "To report a security vulnerability, consult our security policy at `/server/security`." — rendered as a link to `/server/security`. Never point users at the raw `/.well-known/security.txt` file from this page. |
-| Abuse Reports | "To report abusive content or policy violations, use this contact form." — append " or email {abuse_email}" where `{abuse_email}` resolves to `server.contact.abuse.email` if set, else `server.contact.general.email` if set; omit the email clause entirely when neither is set. NEVER render `server.contact.admin.email` here (it is never public). |
-
-### /server/help
-
-General help and FAQ page. Includes a Tor access section when Tor is configured and running.
-
-**Template variables:**
-
-| Variable | Type | Description |
-|---|---|---|
-| `faqs` | `Vec<Faq>` | List of FAQ entries (`question`, `answer` fields) |
-| `tor_enabled` | `bool` | Tor is configured |
-| `tor_running` | `bool` | Tor process is active |
-| `tor_address` | `String` | `.onion` hostname |
-
-```html
-{% if tor_enabled and tor_running and tor_address %}
-<section id="tor-access" class="tor-access">
-  <h4>Onion Address</h4>
-  <div class="code-block">
-    <code class="code-content">{{ tor_address }}</code>
-    <button type="button" class="copy-btn" data-copy="{{ tor_address }}" aria-label="Copy to clipboard">
-      <span class="copy-icon">📋</span>
-      <span class="copy-text" aria-live="polite">Copy</span>
-    </button>
-  </div>
-</section>
-{% endif %}
-```
-
-**Copy feedback is mandatory:** every copy button MUST show a visible "Copied!" confirmation on success — checkmark icon plus the translated label (i18n key `copied`, rendered server-side into `data-copied-label`), `.copied` class for the success colors (CSS custom properties only), reverting after 2 seconds. The `aria-live="polite"` region announces the change to screen readers. Icon-only buttons (e.g. the footer 📋) swap their own content and carry `aria-live="polite"` on the button itself.
-
-### /server/terms
-
-Displays the Terms of Service. Content is loaded from configuration or a markdown file.
-
-**Template variables:**
-
-| Variable | Type | Description |
-|---|---|---|
-| `terms_content` | `String` | Markdown; rendered via `markdown_to_html` filter |
-| `last_updated` | `String` | ISO 8601 date |
-
----
-
-## Configuration YAML
-
-```yaml
-server:
-  branding:
-    title: "{project_name}"
-    tagline: ""
-    description: ""
-    favicon: ""
-    logo: ""
-  seo:
-    keywords: []
-    author: ""
-    og_image: ""
-    twitter_handle: ""
-  tracking:
-    # Analytics type: google, matomo, piwik, owa, fathom, plausible, umami, simple, cloudflare
-    # Empty or "none" = disabled
-    type: ""
-    # Tracking/Site ID (format depends on type)
-    id: ""
-    # Self-hosted URL (required for: matomo, piwik, owa, umami)
-    url: ""
-  operator:
-    name: ""
-    url: ""
-    contact_email: ""
-  cors:
-    allowed_origins: []
-    allow_credentials: true
-    max_age: 86400
-
-web:
-  footer:
-    # Custom branding HTML above the Application Footer (sanitized)
-    custom_html: ""
-
-privacy:
-  data:
-    sold: false
-    sharing: []
-  content:
-    data_collection: ""
-    cookie_policy: ""
-  # empty = use built-in default
-  consent_message: ""
-
-pages:
-  about:
-    # Additional content for about page (markdown supported)
-    content: ""
-  privacy:
-    # Privacy policy content (markdown supported)
-    # If empty, uses default template
-    content: ""
-  contact:
-    # Enable contact form
-    enabled: true
-    # Captcha type: recaptcha, hcaptcha, simple (built-in)
-    captcha: simple
-    # Success message after form submission
-    success_message: "Thank you for your message. We'll respond soon."
-  help:
-    # Help page content (markdown supported)
-    # Project-specific - must be defined per application
-    content: ""
-  terms:
-    # Terms of service content (markdown supported)
-    # If empty, uses default template
-    content: ""
-```
-
----
-
-## Pages Configuration
-
-| Page | Config keys |
-|---|---|
-| `/server/about` | `pages.about.content` (Markdown) |
-| `/server/privacy` | `pages.privacy.content` (Markdown) |
-| `/server/contact` | `pages.contact.enabled`, `pages.contact.captcha`, `pages.contact.success_message` |
-| `/server/help` | `pages.help.content` (Markdown) |
-| `/server/terms` | `pages.terms.content` (Markdown) |
-
-When the contact form is disabled (`pages.contact.enabled: false`), the contact form endpoint returns 404; the other pages are always available.
-
----
-
-## /server/ API Endpoints
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `GET` | `/server/about` | None | Server information page |
-| `GET` | `/server/privacy` | None | Privacy policy page |
-| `POST` | `/server/contact` | None | Submit contact form |
-| `GET` | `/server/contact` | None | Contact page |
-| `GET` | `/server/help` | None | Help and FAQ page |
-| `GET` | `/server/terms` | None | Terms of service page |
-| `GET` | `/server/healthz` | None | Health check (JSON) |
-| `GET` | `/server/version` | None | Version info (JSON) |
-
----
-
-## /server/ Frontend Routes
-
-| Route | Handler | Description |
-|---|---|---|
-| `/server/about` | `about_handler` | About page |
-| `/server/privacy` | `privacy_handler` | Privacy policy page |
-| `/server/contact` | `contact_handler` | Contact page |
-| `/server/help` | `help_handler` | Help page |
-| `/server/terms` | `terms_handler` | Terms of service page |
-
----
 ## Themes (NON-NEGOTIABLE - PROJECT-WIDE)
 
 **Theme system applies to THE ENTIRE PROJECT - ALL interfaces share the same colors and settings:**
 - Web interface (HTML pages)
+- Admin panel (when enabled — PART 28)
 - Swagger UI
 - GraphiQL interface
 - CLI colored output
@@ -24163,7 +25809,7 @@ When the contact form is disabled (`pages.contact.enabled: false`), the contact 
 - **BOTH light AND dark themes MUST be easy to read**
 - **NO color conflicts** - nothing should be invisible or unreadable in either theme
 - **Sufficient contrast ratio** - minimum WCAG AA compliance (4.5:1) in both themes
-- **Theme applies everywhere** - WebUI, Swagger, GraphQL, etc.
+- **Theme applies everywhere** - WebUI, admin panel, Swagger, GraphQL, etc.
 - **Theme switching MUST work seamlessly** without page reload
 - **All interactive elements MUST be clearly visible** in both themes
 - **Syntax highlighting MUST adapt** to theme (use appropriate colors for each theme)
@@ -24332,7 +25978,7 @@ widgets with the hex values from `dark_palette()`/`light_palette()`.
 | **Windows** | Registry `AppsUseLightTheme` | 0 = dark, 1 = light |
 | **Terminal** | `COLORFGBG` env or fallback to dark | Terminal-specific |
 
-**See "CLI/TUI/GUI Theming" later in this document for implementation details.**
+**See PART 2 for the native GUI/TUI/CLI surfaces of this same binary; the standalone client binary is PART 29.**
 
 **Theme Detection Flow:**
 ```
@@ -24361,6 +26007,1909 @@ widgets with the hex values from `dark_palette()`/`light_palette()`.
 - Screen readers MUST work correctly in both themes
 - No information conveyed by color alone
 
+## Branding & SEO
+
+**White labeling is cosmetic only - it changes what users see, not how the server works.**
+
+### What Branding Changes
+
+| Changes (User-Visible) | Does NOT Change (System) |
+|------------------------|--------------------------|
+| Page titles | Directory names (`{internal_name}/`) |
+| Browser tab | System username (`{internal_name}`) |
+| Header/logo text | Log filenames |
+| Footer branding | Config paths |
+| Email "From" name | Binary name |
+| SEO meta tags | API routes |
+| OpenGraph data | Service names |
+| Swagger UI title | Container names |
+
+### Configuration
+
+```yaml
+server:
+  branding:
+    # Display name (e.g., "Jokes API")
+    title: "{project_name}"
+    # Short slogan (e.g., "The best jokes API")
+    tagline: ""
+    # Longer description for SEO/about
+    description: ""
+
+  seo:
+    # Project-specific - define per app
+    # e.g., ["jokes", "api", "humor", "free api"]
+    keywords: []
+    # Author/organization name
+    author: ""
+    # OpenGraph image URL for social sharing
+    og_image: ""
+    # Twitter @handle for cards
+    twitter_handle: ""
+```
+
+### Where Branding Is Used
+
+| Field | Used In |
+|-------|---------|
+| `title` | `<title>` tag, header, emails, footer, Swagger UI |
+| `tagline` | Homepage hero section, meta description fallback |
+| `description` | Meta description, OpenGraph description, about page |
+| `keywords` | Meta keywords tag |
+| `author` | Meta author tag |
+| `og_image` | OpenGraph/Twitter card image |
+| `twitter_handle` | Twitter card attribution |
+
+### SEO Meta Tags (Generated)
+
+```html
+<head>
+  <title>{title} - {tagline}</title>
+  <meta name="description" content="{description}">
+  <meta name="keywords" content="{keywords}">
+  <meta name="author" content="{author}">
+
+  <!-- OpenGraph -->
+  <meta property="og:title" content="{title}">
+  <meta property="og:description" content="{description}">
+  <meta property="og:image" content="{og_image}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{current_url}">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{title}">
+  <meta name="twitter:description" content="{description}">
+  <meta name="twitter:image" content="{og_image}">
+  <meta name="twitter:site" content="{twitter_handle}">
+</head>
+```
+
+### Site Verification Meta Tags
+
+**Custom verification meta tags for search engines and services MUST be validated before rendering.**
+
+**Configuration:**
+
+```yaml
+server:
+  seo:
+    verification:
+      # Format: { "provider": "verification_code" }
+      # Google Search Console
+      google: ""
+      # Bing Webmaster Tools
+      bing: ""
+      # Yandex Webmaster
+      yandex: ""
+      # Baidu Webmaster
+      baidu: ""
+      # Pinterest verification
+      pinterest: ""
+      # Facebook domain verification
+      facebook: ""
+      # Custom meta tags (see below)
+      custom: []
+```
+
+**Generated Meta Tags:**
+
+```html
+<head>
+  <!-- Site Verification (only rendered if configured) -->
+  <meta name="google-site-verification" content="{google}">
+  <meta name="msvalidate.01" content="{bing}">
+  <meta name="yandex-verification" content="{yandex}">
+  <meta name="baidu-site-verification" content="{baidu}">
+  <meta name="p:domain_verify" content="{pinterest}">
+  <meta property="fb:domain_verification" content="{facebook}">
+</head>
+```
+
+**Validation Rules:**
+
+| Provider | Format | Max Length | Pattern |
+|----------|--------|------------|---------|
+| Google | Alphanumeric | 43 chars | `^[a-zA-Z0-9_-]+$` |
+| Bing | Hex string | 32 chars | `^[A-F0-9]+$` |
+| Yandex | Alphanumeric | 32 chars | `^[a-f0-9]+$` |
+| Baidu | Alphanumeric | 32 chars | `^[a-zA-Z0-9]+$` |
+| Pinterest | Hex string | 32 chars | `^[a-f0-9]+$` |
+| Facebook | Alphanumeric | 64 chars | `^[a-z0-9]+$` |
+
+**Custom Verification Tags:**
+
+```yaml
+server:
+  seo:
+    verification:
+      custom:
+        - name: "norton-safeweb-site-verification"
+          content: "abc123..."
+        - name: "alexaVerifyID"
+          content: "xyz789..."
+        - property: "fb:app_id"
+          content: "123456789"
+```
+
+**Custom Tag Validation:**
+
+| Field | Required | Validation |
+|-------|----------|------------|
+| `name` OR `property` | One required | Must be valid meta attribute name |
+| `content` | Yes | Non-empty string, max 256 chars |
+| `name`/`property` value | Yes | Alphanumeric + hyphens/underscores only |
+
+**NEVER render:**
+- Tags with empty content
+- Tags that fail validation
+- Tags with invalid characters (potential XSS)
+- Tags exceeding max length
+
+**SEO Configuration (config file):**
+
+| Element | Config Key | Description |
+|---------|------------|-------------|
+| Google Verification | `server.seo.verification.google` | Google Search Console code |
+| Bing Verification | `server.seo.verification.bing` | Bing Webmaster code |
+| Yandex Verification | `server.seo.verification.yandex` | Yandex Webmaster code |
+| Baidu Verification | `server.seo.verification.baidu` | Baidu Webmaster code |
+| Pinterest Verification | `server.seo.verification.pinterest` | Pinterest verification code |
+| Facebook Verification | `server.seo.verification.facebook` | Facebook domain verification code |
+| Custom Tags | `server.seo.verification.custom` | Additional verification tags |
+
+**Validation:** Server validates codes on startup and logs errors for invalid formats. When the admin panel is enabled (PART 28) these settings are also editable at `/server/{admin_path}/config/seo`, validated on save.
+
+### Static Files
+
+**If the project serves user-controlled files/blobs, follow PART 11 "Private File Delivery" and PART 11 "Untrusted File / Rich Content Handling".**
+
+| File | Purpose | Generated |
+|------|---------|-----------|
+| `/sitemap.xml` | Site map for search engines | Yes - auto-generated |
+| `/favicon.ico` | Browser favicon | Embedded default, customizable |
+| `/.well-known/*` | Standards/discovery/verification endpoints only | Mix of dynamic, config-backed, embedded, or feature-gated |
+
+### Sitemap.xml
+
+**ALL projects MUST serve a dynamically generated sitemap at `/sitemap.xml`.**
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>{app_url}/</loc>
+    <lastmod>{last_modified}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>{app_url}/docs</loc>
+    <lastmod>{last_modified}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Additional pages dynamically added -->
+</urlset>
+```
+
+**Sitemap Generation Rules:**
+
+| Page Type | Include | Priority | Change Frequency |
+|-----------|---------|----------|------------------|
+| Homepage (`/`) | Always | 1.0 | daily |
+| Public pages | Always | 0.8 | weekly |
+| Public documentation pages (project-defined, if any) | Dynamic | 0.8 | weekly |
+| API docs (`/server/docs/swagger`, `/server/docs/graphql`) | Always | 0.7 | weekly |
+| Public content pages (project-defined, if any) | Dynamic | 0.6 | weekly |
+| Admin pages (`/server/{admin_path}/*`) | **NEVER** | - | - |
+| Auth pages (`/server/auth/*`) | **NEVER** | - | - |
+| API endpoints (`/api/*`) | **NEVER** | - | - |
+
+**Sitemap Configuration:**
+
+```yaml
+server:
+  seo:
+    sitemap:
+      # Default: true
+      enabled: true
+      # Sitemap protocol limit
+      max_urls: 50000
+      # Include image URLs
+      include_images: false
+```
+
+**Large Sites (>50,000 URLs):**
+- Generate sitemap index file at `/sitemap.xml`
+- Split into multiple sitemap files: `/sitemap-1.xml`, `/sitemap-2.xml`, etc.
+- Each sitemap file max 50,000 URLs
+
+### Branding Configuration (config file)
+
+| Element | Config Key | Description |
+|---------|------------|-------------|
+| Title | `server.branding.title` | Application display name |
+| Tagline | `server.branding.tagline` | Short slogan |
+| Description | `server.branding.description` | Longer description for SEO |
+| Keywords | `server.seo.keywords` | SEO keywords (list) |
+| Author | `server.seo.author` | Author/organization |
+| OG Image | `server.seo.og_image` | Social sharing image |
+| Twitter Handle | `server.seo.twitter_handle` | @handle |
+| Favicon | `server.branding.favicon` | Custom favicon |
+| Logo | `server.branding.logo` | Custom logo (header) |
+
+When the admin panel is enabled (PART 28) these are also editable at `/server/{admin_path}/config/branding` (file upload supported for images).
+
+### Image Sources
+
+**Logo, favicon, and OG image can be from local file or remote URL.**
+
+| Source | Format | Example |
+|--------|--------|---------|
+| Local file | File path | Set `branding.logo_path` in config to an absolute file path (or upload via the admin panel — PART 28) |
+| Remote URL | URL input | `https://example.com/logo.png` |
+| Embedded default | - | Built-in fallback |
+
+### Image Scaling
+
+**Images are automatically scaled/resized as needed:**
+
+| Image | Sizes Generated |
+|-------|-----------------|
+| Logo | Original, 200px width (header), 50px width (mobile) |
+| Favicon | 16x16, 32x32, 48x48, 180x180 (apple-touch-icon), 192x192, 512x512 |
+| OG Image | Original, 1200x630 (OpenGraph standard) |
+
+**Scaling Rules:**
+- Preserve aspect ratio
+- Generate multiple sizes on upload/fetch
+- Cache scaled versions locally
+- Re-fetch remote URLs periodically (configurable, default: daily)
+- Fallback to embedded default if remote URL fails
+
+### Remote URL Fetching
+
+**When fetching remote URLs for logo/favicon/images, use secure functions with validation.**
+
+```rust
+// src/common/urlutil/fetch.rs
+use std::time::Duration;
+use anyhow::{bail, Context, Result};
+use reqwest::Client;
+use url::Url;
+
+pub struct FetchRemoteImageConfig {
+    pub max_size: u64,
+    pub timeout: Duration,
+    pub allowed_types: Vec<String>,
+    pub allowed_schemes: Vec<String>,
+}
+
+impl Default for FetchRemoteImageConfig {
+    fn default() -> Self {
+        Self {
+            max_size: 10 * 1024 * 1024,
+            timeout: Duration::from_secs(30),
+            allowed_types: vec![
+                "image/png".into(),
+                "image/jpeg".into(),
+                "image/gif".into(),
+                "image/webp".into(),
+                "image/x-icon".into(),
+            ],
+            // NEVER allow http in production
+            allowed_schemes: vec!["https".into()],
+        }
+    }
+}
+
+pub fn validate_remote_url(raw_url: &str, cfg: &FetchRemoteImageConfig) -> Result<Url> {
+    let u = Url::parse(raw_url).context("invalid URL")?;
+
+    let scheme_allowed = cfg
+        .allowed_schemes
+        .iter()
+        .any(|s| s.eq_ignore_ascii_case(u.scheme()));
+    if !scheme_allowed {
+        bail!("scheme not allowed: {} (allowed: {:?})", u.scheme(), cfg.allowed_schemes);
+    }
+
+    let host = u.host_str().unwrap_or("");
+    let hostname = host.to_lowercase();
+
+    if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" {
+        bail!("localhost URLs not allowed");
+    }
+    if hostname.ends_with(".local") || hostname.ends_with(".internal") {
+        bail!("internal hostnames not allowed");
+    }
+
+    validate_not_private_ip(host)?;
+
+    Ok(u)
+}
+
+fn validate_not_private_ip(hostname: &str) -> Result<()> {
+    use std::net::ToSocketAddrs;
+    let addrs = format!("{}:443", hostname)
+        .to_socket_addrs()
+        .context("DNS lookup failed")?;
+    for addr in addrs {
+        let ip = addr.ip();
+        if ip.is_loopback() || is_private_ip(ip) {
+            bail!("private/local IP not allowed: {} resolves to {}", hostname, ip);
+        }
+    }
+    Ok(())
+}
+
+fn is_private_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => v4.is_private() || v4.is_link_local(),
+        std::net::IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified(),
+    }
+}
+
+pub async fn fetch_remote_image(
+    raw_url: &str,
+    cfg: &FetchRemoteImageConfig,
+) -> Result<(Vec<u8>, String)> {
+    let validated = validate_remote_url(raw_url, cfg)?;
+
+    let client = Client::builder()
+        .timeout(cfg.timeout)
+        .redirect(reqwest::redirect::Policy::custom({
+            let cfg_schemes = cfg.allowed_schemes.clone();
+            move |attempt| {
+                let url = attempt.url();
+                let ok = cfg_schemes
+                    .iter()
+                    .any(|s| s.eq_ignore_ascii_case(url.scheme()));
+                if !ok || attempt.previous().len() >= 5 {
+                    attempt.error("redirect blocked or too many redirects")
+                } else {
+                    attempt.follow()
+                }
+            }
+        }))
+        .build()
+        .context("building HTTP client")?;
+
+    let accept = cfg.allowed_types.join(", ");
+    let resp = client
+        .get(validated)
+        .header("User-Agent", "{project_name}/1.0")
+        .header("Accept", accept)
+        .send()
+        .await
+        .context("fetching URL")?;
+
+    if !resp.status().is_success() {
+        bail!("unexpected status: {}", resp.status());
+    }
+
+    let content_type = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    let type_allowed = cfg
+        .allowed_types
+        .iter()
+        .any(|t| content_type.starts_with(t.as_str()));
+    if !type_allowed {
+        bail!("content type not allowed: {}", content_type);
+    }
+
+    let bytes = resp.bytes().await.context("reading response")?;
+    if bytes.len() as u64 > cfg.max_size {
+        bail!("file too large (max: {} bytes)", cfg.max_size);
+    }
+
+    Ok((bytes.to_vec(), content_type))
+}
+```
+
+**Usage for logo/favicon:**
+
+```rust
+let cfg = FetchRemoteImageConfig::default();
+let (data, content_type) = fetch_remote_image(&logo_url, &cfg).await.unwrap_or_else(|err| {
+    tracing::warn!(url = %logo_url, error = %err, "failed to fetch remote logo");
+    (EMBEDDED_DEFAULT_LOGO.to_vec(), "image/png".into())
+});
+```
+
+**Security Rules:**
+| Rule | Implementation |
+|------|----------------|
+| **HTTPS only** | Block http:// URLs in production |
+| **No private IPs** | Validate resolved IPs are not RFC1918/loopback |
+| **No localhost** | Block localhost, 127.0.0.1, ::1 |
+| **No internal hosts** | Block .local, .internal domains |
+| **Size limits** | Limit download size (default 10MB) |
+| **Type validation** | Only allow image MIME types |
+| **Redirect validation** | Validate each redirect URL |
+| **Timeout** | Set reasonable timeout (default 30s) |
+
+**Rule:** remote user-controlled images follow the same active-content rules as uploads. Do NOT allow remote SVG unless the project explicitly sanitizes and rasterizes it before storage/display.
+
+### Defaults
+
+| Field | Default Value |
+|-------|---------------|
+| `title` | `{project_name}` |
+| `tagline` | Empty |
+| `description` | Empty |
+| `keywords` | Empty |
+| All others | Empty |
+
+**Rule:** If `title` is empty, fall back to `{project_name}`. Other fields are optional.
+
+## Announcements
+
+**Operator messages (configured in `server.yml`) shown in UI for downtime notices, updates, etc.**
+
+Active announcements are rendered by the Site Banner (see "Site Banner" in this PART) — multiple active announcements stack in config order.
+
+### Configuration
+
+```yaml
+web:
+  announcements:
+    enabled: true
+    # List of announcement messages
+    messages: []
+```
+
+### Announcement Structure
+
+```yaml
+messages:
+  - id: "maintenance-2025-01"
+    type: warning
+    # warning, info, error, success
+    title: "Scheduled Maintenance"
+    message: "The server will be down for maintenance on Jan 15, 2025 from 2-4 AM UTC."
+    start: "2025-01-14T00:00:00Z"
+    # When to start showing
+    end: "2025-01-15T04:00:00Z"
+    # When to stop showing
+    dismissible: true
+    # User can dismiss
+```
+
+### Announcements Configuration (config file)
+
+| Element | Config Key | Description |
+|---------|------------|-------------|
+| Enable announcements | `web.announcements.enabled` | Turn announcements on/off |
+| Type | `web.announcements.messages[].type` | warning, info, error, success |
+| Title | `web.announcements.messages[].title` | Short title |
+| Message | `web.announcements.messages[].message` | Full message content |
+| Start date | `web.announcements.messages[].start` | When to start showing (ISO 8601) |
+| End date | `web.announcements.messages[].end` | When to stop showing (ISO 8601) |
+| Dismissible | `web.announcements.messages[].dismissible` | Allow users to dismiss |
+
+When the admin panel is enabled (PART 28) announcements are also manageable at `/server/{admin_path}/config/announcements`.
+
+## CORS
+
+**Default CORS policy allows all origins (`*`).**
+
+### Configuration
+
+```yaml
+web:
+  # CORS origin configuration
+  # - "*": Allow all origins (default)
+  # - "https://example.com": Single origin
+  # - "https://example.com,https://app.example.com": Multiple origins (comma-separated)
+  # - "": Disable CORS headers entirely
+  cors: "*"
+```
+
+### CORS Headers
+
+| Header | Value |
+|--------|-------|
+| `Access-Control-Allow-Origin` | Configured origin(s) or `*` |
+| `Access-Control-Allow-Methods` | `GET, POST, PUT, PATCH, DELETE, OPTIONS` |
+| `Access-Control-Allow-Headers` | `Content-Type, Accept, X-Requested-With, Authorization, X-API-Key, X-Api-Key, API-Key, ApiKey, X-Auth-Token, X-Access-Token, X-Token, Token, X-CSRF-Token, X-XSRF-Token, X-Session-ID, X-Service-Token, X-Internal-Token` |
+| `Access-Control-Allow-Credentials` | `true` (only when specific origin, not `*`) |
+| `Access-Control-Max-Age` | `86400` (24 hours) |
+
+**Never `*` here:** the Fetch spec's `Access-Control-Allow-Headers: *` wildcard does NOT cover `Authorization`, and wildcards are invalid when credentials are allowed. Every supported auth header is listed by name — keep in sync with PART 8 → "Auth Token Headers (All Headers Supported)".
+
+**Query param bypass:** `?token=` auth (last in the PART 8 priority order) travels in the URL, not a header — it never triggers a CORS preflight and works from any origin regardless of the Allow-Headers list.
+
+### Behavior
+
+| Scenario | Behavior |
+|----------|----------|
+| `cors: "*"` | Allow all origins, credentials NOT allowed |
+| `cors: "https://example.com"` | Allow single origin, credentials allowed |
+| `cors: "https://a.com,https://b.com"` | Allow listed origins, credentials allowed |
+| `cors: ""` | No CORS headers (same-origin only) |
+| Preflight (OPTIONS) | Return CORS headers, 204 No Content |
+
+### CORS Allow-list Resolution Order
+
+The effective CORS allow-list is resolved from these sources in order; the request `Origin` is matched against the combined list:
+
+1. **Explicit config** — origins listed in `web.cors` (comma-separated). `""` disables CORS entirely and stops resolution.
+2. **DOMAIN env entries** — every hostname from the `DOMAIN` environment variable is added as an `https://` origin.
+3. **Reverse-proxy-learned hosts** — hostnames observed via `X-Forwarded-Host` from trusted proxies only (gated on `trusted_proxies` — see PART 12 → "Trusted Proxies") are appended at runtime.
+4. **Default** — if no source produced a list, fall back to `*` (credentials NOT allowed).
+
+Credentials (`Access-Control-Allow-Credentials: true`) are sent only when the resolved list is explicit — never with `*`. CSP `connect-src` `{learned_origins}` (PART 11 → "Content Security Policy") uses this same resolved list.
+
+### Mode-Specific Behavior
+
+| Mode | Default | Behavior |
+|------|---------|----------|
+| Production | `*` | Allow all origins by default (configure if needed) |
+| Development | `*` | Allow all origins |
+
+Configure CORS in Axum using `tower_http::cors::CorsLayer`:
+
+```rust
+use tower_http::cors::{CorsLayer, AllowOrigin, AllowMethods, AllowHeaders};
+use axum::http::{header, HeaderName, HeaderValue, Method};
+
+// Every supported auth header, by name — the `*` wildcard does NOT cover Authorization
+// and wildcards are invalid with credentials.
+// Keep in sync with PART 8 → "Auth Token Headers (All Headers Supported)".
+const CORS_ALLOW_HEADERS: [HeaderName; 16] = [
+    header::CONTENT_TYPE,
+    header::ACCEPT,
+    header::AUTHORIZATION,
+    HeaderName::from_static("x-requested-with"),
+    HeaderName::from_static("x-api-key"),
+    HeaderName::from_static("api-key"),
+    HeaderName::from_static("apikey"),
+    HeaderName::from_static("x-auth-token"),
+    HeaderName::from_static("x-access-token"),
+    HeaderName::from_static("x-token"),
+    HeaderName::from_static("token"),
+    HeaderName::from_static("x-csrf-token"),
+    HeaderName::from_static("x-xsrf-token"),
+    HeaderName::from_static("x-session-id"),
+    HeaderName::from_static("x-service-token"),
+    HeaderName::from_static("x-internal-token"),
+];
+
+pub fn build_cors_layer(cors_config: &str) -> CorsLayer {
+    match cors_config {
+        "" => CorsLayer::new(),
+        "*" => CorsLayer::permissive(),
+        origins => {
+            let allowed: Vec<HeaderValue> = origins
+                .split(',')
+                .filter_map(|o| o.trim().parse().ok())
+                .collect();
+            CorsLayer::new()
+                .allow_origin(AllowOrigin::list(allowed))
+                .allow_methods([
+                    Method::GET, Method::POST, Method::PUT,
+                    Method::PATCH, Method::DELETE, Method::OPTIONS,
+                ])
+                .allow_headers(AllowHeaders::list(CORS_ALLOW_HEADERS))
+                .allow_credentials(true)
+                .max_age(std::time::Duration::from_secs(86400))
+        }
+    }
+}
+```
+
+### Web Configuration (config file)
+
+| Element | Config Key | Description |
+|---------|------------|-------------|
+| CORS Origins | `web.cors` | Comma-separated list of allowed origins (`*` = all) |
+| Root `/healthz` alias | `server.healthz.root.enabled` | Enables `/healthz` alias for compatibility with tools that require it |
+
+When the admin panel is enabled (PART 28) these are also editable at `/server/{admin_path}/config/web`, with a read-only preview of the resulting CORS headers.
+
+## CSRF Protection
+
+**CSRF protects cookie-authenticated browser forms from cross-site forgery. It does NOT apply to Bearer/API-token requests, public endpoints, read-only methods, or callers that don't carry browser cookies — applying it there breaks legitimate clients (CLI tools, agents, webhooks, OAuth callbacks) without adding security value.**
+
+### When CSRF Validation Runs
+
+**Validate the CSRF token if and only if ALL of these are true:**
+
+| Condition | Reason |
+|-----------|--------|
+| Method is `POST`, `PUT`, `PATCH`, or `DELETE` | Read-only methods (`GET`, `HEAD`, `OPTIONS`) cannot change state |
+| The request authenticates via session cookie (no `Authorization` / `X-API-Token` / similar bearer header) | Bearer credentials are not auto-attached by browsers, so cross-site forgery has no vector |
+| `Origin` (or `Referer` if `Origin` absent) indicates a cross-site or unknown source | Same-origin requests are inherently CSRF-safe under the browser's same-origin policy |
+
+**Bypass the CSRF check (no validation, no token needed) if ANY of these are true:**
+
+| Bypass | Reason |
+|--------|--------|
+| `Authorization: Bearer …` or `X-API-Token: …` header present | Bearer auth — caller proves possession of a credential the browser cannot auto-attach. CSRF protects against forgery of *cookie* auth; this is a different auth model. |
+| Endpoint is public (no auth required) | Nothing to forge — the endpoint is open to anyone with no session to abuse. |
+| Method is `GET`, `HEAD`, or `OPTIONS` | Safe per RFC 9110. Must remain side-effect-free; if a `GET` mutates, that is a separate spec violation, not a CSRF problem. |
+| `Origin` matches the app's own host AND session cookie is `SameSite=Strict` | The browser already blocked cross-site cookie attachment; the token is redundant. (Same-origin + Lax SameSite cookie still gets the token check on cross-site POST forms.) |
+| WebSocket upgrade request (`Upgrade: websocket`) | Auth happens at the connection level, then per-message; CSRF tokens don't fit the WS lifecycle. |
+| Endpoint is in the explicit `web.csrf.exempt_paths` allow-list | Operator-declared exception. Used for OAuth callbacks, webhook receivers, and other endpoints that are POST'd to from origins the operator has whitelisted but cannot supply a token. |
+
+**Why these bypasses are safe:** CSRF is a defense against *the browser auto-attaching cookies to a cross-site request*. If cookies aren't the auth (Bearer), or the browser already blocked the attachment (SameSite=Strict + same-origin), or there is no auth at all (public endpoint), there is no auto-attached credential to forge. Adding CSRF on top of those situations breaks legitimate non-browser clients without adding any defense.
+
+### Cookie Posture (the first line of defense)
+
+| Cookie | `SameSite` | Why |
+|--------|------------|-----|
+| Session cookie (default) | `Strict` | Most browser auth is same-origin; `Strict` blocks cross-site cookie attachment entirely, neutralizing most CSRF before the token is even checked. |
+| OAuth-callback cookie (state, PKCE-verifier) | `Lax` | OAuth providers redirect cross-site back to our callback; `Strict` would drop the cookie. CSRF token is the second layer here. |
+
+**Modern browsers default to `SameSite=Lax` if unset.** Always set `SameSite` explicitly — never rely on the default.
+
+### Configuration
+
+```yaml
+web:
+  csrf:
+    # default: true. Set false ONLY for API-only deployments (no browser forms at all).
+    enabled: true
+    # bytes
+    token_length: 32
+    cookie_name: csrf_token
+    header_name: X-CSRF-Token
+    # auto | true | false. "auto" sets Secure when proto is https.
+    secure: auto
+    # Endpoints exempt from CSRF (operator-declared). Glob patterns supported.
+    # Common exemptions: OAuth callbacks, webhook receivers.
+    exempt_paths:
+      - /api/{api_version}/server/auth/oidc/*/callback
+      - /server/auth/saml/*/acs
+      - /server/auth/saml/*/slo
+      - /server/auth/saml/*/slo/callback
+      - /api/{api_version}/webhooks/*
+```
+
+### Implementation Rules
+
+| Rule | Detail |
+|------|--------|
+| Token in cookie + matching value in form/header | Double-submit cookie pattern. Token cookie is `SameSite=Strict`, `HttpOnly=false` (the form needs to read it), `Secure` per `csrf.secure`. |
+| Forms include hidden `<input name="csrf_token" value="…">` | Server-rendered HTML inserts the token automatically — no manual work in templates. |
+| Non-GET requests under cookie-session auth check the token | Per the "When CSRF Validation Runs" table above — Bearer/public/read-only paths skip the check. |
+| Token regenerated on login, logout, and privilege change | Prevents fixation. |
+| Validation failure → `403 FORBIDDEN` with canonical error body | `{"ok": false, "error": "CSRF_FAILED", "message": "CSRF token validation failed"}` (PART 13 → "Error Response"). |
+| Reject if cookie present and header/form missing, or if values mismatch | No silent fallback. |
+| Log to `security.log` as `security.csrf_failure` | IP, endpoint, reason — see PART 11. |
+
+### Threat Model — What CSRF Stops, What It Doesn't
+
+| Attack | Stops it? |
+|--------|-----------|
+| Attacker page POSTs a form to our domain using the victim's cookie session | ✓ Yes (token mismatch / Origin mismatch / SameSite=Strict drops the cookie) |
+| Attacker page calls our JSON API with `fetch()` from another origin, no Bearer | ✓ Yes (Origin mismatch + SameSite=Strict; CORS preflight also blocks) |
+| Attacker steals a CSRF token via XSS and submits a forged request | ✗ No (XSS bypasses CSRF — the attacker is now running in our origin). XSS defense is CSP + escaping. |
+| Attacker steals the session cookie via XSS | ✗ No (CSRF can't help — session theft is its own problem). Defense is `HttpOnly` cookie + CSP. |
+| Attacker submits a request with a stolen Bearer token | ✗ No (Bearer auth bypasses CSRF by design). Defense is token rotation, scoping, and rate limiting. |
+| Public endpoint POST'd to from anywhere | n/a (no auth, nothing to abuse) |
+| Browser-issued report to `/api/{api_version}/server/reports/*` | n/a (PART 13 reports are deliberately public; rate-limited per-IP) |
+
+## Footer Customization
+
+### Configuration
+
+**Note:** Analytics tracking → `server.tracking` (PART 12). Privacy/consent → `server.privacy` (PART 12).
+
+```yaml
+web:
+  footer:
+    # Custom branding HTML above the Application Footer
+    # - Not set or "": Use default branding (built-in)
+    # - " " (space): Disable branding, show only Application Footer
+    # - Custom HTML: Use your own branding (SANITIZED - no scripts)
+    custom_html: ""
+```
+
+### Custom HTML Validation
+
+**`custom_html` is SANITIZED before rendering. Scripts and dangerous elements are NEVER executed.**
+
+```rust
+// src/server/footer.rs
+use ammonia::Builder;
+
+/// Sanitize custom footer HTML.
+/// Only allows safe formatting tags — NO scripts, NO event handlers.
+pub fn sanitize_footer_html(html: &str) -> String {
+    if html.is_empty() || html == " " {
+        return html.to_string();
+    }
+
+    Builder::new()
+        .tags(std::collections::HashSet::from([
+            "p", "br", "span", "div",
+            "strong", "b", "em", "i", "u", "s", "small",
+            "h1", "h2", "h3", "h4", "h5", "h6",
+            "ul", "ol", "li", "a", "img",
+        ]))
+        .tag_attributes(std::collections::HashMap::from([
+            ("a".into(), std::collections::HashSet::from(["href", "title", "target", "rel"])),
+            ("img".into(), std::collections::HashSet::from(["src", "alt", "title", "width", "height"])),
+        ]))
+        .generic_attributes(std::collections::HashSet::from(["class", "id"]))
+        .url_schemes(std::collections::HashSet::from(["https", "data"]))
+        .link_rel(Some("noopener noreferrer"))
+        .clean(html)
+        .to_string()
+}
+
+/// Validate and return sanitized footer HTML.
+pub fn validate_footer_html(html: &str) -> Result<String, anyhow::Error> {
+    let sanitized = sanitize_footer_html(html);
+
+    if !html.is_empty() && sanitized.is_empty() {
+        anyhow::bail!("custom HTML contained only disallowed elements");
+    }
+
+    if html != sanitized && !html.is_empty() && html != " " {
+        tracing::warn!("footer custom_html was sanitized: removed potentially dangerous content");
+    }
+
+    Ok(sanitized)
+}
+```
+
+### Allowed vs Blocked Elements
+
+| Allowed | Blocked (Stripped) |
+|---------|-------------------|
+| `<p>`, `<br>`, `<span>`, `<div>` | `<script>`, `<noscript>` |
+| `<strong>`, `<b>`, `<em>`, `<i>` | `<iframe>`, `<frame>` |
+| `<a href="...">` | `<object>`, `<embed>` |
+| `<img src="...">` | `<form>`, `<input>`, `<button>` |
+| `<ul>`, `<ol>`, `<li>` | `<style>`, `<link>` |
+| `<h1>`-`<h6>` | `<meta>`, `<base>` |
+| `class`, `id` attributes | `onclick`, `onerror`, etc. |
+| | `javascript:` URLs |
+| | `style` attribute |
+
+### Example Valid Custom HTML
+
+```html
+<!-- Valid: Simple text branding -->
+<p>Powered by <strong>MyCompany</strong></p>
+
+<!-- Valid: Link with safe attributes -->
+<p>Built with <a href="https://example.com" target="_blank">Example Framework</a></p>
+
+<!-- Valid: Image (https or relative only) -->
+<p><img src="/static/logo.png" alt="Logo" width="100"></p>
+
+<!-- Valid: Using CSS classes (define in theme) -->
+<div class="custom-footer-brand">
+  <span class="brand-text">MyBrand</span>
+</div>
+```
+
+### Example Invalid Custom HTML (Stripped)
+
+```html
+<!-- STRIPPED: Script tags -->
+<script>alert('xss')</script>
+
+<!-- STRIPPED: Event handlers -->
+<img src="x" onerror="alert('xss')">
+
+<!-- STRIPPED: JavaScript URLs -->
+<a href="javascript:alert('xss')">Click</a>
+
+<!-- STRIPPED: Iframes -->
+<iframe src="https://evil.com"></iframe>
+
+<!-- STRIPPED: Style attribute (use classes instead) -->
+<p style="color: red;">Text</p>
+
+<!-- STRIPPED: Forms -->
+<form action="/steal"><input type="text"></form>
+```
+
+### Sanitization Preview
+
+When the operator sets `custom_html` in `server.yml`, the server logs at startup (and the admin panel, when enabled — PART 28, shows the same on edit):
+1. **Raw input** - What was configured
+2. **Sanitized output** - What will actually render
+3. **Warning** - If content was modified by sanitizer
+
+### Available Footer Variables
+
+| Variable | Description |
+|----------|-------------|
+| `{current_year}` | Current year (e.g., 2025) |
+| `{project_name}` | Project name |
+| `{project_org}` | Organization name |
+| `{project_version}` | Application version |
+| `{build_datetime}` | Build date/time (`%B %d, %Y at %H:%M:%S %Z`) |
+| `{onion_address}` | Tor `.onion` address (only when Tor is enabled, running, and an address is published; empty otherwise) |
+
+### Default Application Footer (Always Shown)
+
+```html
+<footer class="footer">
+  <!-- Onion address (only shown if Tor is enabled, running, and an onion address is published) -->
+  {% if tor_enabled && tor_running && !tor_address.is_empty() %}
+  <p class="footer-onion">
+    <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
+    <code class="onion-address">{onion_address}</code>
+    <button type="button" class="copy-btn" data-copy="{onion_address}" aria-live="polite" aria-label="Copy onion address">📋</button>
+  </p>
+  {% endif %}
+
+  <!-- Standard page links -->
+  <p>
+    <a href="/server/about">About</a>
+    <span>•</span>
+    <a href="/server/privacy">Privacy</a>
+    <span>•</span>
+    <a href="/server/contact">Contact</a>
+    <span>•</span>
+    <a href="/server/help">Help</a>
+  </p>
+
+  <!-- Application branding -->
+  <p>
+    <a href="{PLATFORM_REPO_URL}" target="_blank">Made with</a> ❤️
+    <span>•</span>
+    <span>{project_version}</span>
+  </p>
+
+  <!-- Build stamp -->
+  <p>
+    <a href="/server/healthz">Last update: {build_datetime}</a>
+  </p>
+</footer>
+```
+
+**No `<br />` spacers between rows** — rows are consecutive `<p>` elements; vertical rhythm comes from CSS (`footer p { margin: 0.25rem 0; }`), kept tight. Row order is fixed: onion address (Tor only) → page links → branding → last update. A disabled feature drops its row entirely without leaving a gap.
+
+### Admin Footer
+
+Admin-panel-only — the admin footer (version link to `/server/{admin_path}/config/info`, docs link, live health indicator fed by `/server/healthz`) is specified in PART 28.
+
+### Footer Configuration (config file)
+
+| Element | Config Key | Description |
+|---------|------------|-------------|
+| Custom branding HTML | `web.footer.custom_html` | HTML above application footer (sanitized) |
+
+When the admin panel is enabled (PART 28) the footer HTML is also editable at `/server/{admin_path}/config/footer` with sanitized and rendered previews.
+
+**Related configuration:**
+- Analytics tracking: `server.tracking` (PART 12: Analytics Tracking)
+- Privacy & consent: `server.privacy` (PART 12: Privacy & Consent)
+
+## Cookie Consent Banner
+
+**Fixed bottom banner for GDPR/privacy compliance. ALWAYS enabled - we use cookies.**
+
+**Configuration:** `server.privacy.consent` (see PART 12: Privacy & Consent)
+
+**Configuration:** `server.privacy` section in the config file (admin panel: `/server/{admin_path}/config/privacy` when enabled — PART 28)
+
+### Banner Layout
+
+**Desktop (full width, single row):**
+```
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│  {message} - {policy_link}                                    [Decline]  [I Agree]   │
+└──────────────────────────────────────────────────────────────────────────────────────┘
+  ↑ Fixed to bottom, full width, purple/magenta background
+    Message centered, buttons RIGHT-aligned
+```
+
+**Mobile (stacked, centered):**
+```
+┌─────────────────────────────────┐
+│  In accordance with the EU GDPR │
+│  law this message is being      │
+│  displayed.                     │
+│        - {policy_link}          │
+│                                 │
+│    [Decline]    [I Agree]       │
+└─────────────────────────────────┘
+  ↑ Text wraps and centers
+    Buttons side-by-side, centered below
+```
+
+### Banner Rules
+
+| Rule | Requirement |
+|------|-------------|
+| **Position** | Fixed bottom of viewport, full width |
+| **Background** | Purple/magenta (`#7c5295` or theme accent) |
+| **Text color** | White |
+| **Height** | Single row on desktop (~50px), expands on mobile |
+| **Message** | Centered text, inline with policy link |
+| **Policy link** | Inline after " - ", underlined, same color |
+| **Buttons (desktop)** | RIGHT-aligned, inline with message |
+| **Buttons (mobile)** | Centered below message, side-by-side |
+| **Decline button** | Text/outline style, no background |
+| **"I Agree" button** | Filled white background, purple text |
+| **Persistence** | Choice stored in the `cookieConsent` cookie (server-readable) — server skips rendering the banner on later requests |
+| **Z-index** | Above all content, below modals |
+
+### Banner Behavior
+
+| Action | Result |
+|--------|--------|
+| **I Agree** | POST to `/consent` — server sets `cookieConsent` cookie (all categories true), redirects back, enables all cookies + tracking |
+| **Decline** | POST to `/consent` — server sets `cookieConsent` cookie (essential only), redirects back, session cookies only |
+| **Already set** | Server does NOT render the banner when a valid `cookieConsent` cookie exists (`consent_middleware` parses it) |
+| **First visit** | No consent cookie — server renders the banner visible; it works without JavaScript |
+
+### Implementation
+
+**Values from `server.privacy.consent`:**
+
+| Template Variable | Config Path | Notes |
+|-------------------|-------------|-------|
+| `{message}` | Dynamic selection | Uses `get_consent_message()` - returns `message_if_sold` when `data.sold=true`, otherwise `message` |
+| `{policy_url}` | `server.privacy.consent.policy.url` | |
+| `{policy_text}` | `server.privacy.consent.policy.text` | |
+| `{decline_text}` | `server.privacy.consent.buttons.decline` | |
+| `{accept_text}` | `server.privacy.consent.buttons.accept` | |
+| `{preferences_text}` | `server.privacy.consent.preferences_text` | |
+| `{data_sold}` | `server.privacy.data.sold` | Boolean rendered into `data-sold` for the JS enhancement |
+
+**Dynamic Message Selection:**
+```rust
+// Template rendering uses get_consent_message() for {message}
+// Returns appropriate message based on data.sold
+let message = cfg.privacy.get_consent_message();
+```
+
+```html
+<!-- Cookie Consent Banner - SERVER-RENDERED only when no valid cookieConsent
+     cookie exists (consent_middleware parses it; get_consent_from_jar()).
+     The banner is fully functional without JavaScript: Accept/Decline are
+     plain POST forms. No hidden-by-default + JS-reveal pattern. -->
+<!-- {message} is dynamically selected based on server.privacy.data.sold -->
+{% if !consent_given %}
+<div id="cookie-consent" class="cookie-banner" data-sold="{data_sold}">
+  <div class="cookie-banner-content">
+    <span class="cookie-message">
+      {message} - <a href="{policy_url}" class="policy-link">{policy_text}</a>
+    </span>
+    <div class="cookie-buttons">
+      <form method="post" action="/consent">
+        <input type="hidden" name="choice" value="decline">
+        <button type="submit" class="btn-decline">{decline_text}</button>
+      </form>
+      <form method="post" action="/consent">
+        <input type="hidden" name="choice" value="accept">
+        <button type="submit" class="btn-accept">{accept_text}</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+```
+
+**Server handler (`POST /consent`) — the no-JS baseline:**
+
+```rust
+// POST /consent sets the cookieConsent cookie (JSON value, 1 year, SameSite=Lax)
+// and redirects back to the referring page (303 See Other).
+// choice=accept  -> {"essential":true,"preferences":true,"analytics":true,"timestamp":...}
+// choice=decline -> {"essential":true,"preferences":false,"analytics":false,"timestamp":...}
+// choice=custom  -> per-category values from the preferences form checkboxes
+// GET /consent renders the granular preferences page (server-rendered form) -
+// the no-JS target for every "Manage Preferences" link.
+```
+
+**JavaScript enhancement (static/js/app.js — external file, NO inline handlers):**
+
+```javascript
+// Progressive enhancement ONLY - the banner works without JS via the POST forms.
+// This intercepts the submit to apply consent without a page reload.
+document.addEventListener('submit', async (e) => {
+  const form = e.target.closest('#cookie-consent form, #cookie-preferences-modal form');
+  if (!form) return;
+  e.preventDefault();
+  const data = new FormData(form);
+  // The server's Set-Cookie response stores the consent - no client-side storage
+  await fetch(form.action, { method: 'POST', body: data });
+  document.getElementById('cookie-consent')?.remove();
+  document.getElementById('cookie-preferences-modal')?.close();
+  if (data.get('choice') === 'accept') loadTracking();
+});
+
+// Enhancement: open the native <dialog id="cookie-preferences-modal"> in place
+// instead of navigating to the server-rendered /consent page
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('[data-consent-preferences]');
+  const dialog = document.getElementById('cookie-preferences-modal');
+  if (link && dialog?.showModal) {
+    e.preventDefault();
+    dialog.showModal();
+  }
+});
+
+function loadTracking() {
+  // Load analytics if server.tracking is configured AND consent.analytics is true.
+  // On full page loads the server injects the script via {{ trackingScript }};
+  // this only covers the no-reload accept path.
+}
+```
+
+**CCPA "Do Not Sell"** (only rendered when `server.privacy.data.sold = true`) is a plain POST form to `/consent/ccpa` — no JavaScript required. The server sets the `ccpa_opt_out` cookie (1 year), declines non-essential categories in `cookieConsent`, blocks third-party data sharing, and honors the GPC (Global Privacy Control) signal server-side. Nothing is stored in localStorage — the server must be able to read the opt-out on every request.
+
+<style>
+/* Cookie Consent Banner - matches reference design.
+   No hidden state needed: the server only renders the banner when there is
+   no valid consent cookie, and the JS enhancement removes the element. */
+.cookie-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  background: var(--color-primary);
+  color: white;
+  z-index: 9999;
+}
+
+/* Base: Mobile styles - stacked, centered */
+.cookie-banner-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem 1rem;
+  max-width: 100%;
+  gap: 1rem;
+}
+
+.cookie-message {
+  text-align: center;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.cookie-banner .policy-link {
+  color: white;
+  text-decoration: underline;
+}
+
+.cookie-banner .policy-link:hover {
+  opacity: 0.9;
+}
+
+.cookie-buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  justify-content: center;
+}
+
+.cookie-banner .btn-decline {
+  background: transparent;
+  border: none;
+  color: white;
+  padding: 0.625rem 1.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.cookie-banner .btn-decline:hover {
+  text-decoration: underline;
+}
+
+.cookie-banner .btn-accept {
+  background: white;
+  border: none;
+  color: var(--color-primary);
+  padding: 0.625rem 1.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  border-radius: 2px;
+}
+
+.cookie-banner .btn-accept:hover {
+  opacity: 0.95;
+}
+
+/* Desktop: side-by-side layout */
+@media (min-width: 601px) {
+  .cookie-banner-content {
+    flex-direction: row;
+    padding: 0.875rem 1.5rem;
+    gap: 2rem;
+  }
+
+  .cookie-banner .btn-decline,
+  .cookie-banner .btn-accept {
+    padding: 0.5rem 1.25rem;
+  }
+}
+</style>
+```
+
+### Consent Logic (Granular)
+
+**Consent stored as JSON in the `cookieConsent` cookie (server-readable):** `{"essential":true,"preferences":true,"analytics":false,"timestamp":1704067200}`
+
+| Condition | Show Banner | Essential | Preferences | Analytics |
+|-----------|-------------|-----------|-------------|-----------|
+| No `cookieConsent` cookie (first visit) | **Yes** | Yes (always) | Wait | Wait |
+| Accept All clicked | No | Yes | **Yes** | **Yes** (if `server.tracking` configured) |
+| Decline clicked | No | Yes | No | No |
+| Custom preferences saved | No | Yes | User choice | User choice |
+
+**Cookie consent is ALWAYS enabled - we use cookies for sessions and preferences.**
+
+**Cookie categories:**
+
+| Category | Can Disable | Examples |
+|----------|-------------|----------|
+| **Essential** | No | Session, CSRF token, auth |
+| **Preferences** | Yes | Theme, language, UI settings |
+| **Analytics** | Yes | Tracking (only if `server.tracking` configured) |
+
+### Decline Behavior
+
+**When user clicks "Decline", the following MUST happen:**
+
+| Category | Behavior | Details |
+|----------|----------|---------|
+| **Analytics/Tracking** | **NEVER loaded** | No tracking scripts injected, no data sent to analytics providers |
+| **Preference cookies** | **NOT set** | Theme defaults to system/dark, language defaults to browser/en |
+| **Essential cookies** | **Still work** | Session, CSRF, auth tokens required for app to function |
+| **localStorage** | **Not used** | The decline is remembered in the `cookieConsent` cookie (essential category) so the server can skip the banner |
+| **Third-party scripts** | **NOT loaded** | No Google Analytics, Matomo, etc. |
+| **Embedded content** | **Placeholder shown** | YouTube, social embeds show "Content blocked" placeholder |
+
+**What IS allowed after decline:**
+```
+✓ Session cookie (required for login/auth)
+✓ CSRF token cookie (required for form security)
+✓ Remember decline choice (`cookieConsent` cookie — essential, stores the refusal)
+✓ Basic functionality (browse, view content)
+```
+
+**What is BLOCKED after decline:**
+```
+✗ Analytics tracking scripts (Google, Matomo, Fathom, etc.)
+✗ Theme/language preference cookies
+✗ Third-party embeds (YouTube, Twitter, etc.)
+✗ Marketing/advertising cookies (if any)
+✗ Any data sent to external analytics services
+```
+
+**Implementation:**
+
+```rust
+// check_tracking_allowed returns true only if:
+// 1. User has accepted cookies (analytics: true)
+// 2. server.tracking is configured
+pub fn check_tracking_allowed(headers: &HeaderMap, cfg: &Config) -> bool {
+    let Some(consent) = get_consent_from_headers(headers) else {
+        // No consent or declined
+        return false;
+    };
+    if !consent.analytics {
+        return false;
+    }
+    !cfg.server.tracking.tracking_type.is_empty()
+}
+
+// Template helper - only inject tracking if allowed
+pub fn tracking_script(headers: &HeaderMap, cfg: &Config) -> askama::MarkupDisplay<String> {
+    if !check_tracking_allowed(headers, cfg) {
+        return askama::MarkupDisplay::new_safe(String::new());
+    }
+    generate_tracking_script(cfg)
+}
+```
+
+**Consent check in templates (Askama):**
+
+```html
+<!-- Only show tracking script if user consented -->
+{% if tracking_allowed %}
+  {{ tracking_script|safe }}
+{% endif %}
+
+<!-- Show placeholder for blocked embeds -->
+<!-- The link targets the server-rendered /consent page (works without JS);
+     app.js upgrades it to open the preferences <dialog> in place -->
+{% if !preferences_allowed %}
+  <div class="embed-blocked">
+    <p>External content blocked due to cookie preferences.</p>
+    <a href="/consent" class="btn" data-consent-preferences>Manage Preferences</a>
+  </div>
+{% else %}
+  <!-- Actual embed -->
+{% endif %}
+```
+
+## Standard Pages
+
+**ALL applications MUST have these standard pages. Content is defined per-application.**
+
+### /server/about
+
+**About the application - what it does and version info.**
+
+| Section | Description |
+|---------|-------------|
+| Application name | From branding config |
+| Version | Current version |
+| Description | From branding config or project-specific |
+| Features | Key features list (project-specific) |
+| Links | GitHub, documentation, etc. |
+
+**⚠️ CRITICAL: Content MUST come from IDEA.md - NEVER use generic placeholders.**
+
+| Field | Source | Example |
+|-------|--------|---------|
+| Application name | `IDEA.md` → Project Name | "JokeAPI" |
+| Tagline | `IDEA.md` → Tagline | "A free API for random jokes" |
+| Description | `IDEA.md` → Description section | Actual project description |
+| Features | `IDEA.md` → Features section | List actual features from IDEA.md |
+| Links | `IDEA.md` → Links/URLs or infer from projectorg/projectname | GitHub, docs URLs |
+
+**DO NOT use:**
+- "Your application name here"
+- "Description of your application"
+- "Feature 1, Feature 2, Feature 3"
+- Any placeholder text
+
+**Example About Page (for a jokes API):**
+```html
+<article class="about-page">
+  <h1>JokeAPI</h1>
+  <p class="tagline">A free API for random jokes</p>
+
+  <section class="description">
+    <h2>About</h2>
+    <p>JokeAPI is a free, open-source REST API that serves random jokes.
+    It supports multiple categories, formats, and languages.</p>
+  </section>
+
+  <section class="features">
+    <h2>Features</h2>
+    <ul>
+      <li>Multiple joke categories (programming, misc, dark, pun)</li>
+      <li>Safe mode filtering</li>
+      <li>Multiple response formats (JSON, XML, YAML, plain text)</li>
+      <li>GraphQL support</li>
+      <li>No authentication required</li>
+    </ul>
+  </section>
+
+  <section class="version">
+    <h2>Version</h2>
+    <p>{{ version }} ({{ build_date }})</p>
+  </section>
+
+  <section class="links">
+    <h2>Links</h2>
+    <ul>
+      <li><a href="https://github.com/example/jokeapi">GitHub</a></li>
+      <li><a href="https://jokeapi.readthedocs.io">Documentation</a></li>
+    </ul>
+  </section>
+</article>
+```
+
+**Note:** Tor address is NOT shown here. Tor access is available via:
+- **Footer**: "Tor Support" link → `/server/help#tor-access` (shown when Tor is enabled)
+- **`/server/help`**: Tor Access section with .onion address, copy button, and setup instructions
+- **`/server/healthz`**: Tor status and .onion address (technical/status view)
+
+### /server/privacy
+
+**Privacy policy page - MUST display all privacy information from `server.privacy` config.**
+
+**Required Sections (auto-generated from config):**
+
+| Section | Source | Description |
+|---------|--------|-------------|
+| Summary | Dynamic | Key points: data stored on server, sold/not-sold (based on `data.sold`) |
+| Cookie Policy | `server.privacy.cookies` | What cookies are used and why |
+| Data Collection | `server.privacy.content.data_collection` | What data is collected |
+| Data Usage | `get_data_usage_content()` | Dynamic: returns `data_usage` or `data_usage_if_sold` |
+| Data Security | `server.privacy.content.data_security` | How data is protected |
+| Data Storage | `server.privacy.sharing` | Where data is stored, third-party conditions |
+| Data Retention | `server.privacy.retention` | How long data is kept |
+| Third Parties | `server.privacy.third_party` | Services that receive data (if any) |
+| Your Rights | `server.privacy.retention` | Export/deletion options |
+| **CCPA Opt-Out** | Conditional | **Only shown when `data.sold = true`** - Do Not Sell toggle |
+| Manage Preferences | Link | Button to open cookie preferences modal |
+| Contact | `/server/contact` link | How to contact for privacy concerns |
+
+**Page Layout:**
+
+```html
+<article class="privacy-policy">
+  <h1>Privacy Policy</h1>
+  <p class="last-updated">Last updated: {build_datetime}</p>
+
+  <!-- Summary - Key Points (always shown first) -->
+  <!-- Dynamic: Second key-point changes based on server.privacy.data.sold -->
+  <section id="summary" class="privacy-summary">
+    <h2>Summary</h2>
+    <div class="key-points">
+      <div class="key-point">
+        <span class="icon">🔒</span>
+        <strong>Your data is stored on our servers</strong>
+        <p>All personal data is stored securely on our infrastructure.</p>
+      </div>
+      {% if privacy.data.sold %}
+      <div class="key-point key-point-warning">
+        <span class="icon">⚠️</span>
+        <strong>Your data may be sold</strong>
+        <p>Your personal information may be shared with or sold to third parties. <a href="#ccpa-opt-out">Opt out of data sales</a>.</p>
+      </div>
+      {% else %}
+      <div class="key-point">
+        <span class="icon">🚫</span>
+        <strong>We never sell your data</strong>
+        <p>Your personal information is never sold to third parties.</p>
+      </div>
+      {% endif %}
+      <div class="key-point">
+        <span class="icon">🎛️</span>
+        <strong>You control your data</strong>
+        <p>Request export or deletion of your data anytime via the contact page.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cookie Policy Section - from server.privacy.cookies -->
+  <section id="cookies">
+    <h2>Cookie Policy</h2>
+    <p>We use cookies to ensure our website functions properly and to improve your experience.</p>
+
+    <h3>Essential Cookies</h3>
+    <p>{{ privacy.cookies.essential.description }}</p>
+
+    <h3>Preference Cookies</h3>
+    <p>{{ privacy.cookies.preferences.description }}</p>
+
+    <h3>Analytics Cookies</h3>
+    {% if !tracking.tracking_type.is_empty() %}
+    <!-- Dynamic: get_analytics_description() returns description + appropriate suffix based on data.sold -->
+    <p>{{ privacy.get_analytics_description() }}</p>
+    <p>We use <strong>{{ tracking.type_name }}</strong> for analytics.</p>
+    {% else %}
+    <p>We do not use analytics tracking on this site.</p>
+    {% endif %}
+
+    <div class="manage-cookies">
+      <!-- No-JS baseline: navigates to the server-rendered /consent page;
+           app.js upgrades it to open the preferences <dialog> in place -->
+      <a href="/consent" class="btn" data-consent-preferences>Manage Cookie Preferences</a>
+    </div>
+  </section>
+
+  <!-- Data Collection - admin-defined content -->
+  <section id="data-collection">
+    <h2>Data We Collect</h2>
+    {{ privacy.content.data_collection|markdown_to_html|safe }}
+  </section>
+
+  <!-- Data Usage - admin-defined content -->
+  <!-- Dynamic: get_data_usage_content() returns data_usage or data_usage_if_sold based on data.sold -->
+  <section id="data-usage">
+    <h2>How We Use Your Data</h2>
+    {{ privacy.get_data_usage_content()|markdown_to_html|safe }}
+  </section>
+
+  <!-- Data Security - admin-defined content -->
+  <section id="data-security">
+    <h2>Data Security</h2>
+    {{ privacy.content.data_security|markdown_to_html|safe }}
+  </section>
+
+  <!-- Data Storage - from server.privacy.data -->
+  <section id="data-storage">
+    <h2>Data Storage & Third-Party Sharing</h2>
+    <p><strong>All your data is stored on our servers.</strong> We do not use third-party cloud storage for your personal data.</p>
+
+    <h3>When Data May Be Shared</h3>
+    <p>Your data is only sent to third parties in these specific situations:</p>
+    <ul>
+      {% for entry in privacy.data.sharing %}
+      <li><strong>{{ entry.condition|humanize }}:</strong> {{ entry.when }} - {{ entry.data }}</li>
+      {% endfor %}
+    </ul>
+
+    <p><strong>In all cases:</strong></p>
+    <ul>
+      <li>Data is only shared when necessary for the stated purpose</li>
+      <li>You can opt out of analytics by declining cookies</li>
+      {% if privacy.data.sold %}
+      <li>Your data <strong>may be sold</strong> to third parties. See <a href="#ccpa-opt-out">CCPA opt-out</a> below.</li>
+      {% else %}
+      <li>Your data is <strong>never sold</strong></li>
+      {% endif %}
+    </ul>
+  </section>
+
+  <!-- Data Retention - from server.privacy.retention -->
+  <section id="data-retention">
+    <h2>Data Retention</h2>
+    <p>{{ privacy.retention.period }}</p>
+  </section>
+
+  <!-- Third Parties - from server.privacy.third_party -->
+  <section id="third-parties">
+    <h2>Third-Party Services</h2>
+    {% if !privacy.third_party.services.is_empty() %}
+    <p>We use the following third-party services:</p>
+    <table>
+      <thead>
+        <tr><th>Service</th><th>Purpose</th><th>Data Sent</th><th>Privacy Policy</th></tr>
+      </thead>
+      <tbody>
+        {% for svc in privacy.third_party.services %}
+        <tr>
+          <td>{{ svc.name }}</td>
+          <td>{{ svc.purpose }}</td>
+          <td>{{ svc.data_sent }}</td>
+          <td><a href="{{ svc.policy_url }}" target="_blank" rel="noopener">View Policy</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p><strong>We do not currently use any third-party services that receive your data.</strong></p>
+    <p>If analytics tracking is enabled and you consent, anonymized usage data may be sent to the configured analytics provider. Check the Cookie Policy section above for details.</p>
+    {% endif %}
+  </section>
+
+  <!-- Your Rights - from server.privacy.retention -->
+  <section id="your-rights">
+    <h2>Your Rights</h2>
+    <p>You have the following rights regarding your data:</p>
+    <ul>
+      <li><strong>Access:</strong> Request a summary of all data we have about you.</li>
+      {% if privacy.retention.export_available %}
+      <li><strong>Export:</strong> Download a copy of all your data in a portable format.</li>
+      {% endif %}
+      {% if privacy.retention.deletion_available %}
+      <li><strong>Deletion:</strong> Request permanent deletion of all data associated with you.</li>
+      {% endif %}
+      <li><strong>Correction:</strong> Update or correct your personal information anytime.</li>
+      <li><strong>Cookie Control:</strong> <a href="/consent" data-consent-preferences>Manage your cookie preferences</a></li>
+    </ul>
+  </section>
+
+  <!-- CCPA "Do Not Sell" - ONLY shown when server.privacy.data.sold = true -->
+  {% if privacy.data.sold %}
+  <section id="ccpa-opt-out" class="ccpa-section">
+    <h2>California Privacy Rights (CCPA)</h2>
+    <p>Under the California Consumer Privacy Act (CCPA), California residents have the right to:</p>
+    <ul>
+      <li><strong>Know</strong> what personal information is collected and how it's used</li>
+      <li><strong>Request deletion</strong> of personal information</li>
+      <li><strong>Opt out</strong> of the sale of personal information</li>
+      <li><strong>Non-discrimination</strong> for exercising your privacy rights</li>
+    </ul>
+
+    <div class="ccpa-opt-out-box">
+      <h3>Do Not Sell My Personal Information</h3>
+      <p>Click the button below to opt out of the sale of your personal information.</p>
+      <!-- Plain POST forms - the CCPA opt-out works without JavaScript;
+           the server sets/clears the ccpa_opt_out cookie and redirects back -->
+      {% if ccpa_opted_out %}
+      <div class="ccpa-status opted-out">
+        <span class="status-icon">✓</span>
+        <span>You have opted out of data sales.</span>
+      </div>
+      <form method="post" action="/consent/ccpa">
+        <input type="hidden" name="opt_out" value="false">
+        <button type="submit" class="btn-secondary">Opt Back In</button>
+      </form>
+      {% else %}
+      <form method="post" action="/consent/ccpa">
+        <input type="hidden" name="opt_out" value="true">
+        <button type="submit" class="btn-primary btn-ccpa-opt-out">Do Not Sell My Personal Information</button>
+      </form>
+      {% endif %}
+    </div>
+
+    <p class="ccpa-note">Note: This opt-out applies to the sale of personal information. Essential cookies and site functionality will continue to work normally.</p>
+  </section>
+  {% endif %}
+
+  <!-- Contact -->
+  <section id="contact">
+    <h2>Contact Us</h2>
+    <p>For privacy-related inquiries, please <a href="/server/contact">contact us</a>.</p>
+  </section>
+</article>
+```
+
+**API Endpoint (`/api/{api_version}/server/privacy`):**
+
+```json
+{
+  "summary": {
+    "data_stored_on_server": true,
+    "data_sold": false,
+    "user_control": true
+  },
+  "cookies": {
+    "essential": {
+      "enabled": true,
+      "description": "Required for the site to function. Includes session management, security tokens (CSRF), and authentication."
+    },
+    "preferences": {
+      "enabled": true,
+      "description": "Remember your settings such as theme (dark/light), language, and UI preferences."
+    },
+    "analytics": {
+      "enabled": true,
+      "description": "Help us understand how visitors use our site. Analytics data is anonymized and never sold."
+    }
+  },
+  "data": {
+    "sold": false,
+    "stored_on_server": true,
+    "sharing": [
+      {
+        "condition": "analytics",
+        "when": "Tracking configured AND user consents",
+        "data": "Anonymized: page views, browser type, country"
+      },
+      {
+        "condition": "email",
+        "when": "SMTP configured for sending emails",
+        "data": "Email address, message content"
+      },
+      {
+        "condition": "user_initiated",
+        "when": "User explicitly shares content",
+        "data": "Whatever user chooses to share"
+      }
+    ]
+  },
+  "tracking": {
+    "enabled": false,
+    "type": "",
+    "type_name": ""
+  },
+  "retention": {
+    "period": "Data is retained while the service is in use. Upon a deletion request, all personal data is permanently deleted within 30 days.",
+    "export_available": true,
+    "deletion_available": true
+  },
+  "third_party": {
+    "services": []
+  },
+  "ccpa": {
+    "applicable": false,
+    "opt_out_url": "/server/privacy#ccpa-opt-out",
+    "user_opted_out": false
+  },
+  "content": {
+    "consent_message": "...",
+    "data_usage": "..."
+  }
+}
+```
+
+**Dynamic Fields:**
+- `summary.data_sold`: Reflects `server.privacy.data.sold`
+- `cookies.analytics.description`: From `get_analytics_description()` (includes suffix)
+- `content.consent_message`: From `get_consent_message()` (returns sold/not-sold message)
+- `content.data_usage`: From `get_data_usage_content()` (returns sold/not-sold content)
+- `ccpa.applicable`: `true` only when `data.sold = true`
+
+**Note:** The `tracking` and `third_party.services` fields are populated based on `server.tracking` config. If no tracking is configured, they remain empty.
+
+**Privacy Configuration (config file):**
+
+| Section | Config Keys |
+|---------|-------------|
+| **Data Policies** | `server.privacy.data.sold` (default: false), `server.privacy.data.stored_on_server`, `server.privacy.data.sharing[]` |
+| **Consent Banner** | `server.privacy.consent.message`, `server.privacy.consent.message_if_sold`, `server.privacy.consent.policy.url`, `server.privacy.consent.policy.text`, `server.privacy.consent.buttons.decline`, `server.privacy.consent.buttons.accept` |
+| **Cookie Descriptions** | `server.privacy.cookies.essential`, `server.privacy.cookies.preferences`, `server.privacy.cookies.analytics` |
+| **Data Collection** | `server.privacy.content.data_collection` (Markdown) |
+| **Data Usage** | `server.privacy.content.data_usage`, `server.privacy.content.data_usage_if_sold` (Markdown) |
+| **Data Security** | `server.privacy.content.data_security` (Markdown) |
+| **Data Retention** | `server.privacy.retention.period`, `server.privacy.retention.export_available`, `server.privacy.retention.deletion_available` |
+| **Third Parties** | `server.privacy.third_party.services[]` (name, purpose, data_sent, policy_url) |
+
+When the admin panel is enabled (PART 28) these are editable at `/server/{admin_path}/config/privacy` with a live preview that toggles sold/not-sold views; toggling `data.sold` ON MUST show a warning explaining CCPA implications, and the `*_if_sold` fields are only editable when `data.sold = true`.
+
+**Default content provided, fully customizable via the config file (and the admin panel when enabled — PART 28).**
+
+### /server/contact
+
+**Contact form - sends message to the configured general contact recipient.**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| Name | Text | Yes | Sender's name |
+| Email | Email | Yes | Sender's email (for reply) |
+| Subject | Text | Yes | Message subject |
+| Message | Textarea | Yes | Message body |
+| Captcha | Captcha | Yes | Spam prevention |
+
+**Submission sends to `server.contact.general.email` (or falls back to `server.contact.admin.email` if general is empty).**
+
+**Below the form, the page MUST render exactly two informational sections — the content is spec'd here; never improvise it:**
+
+| Section | Content |
+|---------|---------|
+| Security Issues | "To report a security vulnerability, consult our security policy at `/server/security`." — rendered as a link to `/server/security`. Never point users at the raw `/.well-known/security.txt` file from this page. |
+| Abuse Reports | "To report abusive content or policy violations, use this contact form." — append " or email {abuse_email}" where `{abuse_email}` resolves to `server.contact.abuse.email` if set, else `server.contact.general.email` if set; omit the email clause entirely when neither is set. NEVER render `server.contact.admin.email` here (it is never public). |
+
+### /server/help
+
+**Help page - documentation and usage instructions for the application.**
+
+| Section | Description |
+|---------|-------------|
+| Getting started | Quick start guide |
+| Features | How to use key features |
+| API Documentation | Links to Swagger (`/server/docs/swagger`) and GraphQL (`/server/docs/graphql`) — UIs fetch from `/api/swagger` and `/api/graphql` aliases |
+| Tor Access | How to access via Tor (only shown if Tor enabled) |
+| FAQ | Frequently asked questions |
+| Troubleshooting | Common issues and solutions |
+
+**⚠️ CRITICAL: Content MUST reflect the ACTUAL project - NEVER use generic placeholders.**
+
+| Section | Source | What to include |
+|---------|--------|-----------------|
+| Getting started | `IDEA.md` + actual endpoints | Real curl examples using actual API endpoints |
+| Features | `IDEA.md` → Features | How to USE each feature (not just list them) |
+| FAQ | Common questions for THIS project type | Real questions users would ask |
+| Troubleshooting | Actual error scenarios | Real errors and solutions |
+
+**DO NOT use:**
+- "curl https://api.example.com/endpoint"
+- "Replace YOUR_API_KEY with your actual key"
+- "This is how you use feature X"
+- Generic placeholder examples
+
+**Example Help Page (for a jokes API):**
+```html
+<article class="help-page">
+  <h1>Help</h1>
+
+  <section id="getting-started">
+    <h2>Getting Started</h2>
+    <p>Get a random joke with a single request:</p>
+    <pre><code>curl https://jokes.example.com/api/v1/joke</code></pre>
+
+    <p>Response:</p>
+    <pre><code>{
+  "id": "abc123",
+  "category": "programming",
+  "setup": "Why do programmers prefer dark mode?",
+  "punchline": "Because light attracts bugs."
+}</code></pre>
+  </section>
+
+  <section id="features">
+    <h2>Features</h2>
+
+    <h3>Categories</h3>
+    <p>Filter jokes by category:</p>
+    <pre><code>curl https://jokes.example.com/api/v1/joke?category=programming</code></pre>
+    <p>Available categories: <code>programming</code>, <code>misc</code>, <code>dark</code>, <code>pun</code></p>
+
+    <h3>Safe Mode</h3>
+    <p>Filter out NSFW content:</p>
+    <pre><code>curl https://jokes.example.com/api/v1/joke?safe=true</code></pre>
+
+    <h3>Response Formats</h3>
+    <p>Get jokes in different formats:</p>
+    <pre><code>curl -H "Accept: text/plain" https://jokes.example.com/api/v1/joke
+curl -H "Accept: application/xml" https://jokes.example.com/api/v1/joke</code></pre>
+  </section>
+
+  <section id="faq">
+    <h2>FAQ</h2>
+
+    <h3>Do I need an API key?</h3>
+    <p>No, the API is completely free and requires no authentication.</p>
+
+    <h3>Is there a rate limit?</h3>
+    <p>Yes, 100 requests per minute per IP address.</p>
+
+    <h3>Can I submit jokes?</h3>
+    <p>Yes, use the <code>POST /api/v1/joke/submit</code> endpoint.</p>
+  </section>
+
+  <section id="troubleshooting">
+    <h2>Troubleshooting</h2>
+
+    <h3>429 Too Many Requests</h3>
+    <p>You've exceeded the rate limit. Wait 60 seconds before retrying.</p>
+
+    <h3>No jokes in category</h3>
+    <p>Some category/filter combinations may have no results. Try removing filters.</p>
+  </section>
+</article>
+```
+
+**API Documentation section (always shown):**
+```html
+<div class="api-docs">
+  <h3>API Documentation</h3>
+  <p>This application provides a full REST API with interactive documentation.</p>
+  <ul>
+    <li><a href="/server/docs/swagger">Swagger UI</a> - Interactive REST API explorer</li>
+    <li><a href="/server/docs/graphql">GraphiQL</a> - Interactive GraphQL explorer</li>
+  </ul>
+</div>
+```
+
+**Tor Access section (only shown if Tor is enabled, running, and an onion address is published):**
+```html
+{% if tor_enabled && tor_running && !tor_address.is_empty() %}
+<section id="tor-access" class="tor-access">
+  <h3>Tor Access</h3>
+  <p>This application is available as a Tor hidden service for enhanced privacy.</p>
+
+  <h4>Onion Address</h4>
+  <div class="code-block">
+    <code class="code-content">{{ tor_address }}</code>
+    <button type="button" class="copy-btn" data-copy="{{ tor_address }}" aria-label="Copy to clipboard">
+      <span class="copy-icon">📋</span>
+      <span class="copy-text" aria-live="polite">Copy</span>
+    </button>
+  </div>
+
+  <h4>How to Connect</h4>
+  <ol>
+    <li>Download <a href="https://www.torproject.org/download/" target="_blank" rel="noopener">Tor Browser</a></li>
+    <li>Open Tor Browser and wait for it to connect</li>
+    <li>Copy the onion address above and paste it into the Tor Browser address bar</li>
+  </ol>
+
+  <p class="note">Using Tor provides additional privacy by hiding your IP address and encrypting your connection through the Tor network.</p>
+</section>
+{% endif %}
+```
+
+**⚠️ REMINDER: All content sections MUST be populated from IDEA.md - see sourcing rules above.**
+
+### /server/terms
+
+**Terms of Service - legal terms for using the application.**
+
+| Section | Description |
+|---------|-------------|
+| Acceptance | Agreement to terms by using the service |
+| Acceptable use | What is/isn't allowed |
+| Termination | When/how access can be terminated |
+| Liability | Limitation of liability |
+| Changes | How terms may be updated |
+| Governing law | Jurisdiction |
+
+**Default template provided, customizable via the config file (and the admin panel when enabled — PART 28).**
+
+### Configuration
+
+```yaml
+server:
+  contact:
+    general:
+      # Contact form recipient
+      # If empty, falls back to server.contact.admin.email
+      email: ""
+
+  pages:
+    about:
+      # Additional content for about page (markdown supported)
+      content: ""
+
+    privacy:
+      # Privacy policy content (markdown supported)
+      # If empty, uses default template
+      content: ""
+
+    contact:
+      # Enable contact form
+      enabled: true
+      # Captcha type: recaptcha, hcaptcha, simple (built-in)
+      captcha: simple
+      # Success message after form submission
+      success_message: "Thank you for your message. We'll respond soon."
+
+    help:
+      # Help page content (markdown supported)
+      # Project-specific - must be defined per application
+      content: ""
+
+    terms:
+      # Terms of service content (markdown supported)
+      # If empty, uses default template
+      content: ""
+```
+
+### Pages Configuration (config file)
+
+| Page | Config Keys |
+|------|-------------|
+| **About Page** | `pages.about.content` (Markdown) |
+| **Privacy Policy** | `pages.privacy.content` (Markdown) |
+| **Contact Page** | `pages.contact.enabled`, `pages.contact.captcha`, `pages.contact.success_message` (recipient: `server.contact.general.email`, falls back to `server.contact.admin.email`) |
+| **Help Page** | `pages.help.content` (Markdown) |
+| **Terms of Service** | `pages.terms.content` (Markdown) |
+
+When the admin panel is enabled (PART 28) all pages are editable at `/server/{admin_path}/config/pages` with Markdown editors, previews, and reset-to-default.
+
+### /server/ API Endpoints
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/{api_version}/server/about` | GET | About information (JSON) |
+| `/api/{api_version}/server/privacy` | GET | Privacy policy (JSON) |
+| `/api/{api_version}/server/contact` | POST | Submit contact form |
+| `/api/{api_version}/server/help` | GET | Help content (JSON) |
+| `/api/{api_version}/server/terms` | GET | Terms of service (JSON) |
+| `/api/{api_version}/server/healthz` | GET | Health check (JSON default; text via API rules) |
+| `/api/{api_version}/server/swagger` | GET | OpenAPI JSON spec |
+| `/api/{api_version}/server/graphql` | POST | GraphQL endpoint |
+
+**Direct alias endpoints (same handler, no redirect):**
+
+| Alias | Canonical route |
+|-------|-----------------|
+| `/api/swagger` | `/api/{api_version}/server/swagger` |
+| `/api/graphql` | `/api/{api_version}/server/graphql` |
+| `/api/healthz` | `/api/{api_version}/server/healthz` |
+
+### /server/ Frontend Routes
+
+| Route | Description |
+|-------|-------------|
+| `/server` | Redirect → `/server/about` (301) |
+| `/server/about` | About page (HTML) |
+| `/server/privacy` | Privacy policy page (HTML) |
+| `/server/contact` | Contact form page (HTML) |
+| `/server/help` | Help page (HTML) |
+| `/server/terms` | Terms of service page (HTML) |
+| `/server/healthz` | Health page (HTML) |
+| `/healthz` | Optional direct alias to `/server/healthz` when `server.healthz.root.enabled` is `true` |
+| `/server/docs/swagger` | Swagger UI (HTML) |
+| `/server/docs/graphql` | GraphQL UI (HTML) |
+
+**All /server/ pages follow standard frontend rules (PART 15):**
+- Full HTML with header/footer
+- Theme support (light/dark)
+- Responsive layout
+- Proper SEO meta tags
 
 ---
 
@@ -25484,6 +29033,8 @@ server:
 - Tor exit nodes are evaluated by exit-node country, not by any inferred user origin
 - Private/internal IPs (RFC 1918, RFC 4193, loopback) are never looked up or country-blocked
 
+---
+
 # PART 19: METRICS
 
 ## Overview
@@ -25830,7 +29381,7 @@ server:
 | `rust_mem_alloc_bytes` | Gauge | - | Bytes allocated and in use (heap) |
 | `rust_mem_sys_bytes` | Gauge | - | Total bytes obtained from system |
 
-### Tor Metrics (if using PART 26 Tor)
+### Tor Metrics (if using PART 27 Tor)
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
@@ -27851,7 +31402,336 @@ pub fn verify_checksum(file_path: &str, expected_hash: &str) -> anyhow::Result<(
     Ok(())
 }
 ```
-# PART 22: TESTING, QUALITY & DEBUGGING
+
+---
+
+# PART 22: SERVICE SUPPORT
+
+## Built-in Service Support
+
+**ALL projects MUST have built-in service support for ALL service managers.**
+
+**Binary handles everything internally:**
+- Detects running as root/admin vs regular user
+- Binds configured ports (any port when root/admin)
+- Drops privileges after binding (Unix-like systems)
+- Creates service user if needed
+
+| Run Mode | Who Runs Binary | Port Restriction | Privilege Drop |
+|----------|-----------------|------------------|----------------|
+| **Service (escalated)** | root/admin | Any port | Yes (after binding) |
+| **User mode ($USER)** | Calling user | >1024 only | No (already unprivileged) |
+
+**See above for user creation, privilege escalation, and installation logic.**
+
+## Service Templates
+
+**Unix default:** service starts elevated only for privileged startup, then drops to `{internal_name}` user after port binding.
+**Windows: Service runs as Virtual Service Account (`NT SERVICE\{internal_name}`).**
+
+This allows any port configuration without service file changes.
+
+**Exception:** if IDEA.md explicitly requires permanent root, the service file and documentation MUST say so and explain why privilege drop is not possible.
+
+**HYBRID exception (spec-level, no IDEA.md declaration needed):** when the service starts the server persona as root, the server enters System Service Mode (PART 4 → "System Service Mode") — a single/dual shared port bind serving every system user through their per-user socket registries. In that mode the listener retains root for its lifetime (sshd model; PART 4 defines the privilege rules and security invariants) — the post-bind drop to `{internal_name}` described above applies to per-user/single-user deployments, not to System Service Mode.
+
+### systemd (Linux)
+
+**Installation path:** `/etc/systemd/system/{internal_name}.service`
+
+```ini
+[Unit]
+Description={project_name} service
+Documentation=https://{project_org}.github.io/{project_name}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/{project_name}
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening (binary drops privileges after port binding)
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/etc/{internal_org}/{internal_name}
+ReadWritePaths=/var/lib/{internal_org}/{internal_name}
+ReadWritePaths=/var/cache/{internal_org}/{internal_name}
+ReadWritePaths=/var/log/{internal_org}/{internal_name}
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### OpenRC (Alpine, Gentoo, Devuan)
+
+**Installation path:** `/etc/init.d/{internal_name}` (executable shell script)
+
+```sh
+#!/sbin/openrc-run
+# Service identity comes from {internal_name} so config_dir/data_dir paths stay
+# stable across binary renames (see PART 0 → "Why `{internal_name}` exists separately from `{project_name}`").
+
+name="{internal_name}"
+description="{app_name}"
+# actual binary (may differ from {internal_name} after rename)
+command="/usr/local/bin/{project_name}"
+command_args=""
+command_user="{internal_name}:{internal_name}"
+pidfile="/var/run/{internal_org}/{internal_name}.pid"
+command_background=true
+output_log="/var/log/{internal_org}/{internal_name}/server.log"
+error_log="/var/log/{internal_org}/{internal_name}/error.log"
+
+depend() {
+    need net
+    after firewall
+    use dns logger
+}
+
+start_pre() {
+    checkpath -d -m 0755 -o {internal_name}:{internal_name} /var/run/{internal_org}
+    checkpath -d -m 0755 -o {internal_name}:{internal_name} /var/log/{internal_org}/{internal_name}
+}
+```
+
+**Commands:**
+```bash
+# Enable at boot
+sudo rc-update add {internal_name} default
+
+# Start / stop / restart / status
+sudo rc-service {internal_name} start
+sudo rc-service {internal_name} stop
+sudo rc-service {internal_name} restart
+sudo rc-service {internal_name} status
+
+# Disable at boot
+sudo rc-update del {internal_name} default
+```
+
+### SysVinit (legacy Linux, init.d)
+
+**Installation path:** `/etc/init.d/{internal_name}` (executable shell script — same path as OpenRC; only one of the two is installed per host based on detection)
+
+**Detection:** the binary picks SysVinit only when `/sbin/openrc-run` is absent, `systemctl` is absent, and `/etc/init.d/` exists with a working `update-rc.d` or `chkconfig`.
+
+```sh
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          {internal_name}
+# Required-Start:    $network $remote_fs $syslog
+# Required-Stop:     $network $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: {app_name}
+# Description:       {app_name} daemon
+### END INIT INFO
+
+NAME={internal_name}
+DAEMON=/usr/local/bin/{project_name}
+DAEMON_USER={internal_name}
+PIDFILE=/var/run/{internal_org}/{internal_name}.pid
+LOGFILE=/var/log/{internal_org}/{internal_name}/server.log
+
+case "$1" in
+    start)
+        echo "Starting $NAME..."
+        mkdir -p $(dirname $PIDFILE) $(dirname $LOGFILE)
+        chown -R $DAEMON_USER:$DAEMON_USER $(dirname $PIDFILE) $(dirname $LOGFILE)
+        start-stop-daemon --start --quiet --background --make-pidfile \
+            --pidfile $PIDFILE --chuid $DAEMON_USER --exec $DAEMON \
+            --no-close >> $LOGFILE 2>&1
+        ;;
+    stop)
+        echo "Stopping $NAME..."
+        start-stop-daemon --stop --quiet --pidfile $PIDFILE --retry 30
+        rm -f $PIDFILE
+        ;;
+    restart)
+        $0 stop
+        sleep 1
+        $0 start
+        ;;
+    status)
+        if [ -f $PIDFILE ] && kill -0 $(cat $PIDFILE) 2>/dev/null; then
+            echo "$NAME is running (pid $(cat $PIDFILE))"
+            exit 0
+        else
+            echo "$NAME is stopped"
+            exit 3
+        fi
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status}"
+        exit 1
+        ;;
+esac
+exit 0
+```
+
+**Commands:**
+
+```bash
+# Enable at boot (Debian-style)
+sudo update-rc.d {internal_name} defaults
+
+# Enable at boot (RHEL-style)
+sudo chkconfig --add {internal_name}
+sudo chkconfig {internal_name} on
+
+# Start / stop / restart / status
+sudo /etc/init.d/{internal_name} start
+sudo /etc/init.d/{internal_name} stop
+sudo /etc/init.d/{internal_name} restart
+sudo /etc/init.d/{internal_name} status
+
+# Or via service(8)
+sudo service {internal_name} start
+```
+
+### runit (Linux)
+
+**Installation path:** `/etc/sv/{internal_name}/`
+
+```
+/etc/sv/{internal_name}/
+├── run           # Main service script
+├── log/
+│   └── run       # Logging script
+└── supervise/    # Auto-created by runit
+```
+
+**run script:**
+```bash
+#!/bin/sh
+exec /usr/local/bin/{project_name} 2>&1
+```
+
+**log/run script:**
+```bash
+#!/bin/sh
+exec svlogd -tt /var/log/{internal_org}/{internal_name}
+```
+
+### rc.d (FreeBSD)
+
+**Installation path:** `/usr/local/etc/rc.d/{internal_name}`
+
+```bash
+#!/bin/sh
+
+# PROVIDE: {internal_name}
+# REQUIRE: NETWORKING
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+# Service identity comes from {internal_name} so config_dir/data_dir paths stay stable across binary renames
+name="{internal_name}"
+rcvar="{internal_name}_enable"
+command="/usr/local/bin/{project_name}"
+
+load_rc_config $name
+run_rc_command "$1"
+```
+
+### launchd (macOS)
+
+**Installation path:** `/Library/LaunchDaemons/{plist_name}.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>{plist_name}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/{project_name}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/var/log/{internal_org}/{internal_name}/stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/{internal_org}/{internal_name}/stderr.log</string>
+</dict>
+</plist>
+```
+
+**Commands:**
+```bash
+# Load and start service
+sudo launchctl load /Library/LaunchDaemons/{plist_name}.plist
+
+# Unload service
+sudo launchctl unload /Library/LaunchDaemons/{plist_name}.plist
+
+# Check status
+sudo launchctl list | grep {internal_name}
+```
+
+### Windows Service
+
+**Windows uses Virtual Service Account (VSA).** No privilege dropping needed - VSA is already a minimal-privilege isolated account.
+
+| Account | Description |
+|---------|-------------|
+| `NT SERVICE\{internal_name}` | Virtual Service Account - auto-managed by Windows |
+
+Use the `windows-service` crate for Windows service integration:
+
+```rust
+// #[cfg(target_os = "windows")]
+
+use windows_service::{define_windows_service, service_dispatcher};
+use windows_service::service::{ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus, ServiceType};
+use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
+
+define_windows_service!(ffi_service_main, service_main);
+
+pub fn run_as_service() -> anyhow::Result<()> {
+    service_dispatcher::start("{internal_name}", ffi_service_main)?;
+    Ok(())
+}
+
+fn service_main(_arguments: Vec<std::ffi::OsString>) {
+    let event_handler = move |control_event| -> ServiceControlHandlerResult {
+        match control_event {
+            ServiceControl::Stop | ServiceControl::Shutdown => {
+                // Clean shutdown
+                ServiceControlHandlerResult::NoError
+            }
+            _ => ServiceControlHandlerResult::NotImplemented,
+        }
+    };
+
+    let status_handle = service_control_handler::register("{internal_name}", event_handler)
+        .expect("invariant: service control handler registration succeeds at startup");
+
+    status_handle.set_service_status(ServiceStatus {
+        service_type: ServiceType::OWN_PROCESS,
+        current_state: ServiceState::Running,
+        controls_accepted: ServiceControlAccept::STOP | ServiceControlAccept::SHUTDOWN,
+        exit_code: ServiceExitCode::Win32(0),
+        checkpoint: 0,
+        wait_hint: std::time::Duration::default(),
+        process_id: None,
+    }).expect("invariant: set_service_status succeeds immediately after registration");
+}
+```
+
+---
+
+# PART 23: TESTING, QUALITY & DEBUGGING
 
 
 ## Required Quality Gates
@@ -27865,7 +31745,7 @@ All gates execute inside the project Docker container (PART 6 → "Docker Rule")
 | Tests | `cargo test --workspace --all-features` | `docker compose run --rm dev cargo test …` |
 | Docs | `cargo doc --workspace --no-deps` | `docker compose run --rm dev cargo doc …` |
 | Licenses + advisories + bans + sources | `cargo deny check licenses advisories bans sources` | `docker compose run --rm dev cargo deny check …` |
-| Attribution drift | `cargo about generate about.hbs` (output diffed against the GENERATED region of `LICENSE.md`) | see PART 23 → "Suggested CI Steps" |
+| Attribution drift | `cargo about generate about.hbs` (output diffed against the GENERATED region of `LICENSE.md`) | see PART 24 → "Suggested CI Steps" |
 | GUI smoke (X11) | `cargo run -- --ui gui` against an X11 socket | see PART 6 → "X11 and Wayland Forwarding" |
 | GUI smoke (Wayland) | `cargo run -- --ui gui` against a Wayland socket | see PART 6 → "X11 and Wayland Forwarding" |
 
@@ -28022,8 +31902,8 @@ Config files are NEVER in the repository. They are generated at RUNTIME:
 |------|----------|--------------|
 | `server.yml` | `{config_dir}/server.yml` (see PART 5) | Server first run |
 | `cli.yml` | `~/.config/{internal_org}/{internal_name}/cli.yml` | CLI first run |
-| Tor config | `{config_dir}/tor/torrc` (see PART 26) | When Tor enabled |
-| Tor data | `{data_dir}/tor/` (see PART 26) | When Tor enabled |
+| Tor config | `{config_dir}/tor/torrc` (see PART 27) | When Tor enabled |
+| Tor data | `{data_dir}/tor/` (see PART 27) | When Tor enabled |
 
 **Why runtime-generated?**
 
@@ -28516,7 +32396,7 @@ make test
 
 ### Coverage Enforcement
 
-**In CI/CD Pipeline (REQUIRED):** the canonical coverage-enforcing workflow is `ci.yml` in PART 23 → "CI/CD Workflows" — do not duplicate it here. The single-source rules are: coverage is computed by `cargo tarpaulin`/`cargo llvm-cov` inside `casjaysdev/rust:latest`, the threshold defaults to 60% (overridable via `IDEA.md ## Business logic`), coverage output stays in the ephemeral runner workspace mount (never committed to the project tree — see the tempdir rules earlier in this PART), and the job MUST fail when coverage drops below the threshold. See PART 23's `ci.yml` for the actual pinned, ready-to-use job definition, and the "Coverage Gate" subsection above for the equivalent local Docker-wrapped command.
+**In CI/CD Pipeline (REQUIRED):** the canonical coverage-enforcing workflow is `ci.yml` in PART 24 → "CI/CD Workflows" — do not duplicate it here. The single-source rules are: coverage is computed by `cargo tarpaulin`/`cargo llvm-cov` inside `casjaysdev/rust:latest`, the threshold defaults to 60% (overridable via `IDEA.md ## Business logic`), coverage output stays in the ephemeral runner workspace mount (never committed to the project tree — see the tempdir rules earlier in this PART), and the job MUST fail when coverage drops below the threshold. See PART 24's `ci.yml` for the actual pinned, ready-to-use job definition, and the "Coverage Gate" subsection above for the equivalent local Docker-wrapped command.
 
 ### How to Achieve 60% Coverage
 
@@ -29638,7 +33518,7 @@ Before running any `rm -rf`:
 
 ---
 
-# PART 23: CI/CD, RELEASES & AUTOMATION
+# PART 24: CI/CD, RELEASES & AUTOMATION
 
 ## Single Pipeline, Dual Artifact Class
 
@@ -29939,7 +33819,7 @@ docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -
 docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo test --workspace --all-features
 docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" cargo doc --workspace --no-deps
 
-# License + advisory enforcement (PART 24 → "License Compliance")
+# License + advisory enforcement (PART 25 → "License Compliance")
 docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
   cargo deny check licenses advisories bans sources
 
@@ -32959,7 +36839,9 @@ Before proceeding, confirm you understand:
 | Docker devel image | `docker.yml` `build-devel` job | `docker.yml` `build-devel` job | `docker:build:devel` | Docker Devel stage |
 | Self-hosted | No | Yes | Yes | Yes |
 
-# PART 24: DOCUMENTATION, LICENSE & READTHEDOCS
+---
+
+# PART 25: DOCUMENTATION, LICENSE & READTHEDOCS
 
 ## README Minimum Sections
 
@@ -33070,7 +36952,7 @@ License compliance is enforced by tooling and gated in CI; it is not left to man
 |------|---------|-------------|
 | `cargo-deny` | Enforce the license allowlist / denylist; flag advisories; flag duplicate transitive crates | `deny.toml` (project root) |
 | `cargo-about` | Generate the third-party attribution section of `LICENSE.md` from `Cargo.lock` | `about.toml` (accepted-licenses config) **and** `about.hbs` (Handlebars output template), both at project root |
-| `cargo-cyclonedx` | Generate the SBOM (CycloneDX format) referenced in PART 6 → "Release Artifacts" and PART 23 → "Release Integrity" | (CLI flags; no separate config file) |
+| `cargo-cyclonedx` | Generate the SBOM (CycloneDX format) referenced in PART 6 → "Release Artifacts" and PART 24 → "Release Integrity" | (CLI flags; no separate config file) |
 
 All three tools run inside `casjaysdev/rust:latest` — `rustfmt`, `clippy`, `cargo-audit`, `cargo-deny`, `cargo-tarpaulin`, and `cargo-llvm-cov` are pre-installed. Never install them in CI workflow `run:` steps.
 
@@ -33172,7 +37054,7 @@ All three surfaces read the same `LICENSE.md` blob embedded at compile time via 
 
 ### CI Gate (mandatory)
 
-The canonical CI invocation lives in PART 23 → "Suggested CI Steps" (the `cargo deny check …` command and the `cargo about generate about.hbs` + `sed`/`diff` drift check). This section defines the **policy**; PART 23 owns the script template. Do not duplicate the commands here when editing — keep PART 23 as the single source.
+The canonical CI invocation lives in PART 24 → "Suggested CI Steps" (the `cargo deny check …` command and the `cargo about generate about.hbs` + `sed`/`diff` drift check). This section defines the **policy**; PART 24 owns the script template. Do not duplicate the commands here when editing — keep PART 24 as the single source.
 
 Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI failure, not a warning. The lockfile is the source of truth for what licenses we ship, and `LICENSE.md` MUST match it.
 
@@ -33973,7 +37855,10 @@ make test
 - Adjust background shades for better contrast
 - Add project logo colors to palette
 - Ensure all changes work in BOTH themes
-# PART 25: I18N & A11Y
+
+---
+
+# PART 26: I18N & A11Y
 
 ## Internationalization (i18n)
 
@@ -35341,7 +39226,7 @@ mod tests {
 
 ---
 
-# PART 26: TOR HIDDEN SERVICE
+# PART 27: TOR HIDDEN SERVICE
 
 > **Trust chain integration:** Tor detection is priority 0 in the FQDN resolution table — evaluated before reverse proxy headers, always trusted, no IP check required. See **PART 12 → "Tor Hidden Service Configuration"** for request detection rules, `build_url` / `get_url_vars` behavior, privacy rules, and the Tor security.txt variant.
 
@@ -36632,7 +40517,3440 @@ Tor Hidden Service: Connected
 
 ---
 
-# PART 27: CHECKLISTS
+# PART 28: ADMIN PANEL (OPTIONAL - DISABLED BY DEFAULT; NON-NEGOTIABLE WHEN ENABLED)
+
+**This PART is OPTIONAL and DISABLED BY DEFAULT.** It applies ONLY when IDEA.md `## Business logic` enables the server admin feature. When the feature is NOT enabled, this entire PART is inert: the admin routes (`/server/{admin_path}/**` and `/api/{api_version}/server/{admin_path}/**`) MUST NOT exist, and no server admin account is created. When the feature IS enabled, everything in this PART is NON-NEGOTIABLE and MUST be implemented in full. The admin panel is a server-persona surface of the single binary (PART 2) — it exists only when the binary runs as a server; the native GUI/TUI/CLI personas are unaffected.
+
+**The server admin user and the server admin routes are ONE feature.** Enabling either one enables both: there is no configuration in which the admin routes exist without the server admin account, or the server admin account exists without the admin routes.
+
+**When enabled, the project MUST have a full admin panel.**
+
+## Admin Panel Isolation
+
+**The admin panel is completely isolated from the public site.**
+
+**Note:** `/server/admin` is the default admin root. `{admin_path}` is configurable via `server.admin_path`. See "Configurable Admin Path" section below.
+
+| Rule | Description |
+|------|-------------|
+| **NEVER link to admin path** | No links to `/server/{admin_path}` on ANY public routes (`/**`) |
+| **Intentional access only** | Users must manually type admin path in browser |
+| **Separate authentication** | Admin account is ONLY valid for `/server/{admin_path}/**` routes |
+| **No admin mentions** | Don't advertise admin panel existence anywhere |
+| **Separate session** | Admin session is separate from user sessions |
+
+### User Types
+
+| User Type | Valid Routes | Authentication |
+|-----------|--------------|----------------|
+| **Admin** | `/server/{admin_path}/**` ONLY | Admin token (`server.token`, PART 11) |
+| **Guest/Anon** | `/**` (except `/server/{admin_path}`) | None |
+| **System user (token holder)** | API routes per PART 8 | Per-system-user `sys_` token (`system_users` table) |
+
+**The admin token (`server.token`) is stored in `server.yml` ONLY (PART 11), never in the database. There are no admin passwords.**
+
+### Testing Admin Routes
+
+**Admin authentication MUST be tested, not bypassed:**
+
+| Testing Approach | Use For | Method |
+|------------------|---------|--------|
+| **Proper testing** | Automated tests, beta testing, CI/CD | Use setup token → complete setup → test token login |
+| **Manual dev only** | Quick UI exploration while coding | Log in with the real admin token (`server.token`); `--debug` adds verbosity/diagnostics only and NEVER bypasses auth |
+
+**Automated tests MUST:**
+1. Verify unauthenticated requests are blocked
+2. Use setup token to complete initial setup
+3. Test login with the valid admin token
+4. Verify admin routes work with session
+5. Verify invalid tokens are rejected
+
+**See PART 23: TESTING, QUALITY & DEBUGGING for complete admin authentication testing examples.**
+
+### Why Isolated?
+
+- Security: Admin panel not discoverable
+- Separation: Admin functions separate from user functions
+- Simplicity: No confusion between admin and user roles
+- Protection: Reduces attack surface
+
+## Admin Route Hierarchy
+
+**All admin routes follow a strict hierarchy. Routes MUST NOT conflict.**
+
+### Route Structure
+
+```
+/server/{admin_path}/                          # Admin root (dashboard)
+/server/{admin_path}/{admin_username}/         # Admin's own account root
+/server/{admin_path}/{admin_username}/profile  # Admin's own profile
+/server/{admin_path}/{admin_username}/preferences   # Admin's own preferences/settings
+/server/{admin_path}/{admin_username}/notifications # Admin's own notifications
+/server/{admin_path}/config/                   # Server management (EVERYTHING ELSE)
+/server/{admin_path}/config/setup              # Initial setup wizard
+/server/{admin_path}/config/settings           # Server settings
+/server/{admin_path}/config/ssl                # SSL/TLS configuration
+/server/{admin_path}/config/email              # Email configuration
+/server/{admin_path}/config/scheduler          # Scheduled tasks
+/server/{admin_path}/config/logs               # Server logs
+/server/{admin_path}/config/logs/audit         # Audit logs
+/server/{admin_path}/config/backup             # Backup/restore
+/server/{admin_path}/config/updates            # Update management
+/server/{admin_path}/config/info               # Server information
+/server/{admin_path}/config/metrics            # Metrics dashboard
+/server/{admin_path}/config/network/           # Network settings
+/server/{admin_path}/config/network/tor        # Tor configuration
+/server/{admin_path}/config/network/geoip      # GeoIP settings
+/server/{admin_path}/config/security/          # Security settings
+/server/{admin_path}/config/security/auth      # Authentication config (sessions, MFA)
+/server/{admin_path}/config/security/tokens    # API token management
+/server/{admin_path}/config/security/firewall  # Firewall rules
+/server/{admin_path}/config/system-users       # System Users (read-only view of system_users)
+/server/{admin_path}/config/agents/            # Agent management (if agents)
+```
+
+### Route Hierarchy Rules
+
+| Rule | Description |
+|------|-------------|
+| **`/server/{admin_path}/` root** | Dashboard ONLY |
+| **`/server/{admin_path}/{admin_username}/*`** | Admin's OWN account/profile/preferences/notifications only |
+| **`/server/{admin_path}/config/*`** | ALL server management goes here |
+| **No other direct children** | ONLY `{admin_username}` and `config` under `/server/{admin_path}/` |
+
+### What Goes Where
+
+| Route | Purpose | Example |
+|-------|---------|---------|
+| `/server/{admin_path}/` | Dashboard overview | System status, quick stats |
+| `/server/{admin_path}/{admin_username}/profile` | Admin's personal account | 2FA, API token |
+| `/server/{admin_path}/{admin_username}/preferences` | Admin's UI preferences | Theme, language, timezone |
+| `/server/{admin_path}/config/*` | **EVERYTHING server-related** | Config, users, logs, etc. |
+
+### INVALID Routes (NEVER DO THIS)
+
+```
+# WRONG - Server management at admin root level
+/server/{admin_path}/settings          # ✗ WRONG - use /server/{admin_path}/config/settings
+/server/{admin_path}/system-users      # ✗ WRONG - use /server/{admin_path}/config/system-users
+/server/{admin_path}/logs              # ✗ WRONG - use /server/{admin_path}/config/logs
+/server/{admin_path}/security          # ✗ WRONG - use /server/{admin_path}/config/security
+/server/{admin_path}/email             # ✗ WRONG - use /server/{admin_path}/config/email
+/server/{admin_path}/tor               # ✗ WRONG - use /server/{admin_path}/config/network/tor
+/server/{admin_path}/tokens            # ✗ WRONG - use /server/{admin_path}/config/security/tokens
+/server/{admin_path}/agents            # ✗ WRONG - use /server/{admin_path}/config/agents
+
+# CORRECT
+/server/{admin_path}/{admin_username}/profile      # ✓ Admin's own profile
+/server/{admin_path}/{admin_username}/preferences  # ✓ Admin's own preferences
+/server/{admin_path}/config/settings   # ✓ Server settings
+/server/{admin_path}/config/system-users  # ✓ System Users (read-only)
+```
+
+### API Route Hierarchy (Same Pattern)
+
+```
+/api/{api_version}/server/{admin_path}/                         # Admin API root
+/api/{api_version}/server/{admin_path}/{admin_username}/profile       # Admin's own profile
+/api/{api_version}/server/{admin_path}/{admin_username}/preferences   # Admin's own preferences
+/api/{api_version}/server/{admin_path}/{admin_username}/notifications # Admin's own notifications
+/api/{api_version}/server/{admin_path}/config/                  # Server management API
+/api/{api_version}/server/{admin_path}/config/setup             # Setup flow
+/api/{api_version}/server/{admin_path}/config/settings          # Server settings
+/api/{api_version}/server/{admin_path}/config/system-users      # System Users (read-only)
+/api/{api_version}/server/{admin_path}/config/agents            # Agent management
+```
+
+### Route Conflict Prevention
+
+**New routes MUST be checked against existing routes:**
+
+```rust
+use std::collections::HashSet;
+
+// Admin route hierarchy validation
+fn valid_admin_root_paths() -> HashSet<&'static str> {
+    let mut set = HashSet::new();
+    // Dashboard (/server/{admin_path}/)
+    set.insert("");
+    // Server management (has sub-routes)
+    set.insert("config");
+    set
+}
+
+fn validate_admin_route(path: &str, current_admin_username: &str) -> Result<(), String> {
+    // Extract first segment after /server/{admin_path}/
+    let trimmed = path.trim_matches('/');
+    if trimmed.is_empty() {
+        // Root path is OK
+        return Ok(());
+    }
+
+    let first_segment = trimmed.split('/').next().unwrap_or("");
+    let valid = valid_admin_root_paths();
+
+    if valid.contains(first_segment) {
+        return Ok(());
+    }
+
+    // Otherwise the first segment must be the current admin's username.
+    if first_segment == current_admin_username {
+        return Ok(());
+    }
+
+    Err(format!(
+        "invalid admin route: /{}/* - use /server/{{admin_path}}/{{admin_username}}/* for admin self routes or /server/{{admin_path}}/config/* for server management",
+        first_segment
+    ))
+}
+```
+
+### Why This Structure?
+
+1. **Clear separation**: Admin's personal settings vs server management
+2. **No conflicts**: Only `config` and `{admin_username}` live under the admin root
+3. **Scalability**: All new server features go under `/server/*`
+4. **Predictability**: Developers know where to add new routes
+5. **Security**: Easy to audit - fixed namespace under `/server`
+
+## Configurable Admin Path
+
+**The default `/server/admin` admin root can be changed for security (obscurity).**
+
+### Configuration
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `server.admin_path` | `admin` | Path segment for admin panel (no leading slash) |
+
+**When changed, ALL admin routes update:**
+- `/server/admin/**` → `/server/{admin_path}/**`
+- `/api/{api_version}/server/admin/**` → `/api/{api_version}/server/{admin_path}/**`
+
+### Validation Rules
+
+| Rule | Action |
+|------|--------|
+| **Cannot conflict with existing routes** | Error and revert to `admin` |
+| **Reserved paths blocked** | `api`, `static`, `assets`, `health`, `version`, etc. |
+| **Valid characters only** | `[a-z0-9-]` (lowercase, numbers, hyphens) |
+| **Min/max length** | 2-32 characters |
+| **No leading/trailing hyphens** | `my-admin` ✓, `-admin-` ✗ |
+
+**Path Normalization:** See PART 5 "Path Normalization" for global path cleanup rules that apply to `admin_path` and all other configurable paths.
+
+### Route Conflict Detection
+
+```rust
+use axum::Router;
+
+// Check if new admin path conflicts with existing routes
+fn validate_admin_path(new_path: &str, registered_routes: &[String]) -> Result<(), String> {
+    // Normalize first
+    let new_path = normalize_path(new_path);
+
+    // 1. Check reserved paths
+    let reserved = [
+        "api", "health", "healthz", "metrics", "version", ".well-known",
+        "about", "privacy", "contact", "help", "terms",
+        "docs", "auth", "security",
+        "static", "assets",
+    ];
+    for r in &reserved {
+        if new_path == *r {
+            return Err(format!("'{}' is a reserved path", new_path));
+        }
+    }
+
+    // 2. Check existing routes
+    let prefix = format!("/{}", new_path);
+    for route in registered_routes {
+        if route.starts_with(&prefix) {
+            return Err(format!(
+                "'{}' conflicts with existing route: {}",
+                new_path, route
+            ));
+        }
+    }
+
+    Ok(())
+}
+```
+
+### WebUI Change Flow
+
+**When admin path changed via WebUI (`/server/{admin_path}/config/settings`):**
+
+```
+1. User submits new admin path
+2. Server validates (no conflicts, valid format)
+3. If invalid → Show error, keep current path
+4. If valid:
+   a. Save to config
+   b. Return success with new path
+   c. Frontend shows "Reloading..." overlay
+   d. Server triggers graceful reload
+   e. After reload, frontend redirects to new path
+```
+
+**Frontend JavaScript:**
+```javascript
+async function changeAdminPath(newPath) {
+    const response = await fetch(`/api/{api_version}/server/{admin_path}/config/settings`, {
+        method: 'PATCH',
+        body: JSON.stringify({ admin_path: newPath })
+    });
+
+    if (response.ok) {
+        const data = await response.json();
+        // Show reload overlay
+        showOverlay("Applying changes...");
+        // Wait for server reload
+        await waitForServerReady();
+        // Redirect to new admin path
+        window.location.href = `/server/${data.new_admin_path}`;
+    } else {
+        showError(await response.json());
+    }
+}
+```
+
+### Internal Systems Update
+
+**All internal systems MUST use the configured admin path:**
+
+| System | Update Required |
+|--------|-----------------|
+| **Swagger/OpenAPI** | Base path for admin endpoints |
+| **GraphQL** | Admin schema endpoint path |
+| **WebSocket** | Admin notification channels |
+| **CORS** | Allowed origins for admin path |
+| **CSP** | Content Security Policy paths |
+| **Session cookies** | Cookie path attribute |
+| **Audit logs** | Log correct paths |
+| **Error pages** | Login redirect URLs |
+
+**Implementation:**
+```rust
+// Global admin path accessor
+pub fn admin_path(cfg: &Config) -> &str {
+    // default: "admin"
+    &cfg.server.admin_path
+}
+
+// Global API version accessor
+pub fn api_version(cfg: &Config) -> &str {
+    // default: "v1"
+    &cfg.server.api_version
+}
+
+// API base path helper
+pub fn api_base_path(cfg: &Config) -> String {
+    // e.g., "/api/{api_version}"
+    format!("/api/{}", api_version(cfg))
+}
+
+// Use in route registration
+pub fn register_admin_routes(cfg: &Config) -> axum::Router<Arc<AppState>> {
+    let admin_path = admin_path(cfg).to_string();
+    let api_base = api_base_path(cfg);
+
+    let admin_router = axum::Router::new()
+        // ... register admin routes
+        ;
+
+    let api_admin_router = axum::Router::new()
+        // ... register API admin routes
+        ;
+
+    axum::Router::new()
+        .nest(&format!("/{admin_path}"), admin_router)
+        .nest(&format!("{api_base}/{admin_path}"), api_admin_router)
+}
+
+// Use in Askama templates via template context struct
+// {{ admin_path }}   // Available in all templates
+// {{ api_version }}  // Available in all templates
+// {{ api_base_path }} // e.g., "/api/{api_version}"
+```
+
+### Restart vs Reload
+
+| Change Type | Action | Downtime |
+|-------------|--------|----------|
+| **Admin path** | Graceful reload | None (routes re-registered) |
+| **Port change** | Full restart | Brief (~1-2s) |
+
+## Design Principles
+
+| Principle | Description |
+|-----------|-------------|
+| Server Admin Focus | Designed for server administration, not end-users |
+| Pretty | Clean, modern, professional design |
+| Intuitive | Self-explanatory, no manual needed |
+| Easy Navigation | Logical grouping, breadcrumbs, search |
+| Frontend Rules | Dark theme (default), light/dark/auto themes, responsive, accessible |
+| No JS Alerts | Custom modals, toasts, confirmations |
+| Real-time Feedback | Show save status, validation errors inline |
+| Mobile-Friendly | Works on all screen sizes |
+| Keyboard Shortcuts | Power users can navigate quickly |
+
+## Admin Panel Layout
+
+### Overall Structure
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ HEADER                                                                   │
+│ ┌─────────────────────────────────────────────────────────────────────┐ │
+│ │ Logo/Title          Search...              [Status] [User] [Logout] │ │
+│ └─────────────────────────────────────────────────────────────────────┘ │
+├──────────────┬──────────────────────────────────────────────────────────┤
+│   SIDEBAR    │                    MAIN CONTENT                          │
+│              │                                                          │
+│  Dashboard   │  ┌─────────────────────────────────────────────────────┐ │
+│              │  │ Breadcrumb: Dashboard > Server > Settings           │ │
+│  Server ▼    │  └─────────────────────────────────────────────────────┘ │
+│   Settings   │                                                          │
+│   SSL/TLS    │  ┌─────────────────────────────────────────────────────┐ │
+│   Scheduler  │  │                                                     │ │
+│   Logs       │  │              PAGE CONTENT                           │ │
+│              │  │                                                     │ │
+│  Security ▼  │  │                                                     │ │
+│   Auth       │  │                                                     │ │
+│   Tokens     │  │                                                     │ │
+│   Firewall   │  │                                                     │ │
+│              │  │                                                     │ │
+│  Network ▼   │  │                                                     │ │
+│   Tor        │  │                                                     │ │
+│   GeoIP      │  │                                                     │ │
+│              │  └─────────────────────────────────────────────────────┘ │
+│  System Users│                                                          │
+│              │  ┌─────────────────────────────────────────────────────┐ │
+│              │  │ FOOTER: Version | Docs | Status                     │ │
+│              │  └─────────────────────────────────────────────────────┘ │
+│              │                                                          │
+│              │                                                          │
+└──────────────┴──────────────────────────────────────────────────────────┘
+```
+
+### Header
+
+| Element | Position | Description |
+|---------|----------|-------------|
+| Logo/Title | Left | Project name, clickable → dashboard |
+| Search | Center | Global search (settings, logs, etc.) |
+| Status Indicator | Right | ● Green (OK), ● Yellow (Warning), ● Red (Error) |
+| Admin Name | Right | Current admin username |
+| Logout | Right | Always visible, one-click logout |
+
+### Sidebar Navigation
+
+**Collapsible sidebar with grouped sections.**
+
+```
+📊 Dashboard
+
+📦 Server
+   ├── Settings
+   ├── Branding
+   ├── SSL/TLS
+   ├── Scheduler
+   ├── Email
+   ├── Logs
+   ├── Backup
+   ├── Maintenance
+   ├── Updates
+   └── Info
+
+🔒 Security
+   ├── Authentication
+   ├── API Tokens
+   ├── Rate Limiting
+   └── Firewall
+
+🌐 Network
+   ├── Tor
+   ├── GeoIP
+   └── Blocklists
+
+👥 System Users (read-only)
+   └── System User List
+
+❓ Help
+   └── Documentation
+```
+
+### Sidebar Behavior
+
+| Feature | Description |
+|---------|-------------|
+| Collapsible | Click section header to expand/collapse |
+| Active indicator | Highlight current page |
+| Collapse all | Double-click header to collapse sidebar |
+| Remember state | Persist expanded/collapsed state |
+| Icons | Each section has icon for quick recognition |
+| Mobile | Hamburger menu, slide-out drawer |
+
+## /server/{admin_path} (Web Interface)
+
+### Authentication
+
+| Feature | Description |
+|---------|-------------|
+| Login page | `/server/{admin_path}` (when not logged in) |
+| Login form | Admin token (`server.token`) entry, centered card |
+| Session | Cookie-based (30 days default, configurable) |
+| CSRF | Protection on all forms |
+| Remember Me | Option available (extends to 90 days) |
+| Logout | Always visible in header |
+| MFA | TOTP support (optional, configurable) |
+
+## The Server Admin Account
+
+**There is exactly ONE server admin account: the main server admin. It is an ADMINISTRATIVE identity for managing the application, not an application user.**
+
+### Server Admin vs System Users
+
+| Aspect | Server Admin | System User (PART 8) |
+|--------|--------------|----------------------|
+| **Purpose** | Manage server and configuration | API access as an operating-system user |
+| **Scope** | Server-wide administration | Own `sys_` token and data only |
+| **Identity** | Main server admin (maps to `server.token`) | Operating-system account (`system_users` table) |
+| **Required** | **YES — whenever this PART is enabled** | Core (PART 8) |
+| **Login** | `/server/auth/login` → `/server/{admin_path}/*` | No web login — `sys_` token API auth only |
+| **Access** | Admin panel (`/server/{admin_path}/*`) | API routes per PART 8 |
+| **Created by** | Setup wizard (first run) | Operating system (`useradd` etc.); token minted per PART 8 |
+
+**Important:** The Server Admin and system users are completely separate identity types. The Server Admin is NOT a "privileged user" - it is a different kind of identity entirely, backed by `server.token`.
+
+### Server Admin Behavior
+
+| Route | Server Admin Access |
+|-------|---------------------|
+| `/server/{admin_path}/*` | Full access |
+| `/server/auth/login` | Login page |
+| `/server/auth/logout` | Logout |
+| Public routes (`/`, `/server/*`, etc.) | Guest view (no user-specific content) |
+
+**The admin token (`server.token`) lives in `server.yml` ONLY (PART 11), never in the database or config-managed secrets stores.**
+
+## First Run & Setup Wizard
+
+**IMPORTANT: App works perfectly with sane defaults before setup.** Setup wizard is optional and allows customization. Server is fully functional immediately on first run.
+
+### First Run Experience
+
+**On first run, the application:**
+
+1. Creates default `server.yml` with sane defaults
+2. Creates empty `server.db` database
+3. Auto-detects and configures SMTP (if available)
+4. Selects random available port (64xxx range)
+5. Generates one-time setup token
+6. Displays startup information in console
+7. **Starts serving immediately** - fully functional
+
+**Console Output (First Run):**
+
+```
+╭───────────────────────────────────────────────────────────╮
+│  🚀 {PROJECT_NAME} · 📦 {project_version}                  │
+├───────────────────────────────────────────────────────────┤
+│  🔧 Running in mode: {app_mode}                           │
+├───────────────────────────────────────────────────────────┤
+│  🌐 HTTP:  {proto}://{fqdn}:{port}                        │
+├───────────────────────────────────────────────────────────┤
+│  📡 Listening on {proto}://{address}:{port}               │
+│  ✅ Server started on {startup_datetime}                  │
+╰───────────────────────────────────────────────────────────╯
+
+┌───────────────────────────────────────────────────────────┐
+│  🔑 SETUP REQUIRED                                        │
+├───────────────────────────────────────────────────────────┤
+│  Setup Token: {setup_token}                               │
+│                                                           │
+│  Go to {proto}://{fqdn}/server/{admin_path}/config/setup         │
+│  and enter this token to complete setup.                  │
+│                                                           │
+│  This token will only be shown ONCE.                      │
+└───────────────────────────────────────────────────────────┘
+
+[INFO] Server started successfully
+[INFO] Listening on {address}:{port}
+```
+
+### App Usability Before Setup
+
+**The app is FULLY FUNCTIONAL before completing the setup wizard.**
+
+**This does NOT relax security.** Pre-setup public surfaces still follow the same public-endpoint, sanitization, rate-limit, TLS, auth, and secret-handling rules as the fully configured app.
+
+| Feature | Available Before Setup? |
+|---------|------------------------|
+| Public API endpoints | ✓ Yes |
+| Public web pages | ✓ Yes |
+| Health checks (`/server/healthz`) | ✓ Yes |
+| OpenAPI docs (`/server/docs/swagger`) | ✓ Yes |
+| GraphQL (if applicable) | ✓ Yes |
+| Admin panel (`/server/{admin_path}`) | ✓ Yes (requires setup token) |
+| Email features | ✓ Yes (if SMTP auto-detected) |
+| Scheduled tasks | ✓ Yes (with defaults) |
+
+**What Setup Wizard Provides:**
+- Custom admin username (display/audit identity; instead of the default)
+- Customize app name/branding
+- Review HTTPS/certificate configuration if customization is needed - Note: Tor is auto-enabled if the binary is found; admins can toggle it later via the Tor settings (`config/network/tor`)
+- Receive API token for programmatic access
+
+### Setup Flow
+
+On first run, a one-time setup token is generated and displayed in console. Admin setup follows this flow:
+
+| Step | Action |
+|------|--------|
+| 1 | Server generates one-time setup token (displayed in console ONCE) |
+| 2 | User navigates to `/server/{admin_path}` |
+| 3 | User enters setup token |
+| 4 | Redirect to `/server/{admin_path}/config/setup` (setup wizard) |
+
+**Setup Wizard Steps (`/server/{admin_path}/config/setup`):**
+
+**Step 1: Confirm Admin Account**
+| Field | Default | Notes |
+|-------|---------|-------|
+| Username | `administrator` | Display/audit identity; changeable (username blocklist does NOT apply to admin) |
+| Authentication | Admin token (`server.token`) | Sole credential — no password exists; token shown/rotatable here |
+
+**Step 2: API Token**
+| Action | Notes |
+|--------|-------|
+| Auto-generate API token | User MUST copy (shown once) |
+| Token is tied to admin account | Used for API access |
+
+**Step 3: Server Configuration**
+| Setting | Description |
+|---------|-------------|
+| App name | Display name for the application |
+| Domain/FQDN | Primary domain (if known) |
+| Mode | Production / Development |
+| Timezone | Server timezone |
+
+**Step 4: Security Settings**
+| Setting | Default | Recommended | Description |
+|---------|---------|-------------|-------------|
+| Backup encryption password | (none) | **SET ONE** | Encrypts all backups (AES-256-GCM) |
+| Enable 2FA for this admin | No | Yes | Adds TOTP to admin account |
+
+**Step 5: Optional Services**
+| Setting | Description |
+|---------|-------------|
+| Configure HTTPS / certificate source | Review or customize the default secure HTTPS path if needed |
+
+**Step 6: Complete**
+| Action | Notes |
+|--------|-------|
+| Save configuration | Write to `server.yml` |
+| Mark setup complete | Setup token invalidated |
+| Redirect to `/server/{admin_path}` | Logged in as admin |
+
+**Setup Token Rules:**
+- Generated on first run ONLY
+- Displayed in console ONCE (never stored in plain text)
+- Single use - invalidated after setup complete
+- If lost, must reset database to regenerate
+- Format: 32 hexadecimal characters (128-bit random)
+
+### Relationship to the Operator Token (`server.token`) and the Setup Wizard
+
+**The main server admin account is provisioned through the SAME token-based setup wizard as the rest of the binary (PART 8).** The setup flow above is the server-persona face of that wizard: the one-time setup token gates it exactly as the token-gated first-run flow in PART 8 gates initial configuration. There is no second, admin-only onboarding mechanism.
+
+**The existing operator token (`server.token`, PART 11) maps to — authenticates as — the main server admin account.** It is NOT a separate credential: when server admin is enabled, a request authenticated with `server.token` IS the main server admin, with that account's identity in audit logs and that account's permissions. `server.token` (stored in `server.yml` only, per PART 11 — never in the database) is the ONE credential for the ONE main server admin account — for both the web login form and `Authorization: Bearer` API access.
+
+## Single Server Admin
+
+**There is exactly one server admin account — the main server admin, backed by `server.token`.** There is no mechanism to add, invite, or sync additional admin accounts. If the token is lost, rotate it in `server.yml` or recover via `--maintenance setup`.
+
+## Server Admin Security
+
+**These security settings apply to the Server Admin account.**
+
+| Security Feature | Applies To | Required/Recommended |
+|------------------|------------|---------------------|
+| Admin token security (`server.token`) | Server Admin | REQUIRED |
+| TOTP 2FA support | Server Admin | REQUIRED (usage recommended) |
+| Passkey/WebAuthn support | Server Admin | REQUIRED (usage recommended) |
+| Recovery keys (when MFA enabled) | Server Admin | REQUIRED |
+| Session timeout | Server Admin | REQUIRED |
+| Audit logging | Server Admin | REQUIRED |
+| Rate limiting | Server Admin | REQUIRED |
+| IP restrictions (if configured) | Server Admin | OPTIONAL |
+
+**MFA for the Server Admin:**
+- Every project MUST support TOTP and Passkeys for the Server Admin
+- MFA is optional but STRONGLY recommended - admin chooses to enable
+- This applies even to simple apps (e.g., `jokes`, `airports`)
+- Admin panel shows clear prompts encouraging MFA setup
+
+**No exceptions.**
+
+### Server Admin Account Security Details
+
+**The Server Admin has the following account security features.**
+
+#### Passkeys/WebAuthn
+
+| Feature | Description |
+|---------|-------------|
+| **Registration** | Admin can register multiple passkeys at `/server/{admin_path}/{admin_username}/profile/security` |
+| **Login** | Passkey can be used as primary login or as 2FA |
+| **Device-bound** | Each passkey tied to specific device/authenticator |
+| **Naming** | Admin names each passkey for identification |
+| **Revocation** | Admin can revoke individual passkeys |
+| **Backup** | Recovery keys provided when first passkey registered |
+
+#### TOTP Two-Factor Authentication
+
+| Feature | Description |
+|---------|-------------|
+| **Setup** | QR code + manual entry key at `/server/{admin_path}/{admin_username}/profile/security` |
+| **Apps supported** | Any TOTP app (Google Authenticator, Authy, 1Password, etc.) |
+| **Backup codes** | 10 one-time recovery codes generated on setup |
+| **Regenerate** | Can regenerate backup codes (invalidates old ones) |
+| **Disable** | Requires current TOTP code or recovery key to disable |
+
+#### Account Email vs Notification Email
+
+**Server admins can configure separate email addresses for security vs general notifications.**
+
+| Email Type | Purpose | Required | Examples |
+|------------|---------|----------|----------|
+| **Account Email** | Security-critical communications | YES | 2FA recovery, security alerts, login from new device, session terminated |
+| **Notification Email** | General notifications (non-security) | NO (defaults to account email) | System updates, backup completed, scheduled task failures, certificate expiry warnings |
+
+**Rules:**
+- Account email is set during setup (required)
+- Notification email is optional (defaults to account email if not set)
+- Both emails must be verified before use
+- Account email changes require re-authentication with the admin token + 2FA (if enabled)
+- Notification email changes only require current session
+- **All email features require working SMTP** - if SMTP unavailable, no emails sent
+
+**Admin Profile Email Settings:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Email Settings                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Account Email (security notifications):                    │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ admin@example.com                            [Edit] │    │
+│  └─────────────────────────────────────────────────────┘    │
+│  Used for: 2FA recovery, security alerts, new-device login  │
+│                                                             │
+│  Notification Email (general notifications):                │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ alerts@example.com                           [Edit] │    │
+│  └─────────────────────────────────────────────────────┘    │
+│  Used for: system updates, backup status, task failures    │
+│  [ ] Use account email for all notifications                │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Scoped Notification Preferences
+
+**Server admins can enable/disable specific notification categories.**
+
+| Category | Default | Description |
+|----------|---------|-------------|
+| **Security Alerts** | ON (locked) | Cannot disable - login from new device, token rotated, 2FA changed |
+| **Session Notifications** | ON | Session started from new location, session terminated |
+| **System Status** | ON | Server errors, high resource usage, service degradation |
+| **Backup Status** | ON | Backup completed, backup failed |
+| **Certificate Alerts** | ON | SSL certificate expiring, renewal status |
+| **Scheduled Tasks** | OFF | Task completed, task failed |
+| **Updates Available** | ON | New version available |
+
+**Notification Preferences UI:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Notification Preferences                                   │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Security (cannot be disabled):                             │
+│  [✓] Security alerts (login, token, 2FA changes)           │
+│                                                             │
+│  Account:                                                   │
+│  [✓] Session notifications                                  │
+│                                                             │
+│  System:                                                    │
+│  [✓] System status alerts                                   │
+│  [✓] Backup status                                          │
+│  [✓] Certificate alerts                                     │
+│  [ ] Scheduled task notifications                           │
+│  [✓] Update notifications                                   │
+│                                                             │
+│  Delivery: [Email ▼]  (requires SMTP)                       │
+│                                                             │
+│  [Save Preferences]                                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**SMTP Requirement:**
+- All email notifications require working SMTP configuration
+- If SMTP unavailable, notifications shown in admin panel only (no email)
+- SMTP status shown in notification preferences
+- See PART 16: EMAIL & NOTIFICATIONS for SMTP configuration
+
+#### Admin Appearance Settings (`/server/{admin_path}/{admin_username}/preferences`)
+
+**Server admins can customize their admin panel appearance.**
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `theme` | Select | `dark` | Theme (dark/light/auto) |
+| `font_size` | Select | `medium` | Font size (small/medium/large) |
+| `reduce_motion` | Toggle | Off | Reduce animations |
+| `date_format` | Select | `YYYY-MM-DD` | Date display format |
+| `time_format` | Select | `24h` | Time display format (12h/24h) |
+
+**Admin Appearance Settings UI:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Appearance Settings                                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Theme                                                      │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐                       │
+│  │  🌙     │ │  ☀️     │ │  💻     │                       │
+│  │ Dark    │ │ Light   │ │ Auto    │                       │
+│  └─────────┘ └─────────┘ └─────────┘ ↑ Default: Dark       │
+│                                                             │
+│  Font Size                                                  │
+│  ○ Small                                                    │
+│  ● Medium (default)                                         │
+│  ○ Large                                                    │
+│                                                             │
+│  Accessibility                                              │
+│  [OFF] Reduce motion                                        │
+│        Minimize animations and transitions.                 │
+│                                                             │
+│  Date & Time                                                │
+│  Date Format: [YYYY-MM-DD ▼]                               │
+│  Time Format: [24h ▼]                                       │
+│                                                             │
+│  [Save Changes]                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Admin theme applies to:**
+- Admin panel (`/server/{admin_path}/*`)
+- Admin-accessible Swagger UI
+- Admin-accessible GraphiQL
+
+**Note:** Admin theme preference is independent of the site-wide default theme. The site default is dark, but each admin can choose their own preference.
+
+## Server Admin Privacy
+
+**The single Server Admin account exposes only its own data.**
+
+| What Admin CAN See | Notes |
+|--------------------|-------|
+| Own account details | Username, email settings |
+| Own API token (regenerate) | Shown masked; regenerate at will |
+| Own 2FA status | TOTP/passkey enrollment |
+| Own session history | Active admin sessions |
+
+### Admin Recovery
+
+| Scenario | Recovery Method |
+|----------|-----------------|
+| Lost admin token | Read/rotate `server.token` in `server.yml` (shell access required) |
+| Lost 2FA + recovery keys | Run `--maintenance setup` to reset MFA enrollment |
+
+### Login Page (`/server/{admin_path}`)
+
+```
+┌─────────────────────────────────────────┐
+│                                         │
+│         ┌───────────────────┐           │
+│         │   {Project Name}  │           │
+│         │   Admin Panel     │           │
+│         ├───────────────────┤           │
+│         │                   │           │
+│         │  Admin Token:     │           │
+│         │  [______________] │           │
+│         │                   │           │
+│         │  [ ] Remember me  │           │
+│         │                   │           │
+│         │    [  Login  ]    │           │
+│         │                   │           │
+│         └───────────────────┘           │
+│                                         │
+│              {project_version}          │
+└─────────────────────────────────────────┘
+```
+
+**Login page rules:**
+- Centered card on dark background
+- Project name/logo at top
+- No links to public site
+- Version number at bottom (small)
+- No recovery link (the token lives in `server.yml`; rotate via shell/CLI if lost)
+
+### Dashboard (`/server/{admin_path}`)
+
+**Overview of server status and system resources at a glance.**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Dashboard                                                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│  │   STATUS     │  │   UPTIME     │  │   REQUESTS   │  │   ERRORS     │ │
+│  │   ● Online   │  │   5 days     │  │   12,345     │  │   23         │ │
+│  │              │  │              │  │   (24 hours) │  │   (24 hours) │ │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘ │
+│                                                                         │
+│  ┌─────────────────────────────────┐  ┌─────────────────────────────┐   │
+│  │ SYSTEM RESOURCES                │  │ QUICK ACTIONS               │   │
+│  │                                 │  │                             │   │
+│  │ CPU:    [████████░░] 78%        │  │ [Restart Server]            │   │
+│  │ Memory: [██████░░░░] 62%        │  │ [Clear Cache]               │   │
+│  │ Disk:   [████░░░░░░] 45%        │  │ [Create Backup]             │   │
+│  │                                 │  │ [View Logs]                 │   │
+│  └─────────────────────────────────┘  └─────────────────────────────┘   │
+│                                                                         │
+│  ┌─────────────────────────────────┐  ┌─────────────────────────────┐   │
+│  │ RECENT ACTIVITY                 │  │ SCHEDULED TASKS             │   │
+│  │                                 │  │                             │   │
+│  │ 10:30 Config updated            │  │ SSL Renewal    in 23 days   │   │
+│  │ 10:15 Admin login               │  │ GeoIP Update   in 2 days    │   │
+│  │ 09:45 Backup completed          │  │ Auto Backup    in 5 hours   │   │
+│  │ 09:00 SSL renewed               │  │ Session Clean  in 45 min    │   │
+│  └─────────────────────────────────┘  └─────────────────────────────┘   │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │ ALERTS / WARNINGS                                                │    │
+│  │                                                                  │    │
+│  │ ⚠️  SSL certificate expires in 23 days                          │    │
+│  │ ⚠️  Disk usage above 80% threshold                              │    │
+│  │ ℹ️  Update available: v1.2.4                                    │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Dashboard Widgets
+
+| Widget | Content |
+|--------|---------|
+| Status | Online/Maintenance/Error indicator |
+| Uptime | Time since last restart |
+| Requests | Request count (24 hours) |
+| Errors | Error count (24 hours) |
+| System Resources | CPU, Memory, Disk usage bars |
+| Quick Actions | Common admin tasks |
+| Recent Activity | Last 5-10 audit log entries |
+| Scheduled Tasks | Next scheduled tasks |
+| Alerts | Warnings and notifications |
+
+### Required Admin Pages
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/server/{admin_path}` | Login | Login form (if not authenticated) |
+| `/server/{admin_path}` | Dashboard | Overview, stats, quick actions |
+| `/server/{admin_path}/config/settings` | Server Settings | Port, mode, FQDN, etc. |
+| `/server/{admin_path}/config/branding` | Branding | Title, logo, favicon, colors |
+| `/server/{admin_path}/config/ssl` | SSL/TLS | Certificates, Let's Encrypt |
+| `/server/{admin_path}/config/scheduler` | Scheduler | View/edit scheduled tasks |
+| `/server/{admin_path}/config/email` | Email | SMTP settings, templates |
+| `/server/{admin_path}/config/logs` | Logs | View access, error, audit logs |
+| `/server/{admin_path}/config/security/auth` | Authentication | Admin token, MFA, sessions |
+| `/server/{admin_path}/config/security/tokens` | API Tokens | Generate, revoke tokens |
+| `/server/{admin_path}/config/security/ratelimit` | Rate Limiting | Configure rate limits |
+| `/server/{admin_path}/config/security/firewall` | Firewall | IP allow/block lists |
+| `/server/{admin_path}/config/security/allowlist` | Allowlist | Trusted IPs (bypass blocklist/ratelimit/geoip) |
+| `/server/{admin_path}/config/network/tor` | Tor | View .onion address, status (auto-enabled if installed) |
+| `/server/{admin_path}/config/network/geoip` | GeoIP | Country blocking, database updates |
+| `/server/{admin_path}/config/network/blocklists` | Blocklists | IP/domain blocklists |
+| `/server/{admin_path}/config/system-users` | System Users | Read-only view of `system_users` (username, uid, token status, last_used_at, rotated_at) |
+| `/server/{admin_path}/config/backup` | Backup | Create/restore backups |
+| `/server/{admin_path}/config/maintenance` | Maintenance | Maintenance mode |
+| `/server/{admin_path}/config/updates` | Updates | Check/apply updates |
+| `/server/{admin_path}/config/info` | Server Info | Version, environment, deps |
+| `/server/{admin_path}/help` | Help | Documentation links |
+
+### System Users Page (`/server/{admin_path}/config/system-users`)
+
+**Read-only view of the `system_users` table (PART 8 → Per-System-User Tokens). Accounts are operating-system accounts; the panel never creates, edits, or deletes them.**
+
+| Column | Source (`system_users`) | Description |
+|--------|-------------------------|-------------|
+| Username | `username` | Operating-system account name |
+| UID | `uid` | Operating-system user ID |
+| Token status | token columns | Active / revoked / never minted |
+| Last used | `last_used_at` | Last authenticated `sys_` token use |
+| Rotated | `rotated_at` | Last token rotation timestamp |
+
+**Rules:**
+- Strictly read-only — no create/edit/delete/invite actions of any kind
+- No token values are ever displayed (hashes only exist server-side)
+- Search/filter and sort are client-side conveniences over the same data
+
+### Settings Page Layout
+
+**Standard layout for all settings pages.**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Server Settings                                              [Save All] │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  General                                                                │
+│  ─────────────────────────────────────────────────────────────────────  │
+│                                                                         │
+│  Port                                                                   │
+│  [64580        ]  ⓘ The port the server listens on                     │
+│                   ⚠️ Requires restart                                   │
+│                                                                         │
+│  Mode                                                                   │
+│  [Production ▼]   ⓘ Production enforces strict host validation         │
+│                                                                         │
+│  FQDN                                                                   │
+│  [api.example.com]  ⓘ Fully qualified domain name (auto-detected)      │
+│                                                                         │
+│  ─────────────────────────────────────────────────────────────────────  │
+│                                                                         │
+│  Process                                                                │
+│  ─────────────────────────────────────────────────────────────────────  │
+│                                                                         │
+│  Daemonize                                                              │
+│  [○ Off]            ⓘ Detach from terminal on start (for manual start) │
+│                     ⚠️ Requires restart. Don't use with systemd/docker. │
+│                                                                         │
+│  ─────────────────────────────────────────────────────────────────────  │
+│                                                                         │
+│  Advanced                                                    [Expand ▼] │
+│  ─────────────────────────────────────────────────────────────────────  │
+│                                                                         │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │                                            [Cancel] [Save]      │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Form Elements
+
+| Element | Visual | Usage |
+|---------|--------|-------|
+| **Toggle** | `[● On]` / `[○ Off]` | Boolean on/off (preferred for enable/disable) |
+| **Checkbox** | `[✓]` / `[ ]` | Boolean, multiple selections, opt-in features |
+| **Dropdown** | `[Value ▼]` | Selection from predefined list |
+| **Text** | `[value_____]` | Single-line string |
+| **Number** | `[123_______]` | Numeric values (port, limit, count) |
+| **Password** | `[••••••] 👁` | Secrets with show/hide toggle |
+| **Textarea** | Multi-line box | JSON, lists, long text |
+| **Tags** | `[tag1][tag2][+]` | Multiple values (IPs, keywords) |
+| **File** | `[Choose File]` | Upload (logos, certs) |
+| **Color** | `[#FF5733] 🎨` | Color picker |
+| **Duration** | `[5] [minutes ▼]` | Time with unit dropdown |
+| **Readonly** | `value (locked)` | Display only, not editable |
+
+### Form Behavior
+
+| Feature | Description |
+|---------|-------------|
+| Tooltips | ⓘ icon shows help on hover |
+| Validation | Real-time, inline error messages |
+| Unsaved indicator | Show when form has unsaved changes |
+| Save feedback | Toast notification on save |
+| Confirm dangerous | Modal for destructive actions |
+| Restart warning | ⚠️ icon if setting requires restart |
+| Default values | Show default in placeholder |
+| Live reload | No ⚠️ = changes apply immediately |
+
+### Server Settings Field Definitions
+
+**`/server/{admin_path}/config/settings` - All fields with control types:**
+
+#### General Section
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `port` | Number | `64580` | ⚠️ Yes | Server listen port |
+| `mode` | Dropdown | `production` | ⚠️ Yes | `production` / `development` / `debug` |
+| `fqdn` | Text | (auto) | No | Fully qualified domain name |
+| `address` | Text | `[::]` | ⚠️ Yes | Listen address |
+
+#### Process Section
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `daemonize` | Toggle | Off | ⚠️ Yes | Detach from terminal on start |
+| `pidfile` | Toggle | On | ⚠️ Yes | Create PID file |
+
+#### Branding Section (`/server/{admin_path}/config/branding`)
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `title` | Text | `{project_name}` | No | App display name |
+| `tagline` | Text | (empty) | No | Short slogan |
+| `description` | Textarea | (empty) | No | SEO/about description |
+| `logo` | File | (none) | No | Logo image upload |
+| `favicon` | File | (none) | No | Favicon upload |
+| `theme` | Dropdown | `auto` | No | `auto` / `light` / `dark` |
+| `accent_color` | Color | `#007bff` | No | Primary accent color |
+
+#### SEO Section
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `keywords` | Tags | (empty) | No | Meta keywords |
+| `author` | Text | (empty) | No | Author/org name |
+| `og_image` | File | (none) | No | OpenGraph image |
+| `twitter_handle` | Text | (empty) | No | Twitter @handle |
+
+#### Security Section (`/server/{admin_path}/config/security`)
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `admin_path` | Text | `admin` | Reload | Custom admin panel path (see PART 28) |
+| `rate_limit.enabled` | Toggle | On | No | Enable rate limiting |
+| `rate_limit.read.requests` | Number | `120` | No | Read (GET/HEAD) requests per window, per IP |
+| `rate_limit.write.requests` | Number | `10` | No | Write (POST/PUT/PATCH/DELETE) requests per window, per IP |
+| `rate_limit.health.requests` | Number | `120` | No | Health/status requests per window, per IP |
+| `rate_limit.global_burst` | Number | `240` | No | Absolute per-IP ceiling across all endpoint types |
+| `rate_limit.{class}.window` | Duration | `1 minute` | No | Per-class rate limit window |
+| `cors.enabled` | Toggle | On | No | Enable CORS |
+| `cors.origins` | Tags | `*` | No | Allowed origins |
+| `cors.methods` | Checkbox group | GET,POST,etc | No | Allowed methods |
+| `csp.enabled` | Toggle | On | No | Content Security Policy |
+| `hsts.enabled` | Toggle | On | No | HTTP Strict Transport Security |
+| `hsts.max_age` | Duration | `1 year` | No | HSTS max age |
+
+#### Account Lockout Section
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `soft_lock_attempts` | Number | `5` | No | Attempts before soft lock |
+| `soft_lock_duration` | Duration | `15 min` | No | Soft lock duration |
+| `hard_lock_attempts` | Number | `10` | No | Attempts before hard lock |
+| `hard_lock_duration` | Duration | `1 hour` | No | Hard lock duration |
+| `permanent_lock_attempts` | Number | `15` | No | Attempts before permanent lock |
+
+#### IP Blocking Section
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `ip_block.enabled` | Toggle | On | No | Enable IP blocking |
+| `ip_block.escalation` | Toggle | On | No | Escalating block durations |
+| `ip_block.first_duration` | Duration | `1 hour` | No | First block duration |
+| `ip_block.max_duration` | Duration | `7 days` | No | Maximum block duration |
+| `allowlist` | Tags | (empty) | No | Trusted IPs — bypass blocklists, rate limits, GeoIP (not auth) |
+| `blocklist` | Tags | (empty) | No | IPs always blocked |
+
+#### SSL/TLS Section (`/server/{admin_path}/config/ssl`)
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `ssl.enabled` | Toggle | Off | ⚠️ Yes | Enable HTTPS |
+| `ssl.cert` | File/Text | (auto) | ⚠️ Yes | Certificate path or upload |
+| `ssl.key` | File/Text | (auto) | ⚠️ Yes | Private key path or upload |
+| `ssl.min_version` | Dropdown | `TLS 1.2` | ⚠️ Yes | Minimum TLS version |
+| `ssl.letsencrypt.enabled` | Toggle | Off | No | Use Let's Encrypt |
+| `ssl.letsencrypt.email` | Text | (required) | No | Contact email |
+| `ssl.letsencrypt.staging` | Toggle | Off | No | Use LE staging server |
+| `ssl.letsencrypt.challenge` | Dropdown | `http-01` | No | Challenge type |
+
+#### Authentication Section (`/server/{admin_path}/config/security/auth`)
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `session.timeout` | Duration | `24 hours` | No | Session expiry |
+| `session.extend_on_activity` | Toggle | On | No | Extend on activity |
+| `mfa.enabled` | Toggle | Off | No | Require MFA for the admin |
+| `mfa.methods` | Checkbox group | TOTP | No | Allowed MFA methods |
+
+#### Backup Section (`/server/{admin_path}/config/backup`)
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `backup.enabled` | Toggle | On | No | Enable scheduled backups (backup_daily) |
+| `backup.hourly_enabled` | Toggle | Off | No | Enable hourly incremental (backup_hourly) |
+| `backup.schedule` | Text | `0 2 * * *` | No | Daily backup cron schedule |
+| `backup.retention.max_backups` | Number | `1` | No | Daily full backups to keep (≥1) |
+| `backup.retention.keep_weekly` | Number | `0` | No | Weekly backups (Sunday) - 0 = disabled |
+| `backup.retention.keep_monthly` | Number | `0` | No | Monthly backups (1st) - 0 = disabled |
+| `backup.retention.keep_yearly` | Number | `0` | No | Yearly backups (Jan 1st) - 0 = disabled |
+| `backup.retention.max_total_size` | Text | `"10%"` | No | Hard size cap (e.g. `"10%"`, `"50G"`); `0` = disabled; overrides count limits |
+| `backup.encryption.enabled` | Toggle | Off | No | Encrypt backups |
+| `backup.encryption.password` | Password | (none) | No | Encryption password |
+
+#### Email/SMTP Section (`/server/{admin_path}/config/email`)
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `smtp.host` | Text | (autodetect) | No | SMTP server |
+| `smtp.port` | Number | `587` | No | SMTP port |
+| `smtp.username` | Text | (none) | No | SMTP username |
+| `smtp.password` | Password | (none) | No | SMTP password |
+| `smtp.tls` | Dropdown | `auto` | No | `auto`/`starttls`/`tls`/`none` |
+| `from.name` | Text | (app title) | No | Sender name |
+| `from.email` | Text | `no-reply@{fqdn}` | No | Sender email |
+| `[Test Connection]` | Button | - | - | Send test email |
+
+#### Notifications Section (`/server/{admin_path}/config/notifications`)
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `notifications.backup_success` | Toggle | Off | No | Notify on backup success |
+| `notifications.backup_failure` | Toggle | On | No | Notify on backup failure |
+| `notifications.ssl_expiring` | Toggle | On | No | Notify SSL expiring |
+| `notifications.ssl_expiring_days` | Number | `14` | No | Days before expiry |
+| `notifications.ssl_renewal_failure` | Toggle | On | No | Notify on SSL renewal failure |
+| `notifications.security_alerts` | Toggle | On | No | Security event alerts |
+| `notifications.update_available` | Toggle | On | No | New version available |
+
+#### Scheduler Section (`/server/{admin_path}/config/scheduler`)
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `scheduler.enabled` | Toggle | On | No | Enable scheduler |
+| Task rows with: | | | | |
+| - Task name | Readonly | - | - | Task identifier |
+| - Enabled | Toggle | varies | No | Enable/disable task |
+| - Schedule | Text | cron expr | No | Cron expression |
+| - Last run | Readonly | timestamp | - | Last execution |
+| - Next run | Readonly | timestamp | - | Next execution |
+| - `[Run Now]` | Button | - | - | Trigger immediately |
+
+#### URL Detection Section (`/server/{admin_path}/config/url`)
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `url_detection.learning` | Toggle | On | No | Learn domain patterns |
+| `url_detection.min_samples` | Number | `3` | No | Min samples for wildcard |
+| `url_detection.sample_window` | Duration | `5 min` | No | Sample time window |
+| `url_detection.log_changes` | Toggle | On | No | Log domain changes |
+| `url_detection.live_reload` | Toggle | On | No | Live reload on detection |
+| Detected domains | Readonly | - | - | Currently detected FQDNs |
+| Inferred wildcard | Readonly | - | - | `*.example.com` if detected |
+
+#### Tor Section (`/server/{admin_path}/config/network/tor`) - *if tor installed*
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `tor.enabled` | Toggle | (auto) | No | Enable hidden service |
+| `tor.onion_address` | Readonly | - | - | `.onion` address |
+| `tor.status` | Readonly | - | - | Running/Stopped |
+| `[Copy Address]` | Button | - | - | Copy onion to clipboard |
+
+#### GeoIP Section (`/server/{admin_path}/config/network/geoip`)
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `geoip.enabled` | Toggle | On | No | Enable GeoIP lookups |
+| `geoip.auto_update` | Toggle | On | No | Auto-update databases |
+| `geoip.update_schedule` | Text | `0 3 * * *` | No | Update cron schedule |
+| `geoip.deny_countries` | Tags | (empty) | No | Block these countries (ISO 3166-1 alpha-2) |
+| `geoip.allow_countries` | Tags | (empty) | No | Allow ONLY these countries (overrides deny) |
+| Database status | Readonly | - | - | Last update, size |
+
+#### Blocklists Section (`/server/{admin_path}/config/network/blocklists`)
+
+**Transmission-style IP/domain blocklist management. Download, parse, and enforce external blocklists from configurable URLs.**
+
+**Supported Formats:**
+
+| Format | Extension | Example | Description |
+|--------|-----------|---------|-------------|
+| **P2P (PeerGuardian)** | `.p2p`, `.txt` | `Description:1.2.3.0-1.2.3.255` | Range-based, most common |
+| **CIDR** | `.txt`, `.netset` | `1.2.3.0/24` | Standard CIDR notation, one per line |
+| **DAT (eMule)** | `.dat` | `001.002.003.000 - 001.002.003.255 , 100 , Description` | Legacy eMule format |
+| **Plain IP** | `.txt` | `1.2.3.4` | One IP per line |
+| **Compressed** | `.gz` | Any of above, gzipped | Auto-decompressed on download |
+
+**Comment lines** (starting with `#`) and blank lines are ignored in all formats.
+
+**Config:**
+
+```yaml
+server:
+  security:
+    blocklists:
+      # Master enable/disable for all blocklist enforcement
+      enabled: true
+
+      # Auto-update all enabled blocklists on schedule
+      auto_update: true
+
+      # Sources - list of blocklist URLs (custom URLs can be added)
+      sources:
+        - name: "firehol_level1"
+          url: "https://iplists.firehol.org/files/firehol_level1.netset"
+          format: cidr
+          enabled: true
+
+        - name: "spamhaus_drop"
+          url: "https://www.spamhaus.org/drop/drop.txt"
+          format: cidr
+          enabled: true
+
+        - name: "level1"
+          url: "https://www.iblocklist.com/lists/level1.gz"
+          # auto-detect from content/extension (P2P, gzipped)
+          format: auto
+          enabled: false
+
+        - name: "abuse_ch_urlhaus"
+          url: "https://urlhaus.abuse.ch/downloads/text/"
+          format: plain
+          enabled: false
+
+        - name: "dshield"
+          url: "https://www.dshield.org/block.txt"
+          format: cidr
+          enabled: false
+
+      # Where parsed blocklist data is stored
+      # Uses {data_dir}/security/blocklists/ directory
+      # Each source saved as {name}.txt (raw) + {name}.parsed (binary)
+
+      # Action when a blocked IP connects
+      # reject = return 403 Forbidden
+      # drop = close connection silently (no response)
+      action: reject
+
+      # Reject uses translated "errors.forbidden" message by default.
+      # Set custom reject_message to override (applies to ALL languages):
+      # reject_message: "Custom block message"
+
+      # Log blocked requests
+      log_blocked: true
+```
+
+**Data Model:**
+
+```rust
+/// BlocklistSource represents a configured blocklist URL
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlocklistSource {
+    pub name: String,
+    pub url: String,
+    /// Format: "auto", "p2p", "cidr", "dat", or "plain"
+    pub format: String,
+    pub enabled: bool,
+    /// Number of IP ranges/CIDRs parsed
+    pub rule_count: i64,
+    pub last_updated: Option<DateTime<Utc>>,
+    pub last_error: Option<String>,
+    /// Raw download size in bytes
+    pub file_size: i64,
+}
+
+/// BlocklistStats provides aggregate statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlocklistStats {
+    pub enabled: bool,
+    pub total_sources: i64,
+    pub active_sources: i64,
+    /// Total IP ranges across all lists
+    pub total_rules: i64,
+    /// Most recent update timestamp
+    pub last_updated: Option<DateTime<Utc>>,
+    /// Requests blocked in last 24h
+    pub blocked_today: i64,
+}
+```
+
+**Blocklist Parsing:**
+
+```rust
+/// Parse a blocklist stream, auto-detecting format when format == "auto".
+///
+/// If the stream is gzip-compressed, wrap it with a GzDecoder first.
+/// Format detection from first non-comment line:
+///   - Contains ":" before IP → P2P format (Description:Start-End)
+///   - Contains "/" → CIDR format
+///   - Contains " - " with commas → DAT format
+///   - Otherwise → plain IP (converted to /32)
+/// All formats are normalized to Vec<IpNet> for uniform lookup.
+pub fn parse_blocklist<R: Read>(reader: R, format: &str) -> Result<Vec<IpNet>, AppError> {
+    // implementation
+}
+
+/// BlocklistLookup uses a prefix trie for O(log n) IP matching.
+pub struct BlocklistLookup {
+    /// ip_network trie or similar prefix structure
+    prefixes: Vec<(IpNet, String)>,
+    size: usize,
+}
+
+impl BlocklistLookup {
+    pub fn contains(&self, ip: IpAddr) -> bool { todo!() }
+    pub fn load(&mut self, prefixes: Vec<(IpNet, String)>) -> Result<(), AppError> { todo!() }
+    pub fn count(&self) -> usize { self.size }
+    /// Returns the source name that matched, or None
+    pub fn matched_list(&self, ip: IpAddr) -> Option<&str> { todo!() }
+}
+```
+
+**BlocklistConfig:**
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlocklistConfig {
+    pub enabled: bool,
+    pub auto_update: bool,
+    /// "reject" or "drop"
+    pub action: String,
+    /// Overrides the translated default forbidden message
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reject_message: Option<String>,
+    pub log_blocked: bool,
+}
+```
+
+**AllowlistLookup:**
+
+```rust
+/// AllowlistLookup provides O(log n) IP lookup against allowlisted CIDRs.
+pub struct AllowlistLookup {
+    entries: Vec<(IpNet, AllowlistEntry)>,
+    size: usize,
+}
+
+impl AllowlistLookup {
+    pub fn contains(&self, ip: IpAddr) -> bool { todo!() }
+    pub fn load(&mut self, entries: Vec<AllowlistEntry>) -> Result<(), AppError> { todo!() }
+    pub fn count(&self) -> usize { self.size }
+    /// Returns the matched entry or None
+    pub fn match_ip(&self, ip: IpAddr) -> Option<&AllowlistEntry> { todo!() }
+}
+```
+
+**Middleware Integration:**
+
+```rust
+/// BlocklistLayer checks incoming IPs against loaded blocklists.
+/// Applied AFTER allowlist check — allowlisted IPs bypass the blocklist.
+pub fn blocklist_layer(
+    lookup: Arc<RwLock<BlocklistLookup>>,
+    cfg: BlocklistConfig,
+) -> impl tower::Layer<axum::routing::Route> + Clone {
+    tower_http::map_request_body::MapRequestBodyLayer::new(move |req: axum::http::Request<_>| {
+        // implementation detail — use axum middleware::from_fn for full handler access
+        req
+    })
+}
+
+/// Axum middleware function for blocklist enforcement ("reject" action).
+///
+/// The "drop" action (close connection silently, no response) cannot be
+/// expressed from inside an HTTP handler — it is enforced in the accept
+/// loop, which checks the socket IP against the blocklist and drops the
+/// TcpStream before the HTTP handshake when action == "drop". Behind a
+/// trusted proxy (client IP only known from headers) drop degrades to
+/// reject here.
+pub async fn blocklist_middleware(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    req: axum::http::Request<axum::body::Body>,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    // respects X-Forwarded-For / X-Real-IP if trusted proxy
+    let ip = extract_client_ip(&req, addr.ip());
+
+    let lookup = state.blocklist.read().await;
+    if lookup.contains(ip) {
+        let cfg = &state.config.server.security.blocklists;
+        if cfg.log_blocked {
+            tracing::warn!(
+                ip = %ip,
+                path = req.uri().path(),
+                list = lookup.matched_list(ip).unwrap_or("unknown"),
+                "blocked by blocklist"
+            );
+        }
+        let msg = match &cfg.reject_message {
+            Some(m) if !m.is_empty() => m.clone(),
+            _ => t(&state, "errors.forbidden"),
+        };
+        return (StatusCode::FORBIDDEN, msg).into_response();
+    }
+
+    next.run(req).await
+}
+```
+
+**Middleware Order (see PART 5 for canonical chain):**
+1. URL normalization
+2. Path security (traversal blocking)
+3. Security headers
+4. Allowlist check (set flag — bypasses blocklist/ratelimit/geoip, NOT auth)
+5. **Blocklist check** (reject before any processing)
+6. Rate limiting
+7. GeoIP country blocking
+8. Authentication
+9. Logging
+
+**API Endpoints:**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/config/network/blocklists` | GET | List all blocklist sources with stats |
+| `/api/{api_version}/server/{admin_path}/config/network/blocklists` | PATCH | Update blocklist settings (enabled, action, etc.) |
+| `/api/{api_version}/server/{admin_path}/config/network/blocklists/sources` | POST | Add new blocklist source |
+| `/api/{api_version}/server/{admin_path}/config/network/blocklists/sources/{name}` | PATCH | Update source (enable/disable, URL, format) |
+| `/api/{api_version}/server/{admin_path}/config/network/blocklists/sources/{name}` | DELETE | Remove blocklist source |
+| `/api/{api_version}/server/{admin_path}/config/network/blocklists/update` | POST | Trigger immediate update of all enabled sources |
+| `/api/{api_version}/server/{admin_path}/config/network/blocklists/update/{name}` | POST | Trigger update of specific source |
+| `/api/{api_version}/server/{admin_path}/config/network/blocklists/stats` | GET | Get aggregate blocklist statistics |
+| `/api/{api_version}/server/{admin_path}/config/network/blocklists/check/{ip}` | GET | Check if an IP is in any blocklist |
+
+**API Response Examples:**
+
+Response for `GET /api/{api_version}/server/{admin_path}/config/network/blocklists`:
+
+```json
+{
+  "enabled": true,
+  "action": "reject",
+  "auto_update": true,
+  "total_rules": 482731,
+  "blocked_today": 147,
+  "sources": [
+    {
+      "name": "level1",
+      "url": "https://www.iblocklist.com/lists/level1.gz",
+      "format": "auto",
+      "enabled": true,
+      "rule_count": 398211,
+      "last_updated": "2026-04-17T04:00:12Z",
+      "last_error": "",
+      "file_size": 2847291
+    },
+    {
+      "name": "spamhaus_drop",
+      "url": "https://www.spamhaus.org/drop/drop.txt",
+      "format": "cidr",
+      "enabled": true,
+      "rule_count": 84520,
+      "last_updated": "2026-04-17T04:00:15Z",
+      "last_error": "",
+      "file_size": 12481
+    }
+  ]
+}
+```
+
+Response for `GET /api/{api_version}/server/{admin_path}/config/network/blocklists/check/1.2.3.4`:
+
+```json
+{
+  "ip": "1.2.3.4",
+  "blocked": true,
+  "matched_lists": ["level1", "spamhaus_drop"],
+  "matched_range": "1.2.0.0/16"
+}
+```
+
+**Admin UI:**
+
+**Note:** Wireframe shows English for documentation. Actual UI renders ALL text via `t()` translation keys (see `admin.blocklists_page.*` in translation files). User sees their selected language.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Blocklists                                                     [Save All] │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│ ┌─ Status ──────────────────────────────────────────────────────────┐   │
+│ │ Blocklists:     [ON ▪ OFF]           Total rules: 482,731         │   │
+│ │ Auto-update:    [ON ▪ OFF]           Blocked today: 147           │   │
+│ │ Action:         [Reject ▼]           Last updated: 2 hours ago    │   │
+│ │                              [Update All Now]  [Check IP...]      │   │
+│ └───────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│ ┌─ Sources ─────────────────────────────────────────────────────────┐   │
+│ │                                                                    │   │
+│ │ ☑ level1                     398,211 rules    Updated 2 hours ago  │   │
+│ │   https://www.iblocklist.com/lists/level1.gz                       │   │
+│ │   Format: auto  Size: 2.7 megabytes             [Update] [Remove]  │   │
+│ │                                                                    │   │
+│ │ ☑ spamhaus_drop               84,520 rules    Updated 2 hours ago  │   │
+│ │   https://www.spamhaus.org/drop/drop.txt                           │   │
+│ │   Format: cidr  Size: 12 kilobytes              [Update] [Remove]  │   │
+│ │                                                                    │   │
+│ │ ☐ dshield                          0 rules    Never updated        │   │
+│ │   https://www.dshield.org/block.txt                                │   │
+│ │   Format: cidr  (disabled)                      [Update] [Remove]  │   │
+│ │                                                                    │   │
+│ └───────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│ ┌─ Add Source ──────────────────────────────────────────────────────┐   │
+│ │ Name: [_______________]  URL: [________________________________]  │   │
+│ │ Format: [Auto ▼]                                       [Add]      │   │
+│ └───────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│ ┌─ IP Check ───────────────────────────────────────────────────────┐   │
+│ │ IP: [_______________]  [Check]                                    │   │
+│ │ Result: 1.2.3.4 → Blocked (level1, spamhaus_drop) 1.2.0.0/16     │   │
+│ └───────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Admin UI Settings:**
+
+| Setting | Control | Default | Restart | Description |
+|---------|---------|---------|---------|-------------|
+| `blocklists.enabled` | Toggle | On | No | Master enable/disable |
+| `blocklists.auto_update` | Toggle | On | No | Auto-update on schedule |
+| `blocklists.action` | Dropdown | `reject` | No | `reject` or `drop` |
+| `blocklists.reject_message` | Text | (uses translated `errors.forbidden`) | No | Custom 403 message (overrides translation) |
+| `blocklists.log_blocked` | Toggle | On | No | Log blocked requests |
+| Sources list | Dynamic list | (see config) | No | Add/remove/enable/disable sources |
+| Total rules | Readonly | - | - | Aggregate rule count |
+| Blocked today | Readonly | - | - | Requests blocked in 24h |
+| `[Update All Now]` | Button | - | - | Trigger immediate update |
+| `[Check IP]` | Button + Text | - | - | Test if IP is blocked |
+
+**Update Behavior:**
+
+1. Download from URL (follow redirects, timeout 60s)
+2. If `.gz` extension or `Content-Encoding: gzip`, decompress
+3. Auto-detect format if `format: auto` (examine first non-comment line)
+4. Parse all entries into `Vec<IpNet>`
+5. Save raw file to `{data_dir}/security/blocklists/{name}.txt`
+6. Build radix tree and swap atomically via `ArcSwap` (no downtime during update)
+7. Update stats (rule_count, last_updated, file_size)
+8. Log result: `blocklist updated: {name} ({rule_count} rules, {duration})`
+
+**Error Handling:**
+
+| Error | Behavior |
+|-------|----------|
+| Download fails | Keep existing list, log error, retry per scheduler config |
+| Parse error (corrupt file) | Keep existing list, log error, set `last_error` |
+| Empty list after parse | Keep existing list, log warning (likely bad URL) |
+| Disk full | Log error, keep in-memory list |
+
+**Audit Events:**
+
+| Event | Description | Logged Data |
+|-------|-------------|-------------|
+| `blocklist.updated` | Blocklist source updated | name, rule_count, duration |
+| `blocklist.update_failed` | Update failed | name, error |
+| `blocklist.source_added` | New source added | name, url, added_by |
+| `blocklist.source_removed` | Source removed | name, removed_by |
+| `blocklist.enabled` | Blocklists enabled/disabled | enabled, changed_by |
+| `blocklist.ip_blocked` | Request blocked by blocklist | ip, path, matched_list, matched_range |
+
+**CLI Commands (via `{project_name}-cli --admin`; requires the optional client binary, PART 8 → Client):**
+
+```bash
+# Update all blocklists now
+{project_name}-cli --admin server blocklist update
+
+# Update specific source
+{project_name}-cli --admin server blocklist update --source level1
+
+# List sources with stats
+{project_name}-cli --admin server blocklist list
+
+# Check if an IP is blocked
+{project_name}-cli --admin server blocklist check 1.2.3.4
+
+# Add a new source
+{project_name}-cli --admin server blocklist add --name mylist --url https://example.com/list.gz
+
+# Remove a source
+{project_name}-cli --admin server blocklist remove --name mylist
+
+# Show aggregate stats
+{project_name}-cli --admin server blocklist stats
+```
+
+### Control Type Guidelines
+
+| When to use | Control |
+|-------------|---------|
+| Enable/disable feature | **Toggle** |
+| Yes/no with label | **Checkbox** |
+| Multiple options (2-5) | **Dropdown** |
+| Multiple options (5+) | **Searchable dropdown** |
+| Select multiple | **Checkbox group** or **Tags** |
+| Free text, short | **Text** |
+| Free text, long | **Textarea** |
+| Number with constraints | **Number** (with min/max) |
+| Secret value | **Password** |
+| Time period | **Duration** (number + unit dropdown) |
+| List of values | **Tags** |
+| File upload | **File** |
+| Read-only info | **Readonly** |
+| Trigger action | **Button** |
+
+### Log Viewer (`/server/{admin_path}/config/logs`)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Logs                                                                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  [Access ▼]  [Last 100 ▼]  [Search...        ]  [Auto-refresh: ON]     │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │ 2025-01-15 10:30:45  GET  /api/{api_version}/server/healthz 200  12ms  192.168.1.1│    │
+│  │ 2025-01-15 10:30:44  POST /api/{api_version}/data    201  45ms  192.168.1.2│    │
+│  │ 2025-01-15 10:30:43  GET  /server/healthz        200  2ms   192.168.1.1│    │
+│  │ 2025-01-15 10:30:42  GET  /api/{api_version}/users   401  5ms   10.0.0.50  │    │
+│  │ ...                                                              │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                                                                         │
+│  [< Prev]  Page 1 of 50  [Next >]           [Download] [Clear Logs]    │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Log Types
+
+| Log | Description |
+|-----|-------------|
+| Access | HTTP request logs |
+| Error | Application errors |
+| Audit | Security/admin events |
+| Security | Auth failures, blocked IPs |
+| Debug | Debug output (dev mode) |
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `g d` | Go to Dashboard |
+| `g s` | Go to Settings |
+| `g l` | Go to Logs |
+| `/` | Focus search |
+| `Esc` | Close modal/menu |
+| `Ctrl+S` | Save current form |
+| `?` | Show shortcuts help |
+
+## /server/{admin_path} Authentication Flow
+
+```
+User visits /server/{admin_path}
+       │
+       ▼
+Check for valid admin session
+       │
+       ├─► No session/expired
+       │   │
+       │   ▼
+       │   Show login form
+       │   │
+       │   ▼
+       │   User submits admin token
+       │   │
+       │   ▼
+       │   Constant-time compare against server.token
+       │   │
+       │   ├─► Invalid: Show error, log attempt
+       │   │
+       │   └─► Valid token
+       │       │
+       │       ▼
+       │       Check if 2FA enabled (TOTP or Passkey)
+       │       │
+       │       ├─► No 2FA: Create session, redirect to dashboard
+       │       │
+       │       └─► 2FA enabled
+       │           │
+       │           ▼
+       │           Show 2FA prompt (TOTP code or Passkey)
+       │           │
+       │           ├─► Invalid: Show error, allow retry
+       │           │
+       │           └─► Valid: Create session, redirect to dashboard
+       │
+       └─► Valid session
+           │
+           ▼
+           Show requested admin page
+```
+
+## Admin Session
+
+**The admin session is the ONLY web session — there are no other web-login accounts.**
+
+| Aspect | Admin Session |
+|--------|---------------|
+| Cookie name | `admin_session` |
+| Valid routes | `/server/{admin_path}/**` only |
+| Stored in | `server.db` (admin_sessions) |
+| Credential | Admin token (`server.token`, PART 11) |
+| Default duration | 30 days |
+| MFA | Optional (TOTP) |
+
+### Scheduler Management (Admin Panel)
+
+The admin panel MUST include a scheduler section with:
+
+| Feature | Description |
+|---------|-------------|
+| **Task List** | View all scheduled tasks with status |
+| **Next Run** | Show next scheduled run time for each task |
+| **Last Run** | Show last run time and result (success/failure) |
+| **Run History** | View history of past runs with timestamps |
+| **Manual Trigger** | Button to manually run any task |
+| **Enable/Disable** | Toggle tasks on/off |
+| **Edit Schedule** | Modify task frequency (cron-style or preset) |
+| **Task Details** | View task configuration and logs |
+
+**Preset Schedules:**
+- `hourly` - Every hour
+- `daily` - Once per day (configurable time)
+- `weekly` - Once per week (configurable day/time)
+- `monthly` - Once per month (configurable day/time)
+- `custom` - Cron expression
+
+## /api/{api_version}/server/{admin_path} (REST API)
+
+### Authentication
+
+`Authorization: Bearer {token}`
+
+**Whenever this PART is enabled, these admin API routes are available.**
+
+### Admin - Server (`/api/{api_version}/server/{admin_path}/config/`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/config/setup` | GET | Get setup status |
+| `/api/{api_version}/server/{admin_path}/config/setup/verify` | POST | Verify setup token |
+| `/api/{api_version}/server/{admin_path}/config/setup/account` | POST | Confirm admin account (Step 1) |
+| `/api/{api_version}/server/{admin_path}/config/setup/token` | POST | Generate API token (Step 2) |
+| `/api/{api_version}/server/{admin_path}/config/setup/config` | POST | Save server config (Step 3) |
+| `/api/{api_version}/server/{admin_path}/config/setup/security` | POST | Security settings (Step 4) |
+| `/api/{api_version}/server/{admin_path}/config/setup/services` | POST | Configure services (Step 5) |
+| `/api/{api_version}/server/{admin_path}/config/setup/complete` | POST | Complete setup wizard (Step 6) |
+| `/api/{api_version}/server/{admin_path}/config/settings` | GET | Get server settings |
+| `/api/{api_version}/server/{admin_path}/config/settings` | PATCH | Update server settings |
+| `/api/{api_version}/server/{admin_path}/config/status` | GET | Server status (detailed) |
+| `/api/{api_version}/server/{admin_path}/config/stats` | GET | Statistics |
+| `/api/{api_version}/server/{admin_path}/config/restart` | POST | Restart server |
+
+### Admin - System Users (`/api/{api_version}/server/{admin_path}/config/system-users/`)
+
+**Read-only view of the `system_users` table (PART 8). Accounts are managed by the operating system — this API never creates, modifies, or deletes system users.**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/config/system-users` | GET | List system users (username, uid, token status, last_used_at, rotated_at) |
+| `/api/{api_version}/server/{admin_path}/config/system-users/{username}` | GET | Get one system user's row (same read-only fields) |
+
+### Admin - Profile (`/api/{api_version}/server/{admin_path}/{admin_username}/profile/`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/{admin_username}/profile` | GET | Get admin profile |
+| `/api/{api_version}/server/{admin_path}/{admin_username}/profile` | PATCH | Update admin profile |
+| `/api/{api_version}/server/{admin_path}/{admin_username}/profile/token` | GET | Get current API token (masked) |
+| `/api/{api_version}/server/{admin_path}/{admin_username}/profile/token` | POST | Regenerate API token |
+| `/api/{api_version}/server/{admin_path}/{admin_username}/preferences` | GET | Get admin preferences (theme, notifications) |
+| `/api/{api_version}/server/{admin_path}/{admin_username}/preferences` | PATCH | Update admin preferences |
+
+### Admin - Branding (`/api/{api_version}/server/{admin_path}/config/branding/`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/config/branding` | GET | Get branding settings |
+| `/api/{api_version}/server/{admin_path}/config/branding` | PATCH | Update branding |
+
+### Admin - SSL (`/api/{api_version}/server/{admin_path}/config/ssl/`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/config/ssl` | GET | Get SSL settings |
+| `/api/{api_version}/server/{admin_path}/config/ssl` | PATCH | Update SSL settings |
+| `/api/{api_version}/server/{admin_path}/config/ssl/renew` | POST | Force certificate renewal |
+
+### Admin - Tor (`/api/{api_version}/server/{admin_path}/config/network/tor/`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/config/network/tor` | GET | Get Tor status |
+| `/api/{api_version}/server/{admin_path}/config/network/tor` | PATCH | Update Tor settings |
+| `/api/{api_version}/server/{admin_path}/config/network/tor/regenerate` | POST | Regenerate .onion address |
+| `/api/{api_version}/server/{admin_path}/config/network/tor/vanity` | GET | Get vanity generation status |
+| `/api/{api_version}/server/{admin_path}/config/network/tor/vanity` | POST | Start vanity generation |
+| `/api/{api_version}/server/{admin_path}/config/network/tor/vanity` | DELETE | Cancel vanity generation |
+| `/api/{api_version}/server/{admin_path}/config/network/tor/vanity/apply` | POST | Apply vanity address |
+| `/api/{api_version}/server/{admin_path}/config/network/tor/import` | POST | Import external keys |
+
+### Admin - Web (`/api/{api_version}/server/{admin_path}/config/web/`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/config/web` | GET | Get web settings |
+| `/api/{api_version}/server/{admin_path}/config/web` | PATCH | Update web settings |
+| `/api/{api_version}/server/{admin_path}/config/web/robots` | GET | Get robots.txt config |
+| `/api/{api_version}/server/{admin_path}/config/web/robots` | PATCH | Update robots.txt |
+| `/api/{api_version}/server/{admin_path}/config/web/robots/preview` | GET | Preview robots.txt |
+| `/api/{api_version}/server/{admin_path}/config/web/security` | GET | Get security.txt config |
+| `/api/{api_version}/server/{admin_path}/config/web/security` | PATCH | Update security.txt |
+| `/api/{api_version}/server/{admin_path}/config/web/security/preview` | GET | Preview security.txt |
+| `/api/{api_version}/server/{admin_path}/config/web/well-known` | GET | Get well-known namespace settings and supported entries |
+| `/api/{api_version}/server/{admin_path}/config/web/well-known` | PATCH | Update optional well-known entry settings |
+| `/api/{api_version}/server/{admin_path}/config/web/well-known/preview/{name}` | GET | Preview the exact rendered body for one well-known entry |
+
+**`/api/{api_version}/server/{admin_path}/config/web` includes `server.healthz.root.enabled` and well-known namespace status in its settings payload.**
+
+### Admin - Pages (`/api/{api_version}/server/{admin_path}/config/pages/`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/config/pages` | GET | Get all page settings |
+| `/api/{api_version}/server/{admin_path}/config/pages/about` | GET | Get about page content |
+| `/api/{api_version}/server/{admin_path}/config/pages/about` | PATCH | Update about page |
+| `/api/{api_version}/server/{admin_path}/config/pages/privacy` | GET | Get privacy policy |
+| `/api/{api_version}/server/{admin_path}/config/pages/privacy` | PATCH | Update privacy policy |
+| `/api/{api_version}/server/{admin_path}/config/pages/contact` | GET | Get contact page settings |
+| `/api/{api_version}/server/{admin_path}/config/pages/contact` | PATCH | Update contact page |
+| `/api/{api_version}/server/{admin_path}/config/pages/help` | GET | Get help page content |
+| `/api/{api_version}/server/{admin_path}/config/pages/help` | PATCH | Update help page |
+
+### Admin - Email (`/api/{api_version}/server/{admin_path}/config/email/`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/config/email` | GET | Get email settings |
+| `/api/{api_version}/server/{admin_path}/config/email` | PATCH | Update email settings |
+| `/api/{api_version}/server/{admin_path}/config/email/test` | POST | Send test email |
+| `/api/{api_version}/server/{admin_path}/config/email/templates` | GET | List email templates |
+| `/api/{api_version}/server/{admin_path}/config/email/templates/{name}` | GET | Get template |
+| `/api/{api_version}/server/{admin_path}/config/email/templates/{name}` | PUT | Update template |
+| `/api/{api_version}/server/{admin_path}/config/email/templates/{name}/reset` | POST | Reset to default |
+| `/api/{api_version}/server/{admin_path}/config/email/templates/{name}/preview` | POST | Preview template |
+
+### Admin - Scheduler (`/api/{api_version}/server/{admin_path}/config/scheduler/`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/config/scheduler` | GET | List scheduled tasks |
+| `/api/{api_version}/server/{admin_path}/config/scheduler/{id}` | GET | Get task details |
+| `/api/{api_version}/server/{admin_path}/config/scheduler/{id}` | PATCH | Update task |
+| `/api/{api_version}/server/{admin_path}/config/scheduler/{id}/run` | POST | Run task now |
+| `/api/{api_version}/server/{admin_path}/config/scheduler/{id}/enable` | POST | Enable task |
+| `/api/{api_version}/server/{admin_path}/config/scheduler/{id}/disable` | POST | Disable task |
+
+### Admin - Backup (`/api/{api_version}/server/{admin_path}/config/backup/`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/config/backup` | GET | List backups |
+| `/api/{api_version}/server/{admin_path}/config/backup` | POST | Create backup |
+| `/api/{api_version}/server/{admin_path}/config/backup/{id}` | GET | Get backup details |
+| `/api/{api_version}/server/{admin_path}/config/backup/{id}` | DELETE | Delete backup |
+| `/api/{api_version}/server/{admin_path}/config/backup/{id}/download` | GET | Download backup file |
+| `/api/{api_version}/server/{admin_path}/config/backup/restore` | POST | Restore from backup |
+
+### Admin - Logs (`/api/{api_version}/server/{admin_path}/config/logs/`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/config/logs` | GET | List log files |
+| `/api/{api_version}/server/{admin_path}/config/logs/{type}` | GET | Get log entries |
+| `/api/{api_version}/server/{admin_path}/config/logs/{type}/download` | GET | Download log file |
+
+## Agent Management (OPTIONAL - When Agent is Enabled)
+
+**Agent management routes are only available when the project includes an agent component.**
+
+**See PART 29 for full agent binary and setup details.**
+
+### Admin Panel (`/server/{admin_path}/config/agents`)
+
+**Main agent dashboard showing all registered agents:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  /server/{admin_path}/config/agents                                                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Connected Agents                                              [+ Add Agent] │
+│  ─────────────────────────────────────────────────────────────────────────  │
+│                                                                             │
+│  │ Name              │ Status    │ Connected     │ Last Seen    │ Health   │
+│  ├───────────────────┼───────────┼───────────────┼──────────────┼──────────│
+│  │ web-server-01     │ ● Online  │ 2 hours       │ Just now     │ ✓ Good   │
+│  │ web-server-02     │ ● Online  │ 2 hours       │ 5 seconds ago│ ✓ Good   │
+│  │ db-primary        │ ● Online  │ 5 days        │ 2 seconds ago│ ⚠ Warn   │
+│  │ db-replica        │ ○ Offline │ —             │ 3 days ago   │ ✗ Error  │
+│  │ cache-01          │ ● Online  │ 12 hours      │ 1 second ago │ ✓ Good   │
+│  └───────────────────┴───────────┴───────────────┴──────────────┴──────────┘
+│                                                                             │
+│  Summary: 4 online, 1 offline                                               │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Table Columns:**
+| Column | Description |
+|--------|-------------|
+| **Name** | Agent hostname (link to detail page) |
+| **Status** | ● Online / ○ Offline |
+| **Connected** | Duration since agent connected (or — if offline) |
+| **Last Seen** | Time since last heartbeat/report |
+| **Health** | ✓ Good / ⚠ Warn / ✗ Error (based on agent metrics) |
+
+### Admin Panel (`/server/{admin_path}/config/agents/{name}`)
+
+**Detailed view of a single agent:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  /server/{admin_path}/config/agents/web-server-01                         [← Back to List] │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  web-server-01                                             ● Online         │
+│  ───────────────────────────────────────────────────────────────────────    │
+│                                                                             │
+│  ┌─ System Info ─────────────────────────────────────────────────────────┐  │
+│  │                                                                       │  │
+│  │  Hostname:    web-server-01                                           │  │
+│  │  OS:          Linux (Ubuntu 22.04)                                    │  │
+│  │  Arch:        amd64                                                   │  │
+│  │  Agent Ver:   1.0.0                                                   │  │
+│  │  Uptime:      45 days, 3 hours                                        │  │
+│  │  Tags:        production, web-tier, us-east-1                         │  │
+│  │                                                                       │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌─ Connection ──────────────────────────────────────────────────────────┐  │
+│  │                                                                       │  │
+│  │  Status:      ● Connected                                             │  │
+│  │  Connected:   2 hours 15 minutes ago                                  │  │
+│  │  Last Report: Just now (every minute)                                 │  │
+│  │  IP Address:  192.168.1.100                                           │  │
+│  │                                                                       │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌─ System Metrics ──────────────────────────────────────────────────────┐  │
+│  │                                                                       │  │
+│  │  CPU:     ████████░░░░░░░░░░░░  42%                                   │  │
+│  │  Memory:  ██████████████░░░░░░  72% (5.8 gigabytes / 8 gigabytes)     │  │
+│  │  Disk:    ████████████░░░░░░░░  62% (124 gigabytes / 200 gigabytes)   │  │
+│  │  Network: ↓ 1.2 megabytes/s  ↑ 450 kilobytes/s                        │  │
+│  │  Load:    2.45 / 4.12 / 3.87                                          │  │
+│  │                                                                       │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌─ Actions ─────────────────────────────────────────────────────────────┐  │
+│  │                                                                       │  │
+│  │  [Refresh Now]  [View Logs]  [Edit Tags]  [Regenerate Token]          │  │
+│  │                                                                       │  │
+│  │  [Remove Agent]  ← Requires confirmation                              │  │
+│  │                                                                       │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Admin Panel (`/server/{admin_path}/config/agents/add`)
+
+**Simple agent registration page:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  /server/{admin_path}/config/agents/add                                   [← Back to List] │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Add New Agent                                                              │
+│  ───────────────────────────────────────────────────────────────────────    │
+│                                                                             │
+│  Agent Name (optional):                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                                                                     │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│  Leave blank to use hostname. Equivalent to: hostname -s                    │
+│                                                                             │
+│  Tags (optional):                                                           │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │ production, web-tier                                                │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│  Comma-separated. Used for filtering and grouping.                          │
+│                                                                             │
+│  Token Expiry:                                                              │
+│  ○ 1 hour                                                                   │
+│  ● 24 hours (recommended)                                                   │
+│  ○ 7 days                                                                   │
+│  ○ Never expires                                                            │
+│                                                                             │
+│  [Generate Agent Token]                                                     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+         ↓ (Token generated)
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ✅ Agent Token Generated                                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Run this command on the target machine:                                       │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │ curl -q -LSsf https://app.example.com/install-agent | sh -s -- \    │    │
+│  │   --server https://app.example.com \                                │    │
+│  │   --token adm_agt_abc123def456ghi789jkl012mno345pqr678              │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│  [Copy to Clipboard]                                                        │
+│                                                                             │
+│  Or manually:                                                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │ projectname-agent --server https://app.example.com \                │    │
+│  │   --token adm_agt_abc123def456ghi789jkl012mno345pqr678              │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│  [Copy to Clipboard]                                                        │
+│                                                                             │
+│  ⚠️  Token expires in 24 hours and can only be used once.                   │
+│                                                                             │
+│  [Done]                                                                     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Server generates the complete command string:**
+```rust
+fn generate_agent_connection_command(server_url: &str, token: &str) -> String {
+    format!("projectname-agent --server {} --token {}", server_url, token)
+}
+```
+
+**Agent Name Default:**
+```rust
+fn get_default_agent_name() -> String {
+    hostname::get()
+        .ok()
+        .and_then(|h| h.into_string().ok())
+        .map(|h| {
+            h.split('.').next().unwrap_or("unknown").to_string()
+        })
+        .unwrap_or_else(|| "unknown".to_string())
+}
+```
+
+### Agent Connection Notifications
+
+**When an agent connects, server WebUI shows real-time notification:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  🔔 Notification                                                      [×]   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ✅ web-server-01 has connected                                             │
+│  Agent is now sending data to server for admin scope                        │
+│                                                                             │
+│  [View Agent]  [Dismiss]                                                    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Notification content:**
+
+| Scope | Notification Message |
+|-------|---------------------|
+| Admin | "{name} has connected. Agent is now sending data to server for admin scope" |
+
+**Notification triggers:**
+- Agent first connection (registration complete)
+- Agent reconnection after disconnect
+- Agent status change (online/offline)
+
+### Admin Panel (`/server/{admin_path}/config/agents/remove`)
+
+**Agent removal page with confirmation:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  /server/{admin_path}/config/agents/remove                                [← Back to List] │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Remove Agent                                                               │
+│  ───────────────────────────────────────────────────────────────────────    │
+│                                                                             │
+│  Select agent to remove:                                                    │
+│                                                                             │
+│  ┌───────────────────┬───────────┬──────────────────────────────────────┐   │
+│  │ Name              │ Status    │ Last Seen                            │   │
+│  ├───────────────────┼───────────┼──────────────────────────────────────┤   │
+│  │ ○ web-server-01   │ ● Online  │ Just now                             │   │
+│  │ ○ web-server-02   │ ● Online  │ 5 seconds ago                        │   │
+│  │ ○ db-primary      │ ● Online  │ 2 seconds ago                        │   │
+│  │ ○ db-replica      │ ○ Offline │ 3 days ago                           │   │
+│  │ ○ cache-01        │ ● Online  │ 1 second ago                         │   │
+│  └───────────────────┴───────────┴──────────────────────────────────────┘   │
+│                                                                             │
+│  [Remove Selected]                                                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+         ↓ (Agent selected, click Remove)
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  ⚠️  Remove Agent                                                           │
+│                                                                             │
+│  Are you sure you want to remove agent "db-replica"?                        │
+│                                                                             │
+│  This will:                                                                 │
+│  • Revoke the agent's authentication token                                  │
+│  • Remove the agent from the dashboard                                      │
+│  • Delete all historical metrics for this agent                             │
+│                                                                             │
+│  The agent binary on the remote machine will NOT be uninstalled.               │
+│  You must manually run: projectname-agent --service --uninstall             │
+│                                                                             │
+│              [No, Cancel]        [Yes, Remove Agent]                        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Agents API
+
+**All agents belong to the admin scope.**
+
+| Scope | Base Route | Owner Token | Agent Token |
+|-------|------------|-------------|-------------|
+| Admin | `/api/{api_version}/server/{admin_path}/config/agents/` | `adm_` | `adm_agt_` |
+
+**Endpoints (replace `{base}` with the base route above):**
+
+| Endpoint | Method | Token | Description |
+|----------|--------|-------|-------------|
+| `{base}` | GET | Owner | List agents |
+| `{base}` | POST | Owner | Create agent token |
+| `{base}/{name}` | GET | Owner | Get agent details |
+| `{base}/{name}` | PATCH | Owner | Update agent (tags, name) |
+| `{base}/{name}` | DELETE | Owner | Remove agent |
+| `{base}/{name}/token` | POST | Owner | Regenerate agent token |
+| `{base}/{name}/metrics` | GET | Owner | Get agent metrics history |
+| `{base}/register` | POST | Agent | Agent self-registration (one-time) |
+| `{base}/heartbeat` | POST | Agent | Agent health check / keepalive |
+| `{base}/report` | POST | Agent | Submit collected data (project-specific) |
+
+**Token Access:**
+- Owner token (`adm_`): Full agent management (CRUD, view metrics)
+- Agent tokens (`adm_agt_`): Limited to register, heartbeat, report (own data only)
+
+**Example:**
+```
+# Admin agent (server infrastructure)
+POST /api/{api_version}/server/{admin_path}/config/agents/register
+Authorization: Bearer adm_agt_abc123...
+```
+
+**Agent Data Views (Project-Specific):**
+
+Agent data can be exposed via project-specific routes for different audiences:
+
+| Route | Description | Example |
+|-------|-------------|---------|
+| `/server/{admin_path}/config/agents/*` | Admin management UI | Full control |
+| `/{custom}/status` | Public status page | Status dashboard |
+
+Define project-specific data views in IDEA.md.
+
+### Agent Database Schema
+
+```sql
+-- agents table (admin scope)
+CREATE TABLE agents (
+    -- UUID
+    id TEXT PRIMARY KEY,
+    -- hostname or custom name
+    name TEXT NOT NULL,
+
+    -- Scope (always 'admin')
+    scope TEXT NOT NULL DEFAULT 'admin',
+    -- 'adm_agt_'
+    token_prefix TEXT NOT NULL,
+    -- SHA-256 hash of full token
+    token_hash TEXT NOT NULL,
+
+    -- System info (from agent)
+    hostname TEXT,
+    -- linux, windows, darwin
+    os TEXT,
+    -- amd64, arm64
+    arch TEXT,
+    -- Agent version
+    version TEXT,
+
+    -- Tags
+    -- JSON array: ["prod", "web"]
+    tags TEXT,
+
+    -- Connection tracking
+    -- pending, online, offline
+    status TEXT DEFAULT 'pending',
+    ip_address TEXT,
+    connected_at TIMESTAMP,
+    last_seen_at TIMESTAMP,
+
+    -- Metadata
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- Name unique within scope
+    UNIQUE(scope, name)
+);
+
+CREATE INDEX idx_agents_scope ON agents(scope);
+
+-- agent_metrics table (for historical data)
+CREATE TABLE agent_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+
+    -- Metrics
+    cpu_percent REAL,
+    memory_percent REAL,
+    memory_used_bytes INTEGER,
+    memory_total_bytes INTEGER,
+    disk_percent REAL,
+    disk_used_bytes INTEGER,
+    disk_total_bytes INTEGER,
+    network_rx_bytes INTEGER,
+    network_tx_bytes INTEGER,
+    load_1 REAL,
+    load_5 REAL,
+    load_15 REAL,
+
+    -- Custom metrics (JSON)
+    custom_metrics TEXT,
+
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_agent_metrics_agent_time ON agent_metrics(agent_id, recorded_at);
+```
+
+---
+
+# PART 29: CLIENT & AGENT (OPTIONAL - DISABLED BY DEFAULT; NON-NEGOTIABLE WHEN ENABLED)
+
+**This PART is DISABLED BY DEFAULT.** It applies ONLY when `IDEA.md` `## Business logic` explicitly enables agent support for `{project_name}` (the project genuinely needs remote agents per the "When Agent is Needed" decision material in this PART). When agent support is not enabled, this PART is inert: no agent subcommand, no agent API routes, no agent tokens, no agent database tables, and no `agent.yml` exist anywhere in the project. When agent support IS enabled, every rule in this PART is NON-NEGOTIABLE.
+
+**One binary:** in HYBRID projects the agent is NOT a separate binary. It is the same single binary (PART 0, PART 2) running in agent mode via the `{project_name} agent` subcommand, using the frozen `{internal_name}` for all on-disk and service identity (PART 3). A dedicated agent build exists only if `IDEA.md` explicitly declares one.
+
+**Admin panel gating:** the agent admin views in this PART exist only when the admin panel (PART 28) is ALSO enabled. Agent support itself does NOT require the admin panel — agents are fully manageable via the server CLI and API using admin-scope tokens.
+
+**Client extension gating:** the client subsections below (API token authentication, config file permissions for tokens, token revocation handling) are client-side companions to the per-system-user tokens in PART 8 and apply to any client build/mode, even if agent support is not enabled.
+
+## Client
+
+The client itself is fully specified in **PART 8 → "Client"** and is NOT restated here. PART 8 covers: overview (client is REQUIRED for all projects), binary naming rules, CLI open API access, CLI config file permissions, CLI auto-update (including flag-to-config save rules), modes and automatic mode detection, display environment detection, CLI/TUI/GUI theming, responsive layout, professional UI/UX standards, configuration (`cli.yml`), standard flags, commands, authentication, HTTP client identity, URL encoding, output formats, project-specific commands, build integration, TUI requirements, error handling and exit codes, `--version` extended output, and whether the project warrants a dedicated client build.
+
+The client subsections below add ONLY what PART 8 does not cover.
+
+## API Token Authentication
+
+**The client MUST support `--token` for API authentication using per-system-user `sys_` tokens (PART 8 → "Per-System-User Tokens").**
+
+| Flag | Description |
+|------|-------------|
+| `--token TOKEN` | API token for authentication |
+| `--token-file FILE` | Read token from file |
+
+**Token sources (priority order):**
+1. `--token` flag (explicit)
+2. `--token-file` flag (file path)
+3. Environment variable: `{PROJECT_NAME}_TOKEN`
+4. Config file: `cli.yml` → `auth.token: xxx`
+5. Token file: `{config_dir}/token` (Unix: `~/.config/{internal_org}/{internal_name}/token`, Windows: `%APPDATA%\{internal_org}\{internal_name}\token`)
+
+**Token format:** See PART 11 "API Token Security" for token format and validation.
+
+```rust
+use std::env;
+use std::fs;
+use std::path::PathBuf;
+
+pub fn get_token(flags: &Flags, cfg: &CliConfig, config_dir: &PathBuf) -> anyhow::Result<Option<String>> {
+    // 1. Explicit flag
+    if let Some(token) = &flags.token {
+        return Ok(Some(token.clone()));
+    }
+    // 2. Token file flag
+    if let Some(token_file) = &flags.token_file {
+        let data = fs::read_to_string(token_file)?;
+        return Ok(Some(data.trim().to_string()));
+    }
+    // 3. Environment variable
+    let env_key = format!("{}_TOKEN", PROJECT_NAME.to_uppercase());
+    if let Ok(token) = env::var(&env_key) {
+        if !token.is_empty() {
+            return Ok(Some(token));
+        }
+    }
+    // 4. Config file
+    if let Some(token) = &cfg.token {
+        if !token.is_empty() {
+            return Ok(Some(token.clone()));
+        }
+    }
+    // 5. Default token file
+    let token_path = config_dir.join("token");
+    if let Ok(data) = fs::read_to_string(&token_path) {
+        let token = data.trim().to_string();
+        if !token.is_empty() {
+            return Ok(Some(token));
+        }
+    }
+    // No token (anonymous access if allowed)
+    Ok(None)
+}
+```
+
+**Usage:**
+```bash
+# Explicit token
+{project_name}-cli --token "sys_abc123..." list
+
+# From environment
+export {PROJECT_NAME}_TOKEN="sys_abc123..."
+{project_name}-cli list
+
+# Store token (interactive login)
+{project_name}-cli login
+# Saves to {config_dir}/token (see platform-specific paths above)
+```
+
+## CLI Config File Permissions
+
+*Extends PART 8 → "CLI Config File Permissions" with the standalone `token` file and mandatory enforcement-on-read.*
+
+**`cli.yml` and the standalone `token` file both contain a bearer credential. They MUST be created with restrictive permissions and the binary MUST refuse to load them if the perms are too loose:**
+
+| Path | Required perms | Behavior on mismatch |
+|------|----------------|----------------------|
+| `~/.config/{internal_org}/{internal_name}/cli.yml` (Unix) | `0600` (`-rw-------`) | If world or group readable → log a warning to stderr and refuse to use the token; user must `chmod 0600` and retry |
+| `~/.config/{internal_org}/{internal_name}/token` (Unix) | `0600` | Same |
+| `%APPDATA%\{internal_org}\{internal_name}\cli.yml` (Windows) | ACL: only the running user (no `Everyone`, no `Users`) | Same warning + refusal |
+| `%APPDATA%\{internal_org}\{internal_name}\token` (Windows) | Same | Same |
+
+**The CLI's `login` command writes new files with the correct perms via `fs::write` + `fs::set_permissions(..., 0o600)` (defense in depth — Windows ignores the mode bit, ACL inheritance handles it). The check on read uses `fs::metadata()` and bails if `metadata.permissions().mode() & 0o077 != 0`.**
+
+## CLI Token Revocation Handling
+
+**When a user's API token is revoked server-side (admin clicked "Revoke" on the user's token, or the user logged out from another session), running CLI processes get `401 TOKEN_REVOKED` on their next request. The CLI's response MUST be graceful, not a crash:**
+
+| Scenario | CLI behavior |
+|----------|--------------|
+| Interactive (TUI) session | Show a modal: "Your session has been revoked. Please log in again." Block until user picks "Re-login" (drops to inline `{project_name}-cli login` prompt) or "Quit". Don't kill in-flight UI state — preserve any unsaved drafts in `{config_dir}/draft/`. |
+| Non-interactive (single-shot command, scripted use) | Print to stderr: `error: your API token has been revoked. Run '{project_name}-cli login' to re-authenticate.` Exit with code `4` (authentication error) per the CLI exit codes table in PART 8, so shell pipelines see the failure. |
+| Background watch / streaming (e.g., `{project_name}-cli watch`) | Stop the stream, print the same stderr message, exit with code `4`. Do NOT auto-retry — re-auth must be a deliberate user action to prevent prompt-loops on credentials. |
+
+**On `401 TOKEN_REVOKED`:** the CLI MUST also delete the cached token from `cli.yml` / `token` so the next invocation prompts for fresh credentials instead of replaying the dead token. Same behavior on `401 TOKEN_EXPIRED`.
+
+**No 3-channel propagation like agents:** CLI is short-lived and request-driven, so the simple "next request returns 401, CLI exits gracefully" pattern is sufficient. There's no long-poll/WebSocket channel to push a control message.
+
+## CLI Auto-Update
+
+Fully specified in **PART 8 → "CLI Auto-Update (Same Pattern as Server Self-Update)"** — check version via autodiscover, download from the server, verify SHA-256, atomic replace, re-exec (the same flow as the server self-update in PART 21). One addition when this PART is enabled: the agent uses the SAME self-update flow (see "Agent" below); `/api/autodiscover` returns agent version info alongside `cli_versions` and server info.
+
+## Flag-to-Config Save Rules
+
+See **PART 8 → "Flag-to-Config Save Rules"** — flags only update `cli.yml` when the current value is empty or invalid; otherwise they apply to the current invocation only. Those rules apply unchanged to `--server` and `--token`.
+
+## Agent (NON-NEGOTIABLE WHEN ENABLED)
+
+**Agent support is only needed for very specific project types.** Most projects do NOT need an agent. The decision material below is exactly what the `IDEA.md` `## Business logic` gate at the top of this PART encodes — enable agent support only when it answers YES.
+
+### When Agent is Needed vs Not Needed
+
+**Key Question: Does the server need to reach INTO remote machines to collect data or execute commands?**
+
+| Scenario | Agent Needed? | Why |
+|----------|---------------|-----|
+| Server collects CPU/RAM/disk from 50 machines | ✅ YES | Agent runs on each machine, pushes metrics |
+| Users upload files via web form | ❌ NO | User initiates, server receives |
+| API serves random quotes | ❌ NO | Server has all data locally |
+| Execute shell commands on remote servers | ✅ YES | Agent receives commands, executes locally |
+| CI/CD pipeline runner on build machines | ✅ YES | Agent pulls jobs, runs builds |
+| Pastebin with user submissions | ❌ NO | Pull-based, users push data |
+| Centralized log aggregation | ✅ YES | Agent tails local logs, ships to server |
+| Weather API (fetches from external sources) | ❌ NO | Server fetches, no machine access needed |
+| Backup orchestration across servers | ✅ YES | Agent runs backup commands locally |
+| Git hosting (Gitea, Forgejo) | ❌ NO | Users push/pull via git protocol |
+
+### Project Examples: Agent vs No Agent
+
+**Projects that DO need an agent:**
+
+| Project Type | Example Names | What Agent Does |
+|--------------|---------------|-----------------|
+| **System Monitoring** | Zabbix, Nagios, Beszel, Netdata | Collects CPU, RAM, disk, network stats from each machine |
+| **Remote Desktop/Shell** | MeshCentral, RustDesk, Teleport | Provides remote access tunnel from the machine |
+| **Log Management** | Fluentd, Filebeat, Vector, Loki | Tails log files, ships to central server |
+| **CI/CD Runners** | GitLab Runner, GitHub Actions Runner, Drone | Pulls jobs from server, executes builds |
+| **Backup Agents** | Restic, Borg, Velero, Bacula | Runs backup commands, ships data to server |
+| **Config Management** | Puppet Agent, Salt Minion, CFEngine | Pulls and applies configuration from server |
+| **Security Scanning** | OSSEC, Wazuh, Falco, Lynis | Monitors files, processes, runs audits |
+| **Container Orchestration** | Kubernetes Kubelet, Nomad Client | Runs containers as directed by control plane |
+| **Network Monitoring** | Prometheus Node Exporter, Telegraf | Exposes machine metrics for scraping |
+| **Update Management** | Landscape Client, WSUS Client | Checks for and applies updates |
+
+**Projects that do NOT need an agent:**
+
+| Project Type | Example Names | Why No Agent |
+|--------------|---------------|--------------|
+| **Content APIs** | Jokes API, Quotes API, Facts API | Data is on server, clients just fetch |
+| **Pastebin/URL Shortener** | Hastebin, YOURLS, Shlink | Users push content, server stores it |
+| **Git Hosting** | Gitea, Forgejo, GitLab | Git protocol handles push/pull |
+| **Image Hosting** | Immich, Photoprism, Piwigo | Users upload, server stores/serves |
+| **Chat/Forum** | Mattermost, Discourse, Flarum | Users connect via web/API |
+| **Wiki/Docs** | Wiki.js, BookStack, Outline | Users edit via web interface |
+| **File Sharing** | Nextcloud, Seafile, FileBrowser | Web/WebDAV uploads, no machine access |
+| **Media Server** | Jellyfin, Plex, Navidrome | Serves content from local storage |
+| **Auth/SSO** | Authentik, Authelia, Keycloak | Applications connect to auth server |
+| **Status Pages** | Uptime Kuma, Gatus, Cachet | Server checks endpoints (pull-based) |
+
+### Agent Architecture Decision Tree
+
+```
+Does your server need to:
+│
+├─► Collect data FROM remote machines (metrics, logs, files)?
+│   └─► YES → Agent needed (runs on each machine, pushes to server)
+│
+├─► Execute commands ON remote machines (shell, backup, updates)?
+│   └─► YES → Agent needed (receives commands from server)
+│
+├─► Run jobs/tasks ON remote machines (builds, scans)?
+│   └─► YES → Agent needed (pulls jobs, executes locally)
+│
+├─► Provide remote access TO machines (shell, desktop, file transfer)?
+│   └─► YES → Agent needed (establishes reverse tunnel)
+│
+└─► Just serve an API/web interface that clients call?
+    └─► NO agent - users/clients connect TO your server
+```
+
+### Agent vs Webhook/API Callback
+
+**Don't confuse agents with webhooks:**
+
+| Mechanism | Direction | Use Case |
+|-----------|-----------|----------|
+| **Agent** | Machine ↔ Server (persistent) | Continuous metrics, remote commands, bidirectional |
+| **Webhook** | External → Server (triggered) | Event notifications, CI triggers |
+| **API Poll** | Server → External (scheduled) | Weather data, external service status |
+
+**Agent = persistent daemon on remote machine communicating with central server**
+
+### Agent Communication Patterns (CRITICAL)
+
+**Agents can SEND, RECEIVE, or BOTH depending on the project type.**
+
+| Pattern | Direction | Description |
+|---------|-----------|-------------|
+| **Send Only** | Agent → Server | Agent pushes data to server (metrics, logs, status) |
+| **Receive Only** | Server → Agent | Agent receives commands/config from server |
+| **Bidirectional** | Agent ↔ Server | Agent both sends data AND receives commands |
+
+#### Send Only (Agent → Server)
+
+Agent collects local data and pushes to server. Server does NOT send commands back.
+
+| Project Type | Examples | What Agent Sends |
+|--------------|----------|------------------|
+| **Metrics Collection** | Beszel Agent, Telegraf, collectd | CPU, RAM, disk, network stats |
+| **Log Shipping** | Filebeat, Fluentd, Vector, Promtail | Log entries, parsed logs |
+| **Health Reporting** | Consul Agent (client mode), Serf | Node health, service status |
+| **Event Streaming** | Kafka producers, NATS publishers | Application events |
+| **Uptime Monitoring** | Uptime Kuma push mode, Healthchecks.io | Heartbeats, alive signals |
+
+**Characteristics:**
+- Simple, stateless agents
+- Server is passive receiver
+- Agent initiates all communication
+- No command execution on agent
+- Lower security risk (no remote code execution)
+
+#### Receive Only (Server → Agent)
+
+Agent receives configuration or commands from server. Agent does NOT push data back (or minimal status only).
+
+| Project Type | Examples | What Agent Receives |
+|--------------|----------|---------------------|
+| **Config Management (pull)** | Puppet Agent, CFEngine | Configuration manifests, policies |
+| **Update Distribution** | WSUS Client, Landscape Client | Package updates, patches |
+| **DNS Updates** | Dynamic DNS clients | Zone changes, record updates |
+| **Certificate Distribution** | Vault Agent, cert-manager | TLS certificates, secrets |
+| **Feature Flags** | LaunchDarkly SDK, Unleash | Flag states, targeting rules |
+
+**Characteristics:**
+- Agent polls server for changes
+- Server pushes config/commands
+- Minimal feedback (success/failure only)
+- Agent applies changes locally
+
+#### Bidirectional (Agent ↔ Server) - MOST COMMON
+
+Agent both sends data AND receives commands. Full two-way communication.
+
+| Project Type | Examples | Agent Sends | Agent Receives |
+|--------------|----------|-------------|----------------|
+| **CI/CD Runners** | Jenkins Agent, GitLab Runner, GitHub Actions Runner, Drone Runner, Buildkite Agent | Build logs, artifacts, test results, status | Job definitions, build commands, environment vars |
+| **Remote Management** | MeshCentral Agent, RustDesk, Teleport, Apache Guacamole | Screen capture, file data, command output | Mouse/keyboard input, file transfers, shell commands |
+| **Container Orchestration** | Kubernetes Kubelet, Nomad Client, Docker Swarm Agent | Pod status, resource usage, container logs | Pod specs, deployments, scaling commands |
+| **Backup Orchestration** | Veeam Agent, Commvault, Bacula File Daemon | Backup status, file metadata, transfer progress | Backup schedules, retention policies, restore commands |
+| **Security/SIEM** | Wazuh Agent, OSSEC, Velociraptor | Security events, file integrity, process info | Detection rules, response actions, hunt queries |
+| **Config Management (push)** | SaltStack Minion, Ansible (with callback) | Execution results, state reports | State definitions, ad-hoc commands |
+| **Edge Computing** | Azure IoT Edge, AWS Greengrass | Telemetry, processed data | Deployment manifests, ML models |
+| **Database Replication** | MySQL Replica, PostgreSQL Standby | Replication lag, health status | WAL segments, replication commands |
+
+**Characteristics:**
+- Persistent connection (WebSocket, gRPC, or long-poll)
+- Full command-and-control capability
+- Rich status reporting
+- Higher complexity and security considerations
+- Requires authentication and authorization
+
+### Communication Pattern Decision Matrix
+
+| If your agent needs to... | Pattern | Example |
+|---------------------------|---------|---------|
+| Only report metrics/logs | **Send Only** | Beszel, Filebeat |
+| Only receive config updates | **Receive Only** | Puppet, WSUS |
+| Report status AND execute commands | **Bidirectional** | Jenkins, MeshCentral |
+| Provide remote shell/desktop | **Bidirectional** | RustDesk, Teleport |
+| Run builds/jobs on demand | **Bidirectional** | GitLab Runner, Drone |
+| Execute backups on schedule from server | **Bidirectional** | Veeam, Bacula |
+| Only push heartbeats | **Send Only** | Healthchecks.io |
+| Apply configurations pulled from server | **Receive Only** | Puppet, CFEngine |
+| Both apply config AND report detailed state | **Bidirectional** | Salt, Ansible+callback |
+
+### Security Implications by Pattern
+
+| Pattern | Risk Level | Key Concerns |
+|---------|------------|--------------|
+| **Send Only** | Low | Data exfiltration, DoS via flood |
+| **Receive Only** | Medium | Malicious config, unauthorized updates |
+| **Bidirectional** | High | Remote code execution, lateral movement |
+
+**Bidirectional agents require:**
+- Strong authentication (mTLS, tokens)
+- Authorization (what commands can execute)
+- Audit logging (who did what)
+- Input validation (prevent injection)
+- Sandboxing where possible
+
+### Determining If YOUR Project Needs Agent
+
+Answer these questions for your specific project:
+
+1. **Where does the data originate?**
+   - On user devices → No agent (users submit data)
+   - On remote servers you manage → Agent likely needed
+
+2. **Who initiates the connection?**
+   - User/client initiates → No agent (standard API)
+   - Server needs to reach machines → Agent needed
+
+3. **What runs on remote machines?**
+   - Nothing (just users with browsers) → No agent
+   - Background daemon collecting/executing → Agent needed
+
+4. **Is it push or pull?**
+   - Server pulls from external APIs → No agent
+   - Machines push data to server → Agent needed
+
+### Project Types That Need Agent
+
+| Category | Examples | Agent Purpose |
+|----------|----------|---------------|
+| **Monitoring** | Zabbix, Nagios, Prometheus Node Exporter | Machine metrics, health checks |
+| **Remote Management** | MeshCentral, RustDesk, TeamViewer | Remote shell, desktop, file transfer |
+| **System Monitor** | Beszel, Netdata, Glances | Real-time system stats |
+| **Log Shipping** | Fluentd, Filebeat, Vector | Tail and forward logs |
+| **Backup** | Restic, Borg, Duplicati | Execute local backups |
+| **Config Management** | Puppet, Ansible (pull mode), Salt | Apply configurations |
+| **Security/Compliance** | OSSEC, Wazuh, Lynis | Security scanning, audit |
+
+### Agent Runs Directly on the System, NOT Container
+
+**Agents MUST run directly on the target system, not in containers.**
+
+| Deployment | Supported | Reason |
+|------------|-----------|--------|
+| Direct on system | ✅ Yes | Full system access, accurate metrics |
+| systemd service | ✅ Yes | Preferred for Linux |
+| Windows service | ✅ Yes | Preferred for Windows |
+| launchd daemon | ✅ Yes | Preferred for macOS |
+| Docker container | ❌ No | Limited system visibility |
+| Kubernetes pod | ❌ No | Cannot monitor system properly |
+
+### Overview
+
+| Attribute | Value |
+|-----------|-------|
+| Invocation | `{project_name} agent` (agent mode of the single binary) |
+| Service identity | `{internal_name}-agent` (frozen `{internal_name}`; see PART 3) |
+| Versioning | Same as the main application (one binary, one version) |
+| Build | Same single artifact (PART 6); agent modules compile in when agent support is enabled |
+| Config file | `{config_dir}/agent.yml` (same dir as server) |
+| Data directory | `{data_dir}/` (same as server) |
+| Database | `{data_dir}/db/agent.db` (if needed, same dir as server) |
+| Privileges | **Root/Admin required** (for full system access) |
+| Update mechanism | Same as client (self-update) |
+
+### Agent Structure (Same as Server)
+
+**Agent mode shares the same CLI structure, banner, and modes as server mode (minus setup token).**
+
+| Component | Server | Agent | Notes |
+|-----------|--------|-------|-------|
+| Startup banner | ✅ | ✅ | Responsive, terminal-aware |
+| Mode line | ✅ | ✅ | Shows production/development |
+| Debug flag | ✅ | ✅ | Enables verbose logging |
+| Service management | ✅ | ✅ | install/uninstall/start/stop |
+| Self-update | ✅ | ✅ | --update flag |
+| Setup token | ✅ | ❌ | Agent uses server-issued token |
+| WebUI | ✅ | ❌ | Agent is headless |
+
+### Agent Startup Banner
+
+```
+┌────────────────────────────────────────┐
+│  ███╗   ███╗ ██████╗ ███╗   ██╗        │
+│  ████╗ ████║██╔═══██╗████╗  ██║        │
+│  ██╔████╔██║██║   ██║██╔██╗ ██║        │
+│  ██║╚██╔╝██║██║   ██║██║╚██╗██║        │
+│  ██║ ╚═╝ ██║╚██████╔╝██║ ╚████║        │
+│  ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝        │
+│                                  AGENT │
+└────────────────────────────────────────┘
+
+🤖 monitor agent v1.0.0
+🔒 Running in mode: production
+
+📡 Server: https://monitor.example.com
+🏷️  Hostname: web-server-01
+🏷️  Tags: production, web-tier
+
+✅ Connected to server
+```
+
+**Compact banner (60-79 cols):**
+```
+🤖 monitor agent v1.0.0
+🔒 Mode: production
+📡 https://monitor.example.com
+🏷️  web-server-01
+✅ Connected
+```
+
+**Minimal banner (<60 cols):**
+```
+monitor agent 1.0.0
+web-server-01 → monitor.example.com
+Connected
+```
+
+**Plain banner (NO_COLOR / TERM=dumb):**
+```
+monitor agent v1.0.0
+Mode: production
+Server: https://monitor.example.com
+Hostname: web-server-01
+Tags: production, web-tier
+[OK] Connected to server
+```
+
+### Agent Flags
+
+**Same flag style as server binary, EXCEPT no `--port` or `--address` (agents don't serve web).**
+
+| Server Flag | Agent | Reason |
+|-------------|-------|--------|
+| `--port` | ❌ No | Agent doesn't serve HTTP |
+| `--address` | ❌ No | Agent doesn't listen for connections |
+| `--config` | ✅ Yes | Same config directory |
+| `--data` | ✅ Yes | Same data directory |
+| `--status` | ✅ Yes | Health check (exit 0=healthy, 1=unhealthy) |
+| `--service` | ✅ Yes | Service management |
+| `--update` | ✅ Yes | Self-update |
+
+```bash
+# Information
+# Show help
+--help, -h
+# Show version (same format as server)
+--version, -v
+# Print shell completions (auto-detect if SHELL omitted)
+--shell completions [SHELL]
+# Print shell init command (auto-detect if SHELL omitted)
+--shell init [SHELL]
+# Show status and health (exit 0=healthy, 1=unhealthy)
+--status
+
+# Configuration
+# Config directory (default: {config_dir})
+--config {path}
+# Data directory override
+--data {path}
+# Log directory override
+--log {path}
+
+# Connection (can also be set in agent.yml)
+# Server URL to connect to
+--server {url}
+# Authentication token (from server)
+--token {token}
+
+# Runtime
+# Force mode (auto-detected by default)
+--mode {production|development|debug}
+# Enable debug logging (verbosity/diagnostics only; independent of mode)
+--debug
+# Color output (default: auto, respects NO_COLOR)
+--color {auto|yes|no}
+# Language for output (default: auto, from LANG env)
+--lang {code}
+
+# Commands (subcommands like server)
+# Show agent status
+status
+# Test server connection
+test
+# Interactive registration with server
+register
+
+# Service management (same as server)
+--service {install|uninstall|start|stop|restart|status}
+
+# Updates (same as server/CLI)
+# Check for or perform self-update
+--update [check|yes]
+```
+
+### Agent --help Output
+
+```bash
+$ {project_name} agent --help
+{project_name} agent {project_version} - Agent for {project_name}
+
+Usage:
+  {project_name} agent [flags]
+  {project_name} agent [command]
+
+Commands:
+status                                - Show agent status
+test                                  - Test server connection
+register                              - Interactive registration
+
+Flags:
+-h, --help                             - Show help
+-v, --version                          - Show version
+--shell completions [SHELL]            - Print shell completions (auto-detect if SHELL omitted)
+--shell init [SHELL]                   - Print shell init command (auto-detect if SHELL omitted)
+--shell help                           - Show shell integration help
+
+--config DIR                           - Config directory
+--data DIR                             - Data directory
+--log DIR                              - Log directory
+--server URL                           - Server URL to connect to
+--token TOKEN                          - Authentication token
+
+--mode {production|development|debug}  - Application mode
+--debug                                - Enable debug mode
+--color {auto|yes|no}                  - Color output (default: auto)
+--lang CODE                            - Language for output (default: auto)
+--status                               - Show agent health
+
+--service CMD                          - Service management (install|uninstall|start|stop|restart)
+--update [CMD]                         - Check/perform self-update
+
+Shells: bash, zsh, fish, sh, dash, ksh, powershell, pwsh
+```
+
+### Agent Commands
+
+**Agent has subcommands similar to server:**
+
+```bash
+# Default: run agent (foreground)
+{project_name} agent
+
+# Status: show current agent status
+{project_name} agent status
+  Agent: monitor agent v1.0.0
+  Hostname: web-server-01
+  Server: https://monitor.example.com
+  Status: Connected (5m 32s)
+  Last Report: 2025-01-15 10:30:00
+  Next Report: 2025-01-15 10:31:00
+
+# Test: verify server connection
+{project_name} agent test
+  Testing connection to https://monitor.example.com...
+  ✅ Connection successful
+  ✅ Authentication valid
+  ✅ Agent registered
+
+# Connect: one-liner from server panel (preferred)
+{project_name} agent --server https://monitor.example.com --token agt_abc123def456...
+  Connecting to https://monitor.example.com...
+  ✅ Connection successful
+  ✅ Token validated
+  ✅ Agent registered as "web-server-01"
+
+  Config saved to: /etc/projectorg/projectname/agent.yml
+  Installing service...
+  ✅ Service installed and started
+
+  Agent is now sending data to the server.
+
+# Service management
+# Install as system service
+{project_name} agent --service --install
+# Start service
+{project_name} agent --service start
+# Stop service
+{project_name} agent --service stop
+# Show service status
+{project_name} agent --service status
+# Remove service
+{project_name} agent --service --uninstall
+```
+
+### Agent Setup Process
+
+**Agent setup is initiated from the SERVER side (admin panel when PART 28 is enabled; otherwise the server CLI/API), NOT via setup token:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    AGENT SETUP FLOW                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. Generate token (server admin panel)                     │
+│     └─→ Server generates complete command string            │
+│     └─→ Display one-liner with [Copy to Clipboard]          │
+│                                                             │
+│  2. On Target Machine (one command)                            │
+│     └─→ Paste and run the one-liner:                        │
+│         {project_name} agent --server {url} --token {token}  │
+│     └─→ Agent connects, registers, saves config             │
+│     └─→ Server shows notification: "{name} has connected"   │
+│                                                             │
+│  3. Agent auto-starts and sends data                        │
+│     └─→ Agent installs itself as service (if root)          │
+│     └─→ Begins sending data to server                       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Server generates the complete command:**
+```rust
+fn generate_agent_command(server_url: &str, token: &str) -> String {
+    format!("{} agent --server {} --token {}", PROJECT_NAME, server_url, token)
+}
+```
+
+### Agent Token Format
+
+**Agent tokens are machine-scoped. There is exactly one prefix:**
+
+| Token Prefix | Issued By | Route |
+|--------------|-----------|-------|
+| `agt_` | Server admin (PART 28 panel or server CLI/API) | `/api/{api_version}/server/{admin_path}/config/agents/*` |
+
+```rust
+use rand::Rng;
+
+pub fn generate_agent_token() -> String {
+    let random_part = generate_secure_random(32);
+    format!("agt_{}", random_part)
+}
+```
+
+### Agent Registration API
+
+**See PART 13 for full API structure.**
+
+**Endpoint:** `POST /api/{api_version}/server/{admin_path}/config/agents/register`
+
+**Request:**
+```json
+{
+  "token": "agt_abc123def456ghi789jkl012mno345pqr678",
+  "hostname": "web-server-01",
+  "os": "linux",
+  "arch": "amd64",
+  "version": "1.0.0",
+  "tags": ["production", "web-tier"]
+}
+```
+
+**Response (success):**
+```json
+{
+  "ok": true,
+  "data": {
+    "agent_id": "uuid-here",
+    "name": "web-server-01",
+    "server_time": "2025-01-15T10:00:00Z"
+  }
+}
+```
+
+**Response (error):**
+```json
+{
+  "ok": false,
+  "error": "TOKEN_INVALID",
+  "message": "Agent token is invalid or expired"
+}
+```
+
+### Agent Admin Views (Only When PART 28 Is Enabled)
+
+**These views exist ONLY when the admin panel (PART 28) is enabled. Agent support does NOT require them.**
+
+| View | Contents |
+|------|----------|
+| Agents list | Name, hostname, OS/arch, version, tags, last report time, connection status |
+| Agent detail | Full identity/labels, health history, recent reports, assigned work (project-specific) |
+| Token generation | Generated connect one-liner with [Copy to Clipboard] |
+| Actions | Revoke token, remove agent, regenerate one-liner |
+
+**When PART 28 is NOT enabled:** the same operations are performed via the client admin commands (`{project_name}-cli --admin agents ...`) and the agent API routes in this PART using admin tokens. Agents are machine-scoped; they are visible in the server admin panel when PART 28 is enabled.
+
+### agent.yml Configuration
+
+**EVERYTHING must be configurable via agent.yml. Sane defaults match server where applicable.**
+
+**File: `{config_dir}/agent.yml`** (same directory as server.yml)
+
+```yaml
+# /etc/{internal_org}/{internal_name}/agent.yml (root)
+# ~/.config/{internal_org}/{internal_name}/agent.yml (user)
+# Agent configuration - ALL options with defaults
+
+# Language for agent output and API requests
+# auto = detect from env, or "en", "es", etc.
+lang: auto
+
+# Server connection
+server:
+  # Server URL (required, set during registration)
+  primary: ""
+  # API version prefix (default: v1, must match server)
+  api_version: v1
+  # Admin path (default: admin, must match server)
+  admin_path: admin
+  # Request timeout (match server default)
+  timeout: 30s
+  # Retry attempts on failure
+  retry: 3
+  # Delay between retries
+  retry_delay: 5s
+  # Delay before reconnect attempt
+  reconnect_delay: 10s
+
+# Authentication
+auth:
+  # Agent token (agt_xxx, see PART 11)
+  token: ""
+  # Read token from file instead
+  token_file: ""
+
+# Agent identity
+identity:
+  # Hostname (auto-detect if empty)
+  hostname: ""
+  # Friendly name (defaults to hostname)
+  display_name: ""
+  # Tags for grouping ["production", "web-tier"]
+  tags: []
+  # Key-value labels {environment: prod, tier: web}
+  labels: {}
+
+# Data collection (project-specific)
+collection:
+  # Enable data collection
+  enabled: true
+  # Collection interval
+  interval: 60s
+  # Max items per batch
+  batch_size: 100
+  # Max buffered items if offline
+  buffer_size: 1000
+
+# Logging
+logging:
+  # debug, info, warn, error (match server default)
+  level: info
+  # Log file path (empty = {log_dir}/agent.log)
+  file: ""
+  # Max log file size (match server default)
+  max_size: 10MB
+  # Max log files to keep (match server default)
+  max_files: 5
+
+# Health reporting
+health:
+  # Report agent health to server
+  enabled: true
+  # Health check interval
+  interval: 30s
+
+# Debug
+# Enable debug mode (same as --debug)
+debug: false
+
+# Mode (auto-detected, can override)
+# production, development, debug (empty = auto-detect; debug is never auto-detected — explicit opt-in only)
+mode: ""
+```
+
+**Config precedence (highest to lowest):**
+
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 | CLI flag | `--server https://...` |
+| 2 | Environment variable | `{PROJECT_NAME}_AGENT_SERVER=https://...` |
+| 3 | Config file | `server.primary: https://...` |
+| 4 | Compiled default | (none for server, must be configured) |
+
+**Environment variable mapping:**
+```bash
+# Pattern: {PROJECT_NAME}_AGENT_{KEY} or {PROJECT_NAME}_{KEY}
+{PROJECT_NAME}_AGENT_SERVER_PRIMARY="https://example.com"
+{PROJECT_NAME}_AGENT_TOKEN="agt_abc123..."
+{PROJECT_NAME}_AGENT_HOSTNAME="web-server-01"
+{PROJECT_NAME}_AGENT_COLLECTION_INTERVAL=30
+{PROJECT_NAME}_DEBUG=true
+```
+
+### Agent Reconnect
+
+**There is exactly one server. If the connection to `server.primary` fails, the agent retries the SAME URL per the retry config in `agent.yml` (`retry`, `retry_delay`, `reconnect_delay`). Autodiscover is kept for server/version info only — it never supplies alternate URLs.**
+
+**Agent Startup Sequence:**
+```
+1. Load agent.yml
+2. Connect to server.primary (retry per retry config on failure)
+3. Once connected → GET /api/autodiscover (server/version info)
+4. Begin normal operation
+```
+
+### Shared Directories with Server
+
+**Agent uses the SAME directory structure as server:**
+
+| Directory | Path | Shared With |
+|-----------|------|-------------|
+| Config | `{config_dir}/` | Server (agent.yml alongside server.yml) |
+| Data | `{data_dir}/` | Server |
+| Database | `{data_dir}/db/agent.db` | Server uses `server.db` in same dir |
+| Logs | `{log_dir}/agent.log` | Server uses `server.log` in same dir |
+| Cache | `{cache_dir}/` | Server |
+
+**Same privilege escalation as server (see PART 4)** - agent requires root/admin for full system access.
+
+### Agent vs Client vs Server
+
+| Aspect | Server | Client | Agent |
+|--------|--------|------------|-------|
+| **Runs as** | Service/daemon | Interactive/one-shot | Service/daemon |
+| **Purpose** | Serve API, WebUI | User interaction | Data collection |
+| **Initiated by** | System startup | User | System startup |
+| **Connection** | Listens for connections | Connects to server | Connects to server |
+| **Lifetime** | Long-running | Short-lived | Long-running |
+| **User interaction** | WebUI, API | Terminal, TUI | None (headless) |
+| **Updates** | Manual or scheduled | Self-update (same flow as server/agent) | Auto or server-pushed |
+
+### Execution Context
+
+**Client and Agent run in fundamentally different execution contexts:**
+
+| Aspect | Client | Agent |
+|--------|------------|-------|
+| **Execution context** | User-scope context | System context |
+| **Runs as** | Invoking user account (may be root/admin, but still user-scope) | root/Administrator |
+| **Config base path** | `~/` (user home) | `/` (system root) |
+| **Config directory** | `~/.config/{internal_org}/{internal_name}/` | `/etc/{internal_org}/{internal_name}/` |
+| **Data directory** | `~/.local/share/{internal_org}/{internal_name}/` | `/var/lib/{internal_org}/{internal_name}/` |
+| **Log directory** | `~/.local/log/{internal_org}/{internal_name}/` | `/var/log/{internal_org}/{internal_name}/` |
+| **Cache directory** | `~/.cache/{internal_org}/{internal_name}/` | `/var/cache/{internal_org}/{internal_name}/` |
+| **Privilege requirement** | No escalation required | Elevated (root/admin) |
+| **System access** | User-scope files/dirs only | Full system access |
+
+**Why Different Contexts?**
+
+| Component | Context | Reason |
+|-----------|---------|--------|
+| **Client** | User (`~/`) | User tool - accesses user's files, runs with user permissions, stores user-specific settings |
+| **Agent** | System (`/`) | System daemon - needs root for system metrics, hardware access, service management |
+
+**Path Examples:**
+
+```bash
+# Client (user context - runs as "alice")
+# Alice's config
+~/.config/{internal_org}/{internal_name}/cli.yml
+# Alice's data
+~/.local/share/{internal_org}/{internal_name}/
+# Alice's logs
+~/.local/log/{internal_org}/{internal_name}/cli.log
+
+# Agent (system context - runs as root)
+# System config
+/etc/{internal_org}/{internal_name}/agent.yml
+# System data
+/var/lib/{internal_org}/{internal_name}/
+# System logs
+/var/log/{internal_org}/{internal_name}/agent.log
+```
+
+**Platform-Specific Paths:**
+
+| Platform | Client Config | Agent Config |
+|----------|-------------------|--------------|
+| **Linux** | `~/.config/{internal_org}/{internal_name}/` | `/etc/{internal_org}/{internal_name}/` |
+| **macOS** | `~/.config/{internal_org}/{internal_name}/` | `/Library/Application Support/{internal_org}/{internal_name}/` |
+| **Windows** | `%APPDATA%\{internal_org}\{internal_name}\` | `%PROGRAMDATA%\{internal_org}\{internal_name}\` |
+| **FreeBSD** | `~/.config/{internal_org}/{internal_name}/` | `/usr/local/etc/{internal_org}/{internal_name}/` |
+
+### Purpose Matching
+
+**Client and Agent are companion surfaces designed FOR the Server. They match the server's intent, purpose, and functionality.**
+
+All three surfaces are built into the SAME binary and work together as a system:
+
+```
+┌───────────────────────────────────────────────────────────────────────────┐
+│                          PROJECT BINARY ECOSYSTEM                          │
+├───────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  ┌─────────────────────┐                                                   │
+│  │       SERVER        │  Central server - serves API, WebUI, manages data│
+│  │    {project_name}    │  Runs as service/daemon                           │
+│  └──────────┬──────────┘                                                   │
+│             │                                                              │
+│             │ API                                                          │
+│             │                                                              │
+│       ┌─────┴─────┐                                                        │
+│       │           │                                                        │
+│       ▼           ▼                                                        │
+│  ┌─────────────────────┐     ┌─────────────────────────┐                   │
+│  │ {project_name} CLIENT │     │         AGENT           │                   │
+│  │  {project_name}-cli  │     │  {project_name} agent    │                   │
+│  └─────────────────────┘     └─────────────────────────┘                   │
+│                                                                            │
+│  {project_name} CLIENT:                AGENT:                                   │
+│  • Full remote admin              • Purpose-specific daemon                │
+│  • TUI/CLI/GUI modes              • Headless, no admin                     │
+│  • User context (~/)              • System context (/)                     │
+│  • --admin* flags                 • No --admin* flags                      │
+│                                                                            │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+**Real-World Examples:**
+
+| Product | Server | Client | Agent |
+|---------|--------|------------|-------|
+| **Jenkins** | Jenkins Server (WebUI, job management) | Jenkins CLI (remote admin) | Jenkins Agent (executes builds on nodes) |
+| **Portainer** | Portainer Server (container management UI) | - | Portainer Agent (runs on Docker hosts) |
+| **Beszel** | Beszel Hub (monitoring dashboard) | - | Beszel Agent (collects machine metrics) |
+| **Zabbix** | Zabbix Server (monitoring, alerting) | zabbix_get (query agents) | Zabbix Agent (host monitoring) |
+| **Netdata** | Netdata Parent (aggregates metrics) | netdatacli (local control) | Netdata Child (streams to parent) |
+| **Prometheus** | Prometheus Server (scrapes, stores, alerts) | promtool (config validation) | Node Exporter (exposes machine metrics) |
+| **ManageEngine** | ManageEngine Server (IT management) | CLI tools | Desktop Central Agent (endpoint management) |
+| **Proxmox** | Proxmox VE (virtualization management) | pvesh (API access) | qemu-guest-agent (VM guest agent) |
+| **Kubernetes** | kube-apiserver (control plane) | kubectl (admin CLI) | kubelet (runs pods on nodes) |
+| **Salt** | Salt Master (configuration management) | salt (command execution) | Salt Minion (applies configs on nodes) |
+| **Ansible AWX** | AWX Server (automation platform) | awx-cli (tower-cli) | - (agentless, but receptor for mesh) |
+
+**The Pattern:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  SERVER: Central control, WebUI, data storage, orchestration           │
+│  └─► Portainer, Zabbix Server, Jenkins, Proxmox VE, K8s API Server      │
+├─────────────────────────────────────────────────────────────────────────┤
+│  CLIENT: Full remote administration, scripting, automation │
+│  └─► kubectl, pvesh, salt, zabbix_get, jenkins-cli                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│  AGENT: Runs on managed hosts, reports to server, executes tasks         │
+│  └─► Portainer Agent, Zabbix Agent, Jenkins Agent, kubelet, Salt Minion │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Component Responsibilities:**
+
+| Component | Purpose | Admin Capabilities | Modes |
+|-----------|---------|-------------------|-------|
+| **Server** | Central server | N/A (IS the admin) | Daemon/service |
+| **Client** | Full remote administration | ✅ `--admin*` flags, full server control | TUI, CLI, GUI |
+| **Agent** | Purpose-specific work | ❌ No admin flags | Daemon/service (headless) |
+
+### Agent Shares Server Structure
+
+**Agent has many of the same flags and startup procedures as Server, but in agent context.**
+
+The Agent is essentially the Server's "little sibling" - same professional structure, similar startup sequence, but connecting TO a server instead of BEING the server.
+
+**For detailed flag documentation, see:**
+- **"Agent Flags"** - Complete flag list and comparison
+- **"Agent Startup Banner"** - Banner examples for all screen sizes
+- **"Agent Commands"** - Subcommands and usage
+
+**Key Differences (Server vs Agent):**
+
+| Aspect | Server | Agent |
+|--------|--------|-------|
+| **Listens for connections** | ✅ Yes (`--port`, `--address`) | ❌ No |
+| **Connects to parent server** | ❌ No (IS the server) | ✅ Yes (`--server`, `--token`) |
+| **Setup** | ✅ Web-based (token entered at `/server/{admin_path}/config/setup`) | ❌ No (registers with server via connection string) |
+| **Admin operations** | N/A (IS the server) | ❌ No (Client's job) |
+| **WebUI** | ✅ Yes | ❌ No (headless) |
+| **Database** | ✅ `server.db` | ✅ `agent.db` (if needed) |
+
+**Startup Sequence Comparison:**
+
+```
+SERVER STARTUP                          AGENT STARTUP
+─────────────────                       ─────────────────
+1. Parse flags                          1. Parse flags
+2. Load config                          2. Load config
+3. Detect mode (prod/dev)               3. Detect mode (prod/dev)
+4. Show banner                          4. Show banner
+5. Initialize logging                   5. Initialize logging
+6. Connect to database                  6. Connect to SERVER ← different
+7. Start HTTP server                    7. Start reporter/collector ← different
+8. Listen for connections               8. Begin agent tasks ← different
+```
+
+### Client = Full Server Access
+
+**The Client is a COMPLETE interface to the server. It can do EVERYTHING the server offers.**
+
+| Client Capability | Description |
+|-----------------------|-------------|
+| **All user operations** | Everything a logged-in user can do |
+| **All admin operations** | `--admin*` flags for server administration |
+| **TUI mode** | Interactive terminal UI |
+| **CLI mode** | Scriptable command-line |
+| **GUI mode** | Native graphical interface (if available) |
+
+**Admin flags (Client only):**
+```bash
+# List all agents
+{project_name}-cli --admin agents list
+# Revoke an agent token
+{project_name}-cli --admin agents revoke ...
+# Server status
+{project_name}-cli --admin server status
+# View/edit config
+{project_name}-cli --admin server config
+# Create backup
+{project_name}-cli --admin backup create
+```
+
+### Agent = Purpose-Specific Worker
+
+**The Agent does ONE thing: its designated job. No admin, no user operations, no TUI.**
+
+| Agent Does | Agent Does NOT |
+|------------|----------------|
+| Connect to server | Admin operations |
+| Authenticate with agent token | User operations |
+| Perform its designated function | Interactive modes (TUI/GUI) |
+| Report status/data to server | Server configuration |
+| Execute server-assigned tasks | Anything outside its scope |
+
+**Example by project type:**
+
+| Project Type | Agent Purpose |
+|--------------|---------------|
+| **Monitoring** | Collect machine metrics (CPU, RAM, disk), send to server |
+| **CI/CD** | Pull jobs from server, execute builds, report results |
+| **Log aggregation** | Tail local logs, ship to server |
+| **Backup** | Execute backup commands, upload to server |
+| **Remote management** | Provide reverse tunnel for remote access |
+
+### Same Codebase, Same Project
+
+**Server, client, and agent surfaces are built from the same source tree into the single binary:**
+
+```
+src/
+├── common/           # Shared code used by server, client, and agent
+│   ├── banner/       # Startup banner (responsive, terminal-aware)
+│   ├── config/       # Configuration loading/parsing
+│   ├── display/      # Display environment detection
+│   ├── terminal/     # Terminal size/capabilities
+│   ├── theme/        # Color palette (dark/light/auto)
+│   ├── version/      # Version info (shared across all binaries)
+│   └── ...           # Other shared packages as needed
+├── server/           # Server-specific code
+├── client/           # Client-specific code (TUI, GUI, admin commands)
+└── agent/            # Agent-specific code (collectors, reporters)
+```
+
+| Aspect | Description |
+|--------|-------------|
+| **Same codebase** | All three built from `src/` |
+| **Same release** | `make build` produces the single artifact embedding all surfaces |
+| **Shared packages** | `src/common/` used by server, client, and agent |
+| **Same API** | Client and Agent use server's API |
+| **Same models** | Shared data structures across all components |
+
+### Agent Directory Structure
+
+**Source Code:**
+```
+src/
+├── server/               # Server-specific code
+├── client/               # CLI-specific code (if present)
+└── agent/                # Agent-specific code
+    ├── collectors/       # Data collectors
+    │   ├── mod.rs
+    │   ├── cpu.rs
+    │   ├── memory.rs
+    │   ├── disk.rs
+    │   └── network.rs
+    ├── reporters/        # Server reporting
+    │   └── mod.rs
+    ├── service/          # OS service management
+    │   ├── mod.rs
+    │   ├── linux.rs
+    │   ├── windows.rs
+    │   └── darwin.rs
+    └── updater/          # Self-update logic
+        └── mod.rs
+```
+
+### Build Output
+
+**There is no separate agent binary by default.** The single release artifact per platform (PART 6) embeds the server, client, and agent surfaces; agent mode is activated with the `{project_name} agent` subcommand. If `IDEA.md` explicitly declares a dedicated agent build, it follows the client-build naming pattern (`{project_name}-agent-{os}-{arch}`) and is produced by the same `make build`.
+
+**See PART 6 (Makefile) for full build details.**
+
+---
+
+# PART 30: CHECKLISTS
 
 ## Bootstrap Checklist
 
@@ -36656,7 +43974,7 @@ Tor Hidden Service: Connected
 - [ ] Web frontend templates, static CSS/JS, and locale files live under `src/` and are embedded via `rust-embed` / `include_str!` — no on-disk asset directory shipped alongside the binary
 - [ ] Database schema/migration files (if any) are embedded in the binary — no separate `.sql` files required at runtime
 - [ ] No source files in any language other than Rust contribute to the binary (small Docker shell helpers excepted)
-- [ ] `deny.toml` exists at project root with the spec's default allowlist / denylist (PART 24 → "License Compliance")
+- [ ] `deny.toml` exists at project root with the spec's default allowlist / denylist (PART 25 → "License Compliance")
 - [ ] `about.toml` and `about.hbs` exist at project root and `cargo-about` produces the third-party attribution section
 - [ ] `cargo-deny`, `cargo-about`, and `cargo-cyclonedx` are pre-installed in the Docker image
 - [ ] `Cargo.toml` for every workspace member sets `[package].license`, `authors`, `repository`, `description`
@@ -36672,7 +43990,7 @@ Tor Hidden Service: Connected
 - [ ] All server-side assets (web frontend templates, static CSS/JS, locale files, default config, schemas, default database migrations) are embedded at compile time
 - [ ] Dependencies are pure Rust where a viable pure-Rust crate exists (PART 6 → "Pure-Rust Library Stack"); each `*-sys` crate is justified in IDEA.md and statically linked
 - [ ] `cargo tree` was reviewed — no surprise transitive `*-sys` dependencies
-- [ ] No GPL / AGPL / LGPL / SSPL / BUSL / source-available dep was added without an IDEA.md `## License exceptions` entry and an updated `distribution_license` (PART 24 → "License Compliance")
+- [ ] No GPL / AGPL / LGPL / SSPL / BUSL / source-available dep was added without an IDEA.md `## License exceptions` entry and an updated `distribution_license` (PART 25 → "License Compliance")
 - [ ] User-visible licenses surface exists: CLI `--licenses`, web frontend "About → Open Source Licenses" page — both read the same embedded `LICENSE.md`
 - [ ] Server runs end-to-end from the binary alone on an air-gapped machine — no first-run downloads except opt-in updates/GeoIP/Let's Encrypt
 - [ ] No plugin or runtime extension loading from disk unless IDEA.md defines a hardened plugin contract
@@ -36682,6 +44000,13 @@ Tor Hidden Service: Connected
 - [ ] Database migrations run automatically on startup using `CREATE TABLE IF NOT EXISTS` (or equivalent) and were tested against a fresh database and an already-migrated database
 - [ ] Global `server.token` authentication is enforced on every protected server route and was verified with a request that omits/misuses the token (expect 401/403)
 - [ ] The project is never described as an "API server" anywhere — code comments, docs, CLI help text, startup banners, and health output all say "server"
+- [ ] Optional server features (PARTs 28–29) are implemented ONLY when IDEA.md enables them — verified by requesting a disabled feature's routes (expect 404, not 401/403) and checking its tables do not exist
+- [ ] If server admin is enabled: admin user and admin routes are both active (one switch), the main server admin account is provisioned via the token-based setup wizard, and the admin token authenticates as that account (PART 28)
+- [ ] If agent support is enabled: agent routes/tokens follow PART 29; agent admin views exist only when server admin is also enabled
+- [ ] Every running instance registers on the per-user broker socket; the web instance switcher lists and attaches to the authenticated system user's instances only (PARTs 4, 15)
+- [ ] Per-system-user tokens: generated on first run, stored hash-only in `system_users`, rotation works via both web settings and `{project_name} token rotate`, and every socket operation is kernel peer-credential verified (PARTs 4, 8)
+- [ ] System service mode: the root-started service is the only TCP listener (single/dual port per PART 14); per-user instances bind no TCP ports in this mode and are reached only via their socket registries (PART 4 → "System Service Mode")
+- [ ] System service mode: a request with user A's `sys_` token can never reach user B's instances — verified with two system users and forged/blank tokens (expect 401/403, never cross-user routing)
 - [ ] Web frontend and REST/GraphQL API are served from the same binary and the same port — no separate frontend deployment
 - [ ] If a GUI surface is in scope, both X11 and Wayland backends are supported and runtime-selected — neither X11-only nor Wayland-only is acceptable (PART 0 → "X11 AND Wayland Are Both Required")
 
@@ -36695,7 +44020,7 @@ All gates run inside the project Docker image — never on the host.
 - [ ] `cargo doc --workspace --no-deps` (Docker-wrapped)
 - [ ] `cargo deny check licenses advisories bans sources` passes (Docker-wrapped)
 - [ ] `cargo about generate` output matches the generated region of `LICENSE.md` (Docker-wrapped diff check)
-- [ ] `make i18n-validate` passes with zero errors (if i18n is in scope — PART 25)
+- [ ] `make i18n-validate` passes with zero errors (if i18n is in scope — PART 26)
 - [ ] Web frontend assets are embedded in the release binary — verified by running the release build with the source `assets/`/`src/server/frontend/` tree removed or renamed and confirming the frontend still renders
 - [ ] New behavior includes tests where practical
 - [ ] If a GUI surface is in scope: smoke test exercised under both X11 and Wayland forwarding, and the documented X11 (Xorg/XWayland) and Wayland forwarding sample commands both work against a real session (PART 6 → "X11 and Wayland Forwarding")
@@ -36740,7 +44065,7 @@ All gates run inside the project Docker image — never on the host.
 - requested behavior contradicts documented product scope in IDEA.md
 - a proposed dependency would force a non-Rust source file into the build, dynamic linking into the release binary, or a runtime asset alongside the binary
 - a feature request implies shipping multiple files, an installer-only flow, or a first-run download
-- a proposed dependency is GPL / AGPL / LGPL / SSPL / BUSL / source-available — flag the license-relicensing implication before adding (PART 24 → "License Compliance")
+- a proposed dependency is GPL / AGPL / LGPL / SSPL / BUSL / source-available — flag the license-relicensing implication before adding (PART 25 → "License Compliance")
 - any doc, comment, banner, or response text refers to the project as an "API server" instead of "server"
 
 ## Success Criteria
@@ -36749,6 +44074,9 @@ A compliant Rust project following this specification:
 - is driven by `IDEA.md` project variables while `AI.md` stays read-only
 - preserves the governance/documentation discipline of this specification
 - ships one statically linked binary per target that is simultaneously the full server (web frontend, REST API, GraphQL API) and, alongside its companion client binary, the CLI/TUI surface — never described as merely an "API server"
+- ships the optional server features (admin panel, client & agent — PARTs 28–29) only when IDEA.md enables them; both are disabled by default
+- registers every running instance on the per-user socket registry and offers web instance switching scoped to the authenticated system user (PARTs 2, 4, 8, 15)
+- in system service mode, serves every system user from a single root-started listener (single/dual port) that routes to per-user instances over their socket registries — never per-user port binds (PART 4 → "System Service Mode")
 - ships exclusively Rust source code (small Docker shell helpers excepted)
 - produces one statically linked binary per target with all assets (frontend, locales, schemas, default config) embedded
 - runs end-to-end from the binary alone on an air-gapped machine, aside from explicitly opt-in outbound features (updates, GeoIP, Let's Encrypt)
@@ -36758,11 +44086,11 @@ A compliant Rust project following this specification:
 
 ---
 
-# PART 28: IDEA.md REFERENCE
+# PART 31: IDEA.md REFERENCE
 
 **NEVER modify this PART. Read-only reference for IDEA.md structure.**
 
-The canonical layout, variable rules, immutability constraints, and migration procedure are defined at the top of this file under "IDEA.md Required Layout" (the section preceding PART 0). PART 28 here is the worked-example reference — every example below uses the same three-section structure.
+The canonical layout, variable rules, immutability constraints, and migration procedure are defined at the top of this file under "IDEA.md Required Layout" (the section preceding PART 0). PART 31 here is the worked-example reference — every example below uses the same three-section structure.
 
 ---
 
@@ -36817,6 +44145,10 @@ maintainer_email: {maintainer@example.com — or empty; used only if set}
 - CLI client: {yes / no — client is required for all server-mode projects}
 - TUI (interactive client): {yes / no}
 
+**Optional server features (both disabled by default — see PART 2 → "Optional Server Features (Disabled by Default)"; declare only when the server surface is in scope):**
+- Server admin (admin user + admin routes): {yes / no}
+- Client & agent support: {yes / no}
+
 **Features:**
 - **{Feature category 1}**: {brief description}
 - **{Feature category 2}**: {brief description}
@@ -36845,16 +44177,16 @@ maintainer_email: {maintainer@example.com — or empty; used only if set}
 **Stored data location (see PART 3 → "OS-Specific Paths"):**
 - {What is stored, and at which path}
 
-**License exceptions (only if a denylisted or vendored-C dep is used — see PART 24 → "License Compliance"):**
+**License exceptions (only if a denylisted or vendored-C dep is used — see PART 25 → "License Compliance"):**
 - {crate, upstream license, rationale, `distribution_license` consequence if applicable}
 ```
 
 **Rules for the example contents above:**
 
 - No hardcoded routes — say "Get random joke", not `/api/v1/jokes/random`. AI.md PART 13 defines route patterns.
-- No implementation details — describe behavior, not algorithms or libraries. AI.md PARTs 0–28 define HOW; this PART verifies compliance is covered in PART 27.
+- No implementation details — describe behavior, not algorithms or libraries. AI.md PARTs 0–29 define HOW; compliance verification is covered in PART 30.
 - This specification targets the HYBRID model: a single static Rust binary that is both a full server (web frontend + REST + GraphQL) and, together with its companion client, a CLI/TUI surface (PART 2 → "Application & Server Model").
-- Cross-reference AI.md PARTs by number for any pattern that already exists there (database → PART 10, security → PART 11, scheduler → PART 17, license exceptions → PART 24, etc.).
+- Cross-reference AI.md PARTs by number for any pattern that already exists there (database → PART 10, security → PART 11, scheduler → PART 17, license exceptions → PART 25, etc.).
 - `internal_name` and `internal_org` are immutable after first set (see "IDEA.md Required Layout" → Project variables rules).
 - Never describe the project as an "API server" in IDEA.md — always "server".
 
