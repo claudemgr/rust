@@ -41338,7 +41338,7 @@ jobs:
 
       # CLI build - only if src/client/ or a cli binary exists in Cargo.toml
       - name: Build CLI
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -41357,7 +41357,7 @@ jobs:
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
@@ -41365,7 +41365,7 @@ jobs:
 
       # Agent build - only if src/agent/ binary exists
       - name: Build Agent
-        if: hashFiles('src/agent/') != ''
+        if: hashFiles('src/agent/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -41378,7 +41378,7 @@ jobs:
             ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload Agent artifact
-        if: hashFiles('src/agent/') != ''
+        if: hashFiles('src/agent/**') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
@@ -41526,7 +41526,7 @@ jobs:
 
       # CLI build - only if src/client/ binary exists
       - name: Build CLI
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -41545,7 +41545,7 @@ jobs:
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
@@ -41553,7 +41553,7 @@ jobs:
 
       # Agent build - only if src/agent/ binary exists
       - name: Build Agent
-        if: hashFiles('src/agent/') != ''
+        if: hashFiles('src/agent/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -41566,7 +41566,7 @@ jobs:
             ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload Agent artifact
-        if: hashFiles('src/agent/') != ''
+        if: hashFiles('src/agent/**') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
@@ -41706,7 +41706,7 @@ jobs:
 
       # CLI build - only if src/client/ binary exists
       - name: Build CLI
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -41725,7 +41725,7 @@ jobs:
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
@@ -41733,7 +41733,7 @@ jobs:
 
       # Agent build - only if src/agent/ binary exists
       - name: Build Agent
-        if: hashFiles('src/agent/') != ''
+        if: hashFiles('src/agent/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -41746,7 +41746,7 @@ jobs:
             ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload Agent artifact
-        if: hashFiles('src/agent/') != ''
+        if: hashFiles('src/agent/**') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
@@ -42275,7 +42275,7 @@ jobs:
 
       # CLI build - only if src/client/ binary exists
       - name: Build CLI
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -42294,7 +42294,7 @@ jobs:
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
@@ -42302,7 +42302,7 @@ jobs:
 
       # Agent build - only if src/agent/ binary exists
       - name: Build Agent
-        if: hashFiles('src/agent/') != ''
+        if: hashFiles('src/agent/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -42315,7 +42315,7 @@ jobs:
             ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload Agent artifact
-        if: hashFiles('src/agent/') != ''
+        if: hashFiles('src/agent/**') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
@@ -42463,7 +42463,7 @@ jobs:
 
       # CLI build - only if src/client/ binary exists
       - name: Build CLI
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -42482,7 +42482,7 @@ jobs:
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
@@ -42490,7 +42490,7 @@ jobs:
 
       # Agent build - only if src/agent/ binary exists
       - name: Build Agent
-        if: hashFiles('src/agent/') != ''
+        if: hashFiles('src/agent/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -42503,7 +42503,7 @@ jobs:
             ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload Agent artifact
-        if: hashFiles('src/agent/') != ''
+        if: hashFiles('src/agent/**') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
@@ -42639,7 +42639,7 @@ jobs:
 
       # CLI build - only if src/client/ directory exists
       - name: Build CLI
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         run: |
           cargo build --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
           cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-cli${{ matrix.ext }} \
@@ -42657,7 +42657,7 @@ jobs:
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
@@ -42665,7 +42665,7 @@ jobs:
 
       # Agent build - only if src/agent/ directory exists
       - name: Build Agent
-        if: hashFiles('src/agent/') != ''
+        if: hashFiles('src/agent/**') != ''
         run: |
           cargo build --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-agent
           cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-agent${{ matrix.ext }} \
@@ -42677,7 +42677,7 @@ jobs:
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
 
       - name: Upload Agent artifact
-        if: hashFiles('src/agent/') != ''
+        if: hashFiles('src/agent/**') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}

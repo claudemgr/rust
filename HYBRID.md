@@ -34359,7 +34359,7 @@ jobs:
 
       # CLI build - only if src/client/ directory exists
       - name: Build CLI
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -34378,7 +34378,7 @@ jobs:
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -34525,7 +34525,7 @@ jobs:
 
       # CLI build - only if src/client/ directory exists
       - name: Build CLI
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -34544,7 +34544,7 @@ jobs:
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -34684,7 +34684,7 @@ jobs:
 
       # CLI build - only if src/client/ directory exists
       - name: Build CLI
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -34703,7 +34703,7 @@ jobs:
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -35135,7 +35135,7 @@ jobs:
 
       # CLI build - only if src/client/ directory exists
       - name: Build CLI
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -35154,7 +35154,7 @@ jobs:
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -35301,7 +35301,7 @@ jobs:
 
       # CLI build - only if src/client/ directory exists
       - name: Build CLI
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -35320,7 +35320,7 @@ jobs:
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -35460,7 +35460,7 @@ jobs:
 
       # CLI build - only if src/client/ directory exists
       - name: Build CLI
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
@@ -35479,7 +35479,7 @@ jobs:
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
-        if: hashFiles('src/client/') != ''
+        if: hashFiles('src/client/**') != ''
         # v7.0.1
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
