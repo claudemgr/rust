@@ -20525,6 +20525,8 @@ fn detect_client_type(headers: &axum::http::HeaderMap) -> &'static str {
 
 ## CRUD Operations
 
+**No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works.
+
 All CRUD handlers follow this pattern:
 
 **Create**
@@ -21340,6 +21342,8 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
 
 ## UI Components
 
+**No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works.
+
 ### Buttons
 
 ```html
@@ -21798,6 +21802,8 @@ document.querySelectorAll('.field input, .field select, .field textarea').forEac
 ---
 
 ## PWA Support
+
+**No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works. The PWA layer itself is an enhancement — the site must be fully usable if the service worker never installs.
 
 ### Service Worker Registration
 
@@ -23191,6 +23197,8 @@ let message = cfg.privacy.get_consent_message();
 ---
 
 ## Standard Pages
+
+**No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works.
 
 ### /server/about
 

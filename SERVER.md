@@ -25475,6 +25475,8 @@ textarea:user-invalid {
 
 **Progressive Web App = Native-like web app (installable, offline, push notifications, GPS)**
 
+**No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works. The PWA layer itself is an enhancement — the site must be fully usable if the service worker never installs.
+
 **Goal: Indistinguishable from native app** - same UX, capabilities, and performance.
 
 | Feature | Implementation | Notes |
@@ -30176,6 +30178,8 @@ server:
 
 **ALL projects MUST have a full admin panel.**
 
+**No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works.
+
 ## Admin Panel Isolation
 
 **The admin panel is completely isolated from the public site.**
@@ -33663,6 +33667,8 @@ Do not reply to this email.
 ## WebUI Notification System
 
 **The WebUI has a built-in notification system for both Server Admins and users. This is ALWAYS available regardless of SMTP configuration.**
+
+**No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works.
 
 ### How It Works
 
@@ -56382,6 +56388,8 @@ PARTS 34-36 ship marked `OPTIONAL - NON-NEGOTIABLE WHEN IMPLEMENTED`. A project 
 
 **This PART covers Regular User accounts (end-users). Server Admin accounts are covered in PART 17: ADMIN PANEL.**
 
+**No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works.
+
 **Projects can operate in two modes: admin-only or multi-user.**
 
 | Mode | Use Case | Default |
@@ -60823,6 +60831,8 @@ See PART 16 (Web Frontend) for the complete reserved names list.
 
 **Requires PART 34: MULTI-USER to be implemented first.**
 
+**No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works.
+
 ## When Organizations Are Needed vs Not Needed
 
 **Key Question: Do users need to collaborate as teams/groups with shared resources?**
@@ -61551,6 +61561,8 @@ See PART 16 (Web Frontend) for the complete reserved names list. Users and orgs 
 ## Overview
 
 **Custom domains is an OPTIONAL feature that allows users or organizations to use their own domains with the application.** Not all projects need this feature.
+
+**No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works.
 
 **IMPORTANT: Once a project implements custom domains, this entire PART becomes NON-NEGOTIABLE.** The implementation must follow all standards defined here exactly.
 
