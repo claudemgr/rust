@@ -1912,7 +1912,7 @@ Instructions for how this agent should behave...
 | `docker/` | ✓ | Dockerfile, compose files, and build-time `rootfs/` overlay | No |
 | `docs/` | ✓ | MkDocs documentation only | No |
 | `scripts/` | ✓ | Production/install scripts | No |
-| `tests/` | ✓ | Repository-root executable integration test scripts (`run_tests.sh`, `docker.sh`, `incus.sh`, optional helpers). Rust unit tests live alongside code as `#[cfg(test)]` modules | No |
+| `tests/` | ✓ | Repository-root executable integration test scripts (`run_tests.sh`, `docker.sh`, `incus.sh`, `e2e.sh`, optional helpers). Rust unit tests live alongside code as `#[cfg(test)]` modules | No |
 | `.github/` | If GitHub / public repo | GitHub Actions, community files, templates | No |
 | `.gitea/` | If Gitea | Gitea Actions, templates | No |
 | `.claude/` | Auto | Claude Code config — team config (settings, rules, agents, hooks) committed; personal/runtime files gitignored | Partial |
@@ -5989,7 +5989,8 @@ PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+
 ├── tests/                  # Repository-root executable integration test scripts (Rust unit tests stay next to code in #[cfg(test)] blocks or tests/ dir)
 │   ├── run_tests.sh        # Auto-detect and run tests (REQUIRED)
 │   ├── docker.sh           # Beta testing with Docker (REQUIRED)
-│   └── incus.sh            # Beta testing with Incus (REQUIRED)
+│   ├── incus.sh            # Beta testing with Incus (REQUIRED)
+│   └── e2e.sh              # Browser E2E beta testing, headless Chromium (REQUIRED — PART 28)
 ├── docker/                 # Docker files
 │   ├── Dockerfile          # Production Dockerfile
 │   ├── Dockerfile.dev      # devel image — same as release but binary runs in debug mode; tagged :devel (project-specific)
@@ -28630,6 +28631,7 @@ docker run --rm \
 | `./tests/run_tests.sh` | Auto-detect | General testing (picks best available) |
 | `./tests/docker.sh` | Docker `alpine:latest` | Quick binary validation |
 | `./tests/incus.sh` | Incus `debian:latest` | **PREFERRED** - Full OS, systemd, realistic |
+| `./tests/e2e.sh` | Docker + Chromium/chromedriver | Browser E2E beta testing — frontend with and without JS (PART 28) |
 
 **Typical workflow:**
 ```bash
@@ -33002,7 +33004,7 @@ rm -rf "${TMPDIR:-/tmp}/${PROJECT_ORG}/"
 - Tests project-specific functionality (from IDEA.md)
 - Run with `./tests/run_tests.sh`
 - `./tests/*` means executable shell scripts in the repository-root `tests/` directory
-- Minimum required scripts: `./tests/run_tests.sh`, `./tests/docker.sh`, `./tests/incus.sh`
+- Minimum required scripts: `./tests/run_tests.sh`, `./tests/docker.sh`, `./tests/incus.sh`, `./tests/e2e.sh` (browser E2E — see "Browser E2E Testing" below; standalone entry point, not invoked by `./tests/run_tests.sh`)
 - Additional helper scripts are allowed (for example `./tests/test_content_negotiation.sh`)
 - These scripts complement integration coverage; they do **NOT** replace required Rust unit tests in `#[cfg(test)]` blocks
 
@@ -34007,7 +34009,7 @@ fi
 
 | Rule | Requirement |
 |------|-------------|
-| **Location** | `tests/run_tests.sh`, `tests/docker.sh`, `tests/incus.sh` |
+| **Location** | `tests/run_tests.sh`, `tests/docker.sh`, `tests/incus.sh`, `tests/e2e.sh` |
 | **Permissions** | Executable (`chmod +x tests/*.sh`) |
 | **Build method** | Use `make build` if Makefile exists; otherwise Docker (`casjaysdev/rust:latest`) with host cache dirs |
 | **Rust cache** | `CARGO_CACHE` (`~/.cargo`) → `/usr/local/share/cargo`; `RUSTUP_CACHE` (`~/.rustup`) → `/usr/local/share/rustup`; `SCCACHE_CACHE` (`~/.cache/sccache`) → `/root/.cache/sccache`; `CARGO_TARGET` (`~/.cache/cargo-target/{project_name}`) → `/app/target` |
@@ -34186,6 +34188,96 @@ docker run --rm \
   -w /app \
   casjaysdev/rust:latest sh
 ```
+
+## Browser E2E Testing (Headless Browser, On-Demand Beta Testing)
+
+The web frontend (PART 16) is verified end to end by driving the real frontend in a real headless browser. This suite is the project's beta-testing harness: it is built alongside the frontend and run **on demand** — when the user asks for beta testing, before a release, or after major frontend work. It is **NOT part of the commit gate** (`make test` does not run it). When it does run, every requirement in this section is non-negotiable: route unit tests and `curl` smoke tests are not a substitute for verifying what a user actually sees and does, with and without JavaScript. Every HTML page the server serves is in scope: the home page, project feature pages, the `/server/*` standard pages, and the Swagger/API docs pages (PART 14).
+
+**Engine:** `thirtyfour` (WebDriver) driving headless Chromium via `chromedriver` — pure Rust, no Node toolchain. Test code lives in `tests/e2e/` behind an `e2e` feature/`#[ignore]` gate, so `make test` never sees it; the entry point is `./tests/e2e.sh`, which Docker-wraps the gated `cargo test` invocation and joins the existing manual `./tests/*.sh` script family alongside `docker.sh`/`incus.sh`. No new Makefile target — the target set is fixed. Everything runs inside Docker like every other test (this PART → "Host System Safety Applies to All Testing & Debugging").
+
+### Three Mandatory Tiers
+
+| Tier | Engine | JavaScript | Verifies |
+|------|--------|------------|----------|
+| 1 — SSR | plain `reqwest` client (no browser) | n/a (raw HTML) | Server renders complete, correct HTML: real page content in the initial response, correct `<title>`, meta tags, valid structure — never an empty shell that JS fills in later |
+| 2 — No-JS browser | thirtyfour, JavaScript disabled via Chrome prefs | OFF | Progressive enhancement (PART 16 → "HTML5/CSS over JavaScript"): every core flow works without JS — native form POSTs, links, redirects, pagination |
+| 3 — Full browser | thirtyfour | ON | Full flows with JS enhancements; zero console errors; zero failed asset/XHR requests |
+
+All three tiers are REQUIRED. A feature that only passes Tier 3 is a PART 16 progressive-enhancement violation, not a passing test.
+
+Tier 2 disables JavaScript through Chrome content-settings prefs on the session capabilities:
+
+```rust
+// tests/e2e/nojs.rs — Tier 2: a dedicated no-JS browser session
+let mut caps = DesiredCapabilities::chrome();
+caps.add_arg("--headless=new")?;
+caps.add_experimental_option(
+    "prefs",
+    serde_json::json!({ "profile.managed_default_content_settings.javascript": 2 }),
+)?;
+let driver = WebDriver::new("http://localhost:9515", caps).await?;
+driver.goto(format!("{base_url}/")).await?;
+let html = driver.source().await?;
+```
+
+### SSR Correctness (Tier 1)
+
+- The initial HTML response contains the actual page content — assert on real domain data (the paste body, the shortened URL's stats, the metric values), never just HTTP 200
+- No loading spinners, empty `<div id="app">` shells, or client-side-only rendering — that violates PART 16 and MUST fail the test
+- Correct status per route: 200 for pages, 301/302 + `Location` for redirects, 404 for unknown paths
+- `<title>`, `lang`, charset, and viewport meta present and correct on every page
+- Content negotiation honored per PART 16 `detectClientType`: HTML for browsers, plain text for CLI tools, JSON for `Accept: application/json` — assert each on at least one route
+
+### Project-Scoped Feature Coverage (NON-NEGOTIABLE)
+
+Generic route checks alone are NON-COMPLIANT. The suite MUST exercise this project's actual domain features end to end, derived feature-by-feature from IDEA.md — every user-facing feature gets at least one Tier-1 assertion, one Tier-2 scenario, and one Tier-3 scenario, each a named test.
+
+| Example project | Minimum required E2E scenarios |
+|-----------------|-------------------------------|
+| Pastebin API | Create paste via web form POST → view rendered paste → raw view matches input exactly; syntax highlighting present; owner edit/delete via `owner_token` cookie works with JS off; expired paste → 404/410; unknown ID → 404 |
+| URL shortener | Shorten via form → redirect fires (301/302 + correct `Location`); stats page reflects the hit; invalid/dangerous URL rejected with a rendered error; reserved slug rejected |
+| Status/metrics API | Dashboard SSR shows real metric values from fixture data (PART 20); service detail pages render; `/server/healthz` returns JSON to `curl` and HTML to a browser; stale service shown as down |
+| Read-only data API | Search page renders real results without JS; pagination works as plain links; `/docs` lists every real endpoint from the generated OpenAPI spec (PART 14); empty query and no-results pages handled |
+
+The table is illustrative — the rule is universal: enumerate IDEA.md's features and map each to E2E scenarios covering create/read/update/delete/error paths as applicable. A feature without an E2E scenario is untested.
+
+### Universal Coverage (Every Project)
+
+- **Full crawl**: start at `/`, follow every internal link — no dead links, no 500s, every navigable route visited, including all `/server/*` standard pages (PART 16)
+- **Owner-token web management (PART 8)**: only when the project defines resource owner tokens per IDEA.md — web-form create shows the raw `tok_` token once AND sets the `owner_token` cookie; edit/delete plain POST forms then work with JS disabled; a revoked/invalid token gets a rendered error with no resource-existence hints
+- **API auth boundary**: HTML pages are public — assert no page ever demands a login; assert `/api/` mutating routes reject a cookie-only browser request (Bearer header required, PART 8)
+- **API docs (PART 14)**: `/docs` and the Swagger UI page render; Tier 1 asserts real endpoint paths from the generated spec appear in the HTML
+- **Theme**: dark, light, and auto all render; assert computed styles actually change (PART 16 theme rules)
+- **Responsive**: 375×812 viewport — no horizontal scroll, navigation usable (PART 16 mobile-first rules)
+- **i18n (PART 30)**: switching language changes rendered strings
+- **Forms**: validation errors render server-side (Tier 2) and inline (Tier 3); CSRF protection enforced on browser form POSTs (PART 16 → CSRF)
+- **Error pages**: 404 and 500 render the PART 16 themed error pages, not blank bodies or stack traces
+- **Static assets**: every referenced CSS/JS/image/font loads with 200
+- **Console**: zero JavaScript errors on every page visited (Tier 3)
+
+### Determinism & Hermeticity
+
+- Fixture data seeded into a fresh test database before the suite; never depends on prior runs
+- **Zero external network**: every outbound dependency (remote URL fetching, webhooks, GeoIP downloads, update checks) is stubbed with local mock HTTP servers (e.g. `wiremock` or a hand-rolled hyper listener) — the whole suite MUST pass offline
+- Server under test starts once per suite on a port from 64500–64999, PID captured, killed and cleaned in teardown
+- Failure artifacts (screenshots, page HTML, server log) go to the tempdir structure (this PART → "Temporary Directory Structure") — never the project tree
+
+### Invocation & CI
+
+| Target | Runs | When |
+|--------|------|------|
+| `make test` | Unit + route tests only — the commit gate; NEVER runs E2E | Before every commit |
+| `./tests/e2e.sh` | Full E2E suite (all three tiers) | On demand: beta testing, pre-release, after major frontend work |
+
+`./tests/e2e.sh` follows the same manual, developer-initiated pattern as `./tests/incus.sh` and is Docker-wrapped: the E2E container needs Chromium + `chromedriver` (installed in the test image, or a headless-shell-style sidecar with chromedriver). In CI, E2E is at most a manually triggered job (`workflow_dispatch`) that uploads failure artifacts — it is never a required check and never blocks commits, merges, or releases.
+
+### AI Exploratory Pass (Discovery Only — NEVER the Gate)
+
+In addition to the committed suite, AI-driven exploratory testing with a real browser (e.g. Claude driving the Playwright MCP server) is the defined workflow for finding what the scripted suite misses: walk every page, try hostile input, resize, toggle themes, read console/network errors.
+
+- Every finding is either fixed immediately or logged in `TODO.AI.md` — never left only in conversation
+- Every confirmed finding is converted into a committed deterministic thirtyfour test so it can never regress silently
+- Agent runs are not reproducible: they are NEVER a gate of any kind — the committed deterministic suite is the repeatable record of frontend correctness, run on demand alongside this pass
 
 ## Build and Test
 
@@ -41375,6 +41467,7 @@ maintainer_email: jane@example.com
 - [ ] **Quick tests** - Docker `alpine:latest` for unit tests, CI/CD
 - [ ] **Full OS tests** - Incus `debian:latest` for systemd (PREFERRED)
 - [ ] **NEVER run binaries locally** - use Docker or Incus container
+- [ ] Browser E2E suite (PART 28) exists and covers every IDEA.md feature with project-scoped scenarios across all three tiers (SSR, no-JS, full-JS) — run on demand for beta testing, never part of the commit gate
 
 **Debugging (Incus Preferred):**
 - [ ] **Incus** for interactive debugging (full OS, persistent, SSH-able)
@@ -41793,6 +41886,7 @@ make docker
 - [ ] tests/run_tests.sh - Auto-detect environment
 - [ ] tests/docker.sh - Docker-based tests
 - [ ] tests/incus.sh - Incus-based tests
+- [ ] tests/e2e.sh - Browser E2E beta testing, on demand (PART 28)
 - [ ] All tests pass in CI
 - [ ] Test coverage measured
 - [ ] API testing included
