@@ -14168,6 +14168,7 @@ pub async fn get_user_with_version(
 | Static assets with matching `?v=` build stamp | `public, max-age=31536000, immutable` | 1 year — URL changes every release, so this can never go stale |
 | Static assets without / with mismatched `?v=` | `no-cache` + `ETag` | Always revalidated — never trusted across updates |
 | HTML pages | `no-store` | Always fetch fresh |
+| `/sw.js` and `/manifest.json` | `no-cache` + `ETag` | Browser must see the new service worker on its next update check — never immutable |
 | API responses (public) | `public, max-age=60` | Short cache for CDN |
 | API responses (private) | `private, no-store` | User-specific data |
 | Authenticated pages | `private, no-store` | Never cache |
@@ -14185,7 +14186,8 @@ update. The fix is mandatory URL stamping:
 | **`asset()` template helper** | Every static asset reference in every template goes through a shared helper that appends the build stamp: `/static/app.css?v={project_version}-{short_commit}`. Hand-written bare `/static/...` URLs in templates are a bug. |
 | **`immutable` only on a matching stamp** | The static handler sends `public, max-age=31536000, immutable` ONLY when the request's `?v=` equals the running build's stamp. Missing or mismatched stamp → `no-cache` + `ETag` (the bytes still serve — cached HTML from an old version never breaks, it just revalidates). |
 | **HTML is never cached** | All HTML documents: `Cache-Control: no-store` plus an `ETag` derived from the build stamp, so any intermediary that ignores `no-store` still revalidates. |
-| **Service worker (if the project adds one)** | Cache name MUST embed `{project_version}`; `activate` deletes all caches from other versions. |
+| **Service worker (if the project adds one)** | Cache name MUST embed `{project_version}`; `activate` deletes all caches from other versions. `/sw.js` and `/manifest.json` are served `no-cache` + build-stamp `ETag` — a cached service worker script delays every other update mechanism. |
+| **Version-change purge (`Clear-Site-Data`)** | Recovery layer for already-poisoned browsers — see "Version-Change Purge" below. Value is `"cache", "storage"` ONLY; `"cookies"` would destroy the session and cookie-stored preferences. |
 
 **Result:** deploying a new version changes every asset URL, so browsers fetch the
 new frontend on the first page load after an update — no manual cache clearing, ever.
@@ -14221,10 +14223,58 @@ pub fn set_cache_headers(
         "html" => {
             headers.insert(CACHE_CONTROL, "no-store".parse().expect("invariant: valid cache-control header value"));
         }
+        "sw" => {
+            // /sw.js and /manifest.json - never long-cached, or updates stall
+            headers.insert(CACHE_CONTROL, "no-cache".parse().expect("invariant: valid cache-control header value"));
+            headers.insert(ETAG, format!("\"{}\"", build_info::asset_stamp()).parse().expect("invariant: valid etag header value"));
+        }
         _ => {}
     }
 }
 ```
+
+### Version-Change Purge (Clear-Site-Data)
+
+Asset stamping and `no-store` HTML are the primary defenses — but a browser that
+cached HTML or a service worker under an older, buggier build can keep serving
+the old site anyway. The purge is the forced recovery path: the server detects
+the stale client and evicts its caches in one response.
+
+| Rule | Detail |
+|------|--------|
+| **Build-stamp cookie** | Every HTML response sets `{project_name}_build={asset_stamp}` (`Path=/`, `Max-Age=31536000`, `Secure`, `SameSite=Lax`, NOT HttpOnly-sensitive — the stamp is public). Essential cookie — no consent required. |
+| **Mismatch → purge** | If an HTML request carries a `{project_name}_build` cookie whose value ≠ the running stamp, the response adds `Clear-Site-Data: "cache", "storage"` — evicts the HTTP cache, all Cache API caches, and unregisters service workers in one shot. |
+| **`"cookies"` is FORBIDDEN here** | It would destroy the session and every cookie-stored preference (theme, language, consent). The auth-revocation `Clear-Site-Data` in PART 11 keeps `"cookies"`; the version purge never includes it. |
+| **Naturally one-shot** | The same response re-sets the cookie to the new stamp, so the next request matches and no purge loop is possible. First-ever visit (no cookie) never purges. |
+| **Safe by design** | `"storage"` wipes localStorage/IndexedDB — safe because nothing stored there is load-bearing (PART 15): preferences live in cookies, sessions in HttpOnly cookies. |
+
+```rust
+pub fn version_purge(request_headers: &axum::http::HeaderMap, response_headers: &mut axum::http::HeaderMap) {
+    use axum::http::header::{COOKIE, SET_COOKIE};
+
+    let stamp = build_info::asset_stamp();
+    let cookie_name = "{project_name}_build";
+    let seen_stamp = request_headers
+        .get(COOKIE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|cookies| cookies.split(';').find_map(|kv| {
+            let (name, value) = kv.trim().split_once('=')?;
+            (name == cookie_name).then(|| value.to_string())
+        }));
+    if seen_stamp.is_some_and(|v| v != stamp) {
+        response_headers.insert(
+            axum::http::HeaderName::from_static("clear-site-data"),
+            axum::http::HeaderValue::from_static("\"cache\", \"storage\""),
+        );
+    }
+    let set_cookie = format!("{cookie_name}={stamp}; Path=/; Max-Age=31536000; Secure; SameSite=Lax");
+    if let Ok(value) = axum::http::HeaderValue::from_str(&set_cookie) {
+        response_headers.append(SET_COOKIE, value);
+    }
+}
+```
+
+Called from the HTML middleware only — never on static, API, or `/sw.js` responses.
 
 ### Cache Warming
 
@@ -15192,7 +15242,7 @@ web:
 |--------|-----------|---------|----------|
 | `Sec-GPC: 1` (Global Privacy Control) | inbound | honored | When received, treat the request as opt-out of "sale or sharing of personal data" (CCPA/CPRA), opt-out of behavioral profiling (GDPR Art. 21), and skip non-essential cookies. Logged to audit (`compliance.gpc_honored`). |
 | `DNT: 1` (Do Not Track) | inbound | NOT honored by default | DNT was de-facto removed from Firefox/Chrome — honoring it now penalizes users on browsers that still emit it for legacy reasons. Operators with EU-only audiences can opt in via `web.headers.honor_dnt: true`. |
-| `Clear-Site-Data` | outbound | emitted on token-revocation | Sent on token-revocation and consent-withdrawal responses. Default value `"cache", "cookies", "storage"`. `"executionContexts"` opt-in only. |
+| `Clear-Site-Data` | outbound | emitted on token-revocation | Sent on token-revocation and consent-withdrawal responses. Default value `"cache", "cookies", "storage"`. `"executionContexts"` opt-in only. Also sent on version-change purge (PART 9) with value `"cache", "storage"` only — never `"cookies"` there. |
 
 **`Sec-GPC` is the load-bearing one.** When received, the binary MUST:
 1. Set the request's `gpc_opt_out=true` flag throughout the request lifecycle.
@@ -24037,6 +24087,7 @@ async function clearClientData() {
 | `lang` | BCP 47 tag: `en`, `es`, `fr`, … | `Accept-Language` header |
 | `cookie_consent` | JSON: granular categories + timestamp | unset (banner shown) |
 | `ccpa_opt_out` | `true` | unset |
+| `{project_name}_build` | running build stamp `{project_version}-{short_commit}` | set on first HTML response — drives the PART 9 version-change purge |
 
 **Preference writes (JS enhancement — the server sets the same cookies on its POST endpoints):**
 ```javascript
