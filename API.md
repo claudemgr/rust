@@ -158,7 +158,8 @@ Example:
 
     project_name:  jokes
     project_org:   casjay
-    internal_name: jokes        # FROZEN — set once at first-time setup, never edit
+    # FROZEN — set once at first-time setup, never edit
+    internal_name: jokes
     app_name:      jokes
     official_site: jokes.example.com
 
@@ -18798,18 +18799,30 @@ See the **"Themes (NON-NEGOTIABLE - PROJECT-WIDE)"** section for the complete th
 **Color Palette:**
 ```css
 /* Dark Theme Colors */
---dark-bg: #282a36;           /* Background */
---dark-bg-alt: #1e1f29;       /* Alternate background (topbar, etc.) */
---dark-bg-elevated: #44475a;  /* Elevated elements (inputs, buttons) */
---dark-text: #f8f8f2;         /* Primary text */
---dark-text-muted: #6272a4;   /* Muted text, borders */
---dark-accent-cyan: #8be9fd;  /* Links, GET methods */
---dark-accent-green: #50fa7b; /* Success, POST methods */
---dark-accent-orange: #ffb86c; /* Warning, PUT methods */
---dark-accent-red: #ff5555;   /* Error, DELETE methods */
---dark-accent-purple: #bd93f9; /* Primary accent */
---dark-accent-pink: #ff79c6;  /* Secondary accent */
---dark-accent-yellow: #f1fa8c; /* Highlights */
+/* Background */
+--dark-bg: #282a36;
+/* Alternate background (topbar, etc.) */
+--dark-bg-alt: #1e1f29;
+/* Elevated elements (inputs, buttons) */
+--dark-bg-elevated: #44475a;
+/* Primary text */
+--dark-text: #f8f8f2;
+/* Muted text, borders */
+--dark-text-muted: #6272a4;
+/* Links, GET methods */
+--dark-accent-cyan: #8be9fd;
+/* Success, POST methods */
+--dark-accent-green: #50fa7b;
+/* Warning, PUT methods */
+--dark-accent-orange: #ffb86c;
+/* Error, DELETE methods */
+--dark-accent-red: #ff5555;
+/* Primary accent */
+--dark-accent-purple: #bd93f9;
+/* Secondary accent */
+--dark-accent-pink: #ff79c6;
+/* Highlights */
+--dark-accent-yellow: #f1fa8c;
 ```
 
 | Element | Style |
@@ -18914,17 +18927,28 @@ See the **"Themes (NON-NEGOTIABLE - PROJECT-WIDE)"** section for the complete th
 **Color Palette:**
 ```css
 /* Light Theme Colors */
---light-bg: #ffffff;           /* Background */
---light-bg-alt: #f6f8fa;       /* Alternate background (topbar, etc.) */
---light-bg-elevated: #d1d9e0;  /* Elevated elements, borders */
---light-text: #1f2328;         /* Primary text */
---light-text-muted: #59636e;   /* Muted text */
---light-accent-blue: #0969da;  /* Links, GET methods */
---light-accent-green: #1a7f37; /* Success, POST methods */
---light-accent-orange: #9a6700; /* Warning, PUT methods */
---light-accent-red: #d1242f;   /* Error, DELETE methods */
---light-accent-purple: #8250df; /* Primary accent */
---light-accent-teal: #0969da;  /* Secondary accent */
+/* Background */
+--light-bg: #ffffff;
+/* Alternate background (topbar, etc.) */
+--light-bg-alt: #f6f8fa;
+/* Elevated elements, borders */
+--light-bg-elevated: #d1d9e0;
+/* Primary text */
+--light-text: #1f2328;
+/* Muted text */
+--light-text-muted: #59636e;
+/* Links, GET methods */
+--light-accent-blue: #0969da;
+/* Success, POST methods */
+--light-accent-green: #1a7f37;
+/* Warning, PUT methods */
+--light-accent-orange: #9a6700;
+/* Error, DELETE methods */
+--light-accent-red: #d1242f;
+/* Primary accent */
+--light-accent-purple: #8250df;
+/* Secondary accent */
+--light-accent-teal: #0969da;
 ```
 
 | Element | Style |
@@ -20687,7 +20711,8 @@ code {
 .code-content {
   display: block;
   flex: 1;
-  min-width: 0; /* Allow shrinking */
+  /* Allow shrinking */
+  min-width: 0;
   overflow-x: auto;
   white-space: nowrap;
   padding: 0.5rem 0.75rem;
@@ -20695,7 +20720,8 @@ code {
   border-radius: 4px;
   font-family: monospace;
   font-size: 0.875rem;
-  -webkit-overflow-scrolling: touch; /* Smooth scroll on iOS */
+  /* Smooth scroll on iOS */
+  -webkit-overflow-scrolling: touch;
 }
 
 .copy-btn {
@@ -21004,7 +21030,8 @@ document.addEventListener('click', function(e) {
 
 .data-table {
   width: 100%;
-  min-width: 400px; /* Force scroll on narrow screens */
+  /* Force scroll on narrow screens */
+  min-width: 400px;
   border-collapse: collapse;
   font-size: 0.875rem;
 }
@@ -21019,7 +21046,8 @@ document.addEventListener('click', function(e) {
 
 @media (min-width: 768px) {
   .data-table {
-    min-width: 0; /* Allow natural width */
+    /* Allow natural width */
+    min-width: 0;
     font-size: 1rem;
   }
 
@@ -24765,9 +24793,12 @@ server:
     # Which databases to download and use - all three are CC BY 4.0 and
     # require the attribution above whenever their data is used
     databases:
-      asn: true      # autonomous_system_number, autonomous_system_organization
-      country: true  # country_code
-      city: true     # city, country_code, state1, state2, postcode, lat/lon, timezone
+      # autonomous_system_number, autonomous_system_organization
+      asn: true
+      # country_code
+      country: true
+      # city, country_code, state1, state2, postcode, lat/lon, timezone
+      city: true
 ```
 
 | Config Key | Description |
@@ -36428,9 +36459,12 @@ i18n-validate:
 ```css
 /* Use logical properties */
 .element {
-  margin-inline-start: 1rem;  /* Not margin-left */
-  padding-inline-end: 1rem;   /* Not padding-right */
-  text-align: start;          /* Not text-align: left */
+  /* Not margin-left */
+  margin-inline-start: 1rem;
+  /* Not padding-right */
+  padding-inline-end: 1rem;
+  /* Not text-align: left */
+  text-align: start;
 }
 
 /* RTL-specific overrides */
@@ -41266,8 +41300,10 @@ Free-form prose, 1–3 paragraphs.}
 
 project_name:    {project_name}
 project_org:     {project_org}
-internal_name:   {project_name}        # FROZEN — equals project_name on first install, never changes
-internal_org:    {project_org}         # FROZEN — equals project_org on first install, never changes
+# FROZEN — equals project_name on first install, never changes
+internal_name:   {project_name}
+# FROZEN — equals project_org on first install, never changes
+internal_org:    {project_org}
 app_name:        {project_name}
 official_site:   {fqdn}
 maintainer_name: {maintainer_name — defaults to {project_org} if unset}
