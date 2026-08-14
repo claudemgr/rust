@@ -6663,6 +6663,8 @@ edition = "2021"
 | **UUID** | `uuid` | Standard UUID generation; `v4` feature |
 | **Argon2** | `argon2` | Password hashing; pure Rust |
 | **Bcrypt** | `bcrypt` | Verify existing passwords (rehash to Argon2id) |
+| **SHA-256/SHA-512** | `sha2` | Release checksum verification (updater) and HMAC webhook signatures — never hand-roll hashing |
+| **Hex encoding** | `hex` | Encodes HMAC digests (webhook signatures) to hex strings |
 
 ### Authentication (REQUIRED - ALL PROJECTS)
 
@@ -13086,8 +13088,8 @@ async fn build_health_response(state: &Arc<AppState>) -> HealthResponse {
 
         // Build info
         build: BuildInfo {
-            commit: env!("VERGEN_GIT_SHA").to_string(),
-            date: env!("VERGEN_BUILD_DATE").to_string(),
+            commit: env!("COMMIT_ID").to_string(),
+            date: crate::version::build_date(),
         },
 
         // Cluster (dynamic - from cluster manager)
@@ -20158,8 +20160,8 @@ pub struct StatsInfo {
 | `restart_reason` | `config_manager.restart_settings()` | - |
 | `version` | `version::VERSION` (build var) | 7 |
 | `rust_version` | `env!("RUSTC_VERSION")` or build script | 7 |
-| `build.commit` | `version::COMMIT` (build var) | 7 |
-| `build.date` | `version::DATE` (build var) | 7 |
+| `build.commit` | `version::COMMIT_ID` (build var) | 7 |
+| `build.date` | `version::build_date()` (derived from `BUILD_EPOCH`) | 7 |
 | `uptime` | `format_uptime(start_time)` | - |
 | `mode` | `cfg.server.mode` | 6 |
 | `timestamp` | `chrono::Utc::now()` | - |
@@ -20760,9 +20762,9 @@ When not in cluster mode:
 
 ### Format
 
-- Stable: Semantic versioning `MAJOR.MINOR.PATCH` (e.g., `1.0.0`)
-- Beta: `YYYYMMDDHHMMSS-beta` (e.g., `20251205143022-beta`)
-- Daily: `YYYYMMDDHHMMSS` (e.g., `20251218060432`)
+- Stable: Semantic versioning `MAJOR.MINOR.PATCH` (e.g., `1.0.0`); git tag and VERSION are the same string
+- Beta: VERSION `YYYYMMDDHHMMSS-beta` (e.g., `20251205143022-beta`); git tag and VERSION are the same string
+- Daily: VERSION is the short commit id (`git rev-parse --short HEAD`, e.g., `a1b2c3d`) — a daily build IS its commit, so no timestamp or `release.txt` fallback applies; the git/release TAG is always the literal rolling `daily`, never a timestamp
 
 ### Sources (Priority Order)
 
@@ -23249,7 +23251,7 @@ format_url(host, 8443, true);
 
 **Footer timestamp format:** `%B %d, %Y at %H:%M:%S %Z` → `December 04, 2025 at 13:05:13 EST` — anything user-facing MUST use this format; use `%Y-%m-%dT%H:%M:%S%:z` (RFC 3339) only where machine-readability matters (API responses, logs, health endpoints)
 
-**"Last update" MUST use build date, NEVER hardcoded.** Use `{build_datetime}` template variable which comes from `BUILD_DATE` at compile time via `build.rs`. This ensures the footer always shows when the binary was built, not a static date in the source code.
+**"Last update" MUST use build date, NEVER hardcoded.** Use `{build_datetime}` template variable which comes from `version::build_date()`, derived at runtime from the `BUILD_EPOCH` value embedded at compile time via `build.rs` (display format unchanged). This ensures the footer always shows when the binary was built, not a static date in the source code.
 
 **⚠️ DYNAMIC WIDTH: Banner width adapts to terminal size at runtime. Examples below show ≥80 col format. See "Responsive Startup Banner" section for all size variants (<40, 40-59, 60-79, ≥80 cols).**
 
@@ -36846,7 +36848,7 @@ POST /api/{api_version}/server/{admin_path}/config/backup/restore
 |--------|--------------|-------------|---------|
 | `stable` (default) | Release | `v*`, `*.*.*` | `v1.0.0` |
 | `beta` | Pre-release | `*-beta` | `202512051430-beta` |
-| `daily` | Pre-release | `YYYYMMDDHHMMSS` | `20251205143022` |
+| `daily` | Pre-release | Rolling `daily` tag (deleted and recreated nightly) | `daily` (name: "Daily Build a1b2c3d" — VERSION is the short commit id) |
 
 ### Examples
 
@@ -36891,9 +36893,11 @@ defer_days = 0
 |---------|-----------|-----------|
 | `stable` (default) | Full releases only (`v*`, `*.*.*`) | Newest stable |
 | `beta` | Beta pre-releases (`*-beta`) + all stable releases | Newest of both — beta users are never stuck behind a stable release |
-| `daily` | Daily pre-releases (`YYYYMMDDHHMMSS`) + beta + stable | Newest overall |
+| `daily` | Rolling `daily` release (rebuilt nightly) + beta + stable | Newest overall — a newer nightly is detected by comparing the release's `published_at` against the running binary's embedded `BUILD_EPOCH` |
 
 ### Defer Semantics (`defer_days`)
+
+**Applies to the `stable` and `beta` channels only. `defer_days` is a no-op on the `daily` channel — see below.**
 
 **A release is eligible only once `now - published_at >= defer_days` (GitHub Releases `published_at`, UTC).**
 
@@ -36901,8 +36905,8 @@ defer_days = 0
 |------|----------|
 | Gates the scheduled task only | `update_check` skips ineligible releases for BOTH notification and auto-install; manual `--update check` / `--update yes` always see and install the true latest — an explicit operator action overrides the defer window |
 | Eligibility is per-release | The task selects the NEWEST eligible release that is newer than the running version. A brand-new release does not reset the clock for older, already-eligible releases |
-| Rolling delay, never deadlock | Rapid release cadence (e.g. `daily` channel + `defer_days = 30`) still converges: each run adopts the newest release that has aged past the window |
-| Example | Running v1.2.2; v1.2.3 published 40 days ago, v1.2.4 published 5 days ago, `defer_days = 30` → task notifies/installs v1.2.3; v1.2.4 becomes eligible 25 days later |
+| Daily channel ignores `defer_days` | The rolling `daily` release is deleted and recreated nightly, so its `published_at` is always fresh — an age-based gate could never pass and would permanently block the daily channel. Daily selection instead compares the release's `published_at` against the running binary's embedded `BUILD_EPOCH` (see Channel Semantics above), with no deferral window applied |
+| Example (stable/beta) | Running v1.2.2; v1.2.3 published 40 days ago, v1.2.4 published 5 days ago, `defer_days = 30` → task notifies/installs v1.2.3; v1.2.4 becomes eligible 25 days later |
 
 ### Scheduled Check (update_check Task)
 
@@ -37034,10 +37038,13 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::io::Write;
 
+use crate::version::BUILD_EPOCH;
+
 #[derive(Debug, Deserialize)]
 pub struct Release {
     pub tag_name: String,
     pub prerelease: bool,
+    pub published_at: String,
     pub assets: Vec<Asset>,
 }
 
@@ -37094,11 +37101,33 @@ pub async fn check_for_update(
     let releases: Vec<Release> = response.json().await?;
 
     for r in releases {
-        if matches_branch(&r, branch) && r.tag_name != current_version {
+        if !matches_branch(&r, branch) {
+            continue;
+        }
+        if r.tag_name == "daily" {
+            // Rolling tag: a newer nightly exists when the release was published after this binary was built
+            if release_published_epoch(&r.published_at) > build_epoch() {
+                return Ok(Some(r));
+            }
+            continue;
+        }
+        if r.tag_name != current_version {
             return Ok(Some(r));
         }
     }
     Ok(None)
+}
+
+// Parses the embedded BUILD_EPOCH; 0 when unset or invalid
+fn build_epoch() -> i64 {
+    BUILD_EPOCH.parse().unwrap_or(0)
+}
+
+// Parses a GitHub RFC 3339 published_at timestamp; 0 when invalid
+fn release_published_epoch(published_at: &str) -> i64 {
+    chrono::DateTime::parse_from_rfc3339(published_at)
+        .map(|t| t.timestamp())
+        .unwrap_or(0)
 }
 
 /// Downloads and installs the update
@@ -37141,6 +37170,12 @@ pub async fn do_update(release: &Release) -> Result<()> {
         .await
         .context("failed to write temp file")?;
 
+    // Verify against sha256.txt before installing - abort on any mismatch
+    let expected_hash = fetch_expected_sha256(release, &asset_name)
+        .await
+        .context("failed to fetch sha256.txt for verification")?;
+    verify_checksum(&tmp_path, &expected_hash).context("update checksum verification failed")?;
+
     // Make executable (Unix)
     #[cfg(unix)]
     {
@@ -37163,6 +37198,41 @@ pub async fn do_update(release: &Release) -> Result<()> {
     Ok(())
 }
 
+/// Downloads `sha256.txt` from the same release and returns the hash for `asset_name`.
+/// Format is standard `sha256sum` output: "{hash}  {filename}" (two spaces), one line per asset.
+async fn fetch_expected_sha256(release: &Release, asset_name: &str) -> Result<String> {
+    let checksum_url = release
+        .assets
+        .iter()
+        .find(|a| a.name == "sha256.txt")
+        .map(|a| a.browser_download_url.clone())
+        .ok_or_else(|| anyhow::anyhow!("release is missing sha256.txt asset"))?;
+
+    let client = reqwest::Client::new();
+    let body = client
+        .get(&checksum_url)
+        .send()
+        .await
+        .context("failed to download sha256.txt")?
+        .text()
+        .await
+        .context("failed to read sha256.txt")?;
+
+    for line in body.lines() {
+        let mut parts = line.splitn(2, "  ");
+        let (hash, name) = (parts.next(), parts.next());
+        if let (Some(hash), Some(name)) = (hash, name) {
+            if name.trim() == asset_name {
+                return Ok(hash.trim().to_string());
+            }
+        }
+    }
+
+    Err(anyhow::anyhow!(
+        "no sha256.txt entry found for asset {asset_name}"
+    ))
+}
+
 /// Returns the expected binary name for this platform
 fn get_binary_name() -> String {
     let os = std::env::consts::OS;
@@ -37178,8 +37248,8 @@ fn matches_branch(r: &Release, branch: &str) -> bool {
     // Channels are cumulative: beta = beta + stable, daily = daily + beta + stable
     let is_stable = !r.prerelease;
     let is_beta = r.tag_name.ends_with("-beta");
-    // Daily builds are timestamps: YYYYMMDDHHMMSS
-    let is_daily = r.tag_name.len() == 14 && !r.tag_name.contains('.');
+    // The daily channel is a single rolling release: tag "daily", rebuilt nightly
+    let is_daily = r.tag_name == "daily";
     match branch {
         "beta" => is_beta || is_stable,
         "daily" => is_daily || is_beta || is_stable,
@@ -37287,7 +37357,7 @@ fn restart_bsd_service() -> Result<()> {
 
 ### Update Checksum Verification
 
-**All downloads MUST be verified against checksums from the release:**
+**All downloads MUST be verified against checksums from the release. `do_update()` (Shared Update Logic, above) calls `fetch_expected_sha256()` to look up the expected hash from the release's `sha256.txt` asset, then calls `verify_checksum()` below before `replace_binary()` runs — a mismatch aborts the update and the running binary is left untouched:**
 
 ```rust
 use sha2::{Digest, Sha256};
@@ -38778,9 +38848,14 @@ PROJECT_ORG := $(shell git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/
 # Version precedence: release.txt > env/default fallback
 VERSION := $(shell [ -f release.txt ] && cat release.txt || echo "$${VERSION:-devel}")
 
-# Build info — ISO 8601 / RFC 3339 UTC per version_conventions.md
-# Format: "2025-12-04T13:05:13Z"
-BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+# Build info — BUILD_EPOCH is the single captured time source; BUILD_DATE is
+# derived from it (ISO 8601 / RFC 3339 UTC per version_conventions.md)
+# Unix build timestamp (seconds, UTC) - used by the updater's daily-channel check
+BUILD_EPOCH := $(shell date -u +%s)
+# Format: "2025-12-04T13:05:13Z" — derived from BUILD_EPOCH, never captured independently
+# Only consumed by the Docker OCI org.opencontainers.image.created label - the app
+# no longer embeds BUILD_DATE (it derives build_date() from BUILD_EPOCH at runtime)
+BUILD_DATE := $(shell date -u -d @$(BUILD_EPOCH) +"%Y-%m-%dT%H:%M:%SZ")
 COMMIT_ID := $(shell git rev-parse --short HEAD 2>/dev/null || echo "N/A")
 # COMMIT_ID used directly - no VCS_REF alias
 
@@ -38826,7 +38901,7 @@ RUST_DOCKER := docker run --rm \
 	-w /app \
 	-e VERSION="$(VERSION)" \
 	-e COMMIT_ID="$(COMMIT_ID)" \
-	-e BUILD_DATE="$(BUILD_DATE)" \
+	-e BUILD_EPOCH="$(BUILD_EPOCH)" \
 	-e OFFICIAL_SITE="$(OFFICIAL_SITE)" \
 	casjaysdev/rust:latest
 
@@ -39005,6 +39080,7 @@ docker:
 		--platform linux/amd64,linux/arm64 \
 		--build-arg VERSION="$(VERSION)" \
 		--build-arg BUILD_DATE="$(BUILD_DATE)" \
+		--build-arg BUILD_EPOCH="$(BUILD_EPOCH)" \
 		--build-arg COMMIT_ID="$(COMMIT_ID)" \
 		--build-arg OFFICIAL_SITE="$(OFFICIAL_SITE)" \
 		-t $(REGISTRY):$(VERSION) \
@@ -39068,7 +39144,8 @@ Every binary MUST have these values embedded at build time:
 |----------|---------|-------------|
 | `VERSION` | `1.2.3` | Semantic version from release.txt |
 | `COMMIT_ID` | `a1b2c3d` | Git short commit hash |
-| `BUILD_DATE` | `2025-12-04T13:05:13Z` | Build timestamp (ISO 8601 / RFC 3339 UTC per `version_conventions.md`) |
+| `BUILD_EPOCH` | `1765112713` | Unix build timestamp (seconds, UTC) — single captured time source; used by the updater's daily-channel check |
+| `BUILD_DATE` | `2025-12-04T13:05:13Z` | Build timestamp, ISO 8601 / RFC 3339 UTC, derived from `BUILD_EPOCH` (build systems: `date -u -d @$BUILD_EPOCH ...`; in-app: `version::build_date()`) — build systems only pass it through to the Docker OCI `org.opencontainers.image.created` label; the app no longer embeds it directly |
 | `OFFICIAL_SITE` | `https://api.example.com` | Default server URL (empty if self-hosted) |
 
 **Rust code requirement** (in `src/main.rs` or `src/version.rs`):
@@ -39080,11 +39157,11 @@ Use a `build.rs` script to embed build-time values via environment variables:
 fn main() {
     // VERSION comes from release.txt via the build environment; fall back to Cargo.toml
     println!("cargo:rustc-env=VERSION={}", std::env::var("VERSION").unwrap_or_else(|_| env!("CARGO_PKG_VERSION").into()));
-    println!("cargo:rustc-env=BUILD_DATE={}", std::env::var("BUILD_DATE").unwrap_or_else(|_| "N/A".into()));
+    println!("cargo:rustc-env=BUILD_EPOCH={}", std::env::var("BUILD_EPOCH").unwrap_or_else(|_| "0".into()));
     println!("cargo:rustc-env=COMMIT_ID={}", std::env::var("COMMIT_ID").unwrap_or_else(|_| "N/A".into()));
     println!("cargo:rustc-env=OFFICIAL_SITE={}", std::env::var("OFFICIAL_SITE").unwrap_or_default());
     println!("cargo:rerun-if-env-changed=VERSION");
-    println!("cargo:rerun-if-env-changed=BUILD_DATE");
+    println!("cargo:rerun-if-env-changed=BUILD_EPOCH");
     println!("cargo:rerun-if-env-changed=COMMIT_ID");
     println!("cargo:rerun-if-env-changed=OFFICIAL_SITE");
 }
@@ -39095,11 +39172,22 @@ fn main() {
 // VERSION is emitted by build.rs (release.txt value, Cargo.toml fallback)
 pub const VERSION: &str = env!("VERSION");
 pub const COMMIT_ID: &str = env!("COMMIT_ID");
-pub const BUILD_DATE: &str = env!("BUILD_DATE");
+// Unix build timestamp (seconds, UTC) - the single captured time source;
+// used by the updater's daily-channel check and to derive build_date()
+pub const BUILD_EPOCH: &str = env!("BUILD_EPOCH");
+// Build date derived from BUILD_EPOCH (RFC 3339 UTC); "N/A" when unset
+pub fn build_date() -> String {
+    match BUILD_EPOCH.parse::<i64>() {
+        Ok(n) if n > 0 => chrono::DateTime::from_timestamp(n, 0)
+            .map(|t| t.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+            .unwrap_or_else(|| "N/A".into()),
+        _ => "N/A".into(),
+    }
+}
 pub const OFFICIAL_SITE: &str = env!("OFFICIAL_SITE");
 ```
 
-**Build date format:** ISO 8601 / RFC 3339 UTC (`date -u +"%Y-%m-%dT%H:%M:%SZ"`) — never build-system local time.
+**Build date format:** ISO 8601 / RFC 3339 UTC (`date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ"` in build systems, `version::build_date()` in-app) — derived from `BUILD_EPOCH`, never captured independently; never build-system local time.
 
 **OFFICIAL_SITE usage:** If set, CLI/Agent use this as default `--server` value. If empty, users must provide `--server` flag or configure in cli.yml/agent.yml.
 
@@ -39130,7 +39218,7 @@ All Docker builds mount four host directories to persist Cargo, Rustup, sccache,
 4. Builds local binary: `binaries/{project_name}` (musl target)
 5. Builds all platform binaries: `binaries/{project_name}-{os}-{arch}`
 6. Uses musl target for static Linux binaries; cross-compiles for other platforms
-7. Embeds VERSION, COMMIT_ID, BUILD_DATE via `build.rs` + env vars
+7. Embeds VERSION, COMMIT_ID, BUILD_EPOCH via `build.rs` + env vars (BUILD_DATE is derived from BUILD_EPOCH at runtime, not embedded separately)
 8. All builds via Docker (`casjaysdev/rust:latest`)
 
 ### `make release`
@@ -39150,7 +39238,7 @@ All Docker builds mount four host directories to persist Cargo, Rustup, sccache,
 3. Context is project root, Dockerfile at `docker/Dockerfile`
 4. Builds for `linux/amd64` and `linux/arm64`
 5. Tags as `$REGISTRY:{version}` and `:latest` (no push — pushing is CI/CD's responsibility)
-6. Passes VERSION, BUILD_DATE, COMMIT_ID as build args
+6. Passes VERSION, BUILD_DATE, BUILD_EPOCH, COMMIT_ID as build args
 7. Layer caching: Cargo registry cached in builder stage
 
 ### `make test`
@@ -39376,15 +39464,15 @@ The **only** time binaries are copied is during CI/CD release process, where the
 | Property | Value |
 |----------|-------|
 | Trigger | Daily schedule (3am UTC) + push to main/master |
-| Version format | `{YYYYMMDDHHMMSS}` - TIMESTAMP, NO `v` prefix |
+| Version format | `{commit_id}` - short git commit id, NO `v` prefix |
 | Release name | `daily` (single rolling release) |
-| version.txt | `{YYYYMMDDHHMMSS}` (e.g., `20251218060432`) |
+| version.txt | `{commit_id}` (e.g., `a1b2c3d`) |
 | GitHub release | Yes, **replaces previous daily** |
 | Max releases | **1** (always overwrites previous daily) |
 
 **Example:**
-- Daily build → Release name `daily`, version.txt `20251218060432`
-- NO `v` prefix (not a semantic version)
+- Daily build → Release name `daily`, version.txt `a1b2c3d`
+- NO `v` prefix (not a semantic version); a daily build IS its commit, so VERSION is always `git rev-parse --short HEAD`
 
 **Daily Build Rules:**
 - Only ONE daily release exists at any time
@@ -39398,7 +39486,7 @@ The **only** time binaries are copied is during CI/CD release process, where the
 | **Stable** | `v1.2.3` or `1.2.3` | ✓ YES (numbers) | `v1.2.3` | `1.2.3` |
 | **Stable** | `v0.2.0` or `0.2.0` | ✓ YES (numbers) | `v0.2.0` | `0.2.0` |
 | **Beta** | (branch push) | ✗ NO (timestamp) | `20251205-beta` | `20251205-beta` |
-| **Daily** | (branch push) | ✗ NO (timestamp) | `daily` | `20251218` |
+| **Daily** | `daily` (rolling, deleted and recreated nightly) | ✗ NO (literal tag) | `daily` | `a1b2c3d` (commit id) |
 | **Dev** | `dev` | ✗ NO (text) | `dev` | `dev` |
 
 **NEVER:**
@@ -39419,7 +39507,7 @@ The **only** time binaries are copied is during CI/CD release process, where the
 |------|--------|-----------------|--------------|
 | Stable | CI/CD (tag) or `make release` (local) | `1.2.3` | Unlimited |
 | Beta | CI/CD only | `20251205143022-beta` | Unlimited |
-| Daily | CI/CD only | `20251218060432` | **1** (rolling) |
+| Daily | CI/CD only | `a1b2c3d` (short commit id) | **1** (rolling) |
 
 **Note:** `make release` is for manual local releases only. All automated releases use CI/CD (GitHub Actions, Gitea Actions, or GitLab CI depending on git provider).
 
@@ -39650,6 +39738,7 @@ RUN apk add --no-cache git bash
 ARG TARGETARCH
 ARG VERSION=dev
 ARG BUILD_DATE
+ARG BUILD_EPOCH
 ARG COMMIT_ID
 ARG OFFICIAL_SITE
 
@@ -39672,7 +39761,7 @@ RUN mkdir src && echo 'fn main() {}' > src/main.rs && \
 COPY . .
 RUN VERSION="${VERSION}" \
     COMMIT_ID="${COMMIT_ID}" \
-    BUILD_DATE="${BUILD_DATE}" \
+    BUILD_EPOCH="${BUILD_EPOCH}" \
     OFFICIAL_SITE="${OFFICIAL_SITE}" \
     cargo build --release --locked \
     --target "$([ "$TARGETARCH" = "arm64" ] && echo "aarch64-unknown-linux-musl" || echo "x86_64-unknown-linux-musl")" && \
@@ -39686,6 +39775,7 @@ FROM alpine:latest
 # ARGs for build-time values (set by docker build --build-arg)
 ARG VERSION=dev
 ARG BUILD_DATE
+ARG BUILD_EPOCH
 ARG COMMIT_ID
 ARG LICENSE=MIT
 
@@ -40234,9 +40324,10 @@ COPY src/ ./src/
 ARG VERSION=dev
 ARG COMMIT_ID=unknown
 ARG BUILD_DATE=unknown
+ARG BUILD_EPOCH=0
 ARG OFFICIAL_SITE
 
-RUN VERSION="${VERSION}" COMMIT_ID="${COMMIT_ID}" BUILD_DATE="${BUILD_DATE}" OFFICIAL_SITE="${OFFICIAL_SITE}" \
+RUN VERSION="${VERSION}" COMMIT_ID="${COMMIT_ID}" BUILD_EPOCH="${BUILD_EPOCH}" OFFICIAL_SITE="${OFFICIAL_SITE}" \
     RUSTFLAGS="-C target-feature=+crt-static" \
     cargo build --release --target x86_64-unknown-linux-musl \
     && cp target/x86_64-unknown-linux-musl/release/{project_name} /app/{project_name}
@@ -41119,7 +41210,7 @@ networks:
 **CI/CD workflows MUST:**
 - Use explicit `cargo build --release --target x86_64-unknown-linux-musl` commands with all flags visible
 - Use CI-native caching (NOT local host paths)
-- Set VERSION, COMMIT_ID, BUILD_DATE explicitly via environment variables passed to the build
+- Set VERSION, COMMIT_ID, BUILD_EPOCH explicitly via environment variables passed to the build (BUILD_DATE is derived from BUILD_EPOCH at runtime, not passed to cargo build)
 - Build all platforms in matrix
 - Auto-cancel older in-progress runs for the same ref on push workflows targeting `main`, `master`, `devel`, `dev`, or `beta`
 
@@ -41167,9 +41258,14 @@ All workflows MUST set these environment variables:
 # Set in "Set build info" step, NOT as static env:
 #   if [ -f release.txt ]; then echo "VERSION=$(cat release.txt)" >> $GITHUB_ENV; else echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV; fi
 #   echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-#   echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
-# Then use in build step via environment variables read by the Rust build (e.g., build.rs or env!() macros):
-#   VERSION=${{ env.VERSION }} COMMIT_ID=${{ env.COMMIT_ID }} BUILD_DATE=${{ env.BUILD_DATE }} \
+#   BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+#   BUILD_EPOCH="$(date -u +%s)"
+#   echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITHUB_ENV
+#   echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+# Then use in build step via environment variables read by the Rust build (e.g., build.rs or env!() macros)
+# — BUILD_DATE is NOT passed to cargo build (the app derives it from BUILD_EPOCH at runtime);
+# it is only passed to docker build-args/OCI-label contexts:
+#   VERSION=${{ env.VERSION }} COMMIT_ID=${{ env.COMMIT_ID }} BUILD_EPOCH=${{ env.BUILD_EPOCH }} \
 #     cargo build --release --target x86_64-unknown-linux-musl
 ```
 
@@ -41320,7 +41416,10 @@ jobs:
             echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
           fi
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-          echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+          # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+          BUILD_EPOCH="$(date -u +%s)"
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
           # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
           # Never guess or assume - must be explicitly defined by user
           if [ -f site.txt ]; then
@@ -41336,7 +41435,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -41350,7 +41449,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -41377,7 +41476,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -41475,11 +41574,9 @@ jobs:
       - name: Generate checksums
         run: |
           cd binaries
-          for f in *; do
-            [ -f "$f" ] || continue
-            case "$f" in *.sha256) continue ;; esac
-            sha256sum "$f" > "$f.sha256"
-          done
+          FILES="$(ls)"
+          sha256sum $FILES > sha256.txt
+          sha512sum $FILES > sha512.txt
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
@@ -41577,7 +41674,10 @@ jobs:
         run: |
           echo "VERSION=${{ needs.version.outputs.version }}" >> $GITHUB_ENV
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-          echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+          # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+          BUILD_EPOCH="$(date -u +%s)"
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
           # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
           # Never guess or assume - must be explicitly defined by user
           if [ -f site.txt ]; then
@@ -41593,7 +41693,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -41607,7 +41707,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -41634,7 +41734,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -41673,11 +41773,9 @@ jobs:
       - name: Generate checksums
         run: |
           cd binaries
-          for f in *; do
-            [ -f "$f" ] || continue
-            case "$f" in *.sha256) continue ;; esac
-            sha256sum "$f" > "$f.sha256"
-          done
+          FILES="$(ls)"
+          sha256sum $FILES > sha256.txt
+          sha512sum $FILES > sha512.txt
 
       - name: Create Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
@@ -41725,11 +41823,8 @@ jobs:
       - name: Compute version
         id: v
         run: |
-          if [ -f release.txt ]; then
-            VERSION="$(cat release.txt)"
-          else
-            VERSION="$(date -u +%Y%m%d%H%M%S)"
-          fi
+          # Daily identity is the commit, not a timestamp - a daily build IS its commit
+          VERSION="$(git rev-parse --short HEAD)"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
   build:
@@ -41771,7 +41866,10 @@ jobs:
         run: |
           echo "VERSION=${{ needs.version.outputs.version }}" >> $GITHUB_ENV
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-          echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+          # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+          BUILD_EPOCH="$(date -u +%s)"
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
           # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
           # Never guess or assume - must be explicitly defined by user
           if [ -f site.txt ]; then
@@ -41787,7 +41885,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -41801,7 +41899,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -41828,7 +41926,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -41867,11 +41965,9 @@ jobs:
       - name: Generate checksums
         run: |
           cd binaries
-          for f in *; do
-            [ -f "$f" ] || continue
-            case "$f" in *.sha256) continue ;; esac
-            sha256sum "$f" > "$f.sha256"
-          done
+          FILES="$(ls)"
+          sha256sum $FILES > sha256.txt
+          sha512sum $FILES > sha512.txt
 
       - name: Delete previous daily release
         run: |
@@ -41980,7 +42076,10 @@ jobs:
             echo "VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
             echo "IS_TAG=false" >> $GITHUB_ENV
           fi
-          echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+          # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+          BUILD_EPOCH="$(date -u +%s)"
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
 
       - name: Determine tags (standard)
         id: tags
@@ -42011,6 +42110,7 @@ jobs:
           build-args: |
             VERSION=${{ env.VERSION }}
             BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_EPOCH=${{ env.BUILD_EPOCH }}
             COMMIT_ID=${{ env.COMMIT_ID }}
           labels: |
             org.opencontainers.image.vendor={project_org}
@@ -42067,7 +42167,10 @@ jobs:
           # ghcr.io requires a lowercase image path
           echo "IMAGE_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-          echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+          # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+          BUILD_EPOCH="$(date -u +%s)"
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
 
       - name: Build and push (devel)
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
@@ -42081,6 +42184,7 @@ jobs:
           build-args: |
             VERSION=devel
             BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_EPOCH=${{ env.BUILD_EPOCH }}
             COMMIT_ID=${{ env.COMMIT_ID }}
           labels: |
             org.opencontainers.image.vendor={project_org}
@@ -42183,7 +42287,10 @@ jobs:
             echo "VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
             echo "IS_TAG=false" >> $GITHUB_ENV
           fi
-          echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
+          # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+          BUILD_EPOCH="$(date -u +%s)"
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITHUB_ENV
+          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV
 
       - name: Determine tags (all-in-one)
         id: tags
@@ -42216,6 +42323,7 @@ jobs:
           build-args: |
             VERSION=${{ env.VERSION }}
             BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_EPOCH=${{ env.BUILD_EPOCH }}
             COMMIT_ID=${{ env.COMMIT_ID }}
           labels: |
             org.opencontainers.image.vendor={project_org}
@@ -42376,7 +42484,10 @@ jobs:
             echo "VERSION=${GITEA_REF_NAME#v}" >> $GITEA_ENV
           fi
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITEA_ENV
-          echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITEA_ENV
+          # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+          BUILD_EPOCH="$(date -u +%s)"
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITEA_ENV
+          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITEA_ENV
           # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
           # Never guess or assume - must be explicitly defined by user
           if [ -f site.txt ]; then
@@ -42392,7 +42503,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -42406,7 +42517,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -42433,7 +42544,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -42526,11 +42637,9 @@ jobs:
       - name: Generate checksums
         run: |
           cd binaries
-          for f in *; do
-            [ -f "$f" ] || continue
-            case "$f" in *.sha256) continue ;; esac
-            sha256sum "$f" > "$f.sha256"
-          done
+          FILES="$(ls)"
+          sha256sum $FILES > sha256.txt
+          sha512sum $FILES > sha512.txt
 
       - name: Create Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
@@ -42621,7 +42730,10 @@ jobs:
         run: |
           echo "VERSION=${{ needs.version.outputs.version }}" >> $GITEA_ENV
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITEA_ENV
-          echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITEA_ENV
+          # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+          BUILD_EPOCH="$(date -u +%s)"
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITEA_ENV
+          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITEA_ENV
           # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
           # Never guess or assume - must be explicitly defined by user
           if [ -f site.txt ]; then
@@ -42637,7 +42749,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -42651,7 +42763,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -42678,7 +42790,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
           cargo zigbuild --release --target ${{ matrix.target }} \
@@ -42717,11 +42829,9 @@ jobs:
       - name: Generate checksums
         run: |
           cd binaries
-          for f in *; do
-            [ -f "$f" ] || continue
-            case "$f" in *.sha256) continue ;; esac
-            sha256sum "$f" > "$f.sha256"
-          done
+          FILES="$(ls)"
+          sha256sum $FILES > sha256.txt
+          sha512sum $FILES > sha512.txt
 
       - name: Create Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
@@ -42768,11 +42878,8 @@ jobs:
       - name: Compute version
         id: v
         run: |
-          if [ -f release.txt ]; then
-            VERSION="$(cat release.txt)"
-          else
-            VERSION="$(date -u +%Y%m%d%H%M%S)"
-          fi
+          # Daily identity is the commit, not a timestamp - a daily build IS its commit
+          VERSION="$(git rev-parse --short HEAD)"
           echo "version=$VERSION" >> "$GITEA_OUTPUT"
 
   build:
@@ -42814,7 +42921,10 @@ jobs:
         run: |
           echo "VERSION=${{ needs.version.outputs.version }}" >> $GITEA_ENV
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITEA_ENV
-          echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITEA_ENV
+          # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+          BUILD_EPOCH="$(date -u +%s)"
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITEA_ENV
+          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITEA_ENV
           # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
           # Never guess or assume - must be explicitly defined by user
           if [ -f site.txt ]; then
@@ -42831,7 +42941,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
 
       # CLI build - only if src/client/ directory exists
@@ -42844,7 +42954,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
 
       - name: Upload server artifact
@@ -42870,7 +42980,7 @@ jobs:
         env:
           VERSION: ${{ env.VERSION }}
           COMMIT_ID: ${{ env.COMMIT_ID }}
-          BUILD_DATE: ${{ env.BUILD_DATE }}
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
 
       - name: Upload Agent artifact
@@ -42904,11 +43014,9 @@ jobs:
       - name: Generate checksums
         run: |
           cd binaries
-          for f in *; do
-            [ -f "$f" ] || continue
-            case "$f" in *.sha256) continue ;; esac
-            sha256sum "$f" > "$f.sha256"
-          done
+          FILES="$(ls)"
+          sha256sum $FILES > sha256.txt
+          sha512sum $FILES > sha512.txt
 
       - name: Delete previous daily release
         run: |
@@ -43001,7 +43109,10 @@ jobs:
             echo "VERSION=$(git rev-parse --short HEAD)" >> $GITEA_ENV
             echo "IS_TAG=false" >> $GITEA_ENV
           fi
-          echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITEA_ENV
+          # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+          BUILD_EPOCH="$(date -u +%s)"
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITEA_ENV
+          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITEA_ENV
 
       - name: Determine tags (standard)
         id: tags
@@ -43035,6 +43146,7 @@ jobs:
           build-args: |
             VERSION=${{ env.VERSION }}
             BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_EPOCH=${{ env.BUILD_EPOCH }}
             COMMIT_ID=${{ env.COMMIT_ID }}
           labels: |
             org.opencontainers.image.vendor={project_org}
@@ -43098,7 +43210,10 @@ jobs:
           # Container registries require a lowercase image path
           echo "IMAGE_NAME=$(echo "${{ gitea.repository }}" | tr '[:upper:]' '[:lower:]')" >> $GITEA_ENV
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITEA_ENV
-          echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITEA_ENV
+          # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+          BUILD_EPOCH="$(date -u +%s)"
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITEA_ENV
+          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITEA_ENV
 
       - name: Build and push (devel)
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
@@ -43112,6 +43227,7 @@ jobs:
           build-args: |
             VERSION=devel
             BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_EPOCH=${{ env.BUILD_EPOCH }}
             COMMIT_ID=${{ env.COMMIT_ID }}
           labels: |
             org.opencontainers.image.vendor={project_org}
@@ -43220,7 +43336,10 @@ jobs:
             echo "VERSION=$(git rev-parse --short HEAD)" >> $GITEA_ENV
             echo "IS_TAG=false" >> $GITEA_ENV
           fi
-          echo "BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITEA_ENV
+          # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+          BUILD_EPOCH="$(date -u +%s)"
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITEA_ENV
+          echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITEA_ENV
 
       - name: Determine tags (all-in-one)
         id: tags
@@ -43253,6 +43372,7 @@ jobs:
           build-args: |
             VERSION=${{ env.VERSION }}
             BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_EPOCH=${{ env.BUILD_EPOCH }}
             COMMIT_ID=${{ env.COMMIT_ID }}
           labels: |
             org.opencontainers.image.vendor={project_org}
@@ -43378,7 +43498,9 @@ stages:
     # in casjaysdev/rust:latest — never apt-get or cargo install inside a CI job.
     - export VERSION="${CI_COMMIT_TAG#v}"
     - export COMMIT_ID="${CI_COMMIT_SHORT_SHA}"
-    - export BUILD_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+    - export BUILD_EPOCH="$(date -u +%s)"
+    - export BUILD_DATE="$(date -u -d @${BUILD_EPOCH} +"%Y-%m-%dT%H:%M:%SZ")"
     # OFFICIAL_SITE (optional): site.txt wins; otherwise use CI/CD Variables or leave empty
     # Never guess or assume - must be explicitly defined by user
     - |
@@ -43532,9 +43654,20 @@ release:
   script:
     - echo "Creating release ${CI_COMMIT_TAG}"
     - echo "${CI_COMMIT_TAG#v}" > version.txt
+    # Consolidated sha256.txt/sha512.txt over every release asset (version.txt +
+    # binaries) - the job runs in the full repo checkout, not an isolated directory,
+    # so the file list is explicitly scoped rather than a bare `ls`; pre-capturing it
+    # once (GitLab concatenates script items into one shell, so the var carries)
+    # ensures both checksum files cover the identical asset set and never hash
+    # each other or themselves
+    - FILES="version.txt ${PROJECT_NAME}-*"
+    - sha256sum $FILES > sha256.txt
+    - sha512sum $FILES > sha512.txt
   artifacts:
     paths:
       - version.txt
+      - sha256.txt
+      - sha512.txt
       - ${PROJECT_NAME}-*
   release:
     tag_name: $CI_COMMIT_TAG
@@ -43556,6 +43689,10 @@ release:
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${PROJECT_NAME}-windows-arm64.exe?job=build:windows-arm64"
         - name: "${PROJECT_NAME}-freebsd-amd64"
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${PROJECT_NAME}-freebsd-amd64?job=build:freebsd-amd64"
+        - name: "sha256.txt"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/sha256.txt?job=release"
+        - name: "sha512.txt"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/sha512.txt?job=release"
   rules:
     - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+/
 
@@ -43569,7 +43706,9 @@ build:beta:
   before_script:
     - export VERSION="$(date +%Y%m%d%H%M%S)-beta"
     - export COMMIT_ID="${CI_COMMIT_SHORT_SHA}"
-    - export BUILD_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+    - export BUILD_EPOCH="$(date -u +%s)"
+    - export BUILD_DATE="$(date -u -d @${BUILD_EPOCH} +"%Y-%m-%dT%H:%M:%SZ")"
   script:
     # Build all 7 platforms
     - cargo zigbuild --release --target x86_64-unknown-linux-musl && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-amd64
@@ -43610,9 +43749,12 @@ build:daily:
   <<: *rust-build
   stage: build
   before_script:
-    - export VERSION="$(date +%Y%m%d%H%M%S)"
+    # Daily identity is the commit, not a timestamp - a daily build IS its commit
+    - export VERSION="${CI_COMMIT_SHORT_SHA}"
     - export COMMIT_ID="${CI_COMMIT_SHORT_SHA}"
-    - export BUILD_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+    - export BUILD_EPOCH="$(date -u +%s)"
+    - export BUILD_DATE="$(date -u -d @${BUILD_EPOCH} +"%Y-%m-%dT%H:%M:%SZ")"
   script:
     # Build all 7 platforms
     - cargo zigbuild --release --target x86_64-unknown-linux-musl && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-amd64
@@ -43677,7 +43819,9 @@ docker:build:
         VERSION="$CI_COMMIT_SHORT_SHA"
         TAGS="-t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
       fi
-      BUILD_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+      # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+      BUILD_EPOCH="$(date -u +%s)"
+      BUILD_DATE="$(date -u -d @${BUILD_EPOCH} +"%Y-%m-%dT%H:%M:%SZ")"
     - |
       # Build multi-arch with OCI labels and manifest annotations
       docker buildx build \
@@ -43685,6 +43829,7 @@ docker:build:
         --platform linux/amd64,linux/arm64 \
         --build-arg VERSION="${VERSION}" \
         --build-arg COMMIT_ID="${CI_COMMIT_SHORT_SHA}" \
+        --build-arg BUILD_EPOCH="${BUILD_EPOCH}" \
         --build-arg BUILD_DATE="${BUILD_DATE}" \
         --build-arg OFFICIAL_SITE="${OFFICIAL_SITE}" \
         --label "org.opencontainers.image.vendor=${PROJECT_ORG}" \
@@ -43745,7 +43890,9 @@ docker:build-aio:
         VERSION="$CI_COMMIT_SHORT_SHA"
         TAGS="-t ${IMAGE}:${CI_COMMIT_SHORT_SHA}-aio"
       fi
-      BUILD_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+      # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+      BUILD_EPOCH="$(date -u +%s)"
+      BUILD_DATE="$(date -u -d @${BUILD_EPOCH} +"%Y-%m-%dT%H:%M:%SZ")"
     - |
       # Build multi-arch all-in-one with OCI labels and manifest annotations
       docker buildx build \
@@ -43753,6 +43900,7 @@ docker:build-aio:
         --platform linux/amd64,linux/arm64 \
         --build-arg VERSION="${VERSION}" \
         --build-arg COMMIT_ID="${CI_COMMIT_SHORT_SHA}" \
+        --build-arg BUILD_EPOCH="${BUILD_EPOCH}" \
         --build-arg BUILD_DATE="${BUILD_DATE}" \
         --build-arg OFFICIAL_SITE="${OFFICIAL_SITE}" \
         --label "org.opencontainers.image.vendor=${PROJECT_ORG}" \
@@ -43803,7 +43951,9 @@ docker:build-devel:
   script:
     - |
       VERSION="$CI_COMMIT_SHORT_SHA"
-      BUILD_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+      # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+      BUILD_EPOCH="$(date -u +%s)"
+      BUILD_DATE="$(date -u -d @${BUILD_EPOCH} +"%Y-%m-%dT%H:%M:%SZ")"
     - |
       # devel image builds from docker/Dockerfile.dev, static :devel tag, no aio variant
       docker buildx build \
@@ -43811,6 +43961,7 @@ docker:build-devel:
         --platform linux/amd64,linux/arm64 \
         --build-arg VERSION="${VERSION}" \
         --build-arg COMMIT_ID="${CI_COMMIT_SHORT_SHA}" \
+        --build-arg BUILD_EPOCH="${BUILD_EPOCH}" \
         --build-arg BUILD_DATE="${BUILD_DATE}" \
         --build-arg OFFICIAL_SITE="${OFFICIAL_SITE}" \
         --label "org.opencontainers.image.vendor=${PROJECT_ORG}" \
@@ -43989,15 +44140,18 @@ pipeline {
                         env.VERSION = sh(script: 'date -u +"%Y%m%d%H%M%S"', returnStdout: true).trim() + '-beta'
                     } else if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master') {
                         // Daily build - matches daily.yml
+                        // Daily identity is the commit, not a timestamp - a daily build IS its commit
                         env.BUILD_TYPE = 'daily'
-                        env.VERSION = sh(script: 'date -u +"%Y%m%d%H%M%S"', returnStdout: true).trim()
+                        env.VERSION = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                     } else {
                         // Other branches - dev build
                         env.BUILD_TYPE = 'dev'
                         env.VERSION = sh(script: 'date -u +"%Y%m%d%H%M%S"', returnStdout: true).trim() + '-dev'
                     }
                     env.COMMIT_ID = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    env.BUILD_DATE = sh(script: 'date -u +"%Y-%m-%dT%H:%M:%SZ"', returnStdout: true).trim()
+                    // BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
+                    env.BUILD_EPOCH = sh(script: 'date -u +%s', returnStdout: true).trim()
+                    env.BUILD_DATE = sh(script: "date -u -d @${env.BUILD_EPOCH} +\"%Y-%m-%dT%H:%M:%SZ\"", returnStdout: true).trim()
                     // OFFICIAL_SITE (optional): site.txt wins; otherwise use Jenkins credentials or leave empty
                     // Never guess or assume - must be explicitly defined by user
                     env.OFFICIAL_SITE = sh(script: '[ -f site.txt ] && cat site.txt || echo "${OFFICIAL_SITE:-}"', returnStdout: true).trim()
@@ -44026,7 +44180,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target x86_64-unknown-linux-musl
                             cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME} ${BINDIR}/${PROJECT_NAME}-linux-amd64
@@ -44047,7 +44201,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target aarch64-unknown-linux-musl
                             cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME} ${BINDIR}/${PROJECT_NAME}-linux-arm64
@@ -44069,7 +44223,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target x86_64-apple-darwin
                             cp target/x86_64-apple-darwin/release/${PROJECT_NAME} ${BINDIR}/${PROJECT_NAME}-darwin-amd64
@@ -44090,7 +44244,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target aarch64-apple-darwin
                             cp target/aarch64-apple-darwin/release/${PROJECT_NAME} ${BINDIR}/${PROJECT_NAME}-darwin-arm64
@@ -44112,7 +44266,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target x86_64-pc-windows-gnu
                             cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}.exe ${BINDIR}/${PROJECT_NAME}-windows-amd64.exe
@@ -44133,7 +44287,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target aarch64-pc-windows-gnullvm
                             cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}.exe ${BINDIR}/${PROJECT_NAME}-windows-arm64.exe
@@ -44155,7 +44309,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target x86_64-unknown-freebsd
                             cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME} ${BINDIR}/${PROJECT_NAME}-freebsd-amd64
@@ -44185,7 +44339,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-cli
                             cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${BINDIR}/${PROJECT_NAME}-cli-linux-amd64
@@ -44206,7 +44360,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target aarch64-unknown-linux-musl --bin ${PROJECT_NAME}-cli
                             cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${BINDIR}/${PROJECT_NAME}-cli-linux-arm64
@@ -44227,7 +44381,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target x86_64-apple-darwin --bin ${PROJECT_NAME}-cli
                             cp target/x86_64-apple-darwin/release/${PROJECT_NAME}-cli ${BINDIR}/${PROJECT_NAME}-cli-darwin-amd64
@@ -44248,7 +44402,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target aarch64-apple-darwin --bin ${PROJECT_NAME}-cli
                             cp target/aarch64-apple-darwin/release/${PROJECT_NAME}-cli ${BINDIR}/${PROJECT_NAME}-cli-darwin-arm64
@@ -44269,7 +44423,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-cli
                             cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-cli.exe ${BINDIR}/${PROJECT_NAME}-cli-windows-amd64.exe
@@ -44290,7 +44444,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-cli
                             cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-cli.exe ${BINDIR}/${PROJECT_NAME}-cli-windows-arm64.exe
@@ -44311,7 +44465,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-cli
                             cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-cli ${BINDIR}/${PROJECT_NAME}-cli-freebsd-amd64
@@ -44341,7 +44495,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-agent
                             cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-agent ${BINDIR}/${PROJECT_NAME}-agent-linux-amd64
@@ -44362,7 +44516,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target aarch64-unknown-linux-musl --bin ${PROJECT_NAME}-agent
                             cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME}-agent ${BINDIR}/${PROJECT_NAME}-agent-linux-arm64
@@ -44383,7 +44537,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target x86_64-apple-darwin --bin ${PROJECT_NAME}-agent
                             cp target/x86_64-apple-darwin/release/${PROJECT_NAME}-agent ${BINDIR}/${PROJECT_NAME}-agent-darwin-amd64
@@ -44404,7 +44558,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target aarch64-apple-darwin --bin ${PROJECT_NAME}-agent
                             cp target/aarch64-apple-darwin/release/${PROJECT_NAME}-agent ${BINDIR}/${PROJECT_NAME}-agent-darwin-arm64
@@ -44425,7 +44579,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-agent
                             cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-agent.exe ${BINDIR}/${PROJECT_NAME}-agent-windows-amd64.exe
@@ -44446,7 +44600,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-agent
                             cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-agent.exe ${BINDIR}/${PROJECT_NAME}-agent-windows-arm64.exe
@@ -44467,7 +44621,7 @@ pipeline {
                                 -w /app \
                                 -e VERSION="${VERSION}" \
                                 -e COMMIT_ID="${COMMIT_ID}" \
-                                -e BUILD_DATE="${BUILD_DATE}" \
+                                -e BUILD_EPOCH="${BUILD_EPOCH}" \
                                 casjaysdev/rust:latest \
                                 cargo zigbuild --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-agent
                             cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-agent ${BINDIR}/${PROJECT_NAME}-agent-freebsd-amd64
@@ -44514,6 +44668,11 @@ pipeline {
                         --exclude='.forgejo' --exclude='binaries' --exclude='releases' \
                         --exclude='*.tar.gz' \
                         -czf ${RELDIR}/${PROJECT_NAME}-${VERSION}-source.tar.gz .
+
+                    cd ${RELDIR}
+                    FILES="$(ls)"
+                    sha256sum $FILES > sha256.txt
+                    sha512sum $FILES > sha512.txt
                 '''
                 archiveArtifacts artifacts: 'releases/*', fingerprint: true
             }
@@ -44533,6 +44692,11 @@ pipeline {
                         [ -f "$f" ] || continue
                         cp "$f" ${RELDIR}/
                     done
+
+                    cd ${RELDIR}
+                    FILES="$(ls)"
+                    sha256sum $FILES > sha256.txt
+                    sha512sum $FILES > sha512.txt
                 '''
                 archiveArtifacts artifacts: 'releases/*', fingerprint: true
             }
@@ -44552,6 +44716,11 @@ pipeline {
                         [ -f "$f" ] || continue
                         cp "$f" ${RELDIR}/
                     done
+
+                    cd ${RELDIR}
+                    FILES="$(ls)"
+                    sha256sum $FILES > sha256.txt
+                    sha512sum $FILES > sha512.txt
                 '''
                 archiveArtifacts artifacts: 'releases/*', fingerprint: true
             }
@@ -44591,6 +44760,7 @@ pipeline {
                             --build-arg VERSION="${VERSION}" \
                             --build-arg COMMIT_ID="${COMMIT_ID}" \
                             --build-arg BUILD_DATE="${BUILD_DATE}" \
+                            --build-arg BUILD_EPOCH="${BUILD_EPOCH}" \
                             --build-arg OFFICIAL_SITE="${OFFICIAL_SITE}" \
                             --label "org.opencontainers.image.vendor=${PROJECT_ORG}" \
                             --label "org.opencontainers.image.authors=${PROJECT_ORG}" \
@@ -44658,6 +44828,7 @@ pipeline {
                             --build-arg VERSION="${VERSION}" \
                             --build-arg COMMIT_ID="${COMMIT_ID}" \
                             --build-arg BUILD_DATE="${BUILD_DATE}" \
+                            --build-arg BUILD_EPOCH="${BUILD_EPOCH}" \
                             --build-arg OFFICIAL_SITE="${OFFICIAL_SITE}" \
                             --label "org.opencontainers.image.vendor=${PROJECT_ORG}" \
                             --label "org.opencontainers.image.authors=${PROJECT_ORG}" \
@@ -44711,6 +44882,7 @@ pipeline {
                             --build-arg VERSION="${VERSION}" \
                             --build-arg COMMIT_ID="${COMMIT_ID}" \
                             --build-arg BUILD_DATE="${BUILD_DATE}" \
+                            --build-arg BUILD_EPOCH="${BUILD_EPOCH}" \
                             --build-arg OFFICIAL_SITE="${OFFICIAL_SITE}" \
                             --label "org.opencontainers.image.vendor=${PROJECT_ORG}" \
                             --label "org.opencontainers.image.authors=${PROJECT_ORG}" \
