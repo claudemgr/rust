@@ -36632,13 +36632,13 @@ pub struct LocaleFS;
 
 | Rule | Description |
 |------|-------------|
-| **No hardcoded strings** | Every user-facing string MUST use `t(key)` or `{{t .Lang key}}` |
+| **No hardcoded strings** | Every user-facing string MUST use `t(key)` or `{{ t(lang, key) }}` |
 | **HTTP errors** | All error responses MUST use `t(r, "errors.*")` — never hardcoded English |
 | **API responses** | All error/status messages in JSON responses MUST use translation keys |
 | **Config defaults** | Config values shown to users (e.g., `reject_message`) MUST fall back to translated keys |
 | **Wireframes** | ASCII wireframes in this spec show English for documentation only — actual UI renders via `t()` |
 | **Key naming** | Use dot-separated lowercase: `health.status.title` |
-| **Interpolation** | Use `{variable}` syntax: `"Hello, {name}"` |
+| **Interpolation** | Named `{variable}` tokens only: `"Hello, {name}"` — substituted by LITERAL string replacement (`tf`/`translate_format` via `str::replace`), never by `format!` (a translation is not a format string); positional `{0}` and printf-style `%s` placeholders are forbidden in locale files |
 | **Plurals** | Nested under key with `zero`, `one`, `two`, `few`, `many`, `other` |
 | **HTML content** | Store plain text in translations, apply HTML in templates |
 | **Context** | Same word with different meanings gets different keys (e.g., `common.close` vs `nav.close`) |
@@ -36702,21 +36702,35 @@ pub fn translate(lang: &str, key: &str) -> String {
     // last resort: return the key itself
     key.to_string()
 }
+
+// translate_format replaces named {token} placeholders in the translated
+// string with the supplied values. Interpolation is LITERAL string
+// replacement — the translation is NEVER used as a format!() string
+// (no {} captures, no positional {0}), so stray braces in a translation
+// can never panic or corrupt output. Tokens with no supplied value stay
+// visible as-is (a visible bug beats a silent one); extra args are ignored.
+pub fn translate_format(lang: &str, key: &str, args: &[(&str, &str)]) -> String {
+    let mut s = translate(lang, key);
+    for (k, v) in args {
+        s = s.replace(&format!("{{{}}}", k), v);
+    }
+    s
+}
 ```
 
 ```html
-<!-- Simple translation -->
-<h1>{{t .Lang "health.status.title"}}</h1>
+<!-- Simple translation (Askama syntax) -->
+<h1>{{ t(lang, "health.status.title") }}</h1>
 
 <!-- With interpolation -->
-<p>{{tf .Lang "health.ssl_expires_in" .Days}}</p>
+<p>{{ tf(lang, "health.ssl_expires_in", &[("days", &days.to_string())]) }}</p>
 
 <!-- Plurals -->
-<span>{{tp .Lang "plurals.items" .Count}}</span>
+<span>{{ tp(lang, "plurals.items", count) }}</span>
 
 <!-- Attributes -->
-<input placeholder="{{t .Lang "common.search_placeholder"}}">
-<button aria-label="{{t .Lang "common.close"}}">X</button>
+<input placeholder="{{ t(lang, "common.search_placeholder") }}">
+<button aria-label="{{ t(lang, "common.close") }}">X</button>
 ```
 
 **JavaScript (for dynamic frontend strings):**
@@ -36734,7 +36748,7 @@ function t(key) {
 function tf(key, vars) {
     let str = t(key);
     for (const [k, v] of Object.entries(vars)) {
-        str = str.replace(`{${k}}`, v);
+        str = str.replaceAll(`{${k}}`, v);
     }
     return str;
 }

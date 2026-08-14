@@ -49586,7 +49586,7 @@ pub struct LocaleAssets;
 | **Config defaults** | Config values shown to users (e.g., `reject_message`) MUST fall back to translated keys |
 | **Wireframes** | ASCII wireframes in this spec show English for documentation only — actual UI renders via `t()` |
 | **Key naming** | Use dot-separated lowercase: `admin.dashboard.title` |
-| **Interpolation** | Use `{variable}` syntax: `"Hello, {name}"` |
+| **Interpolation** | Named `{variable}` tokens only: `"Hello, {name}"` — substituted by LITERAL string replacement (`tf`/`translate_format` via `str::replace`), never by `format!` (a translation is not a format string); positional `{0}` and printf-style `%s` placeholders are forbidden in locale files |
 | **Plurals** | Nested under key with `zero`, `one`, `two`, `few`, `many`, `other` |
 | **HTML content** | Store plain text in translations, apply HTML in templates |
 | **Context** | Same word with different meanings gets different keys (e.g., `common.close` vs `nav.close`) |
@@ -49675,7 +49675,7 @@ pub fn translate(lang: &str, key: &str) -> String {
 <h1>{{ t(lang, "admin.dashboard.title") }}</h1>
 
 <!-- With interpolation -->
-<p>{{ tf(lang, "admin.dashboard.ssl_expires_in", &[("days", &days.to_string())]) }}</p>
+<p>{{ tf(lang, "admin.dashboard.ssl_expires_in", &[("count", &days.to_string())]) }}</p>
 
 <!-- Plurals -->
 <span>{{ tp(lang, "plurals.items", count) }}</span>
@@ -49700,7 +49700,7 @@ function t(key) {
 function tf(key, vars) {
     let str = t(key);
     for (const [k, v] of Object.entries(vars)) {
-        str = str.replace(`{${k}}`, v);
+        str = str.replaceAll(`{${k}}`, v);
     }
     return str;
 }
