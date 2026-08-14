@@ -34752,6 +34752,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -34770,6 +34772,22 @@ jobs:
       - name: Create version.txt
         run: echo "${{ env.VERSION }}" > binaries/version.txt
 
+      - name: Create source archive
+        run: |
+          tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
+            --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
+            -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
+
+      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
+      # inside the container (never on the runner host); skip if already present
+      - name: Generate SBOM
+        run: |
+          docker run --rm --name "${{ env.PROJECT_NAME }}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+            -v "$PWD":/app -w /app \
+            casjaysdev/rust:latest \
+            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+          cp bom.cdx.json "binaries/${{ env.PROJECT_NAME }}-bom.json"
+
       # FILES is pre-captured so sha256.txt and sha512.txt cover the identical
       # asset set (including version.txt) and never hash each other
       - name: Generate checksums
@@ -34778,6 +34796,11 @@ jobs:
           FILES="$(ls)"
           sha256sum $FILES > sha256.txt
           sha512sum $FILES > sha512.txt
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: binaries/*
 
       - name: Create Release
         # v3.0.2
@@ -34930,6 +34953,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -34948,6 +34973,22 @@ jobs:
       - name: Create version.txt
         run: echo "${{ env.VERSION }}" > binaries/version.txt
 
+      - name: Create source archive
+        run: |
+          tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
+            --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
+            -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
+
+      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
+      # inside the container (never on the runner host); skip if already present
+      - name: Generate SBOM
+        run: |
+          docker run --rm --name "${{ env.PROJECT_NAME }}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+            -v "$PWD":/app -w /app \
+            casjaysdev/rust:latest \
+            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+          cp bom.cdx.json "binaries/${{ env.PROJECT_NAME }}-bom.json"
+
       # FILES is pre-captured so sha256.txt and sha512.txt cover the identical
       # asset set (including version.txt) and never hash each other
       - name: Generate checksums
@@ -34956,6 +34997,11 @@ jobs:
           FILES="$(ls)"
           sha256sum $FILES > sha256.txt
           sha512sum $FILES > sha512.txt
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: binaries/*
 
       - name: Delete previous daily release
         run: |
@@ -35635,6 +35681,22 @@ jobs:
       - name: Create version.txt
         run: echo "${{ env.VERSION }}" > binaries/version.txt
 
+      - name: Create source archive
+        run: |
+          tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
+            --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
+            -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
+
+      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
+      # inside the container (never on the runner host); skip if already present
+      - name: Generate SBOM
+        run: |
+          docker run --rm --name "${{ env.PROJECT_NAME }}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+            -v "$PWD":/app -w /app \
+            casjaysdev/rust:latest \
+            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+          cp bom.cdx.json "binaries/${{ env.PROJECT_NAME }}-bom.json"
+
       # FILES is pre-captured so sha256.txt and sha512.txt cover the identical
       # asset set (including version.txt) and never hash each other
       - name: Generate checksums
@@ -35811,6 +35873,22 @@ jobs:
 
       - name: Create version.txt
         run: echo "${{ env.VERSION }}" > binaries/version.txt
+
+      - name: Create source archive
+        run: |
+          tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
+            --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
+            -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
+
+      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
+      # inside the container (never on the runner host); skip if already present
+      - name: Generate SBOM
+        run: |
+          docker run --rm --name "${{ env.PROJECT_NAME }}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+            -v "$PWD":/app -w /app \
+            casjaysdev/rust:latest \
+            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+          cp bom.cdx.json "binaries/${{ env.PROJECT_NAME }}-bom.json"
 
       # FILES is pre-captured so sha256.txt and sha512.txt cover the identical
       # asset set (including version.txt) and never hash each other
@@ -36168,9 +36246,15 @@ build:linux-amd64:
     - cargo zigbuild --release --target x86_64-unknown-linux-musl
     - cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-amd64
     - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-amd64; fi
+    # VERSION is exported via dotenv so the stable `release` job consumes the
+    # exact same value instead of recomputing ${CI_COMMIT_TAG#v} itself - this
+    # job is already tag-rules-scoped, so no extra guard is needed
+    - echo "RELEASE_VERSION=${VERSION}" > release.env
   artifacts:
     paths:
       - ${PROJECT_NAME}-linux-amd64*
+    reports:
+      dotenv: release.env
     expire_in: 1 week
   rules:
     - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+/
@@ -36285,9 +36369,13 @@ test:
 
 release:
   stage: release
-  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  # BUILD_IMAGE (not release-cli) so tar/cargo-cyclonedx are available; the
+  # `release:` keyword still works - GitLab's docker/kubernetes executor injects
+  # release-cli via the runner helper image regardless of the job's own image
+  image: $BUILD_IMAGE
   needs:
-    - build:linux-amd64
+    - job: build:linux-amd64
+      artifacts: true
     - build:linux-arm64
     - build:darwin-amd64
     - build:darwin-arm64
@@ -36296,18 +36384,43 @@ release:
     - build:freebsd-amd64
     - test
   script:
-    - echo "Creating release ${CI_COMMIT_TAG}"
-    - echo "${CI_COMMIT_TAG#v}" > version.txt
+    - echo "Creating release ${CI_COMMIT_TAG} (${RELEASE_VERSION})"
+    - echo "${RELEASE_VERSION}" > version.txt
+    - tar --exclude='.git' --exclude='.github' --exclude='.gitea' --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' -czf ${PROJECT_NAME}-${RELEASE_VERSION}-source.tar.gz .
+    - cargo cyclonedx --format json --override-filename bom
+    - cp bom.cdx.json ${PROJECT_NAME}-bom.json
+    # Consolidated sha256.txt/sha512.txt over every release asset (version.txt +
+    # binaries) - the job runs in the full repo checkout, not an isolated directory,
+    # so the file list is explicitly scoped rather than a bare `ls`; pre-capturing it
+    # once (GitLab concatenates script items into one shell, so the var carries)
+    # ensures both checksum files cover the identical asset set and never hash
+    # each other or themselves
+    - FILES="version.txt ${PROJECT_NAME}-*"
+    - sha256sum $FILES > sha256.txt
+    - sha512sum $FILES > sha512.txt
   artifacts:
     paths:
       - version.txt
+      - sha256.txt
+      - sha512.txt
       - ${PROJECT_NAME}-*
+  # $RELEASE_VERSION is available here because it arrived via upstream dotenv
+  # through `needs:` - a same-job dotenv export is NOT visible in this
+  # declarative `release:` block, only a needs-inherited one is
   release:
     tag_name: $CI_COMMIT_TAG
     name: "Release $CI_COMMIT_TAG"
     description: "Release created by GitLab CI"
     assets:
       links:
+        - name: "sha256.txt"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/sha256.txt?job=release"
+        - name: "sha512.txt"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/sha512.txt?job=release"
+        - name: "${PROJECT_NAME}-${RELEASE_VERSION}-source.tar.gz"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${PROJECT_NAME}-${RELEASE_VERSION}-source.tar.gz?job=release"
+        - name: "${PROJECT_NAME}-bom.json"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${PROJECT_NAME}-bom.json?job=release"
         - name: "${PROJECT_NAME}-linux-amd64"
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${PROJECT_NAME}-linux-amd64?job=build:linux-amd64"
         - name: "${PROJECT_NAME}-linux-arm64"
@@ -36354,10 +36467,74 @@ build:beta:
     - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-cli && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-amd64.exe; fi
     - if [ -d "src/client" ]; then cargo zigbuild --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-cli && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-arm64.exe; fi
     - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-freebsd-amd64; fi
+    # VERSION is exported via dotenv so release:beta consumes the exact same
+    # timestamp instead of recomputing it and risking drift
+    - echo "RELEASE_VERSION=${VERSION}" > release.env
   artifacts:
     paths:
       - ${PROJECT_NAME}-*
+    reports:
+      dotenv: release.env
     expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == "beta"
+
+release:beta:
+  stage: release
+  # BUILD_IMAGE (not release-cli) so tar/cargo-cyclonedx are available; the
+  # `release:` keyword still works - GitLab's docker/kubernetes executor injects
+  # release-cli via the runner helper image regardless of the job's own image
+  image: $BUILD_IMAGE
+  needs:
+    - job: build:beta
+      artifacts: true
+    - test
+  script:
+    - echo "Creating beta release ${RELEASE_VERSION}"
+    - echo "${RELEASE_VERSION}" > version.txt
+    - tar --exclude='.git' --exclude='.github' --exclude='.gitea' --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' -czf ${PROJECT_NAME}-${RELEASE_VERSION}-source.tar.gz .
+    - cargo cyclonedx --format json --override-filename bom
+    - cp bom.cdx.json ${PROJECT_NAME}-bom.json
+    # FILES pre-captured so sha256.txt/sha512.txt cover the identical asset set
+    # (version.txt + binaries + source archive + SBOM) and never hash each other
+    - FILES="version.txt ${PROJECT_NAME}-*"
+    - sha256sum $FILES > sha256.txt
+    - sha512sum $FILES > sha512.txt
+  artifacts:
+    paths:
+      - version.txt
+      - sha256.txt
+      - sha512.txt
+      - ${PROJECT_NAME}-*
+    expire_in: 1 week
+  release:
+    tag_name: $RELEASE_VERSION
+    name: "Beta Release $RELEASE_VERSION"
+    description: "Beta build created by GitLab CI"
+    assets:
+      links:
+        - name: "sha256.txt"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/sha256.txt?job=release:beta"
+        - name: "sha512.txt"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/sha512.txt?job=release:beta"
+        - name: "${PROJECT_NAME}-${RELEASE_VERSION}-source.tar.gz"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-${RELEASE_VERSION}-source.tar.gz?job=release:beta"
+        - name: "${PROJECT_NAME}-bom.json"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-bom.json?job=release:beta"
+        - name: "${PROJECT_NAME}-linux-amd64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-linux-amd64?job=build:beta"
+        - name: "${PROJECT_NAME}-linux-arm64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-linux-arm64?job=build:beta"
+        - name: "${PROJECT_NAME}-darwin-amd64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-darwin-amd64?job=build:beta"
+        - name: "${PROJECT_NAME}-darwin-arm64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-darwin-arm64?job=build:beta"
+        - name: "${PROJECT_NAME}-windows-amd64.exe"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-windows-amd64.exe?job=build:beta"
+        - name: "${PROJECT_NAME}-windows-arm64.exe"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-windows-arm64.exe?job=build:beta"
+        - name: "${PROJECT_NAME}-freebsd-amd64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-freebsd-amd64?job=build:beta"
   rules:
     - if: $CI_COMMIT_BRANCH == "beta"
 
@@ -36396,6 +36573,74 @@ build:daily:
     paths:
       - ${PROJECT_NAME}-*
     expire_in: 1 day
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+      when: manual
+      allow_failure: true
+
+release:daily:
+  stage: release
+  # BUILD_IMAGE (not release-cli) so tar/cargo-cyclonedx are available; the
+  # `release:` keyword still works - GitLab's docker/kubernetes executor injects
+  # release-cli via the runner helper image regardless of the job's own image
+  image: $BUILD_IMAGE
+  needs:
+    - job: build:daily
+      artifacts: true
+    - test
+  before_script:
+    # Delete the prior rolling `daily` release + tag via the GitLab Releases API
+    # before publishing a new one - daily is a rolling release, not versioned
+    - curl --request DELETE --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases/daily" || true
+    - curl --request DELETE --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/tags/daily" || true
+  script:
+    # Daily builds are identified by the commit they're built from - not a
+    # release.txt version, not a timestamp
+    - echo "${CI_COMMIT_SHORT_SHA}" > version.txt
+    - tar --exclude='.git' --exclude='.github' --exclude='.gitea' --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' -czf ${PROJECT_NAME}-${CI_COMMIT_SHORT_SHA}-source.tar.gz .
+    - cargo cyclonedx --format json --override-filename bom
+    - cp bom.cdx.json ${PROJECT_NAME}-bom.json
+    # FILES pre-captured so sha256.txt/sha512.txt cover the identical asset set
+    # (version.txt + binaries + source archive + SBOM) and never hash each other
+    - FILES="version.txt ${PROJECT_NAME}-*"
+    - sha256sum $FILES > sha256.txt
+    - sha512sum $FILES > sha512.txt
+  artifacts:
+    paths:
+      - version.txt
+      - sha256.txt
+      - sha512.txt
+      - ${PROJECT_NAME}-*
+    expire_in: 1 day
+  release:
+    tag_name: "daily"
+    name: "Daily Build ${CI_COMMIT_SHORT_SHA}"
+    description: "Daily build: ${CI_COMMIT_SHORT_SHA}"
+    assets:
+      links:
+        - name: "sha256.txt"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/sha256.txt?job=release:daily"
+        - name: "sha512.txt"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/sha512.txt?job=release:daily"
+        - name: "${PROJECT_NAME}-${CI_COMMIT_SHORT_SHA}-source.tar.gz"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-${CI_COMMIT_SHORT_SHA}-source.tar.gz?job=release:daily"
+        - name: "${PROJECT_NAME}-bom.json"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-bom.json?job=release:daily"
+        - name: "${PROJECT_NAME}-linux-amd64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-linux-amd64?job=build:daily"
+        - name: "${PROJECT_NAME}-linux-arm64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-linux-arm64?job=build:daily"
+        - name: "${PROJECT_NAME}-darwin-amd64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-darwin-amd64?job=build:daily"
+        - name: "${PROJECT_NAME}-darwin-arm64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-darwin-arm64?job=build:daily"
+        - name: "${PROJECT_NAME}-windows-amd64.exe"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-windows-amd64.exe?job=build:daily"
+        - name: "${PROJECT_NAME}-windows-arm64.exe"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-windows-arm64.exe?job=build:daily"
+        - name: "${PROJECT_NAME}-freebsd-amd64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-freebsd-amd64?job=build:daily"
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
@@ -36996,6 +37241,26 @@ pipeline {
                         --exclude='*.tar.gz' --exclude='target' \
                         -czf ${RELDIR}/${PROJECT_NAME}-${VERSION}-source.tar.gz .
                 '''
+                // cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest -
+                // install it inside the container (never on the agent host); skip
+                // if already present
+                sh '''
+                    docker run --rm \
+                        --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+                        -v ${WORKSPACE}:/app \
+                        -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                        -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                        -w /app \
+                        casjaysdev/rust:latest \
+                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+                    cp bom.cdx.json ${RELDIR}/${PROJECT_NAME}-bom.json
+                '''
+                sh '''
+                    cd ${RELDIR}
+                    FILES="$(ls)"
+                    sha256sum $FILES > sha256.txt
+                    sha512sum $FILES > sha512.txt
+                '''
                 archiveArtifacts artifacts: 'releases/*', fingerprint: true
             }
         }
@@ -37014,6 +37279,31 @@ pipeline {
                         [ -f "$f" ] || continue
                         cp "$f" ${RELDIR}/
                     done
+
+                    tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
+                        --exclude='.forgejo' --exclude='binaries' --exclude='releases' \
+                        --exclude='*.tar.gz' --exclude='target' \
+                        -czf ${RELDIR}/${PROJECT_NAME}-${VERSION}-source.tar.gz .
+                '''
+                // cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest -
+                // install it inside the container (never on the agent host); skip
+                // if already present
+                sh '''
+                    docker run --rm \
+                        --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+                        -v ${WORKSPACE}:/app \
+                        -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                        -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                        -w /app \
+                        casjaysdev/rust:latest \
+                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+                    cp bom.cdx.json ${RELDIR}/${PROJECT_NAME}-bom.json
+                '''
+                sh '''
+                    cd ${RELDIR}
+                    FILES="$(ls)"
+                    sha256sum $FILES > sha256.txt
+                    sha512sum $FILES > sha512.txt
                 '''
                 archiveArtifacts artifacts: 'releases/*', fingerprint: true
             }
@@ -37033,6 +37323,31 @@ pipeline {
                         [ -f "$f" ] || continue
                         cp "$f" ${RELDIR}/
                     done
+
+                    tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
+                        --exclude='.forgejo' --exclude='binaries' --exclude='releases' \
+                        --exclude='*.tar.gz' --exclude='target' \
+                        -czf ${RELDIR}/${PROJECT_NAME}-${VERSION}-source.tar.gz .
+                '''
+                // cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest -
+                // install it inside the container (never on the agent host); skip
+                // if already present
+                sh '''
+                    docker run --rm \
+                        --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+                        -v ${WORKSPACE}:/app \
+                        -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                        -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                        -w /app \
+                        casjaysdev/rust:latest \
+                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+                    cp bom.cdx.json ${RELDIR}/${PROJECT_NAME}-bom.json
+                '''
+                sh '''
+                    cd ${RELDIR}
+                    FILES="$(ls)"
+                    sha256sum $FILES > sha256.txt
+                    sha512sum $FILES > sha512.txt
                 '''
                 archiveArtifacts artifacts: 'releases/*', fingerprint: true
             }

@@ -41749,11 +41749,29 @@ jobs:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
+      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+      - name: Generate SBOM
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        run: |
+          command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
+          cargo cyclonedx --format json --override-filename ${{ env.PROJECT_NAME }}-sbom
+
+      - name: Upload SBOM artifact
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ${{ env.PROJECT_NAME }}-sbom
+          path: ${{ env.PROJECT_NAME }}-sbom.cdx.json
+
   release:
     needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # OIDC token for artifact attestation
+      id-token: write
+      # GitHub artifact attestations (SBOM, provenance)
+      attestations: write
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -41770,12 +41788,24 @@ jobs:
       - name: Create version.txt
         run: echo "${{ env.VERSION }}" > binaries/version.txt
 
+      - name: Create source archive
+        run: |
+          tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
+            --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
+            --exclude='target' \
+            -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
+
       - name: Generate checksums
         run: |
           cd binaries
           FILES="$(ls)"
           sha256sum $FILES > sha256.txt
           sha512sum $FILES > sha512.txt
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: binaries/${{ env.PROJECT_NAME }}-*
 
       - name: Create Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
@@ -41941,11 +41971,29 @@ jobs:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
+      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+      - name: Generate SBOM
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        run: |
+          command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
+          cargo cyclonedx --format json --override-filename ${{ env.PROJECT_NAME }}-sbom
+
+      - name: Upload SBOM artifact
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ${{ env.PROJECT_NAME }}-sbom
+          path: ${{ env.PROJECT_NAME }}-sbom.cdx.json
+
   release:
     needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # OIDC token for artifact attestation
+      id-token: write
+      # GitHub artifact attestations (SBOM, provenance)
+      attestations: write
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -41962,12 +42010,24 @@ jobs:
       - name: Create version.txt
         run: echo "${{ env.VERSION }}" > binaries/version.txt
 
+      - name: Create source archive
+        run: |
+          tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
+            --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
+            --exclude='target' \
+            -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
+
       - name: Generate checksums
         run: |
           cd binaries
           FILES="$(ls)"
           sha256sum $FILES > sha256.txt
           sha512sum $FILES > sha512.txt
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: binaries/${{ env.PROJECT_NAME }}-*
 
       - name: Delete previous daily release
         run: |
@@ -42805,6 +42865,20 @@ jobs:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
+      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+      - name: Generate SBOM
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        run: |
+          command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
+          cargo cyclonedx --format json --override-filename ${{ env.PROJECT_NAME }}-sbom
+
+      - name: Upload SBOM artifact
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ${{ env.PROJECT_NAME }}-sbom
+          path: ${{ env.PROJECT_NAME }}-sbom.cdx.json
+
   release:
     needs: [version, build]
     runs-on: ubuntu-latest
@@ -42826,6 +42900,13 @@ jobs:
       - name: Create version.txt
         run: echo "${{ env.VERSION }}" > binaries/version.txt
 
+      - name: Create source archive
+        run: |
+          tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
+            --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
+            --exclude='target' \
+            -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
+
       - name: Generate checksums
         run: |
           cd binaries
@@ -42839,7 +42920,7 @@ jobs:
           tag_name: ${{ needs.version.outputs.tag }}
           files: binaries/*
           prerelease: true
-```
+
 
 ## Daily Workflow (Gitea/Forgejo Actions)
 
@@ -42933,6 +43014,9 @@ jobs:
             echo "OFFICIAL_SITE=${{ secrets.OFFICIAL_SITE }}" >> $GITEA_ENV
           fi
 
+      - name: Add cross-compile target
+        run: rustup target add ${{ matrix.target }}
+
       - name: Build server
         run: |
           cargo zigbuild --release --target ${{ matrix.target }}
@@ -42990,6 +43074,20 @@ jobs:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
+      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+      - name: Generate SBOM
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        run: |
+          command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
+          cargo cyclonedx --format json --override-filename ${{ env.PROJECT_NAME }}-sbom
+
+      - name: Upload SBOM artifact
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ${{ env.PROJECT_NAME }}-sbom
+          path: ${{ env.PROJECT_NAME }}-sbom.cdx.json
+
   release:
     needs: [version, build]
     runs-on: ubuntu-latest
@@ -43010,6 +43108,13 @@ jobs:
 
       - name: Create version.txt
         run: echo "${{ env.VERSION }}" > binaries/version.txt
+
+      - name: Create source archive
+        run: |
+          tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
+            --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
+            --exclude='target' \
+            -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
       - name: Generate checksums
         run: |
@@ -43522,9 +43627,19 @@ build:linux-amd64:
     - cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-amd64
     - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-amd64; fi
     - if [ -d "src/agent" ]; then cargo zigbuild --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-agent && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-agent ${PROJECT_NAME}-agent-linux-amd64; fi
+    # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+    - command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
+    - cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom
+    # Export RELEASE_VERSION via dotenv so the release job's declarative
+    # release: block (script-local vars aren't visible there) consumes the exact
+    # same version this leg embedded in its binaries, instead of re-deriving it
+    - echo "RELEASE_VERSION=${CI_COMMIT_TAG#v}" > release.env
   artifacts:
     paths:
       - ${PROJECT_NAME}-linux-amd64*
+      - ${PROJECT_NAME}-sbom.cdx.json
+    reports:
+      dotenv: release.env
     expire_in: 1 week
   rules:
     - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+/
@@ -43653,7 +43768,16 @@ release:
     - test
   script:
     - echo "Creating release ${CI_COMMIT_TAG}"
-    - echo "${CI_COMMIT_TAG#v}" > version.txt
+    # RELEASE_VERSION comes from build:linux-amd64's dotenv (via needs) - never
+    # re-derive it here, so version.txt matches what the binaries were built with
+    - echo "${RELEASE_VERSION}" > version.txt
+    # Create source archive (matches GH/Gitea/Jenkins form); SBOM already
+    # generated in build:linux-amd64 and pulled in via this job's needs artifacts
+    - >
+      tar --exclude='.git' --exclude='.github' --exclude='.gitea'
+      --exclude='.forgejo' --exclude='binaries' --exclude='releases'
+      --exclude='*.tar.gz' --exclude='target'
+      -czf ${PROJECT_NAME}-${RELEASE_VERSION}-source.tar.gz .
     # Consolidated sha256.txt/sha512.txt over every release asset (version.txt +
     # binaries) - the job runs in the full repo checkout, not an isolated directory,
     # so the file list is explicitly scoped rather than a bare `ls`; pre-capturing it
@@ -43689,6 +43813,10 @@ release:
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${PROJECT_NAME}-windows-arm64.exe?job=build:windows-arm64"
         - name: "${PROJECT_NAME}-freebsd-amd64"
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${PROJECT_NAME}-freebsd-amd64?job=build:freebsd-amd64"
+        - name: "${PROJECT_NAME}-sbom.cdx.json"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${PROJECT_NAME}-sbom.cdx.json?job=build:linux-amd64"
+        - name: "${PROJECT_NAME}-${RELEASE_VERSION}-source.tar.gz"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${PROJECT_NAME}-${RELEASE_VERSION}-source.tar.gz?job=release"
         - name: "sha256.txt"
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/sha256.txt?job=release"
         - name: "sha512.txt"
@@ -43734,10 +43862,73 @@ build:beta:
     - if [ -d "src/agent" ]; then cargo zigbuild --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-agent && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-agent.exe ${PROJECT_NAME}-agent-windows-amd64.exe; fi
     - if [ -d "src/agent" ]; then cargo zigbuild --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-agent && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-agent.exe ${PROJECT_NAME}-agent-windows-arm64.exe; fi
     - if [ -d "src/agent" ]; then cargo zigbuild --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-agent && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-agent ${PROJECT_NAME}-agent-freebsd-amd64; fi
+    # SBOM ships in every channel (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+    - command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
+    - cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom
+    # Export VERSION via dotenv so release:beta consumes the exact value the
+    # binaries were built with instead of recomputing its own timestamp
+    - echo "RELEASE_VERSION=${VERSION}" > release.env
   artifacts:
     paths:
       - ${PROJECT_NAME}-*
+    reports:
+      dotenv: release.env
     expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == "beta"
+
+release:beta:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - build:beta
+    - test
+  script:
+    - echo "${RELEASE_VERSION}" > version.txt
+    # Create source archive (matches GH/Gitea/Jenkins form)
+    - >
+      tar --exclude='.git' --exclude='.github' --exclude='.gitea'
+      --exclude='.forgejo' --exclude='binaries' --exclude='releases'
+      --exclude='*.tar.gz' --exclude='target'
+      -czf ${PROJECT_NAME}-${RELEASE_VERSION}-source.tar.gz .
+    - FILES="version.txt ${PROJECT_NAME}-*"
+    - sha256sum $FILES > sha256.txt
+    - sha512sum $FILES > sha512.txt
+  artifacts:
+    paths:
+      - version.txt
+      - sha256.txt
+      - sha512.txt
+      - ${PROJECT_NAME}-*
+    expire_in: 1 week
+  release:
+    tag_name: "$RELEASE_VERSION"
+    name: "Beta $RELEASE_VERSION"
+    description: "Beta release created by GitLab CI"
+    assets:
+      links:
+        - name: "${PROJECT_NAME}-linux-amd64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-linux-amd64?job=build:beta"
+        - name: "${PROJECT_NAME}-linux-arm64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-linux-arm64?job=build:beta"
+        - name: "${PROJECT_NAME}-darwin-amd64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-darwin-amd64?job=build:beta"
+        - name: "${PROJECT_NAME}-darwin-arm64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-darwin-arm64?job=build:beta"
+        - name: "${PROJECT_NAME}-windows-amd64.exe"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-windows-amd64.exe?job=build:beta"
+        - name: "${PROJECT_NAME}-windows-arm64.exe"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-windows-arm64.exe?job=build:beta"
+        - name: "${PROJECT_NAME}-freebsd-amd64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-freebsd-amd64?job=build:beta"
+        - name: "${PROJECT_NAME}-sbom.cdx.json"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-sbom.cdx.json?job=build:beta"
+        - name: "${PROJECT_NAME}-${RELEASE_VERSION}-source.tar.gz"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/${PROJECT_NAME}-${RELEASE_VERSION}-source.tar.gz?job=release:beta"
+        - name: "sha256.txt"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/sha256.txt?job=release:beta"
+        - name: "sha512.txt"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_BRANCH}/raw/sha512.txt?job=release:beta"
   rules:
     - if: $CI_COMMIT_BRANCH == "beta"
 
@@ -43780,10 +43971,80 @@ build:daily:
     - if [ -d "src/agent" ]; then cargo zigbuild --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-agent && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-agent.exe ${PROJECT_NAME}-agent-windows-amd64.exe; fi
     - if [ -d "src/agent" ]; then cargo zigbuild --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-agent && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-agent.exe ${PROJECT_NAME}-agent-windows-arm64.exe; fi
     - if [ -d "src/agent" ]; then cargo zigbuild --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-agent && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-agent ${PROJECT_NAME}-agent-freebsd-amd64; fi
+    # SBOM ships in every channel (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+    - command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
+    - cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom
   artifacts:
     paths:
       - ${PROJECT_NAME}-*
     expire_in: 1 day
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+      when: manual
+      allow_failure: true
+
+release:daily:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - build:daily
+    - test
+  before_script:
+    # Delete previous rolling daily release + tag via GitLab Releases API
+    - >
+      curl --request DELETE --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}"
+      "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases/daily" || true
+    - >
+      curl --request DELETE --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}"
+      "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/tags/daily" || true
+  script:
+    # Daily identity is the commit, not a timestamp - matches build:daily
+    - echo "${CI_COMMIT_SHORT_SHA}" > version.txt
+    # Create source archive (matches GH/Gitea/Jenkins form)
+    - >
+      tar --exclude='.git' --exclude='.github' --exclude='.gitea'
+      --exclude='.forgejo' --exclude='binaries' --exclude='releases'
+      --exclude='*.tar.gz' --exclude='target'
+      -czf ${PROJECT_NAME}-${CI_COMMIT_SHORT_SHA}-source.tar.gz .
+    - FILES="version.txt ${PROJECT_NAME}-*"
+    - sha256sum $FILES > sha256.txt
+    - sha512sum $FILES > sha512.txt
+  artifacts:
+    paths:
+      - version.txt
+      - sha256.txt
+      - sha512.txt
+      - ${PROJECT_NAME}-*
+    expire_in: 1 day
+  release:
+    tag_name: "daily"
+    name: "Daily Build ${CI_COMMIT_SHORT_SHA}"
+    description: "Daily build: ${CI_COMMIT_SHORT_SHA}"
+    assets:
+      links:
+        - name: "${PROJECT_NAME}-linux-amd64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/${PROJECT_NAME}-linux-amd64?job=build:daily"
+        - name: "${PROJECT_NAME}-linux-arm64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/${PROJECT_NAME}-linux-arm64?job=build:daily"
+        - name: "${PROJECT_NAME}-darwin-amd64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/${PROJECT_NAME}-darwin-amd64?job=build:daily"
+        - name: "${PROJECT_NAME}-darwin-arm64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/${PROJECT_NAME}-darwin-arm64?job=build:daily"
+        - name: "${PROJECT_NAME}-windows-amd64.exe"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/${PROJECT_NAME}-windows-amd64.exe?job=build:daily"
+        - name: "${PROJECT_NAME}-windows-arm64.exe"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/${PROJECT_NAME}-windows-arm64.exe?job=build:daily"
+        - name: "${PROJECT_NAME}-freebsd-amd64"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/${PROJECT_NAME}-freebsd-amd64?job=build:daily"
+        - name: "${PROJECT_NAME}-sbom.cdx.json"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/${PROJECT_NAME}-sbom.cdx.json?job=build:daily"
+        - name: "${PROJECT_NAME}-${CI_COMMIT_SHORT_SHA}-source.tar.gz"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/${PROJECT_NAME}-${CI_COMMIT_SHORT_SHA}-source.tar.gz?job=release:daily"
+        - name: "sha256.txt"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/sha256.txt?job=release:daily"
+        - name: "sha512.txt"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/sha512.txt?job=release:daily"
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
@@ -44664,6 +44925,19 @@ pipeline {
                         cp "$f" ${RELDIR}/
                     done
 
+                    # SBOM ships in every channel (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+                    docker run --rm \
+                        --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+                        -v ${WORKSPACE}:/app \
+                        -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                        -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                        -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
+                        -w /app \
+                        -e PROJECT_NAME="${PROJECT_NAME}" \
+                        casjaysdev/rust:latest \
+                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom'
+                    cp ${PROJECT_NAME}-sbom.cdx.json ${RELDIR}/
+
                     tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
                         --exclude='.forgejo' --exclude='binaries' --exclude='releases' \
                         --exclude='*.tar.gz' \
@@ -44693,6 +44967,24 @@ pipeline {
                         cp "$f" ${RELDIR}/
                     done
 
+                    # SBOM ships in every channel (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+                    docker run --rm \
+                        --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+                        -v ${WORKSPACE}:/app \
+                        -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                        -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                        -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
+                        -w /app \
+                        -e PROJECT_NAME="${PROJECT_NAME}" \
+                        casjaysdev/rust:latest \
+                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom'
+                    cp ${PROJECT_NAME}-sbom.cdx.json ${RELDIR}/
+
+                    tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
+                        --exclude='.forgejo' --exclude='binaries' --exclude='releases' \
+                        --exclude='*.tar.gz' \
+                        -czf ${RELDIR}/${PROJECT_NAME}-${VERSION}-source.tar.gz .
+
                     cd ${RELDIR}
                     FILES="$(ls)"
                     sha256sum $FILES > sha256.txt
@@ -44716,6 +45008,24 @@ pipeline {
                         [ -f "$f" ] || continue
                         cp "$f" ${RELDIR}/
                     done
+
+                    # SBOM ships in every channel (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+                    docker run --rm \
+                        --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+                        -v ${WORKSPACE}:/app \
+                        -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
+                        -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
+                        -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
+                        -w /app \
+                        -e PROJECT_NAME="${PROJECT_NAME}" \
+                        casjaysdev/rust:latest \
+                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom'
+                    cp ${PROJECT_NAME}-sbom.cdx.json ${RELDIR}/
+
+                    tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
+                        --exclude='.forgejo' --exclude='binaries' --exclude='releases' \
+                        --exclude='*.tar.gz' \
+                        -czf ${RELDIR}/${PROJECT_NAME}-${VERSION}-source.tar.gz .
 
                     cd ${RELDIR}
                     FILES="$(ls)"
