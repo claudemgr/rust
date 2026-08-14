@@ -2037,7 +2037,7 @@ Compound SPDX expressions like `MIT OR Apache-2.0` (the most common dual-license
 
 A project MAY use a denylisted crate only if **all** of:
 
-1. `IDEA.md` adds a `## License exceptions` subsection naming the crate, the upstream license, and the rationale
+1. `IDEA.md` adds (or extends) the `**License exceptions:**` block under `## Business logic`, naming the crate, the upstream license, and the rationale (IDEA.md keeps exactly three top-level sections — this is a block, never a new `##` section)
 2. The exception explicitly accepts the consequence — e.g., "this binary is distributed under GPL-3.0; the project's MIT claim applies only to the source we author, not the published binary" — and `IDEA.md ## Project variables` adds (or updates) the variable `distribution_license` accordingly. `distribution_license` is an exception-only variable: it is not part of the required-keys list (see "IDEA.md Required Layout" → Project variables rules) and is present only in projects that have taken a license exception
 3. README, `LICENSE.md`, and any user-visible "About" surface are updated to reflect the actual distribution license, not just the source license
 4. `deny.toml` is updated with a scoped allow entry for the specific crate + version, not a blanket category unblock
@@ -2162,7 +2162,7 @@ Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI fai
 - [ ] All assets (fonts, icons, themes, default config, schemas, locales) are embedded at compile time
 - [ ] Dependencies are pure Rust where a viable pure-Rust crate exists (PART 5 → "Pure-Rust Library Stack"); each `*-sys` crate is justified in IDEA.md and statically linked
 - [ ] `cargo tree` was reviewed — no surprise transitive `*-sys` dependencies
-- [ ] No GPL / AGPL / LGPL / SSPL / BUSL / source-available dep was added without an IDEA.md `## License exceptions` entry and an updated `distribution_license` (PART 11 → "License Compliance")
+- [ ] No GPL / AGPL / LGPL / SSPL / BUSL / source-available dep was added without an IDEA.md `**License exceptions:**` entry and an updated `distribution_license` (PART 11 → "License Compliance")
 - [ ] User-visible licenses surface exists: CLI `--licenses`, TUI "Licenses" entry, GUI "About → Open Source Licenses" — all reading the same embedded `LICENSE.md`
 - [ ] App runs end-to-end from the binary alone on an air-gapped machine — no first-run downloads
 - [ ] No plugin or runtime extension loading from disk unless IDEA.md defines a hardened plugin contract
@@ -2250,7 +2250,7 @@ Every IDEA.md has exactly three top-level sections, in this order:
 
 1. `## Project description` — free-form prose: what the project is, who uses it, what problem it solves
 2. `## Project variables` — `key: value` lines that provide the canonical values AI.md resolves for `project_name`, `project_org`, `internal_name`, `internal_org`, etc.
-3. `## Business logic` — features, data models, user flows, platform constraints, security assumptions (WHAT, not HOW)
+3. `## Business logic` — features, data models, user flows, trust boundaries, abuse cases, platform constraints, security assumptions (WHAT, not HOW)
 
 See "IDEA.md Required Layout" at the top of this file for the authoritative rules: variable-key naming, the immutable `internal_name` / `internal_org` rule, the missing-value setup flow, and the migration procedure for legacy `CLAUDE.md` files.
 
@@ -2305,13 +2305,19 @@ maintainer_email: {maintainer@example.com — or empty; used only if set}
 **Platform constraints:**
 - {OS support, hardware requirements, display-server requirements}
 
+**Trust boundaries & abuse cases:**
+- {Untrusted input source → where it is validated / what trusts what}
+- {Abuse case: what a hostile input or user could attempt → expected mitigation posture}
+
+**Security exceptions:** {intentionally allowed security-sensitive choice + documented reason — or `none`}
+
 **Outbound network use (if any — see PART 9 → "Security-First Design"):**
 - {Remote service consumed, purpose, auth model}
 
 **Stored data location (per-user — see PART 4 → "Path Rule"):**
 - {What is stored at the per-user paths}
 
-**License exceptions (only if a denylisted or vendored-C dep is used — see PART 11 → "License Compliance"):**
+**License exceptions (always present — write `none` when no denylisted or vendored-C dep is used; see PART 11 → "License Compliance"):**
 - {crate, upstream license, rationale, `distribution_license` consequence if applicable}
 ```
 
@@ -2379,6 +2385,12 @@ maintainer_email: jane@example.com
 - GUI requires X11 or Wayland on Linux/BSD (PART 0 → "X11 AND Wayland Are Both Required")
 - No internet access required; works fully offline (PART 0 → "Self-Contained Assets")
 
+**Trust boundaries & abuse cases:**
+- All data is local and owned by the user; the only untrusted input is imported markdown, which is parsed for rendering and never executed
+- Abuse case: a crafted markdown file targeting the parser → memory-safe parsing, no HTML/script execution, size limit on import
+
+**Security exceptions:** none
+
 **Outbound network use:** none
 
 **Stored data location (per-user):**
@@ -2444,6 +2456,13 @@ maintainer_email: jane@example.com
 **Platform constraints:**
 - TUI requires a TTY (PART 3 → "Smart Detect Rules"); for headless cron use the `feeds sync` CLI subcommand
 
+**Trust boundaries & abuse cases:**
+- Remote feed content (XML/HTML) is fully untrusted → hardened parsing, HTML sanitized to text, scripts and external resource loads never executed
+- Feed URLs are user-supplied → fetched over HTTPS only; non-HTTP schemes refused; no credentials attached
+- Abuse case: a hostile feed serving oversized or decompression-bomb responses → response size and time limits on sync
+
+**Security exceptions:** none
+
 **Outbound network use:**
 - HTTPS GET to feed URLs the user adds. TLS via `rustls` (PART 9 → "Security-First Design"). No telemetry, no tracking, no third-party analytics.
 
@@ -2505,6 +2524,12 @@ maintainer_email: jane@example.com
 
 **Platform constraints:**
 - POSIX-style filesystem operations; Windows support uses real NTFS symlinks via `std::os::windows::fs::symlink_file` / `symlink_dir` (not junctions — a separate reparse-point mechanism), which require Developer Mode or elevated privileges to create
+
+**Trust boundaries & abuse cases:**
+- Repo contents are the user's own but treated as untrusted path input: every target path is validated to resolve inside `$HOME`
+- Abuse case: a repo entry attempting path traversal (`../../etc/...`) or a symlink escape outside `$HOME` → refused; nothing outside `$HOME` is ever written
+
+**Security exceptions:** none
 
 **Outbound network use:** none
 
