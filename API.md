@@ -357,7 +357,7 @@ permission rules, business invariants. The HOW lives in AI.md PARTS 0-33; PART 3
 |------|-------------|
 | **Pure Rust** | ALWAYS. No unsafe FFI to C libraries for core functionality. |
 | **Single static binary** | All assets embedded with Rust `include_bytes!` / `rust-embed` |
-| **8 platforms required** | linux, darwin, windows, freebsd × amd64, arm64 |
+| **7 platforms required** | linux, darwin, windows × amd64, arm64; freebsd × amd64 (freebsd/arm64 is Go-only — Rust Tier 3; darwin is pure-Rust/bundled-C only — no Apple SDK in the build image, so macOS-framework-linking crates cannot build) |
 | **Binary naming** | `{project_name}-{os}-{arch}` (windows adds `.exe`) |
 | **NEVER use -musl suffix** | Alpine builds are NOT musl-specific |
 | **Build source** | ALWAYS `src/` directory via `cargo build --release` |
@@ -372,7 +372,7 @@ permission rules, business invariants. The HOW lives in AI.md PARTS 0-33; PART 3
 |---------|---------|-----------------|-------------|
 | `make dev` | **Development & Debugging** | `${TMPDIR}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX/` | Active coding, quick tests |
 | `make local` | **Production Testing** | `binaries/` (with version) | Test prod builds locally |
-| `make build` | **Full Release** | `binaries/` (all 8 platforms) | Before release |
+| `make build` | **Full Release** | `binaries/` (all 7 platforms) | Before release |
 | `make test` | **Phase 1 — Toolchain Gate** | Coverage report | Before commits; after code changes |
 
 | NEVER (locally) | ALWAYS (Makefile targets) |
@@ -458,7 +458,7 @@ make local
 ./tests/incus.sh
 
 # 6. Full release build
-# All 8 platforms
+# All 7 platforms
 make build
 ```
 
@@ -1105,7 +1105,7 @@ Quick reference: Accept `yes/no`, `true/false`, `1/0`, `on/off`, `enable/disable
 | Put Dockerfile in project root | Put in `docker/Dockerfile` |
 | Use .env files | Hardcode sane defaults in docker-compose |
 | Run docker-compose in project dir | Use temp directory workflow |
-| Skip platforms in releases | Build all 8 platforms |
+| Skip platforms in releases | Build all 7 platforms |
 | Use Makefile in CI/CD | Explicit commands with env vars |
 | Modify ENTRYPOINT/CMD | Customize via entrypoint.sh |
 | Use unsafe C FFI for core functionality | Pure Rust only |
@@ -1550,7 +1550,7 @@ Purpose:
 7. Create premium tiers → All features free, no paywalls
 8. Use Makefile in CI/CD → Explicit commands only
 9. Guess or assume values that a command can produce → Run the command (`date`, `basename "$PWD"`, `git config user.email`, `git rev-parse --short HEAD`, `uname -m`, etc.) — when no command applies, read spec or ask user
-10. Skip platforms → Build all 8 (linux/darwin/windows/freebsd × amd64/arm64)
+10. Skip platforms → Build all 7 (linux/darwin/windows × amd64/arm64; freebsd amd64)
 11. Client-side rendering (React/Vue) → Server-side Tera/Askama templates
 12. Require JavaScript for core features → Progressive enhancement only
 13. Let long strings break mobile → Use word-break CSS
@@ -4765,7 +4765,7 @@ Detect platform by checking for workflow files in this order:
 [![Docs](https://readthedocs.org/projects/{RTD_PROJECT}/badge/?version=latest)](https://{RTD_URL})
 
 # Gitea/Forgejo (use shields.io with custom endpoint or static badge)
-[![Release](https://img.shields.io/badge/dynamic/json?url=https://git.example.com/api/{api_version}/repos/{project_org}/{project_name}/releases/latest&query=$.tag_name&label=release)](https://git.example.com/{project_org}/{project_name}/releases)
+[![Release](https://img.shields.io/badge/dynamic/json?url=https://git.example.com/api/v1/repos/{project_org}/{project_name}/releases/latest&query=$.tag_name&label=release)](https://git.example.com/{project_org}/{project_name}/releases)
 [![License](https://img.shields.io/github/license/{project_org}/{project_name})](LICENSE.md)
 [![Docs](https://readthedocs.org/projects/{RTD_PROJECT}/badge/?version=latest)](https://{RTD_URL})
 
@@ -5648,7 +5648,10 @@ jobs:
       - name: Check licenses
         run: |
           # Verify no GPL/AGPL/LGPL licenses (cargo-deny pre-installed in build image)
-          if cargo deny list | grep -iE 'GPL|AGPL|LGPL'; then
+          # Capture first — a scanner failure must fail the step, never read as "no match"
+          set -o pipefail
+          licenses=$(cargo deny list)
+          if echo "$licenses" | grep -iE 'GPL|AGPL|LGPL'; then
             echo "ERROR: Copyleft license detected!"
             exit 1
           fi
@@ -5676,8 +5679,10 @@ command -v cargo-deny >/dev/null 2>&1 || {
 }
 
 # Check for copyleft licenses
+# Capture first — a scanner failure must abort (set -e), never read as "no match"
 echo "Scanning dependencies..."
-if cargo deny list | grep -iE 'GPL|AGPL|LGPL'; then
+licenses=$(cargo deny list)
+if echo "$licenses" | grep -iE 'GPL|AGPL|LGPL'; then
     echo "ERROR: Copyleft license detected!"
     echo "Remove the dependency or find an alternative."
     exit 1
@@ -28089,7 +28094,7 @@ fn service_main(_arguments: Vec<std::ffi::OsString>) {
 |--------|---------|-----------------|-------------|
 | `dev` | Quick development build | `${TMPDIR}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX/` | Active coding, quick tests |
 | `local` | Production test build | `binaries/` (with version) | Test prod builds locally |
-| `build` | Full release (all 8 platforms) | `binaries/` | Before release |
+| `build` | Full release (all 7 platforms) | `binaries/` | Before release |
 | `test` | Run unit tests | Coverage report | After code changes |
 | `release` | Release with source archive | `releases/` | Creating releases |
 | `docker` | Build and push container | `$REGISTRY` | Container deployment |
@@ -28233,7 +28238,6 @@ binaries/
 ├── {project_name}-windows-amd64.exe
 ├── {project_name}-windows-arm64.exe
 ├── {project_name}-freebsd-amd64
-├── {project_name}-freebsd-arm64
 ├── {project_name}-cli-linux-amd64      # CLI distributions
 ├── {project_name}-cli-linux-arm64
 ├── ...
@@ -28254,7 +28258,7 @@ binaries/
 | Linux | amd64, arm64 |
 | macOS (Darwin) | amd64, arm64 |
 | Windows | amd64, arm64 |
-| FreeBSD | amd64, arm64 |
+| FreeBSD | amd64 (arm64 is Go-only — Rust Tier 3, no prebuilt std) |
 
 ## Makefile Implementation
 
@@ -28296,8 +28300,9 @@ RUSTUP_CACHE  ?= $(HOME)/.rustup
 SCCACHE_CACHE ?= $(HOME)/.cache/sccache
 CARGO_TARGET  ?= $(HOME)/.cache/cargo-target/$(PROJECT_NAME)
 
-# Build targets — space-separated so the shell for-loops split correctly (all 8 platforms)
-PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64 freebsd/amd64 freebsd/arm64
+# Build targets — space-separated so the shell for-loops split correctly (all 7 platforms)
+# freebsd/arm64 omitted — aarch64-unknown-freebsd is Rust Tier 3 (no prebuilt std, not in the build image)
+PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64 freebsd/amd64
 
 # Resource limits — overrideable; prevents any single container from starving concurrent agent builds
 DOCKER_MEM  ?= 4g
@@ -28349,13 +28354,12 @@ build: clean
 			windows/amd64) TARGET="x86_64-pc-windows-gnu" ;; \
 			windows/arm64) TARGET="aarch64-pc-windows-gnullvm" ;; \
 			freebsd/amd64) TARGET="x86_64-unknown-freebsd" ;; \
-			freebsd/arm64) TARGET="aarch64-unknown-freebsd" ;; \
 			*) echo "Unknown platform: $$platform" && exit 1 ;; \
 		esac; \
 		EXT=""; [ "$$OS" = "windows" ] && EXT=".exe"; \
 		OUTPUT=$(BINDIR)/$(PROJECT_NAME)-$$OS-$$ARCH$$EXT; \
 		echo "Building server $$OS/$$ARCH..."; \
-		$(RUST_DOCKER) sh -c "cross build --release --target $$TARGET && cp target/$$TARGET/release/$(PROJECT_NAME)$$EXT $$OUTPUT" || exit 1; \
+		$(RUST_DOCKER) sh -c "cargo zigbuild --release --target $$TARGET && cp target/$$TARGET/release/$(PROJECT_NAME)$$EXT $$OUTPUT" || exit 1; \
 	done
 
 	# Build CLI for all platforms (if exists)
@@ -28371,13 +28375,12 @@ build: clean
 				windows/amd64) TARGET="x86_64-pc-windows-gnu" ;; \
 				windows/arm64) TARGET="aarch64-pc-windows-gnullvm" ;; \
 				freebsd/amd64) TARGET="x86_64-unknown-freebsd" ;; \
-				freebsd/arm64) TARGET="aarch64-unknown-freebsd" ;; \
 				*) echo "Unknown platform: $$platform" && exit 1 ;; \
 			esac; \
 			EXT=""; [ "$$OS" = "windows" ] && EXT=".exe"; \
 			OUTPUT=$(BINDIR)/$(PROJECT_NAME)-cli-$$OS-$$ARCH$$EXT; \
 			echo "Building CLI $$OS/$$ARCH..."; \
-			$(RUST_DOCKER) sh -c "cross build --release --target $$TARGET && cp target/$$TARGET/release/$(PROJECT_NAME)-cli$$EXT $$OUTPUT" || exit 1; \
+			$(RUST_DOCKER) sh -c "cargo zigbuild --release --target $$TARGET && cp target/$$TARGET/release/$(PROJECT_NAME)-cli$$EXT $$OUTPUT" || exit 1; \
 		done; \
 	fi
 
@@ -28652,7 +28655,7 @@ All Docker builds use persistent Rust crate caching to avoid re-downloading depe
 |---------|---------|--------|-------------|
 | `make dev` | **Development & Debugging** | `${TMPDIR}/${PROJECT_ORG}/${PROJECT_NAME}-XXXXXX/` | Active coding, quick tests, debugging |
 | `make local` | **Production Testing** | `binaries/` (with version) | Test production builds locally before release |
-| `make build` | **Full Release Build** | `binaries/` (all 8 platforms) | Before tagging release, cross-platform verification |
+| `make build` | **Full Release Build** | `binaries/` (all 7 platforms) | Before tagging release, cross-platform verification |
 | `make test` | **Phase 1 — Toolchain Gate** | Coverage report | Before commits; after code changes |
 
 **Local Development Workflow:**
@@ -28664,7 +28667,7 @@ All Docker builds use persistent Rust crate caching to avoid re-downloading depe
 | **3. Phase 1 — Toolchain Gate** | `make test` | Unit tests in Docker; pre-commit requirement |
 | **4. Phase 2 — Binary Validation** | `./tests/run_tests.sh` | Shell scripts run against compiled binary |
 | **5. Production Test** | `make local` | Build with version info to `binaries/` |
-| **6. Release** | `make build` | Full cross-platform build (8 platforms) |
+| **6. Release** | `make build` | Full cross-platform build (7 platforms) |
 
 **Debugging in Docker (Local Development):**
 
@@ -28777,7 +28780,6 @@ The **only** time binaries are copied is during CI/CD release process, where the
 | `{project_name}-windows-amd64.exe` | Windows AMD64 server binary |
 | `{project_name}-windows-arm64.exe` | Windows ARM64 server binary |
 | `{project_name}-freebsd-amd64` | FreeBSD AMD64 server binary |
-| `{project_name}-freebsd-arm64` | FreeBSD ARM64 server binary |
 
 ### CLI Binaries (If Project Has CLI)
 
@@ -28790,7 +28792,6 @@ The **only** time binaries are copied is during CI/CD release process, where the
 | `{project_name}-cli-windows-amd64.exe` | Windows AMD64 CLI binary |
 | `{project_name}-cli-windows-arm64.exe` | Windows ARM64 CLI binary |
 | `{project_name}-cli-freebsd-amd64` | FreeBSD AMD64 CLI binary |
-| `{project_name}-cli-freebsd-arm64` | FreeBSD ARM64 CLI binary |
 
 ### Metadata Files (Always)
 
@@ -29910,7 +29911,7 @@ rm -rf "$TEMP_DIR"
 | `release.yml` | Tag push (`v*`, `*.*.*`) | Production releases |
 | `beta.yml` | Push to `beta` branch | Beta releases |
 | `daily.yml` | Daily at 3am UTC + push to main/master | Daily builds |
-| `docker.yml` | Version tag, push to main/master/beta (`build-standard` job); all branch pushes (excluding version tags) + daily cron (`build-devel` job) | Docker images (`:latest`/`:{version}`/etc. and `:devel`) |
+| `docker.yml` | Version tag + any push, all branches (`build-standard` job); all branch pushes (excluding version tags) + daily cron (`build-devel` job) | Docker images (`:latest`/`:{version}`/etc. and `:devel`) |
 > **Note:** `ci.yml` and `release.yml` are required on every project. Rust projects never have `build-toolchain.yml` — `casjaysdev/rust:latest` is maintained externally. `beta.yml`, `daily.yml`, and `docker.yml` are project-specific optional workflows — include only when the project requires them.
 
 **Branch push auto-cancel policy:** Any workflow triggered by pushes to `main`, `master`, `devel`, `dev`, or `beta` MUST use workflow concurrency to cancel older in-progress runs for the same ref. This applies to branch-based CI (for example `beta.yml`, `daily.yml`, `docker.yml`, and any project-specific branch-push workflow).
@@ -29972,12 +29973,23 @@ jobs:
         with:
           # Full history — truffleHog scans the commit range
           fetch-depth: 0
+      # Empty base/head = full-history scan (schedule runs and new-branch pushes)
+      - name: Determine scan range
+        id: range
+        run: |
+          BASE=""; HEAD=""
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            BASE="${{ github.event.before }}"; HEAD="${{ github.sha }}"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"; HEAD="${{ github.event.pull_request.head.sha }}"
+          fi
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+          echo "head=$HEAD" >> "$GITHUB_OUTPUT"
       - name: Scan for secrets (truffleHog)
         uses: trufflesecurity/trufflehog@27b0417c16317ca9a472a9a8092acce143b49c55  # v3.95.9
         with:
-          # Use before/after — never default_branch (resolves to HEAD after push and skips the scan)
-          base: ${{ github.event.before }}
-          head: ${{ github.event.after }}
+          base: ${{ steps.range.outputs.base }}
+          head: ${{ steps.range.outputs.head }}
           extra_args: --results=verified,unknown
 
   workflow-policy:
@@ -29987,10 +29999,10 @@ jobs:
       - name: Enforce SHA-pinned third-party actions
         run: |
           # Every third-party action must be pinned to a full 40-char commit SHA
-          BAD=$(grep -rEn 'uses:\s*[^ ]+@' .github/workflows/ | grep -Ev '@[0-9a-f]{40}' || true)
-          if [ -n "$BAD" ]; then
+          bad=$(grep -RnE '^[[:space:]]*uses:' .github/ .gitea/ .forgejo/ 2>/dev/null | grep -vE '@[0-9a-f]{40}([[:space:]]|$)' || true)
+          if [ -n "$bad" ]; then
             echo "::error::unpinned actions found:"
-            echo "$BAD"
+            echo "$bad"
             exit 1
           fi
 
@@ -30041,14 +30053,15 @@ jobs:
       - run: cargo audit
 
   image-scan:
-    # Only when the project ships a Docker image
-    if: hashFiles('docker/Dockerfile') != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - name: Build image for scanning
+        # Only when the project ships a Docker image
+        if: hashFiles('docker/Dockerfile') != ''
         run: docker build -t local/scan-target:ci -f docker/Dockerfile .
       - name: Scan image (Trivy)
+        if: hashFiles('docker/Dockerfile') != ''
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           image-ref: local/scan-target:ci
@@ -30056,7 +30069,7 @@ jobs:
           severity: CRITICAL,HIGH
 ```
 
-> **Note:** Security jobs (`secret-scan`, `workflow-policy`, `vuln-scan`, `image-scan`) are defined within `ci.yml`. They run on push, PR, and weekly schedule (`cron: '0 6 * * 1'`). Add `if: github.event_name != 'schedule'` to build/test/coverage/artifact jobs to skip non-security work on scheduled runs. Secret scanning is mandatory on every public repo via truffleHog (Apache-2.0). Use `github.event.before` / `github.event.after` for the scan range — never `default_branch`, which after a push resolves to the same commit as HEAD and silently skips the scan.
+> **Note:** Security jobs (`secret-scan`, `workflow-policy`, `vuln-scan`, `image-scan`) are defined within `ci.yml`. They run on push, PR, and weekly schedule (`cron: '0 6 * * 1'`). Add `if: github.event_name != 'schedule'` to build/test/coverage/artifact jobs to skip non-security work on scheduled runs. Secret scanning is mandatory on every public repo via truffleHog (Apache-2.0). Derive the scan range in a dedicated step: `github.event.before`/`github.sha` on push (empty when `before` is all-zeros, i.e. a new branch), PR base/head on pull requests, and empty (full-history scan) on schedule — never `default_branch`, which after a push resolves to the same commit as HEAD and silently skips the scan.
 
 ## Release Workflow — Stable (GitHub Actions)
 
@@ -30076,7 +30089,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   PROJECT_NAME: {project_name}
@@ -30112,9 +30125,6 @@ jobs:
           - target: x86_64-unknown-freebsd
             os: freebsd
             arch: amd64
-          - target: aarch64-unknown-freebsd
-            os: freebsd
-            arch: arm64
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -30143,7 +30153,7 @@ jobs:
           BUILD_DATE: ${{ env.BUILD_DATE }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }}
+          cargo zigbuild --release --target ${{ matrix.target }}
           cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}${{ matrix.ext }} \
             ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
@@ -30156,21 +30166,19 @@ jobs:
           BUILD_DATE: ${{ env.BUILD_DATE }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
+          cargo zigbuild --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
           cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-cli${{ matrix.ext }} \
             ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
-        # v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/**') != ''
-        # v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
@@ -30181,13 +30189,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # GitHub artifact attestations (SBOM, provenance)
+      id-token: write
+      attestations: write
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Download all artifacts
-        # v8.0.1
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           path: binaries
           merge-multiple: true
@@ -30215,9 +30225,29 @@ jobs:
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
             -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
+      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
+      # inside the container (never on the runner host); skip if already present
+      - name: Generate SBOM (CycloneDX)
+        run: |
+          docker run --rm -v "$PWD":/app -w /app casjaysdev/rust:latest \
+            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json'
+          set -- *.cdx.json
+          cp "$1" "binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-sbom.cdx.json"
+
+      - name: Generate checksums
+        run: |
+          cd "$GITHUB_WORKSPACE/binaries"
+          for f in *; do
+            sha256sum "$f" > "$f.sha256"
+          done
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: binaries/${{ env.PROJECT_NAME }}-*
+
       - name: Create Release
-        # v3.0.1
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           files: binaries/*
@@ -30242,13 +30272,30 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   PROJECT_NAME: {project_name}
 
 jobs:
+  # Compute VERSION once — matrix legs must never each compute their own timestamp
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - name: Compute version
+        id: set
+        run: |
+          if [ -f release.txt ]; then
+            echo "version=$(cat release.txt)" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$(date -u +%Y%m%d%H%M%S)-beta" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: [version]
     runs-on: ubuntu-latest
     container:
       image: casjaysdev/rust:latest
@@ -30278,20 +30325,13 @@ jobs:
           - target: x86_64-unknown-freebsd
             os: freebsd
             arch: amd64
-          - target: aarch64-unknown-freebsd
-            os: freebsd
-            arch: arm64
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Set build info
         run: |
-          if [ -f release.txt ]; then
-            echo "VERSION=$(cat release.txt)" >> $GITHUB_ENV
-          else
-            echo "VERSION=$(date -u +"%Y%m%d%H%M%S")-beta" >> $GITHUB_ENV
-          fi
+          echo "VERSION=${{ needs.version.outputs.version }}" >> $GITHUB_ENV
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
           echo "BUILD_DATE=$(date +"%a %b %d, %Y at %H:%M:%S %Z")" >> $GITHUB_ENV
           # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
@@ -30309,7 +30349,7 @@ jobs:
           BUILD_DATE: ${{ env.BUILD_DATE }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }}
+          cargo zigbuild --release --target ${{ matrix.target }}
           cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}${{ matrix.ext }} \
             ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
@@ -30322,28 +30362,26 @@ jobs:
           BUILD_DATE: ${{ env.BUILD_DATE }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
+          cargo zigbuild --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
           cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-cli${{ matrix.ext }} \
             ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
-        # v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/**') != ''
-        # v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
 
   release:
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -30352,26 +30390,26 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Download all artifacts
-        # v8.0.1
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           path: binaries
           merge-multiple: true
 
       - name: Set version
-        run: |
-          if [ -f release.txt ]; then
-            echo "VERSION=$(cat release.txt)" >> $GITHUB_ENV
-          else
-            echo "VERSION=$(date -u +"%Y%m%d%H%M%S")-beta" >> $GITHUB_ENV
-          fi
+        run: echo "VERSION=${{ needs.version.outputs.version }}" >> $GITHUB_ENV
 
       - name: Create version.txt
         run: echo "${{ env.VERSION }}" > binaries/version.txt
 
+      - name: Generate checksums
+        run: |
+          cd "$GITHUB_WORKSPACE/binaries"
+          for f in *; do
+            sha256sum "$f" > "$f.sha256"
+          done
+
       - name: Create Release
-        # v3.0.1
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
         with:
           tag_name: ${{ env.VERSION }}
           files: binaries/*
@@ -30401,13 +30439,30 @@ concurrency:
   cancel-in-progress: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/devel' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/beta' }}
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   PROJECT_NAME: {project_name}
 
 jobs:
+  # Compute VERSION once — matrix legs must never each compute their own timestamp
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - name: Compute version
+        id: set
+        run: |
+          if [ -f release.txt ]; then
+            echo "version=$(cat release.txt)" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$(date -u +%Y%m%d%H%M%S)" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: [version]
     runs-on: ubuntu-latest
     container:
       image: casjaysdev/rust:latest
@@ -30437,20 +30492,13 @@ jobs:
           - target: x86_64-unknown-freebsd
             os: freebsd
             arch: amd64
-          - target: aarch64-unknown-freebsd
-            os: freebsd
-            arch: arm64
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Set build info
         run: |
-          if [ -f release.txt ]; then
-            echo "VERSION=$(cat release.txt)" >> $GITHUB_ENV
-          else
-            echo "VERSION=$(date -u +"%Y%m%d%H%M%S")" >> $GITHUB_ENV
-          fi
+          echo "VERSION=${{ needs.version.outputs.version }}" >> $GITHUB_ENV
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
           echo "BUILD_DATE=$(date +"%a %b %d, %Y at %H:%M:%S %Z")" >> $GITHUB_ENV
           # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
@@ -30468,7 +30516,7 @@ jobs:
           BUILD_DATE: ${{ env.BUILD_DATE }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }}
+          cargo zigbuild --release --target ${{ matrix.target }}
           cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}${{ matrix.ext }} \
             ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
@@ -30481,28 +30529,26 @@ jobs:
           BUILD_DATE: ${{ env.BUILD_DATE }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
+          cargo zigbuild --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
           cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-cli${{ matrix.ext }} \
             ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
-        # v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/**') != ''
-        # v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
 
   release:
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -30511,22 +30557,23 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Download all artifacts
-        # v8.0.1
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           path: binaries
           merge-multiple: true
 
       - name: Set version
-        run: |
-          if [ -f release.txt ]; then
-            echo "VERSION=$(cat release.txt)" >> $GITHUB_ENV
-          else
-            echo "VERSION=$(date -u +"%Y%m%d%H%M%S")" >> $GITHUB_ENV
-          fi
+        run: echo "VERSION=${{ needs.version.outputs.version }}" >> $GITHUB_ENV
 
       - name: Create version.txt
         run: echo "${{ env.VERSION }}" > binaries/version.txt
+
+      - name: Generate checksums
+        run: |
+          cd "$GITHUB_WORKSPACE/binaries"
+          for f in *; do
+            sha256sum "$f" > "$f.sha256"
+          done
 
       - name: Delete previous daily release
         run: |
@@ -30536,8 +30583,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Create Release
-        # v3.0.1
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
         with:
           tag_name: daily
           name: "Daily Build ${{ env.VERSION }}"
@@ -30608,16 +30654,13 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Set up QEMU
-        # v4.1.0
-        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3  # v4.1.0
 
       - name: Set up Docker Buildx
-        # v4.1.0
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5  # v4.1.0
 
       - name: Log in to Container Registry
-        # v4.2.0
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4.2.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -30655,8 +30698,7 @@ jobs:
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
       - name: Build and push (standard)
-        # v7.2.0
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
         with:
           context: .
           file: docker/Dockerfile
@@ -30706,16 +30748,13 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Set up QEMU
-        # v4.1.0
-        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3  # v4.1.0
 
       - name: Set up Docker Buildx
-        # v4.1.0
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5  # v4.1.0
 
       - name: Log in to Container Registry
-        # v4.2.0
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4.2.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -30727,8 +30766,7 @@ jobs:
           echo "BUILD_DATE=$(date +"%a %b %d, %Y at %H:%M:%S %Z")" >> $GITHUB_ENV
 
       - name: Build and push (devel)
-        # v7.2.0
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
         with:
           context: .
           file: docker/Dockerfile.dev
@@ -30831,7 +30869,7 @@ For self-hosted runners, change `runs-on: ubuntu-latest` to your runner label.
 | `release.yml` | Tag push (`v*`, `*.*.*`) | Production releases |
 | `beta.yml` | Push to `beta` branch | Beta releases |
 | `daily.yml` | Daily at 3am UTC + push to main/master | Daily builds |
-| `docker.yml` | Version tag, push to main/master/beta (`build-standard` job); all branch pushes (excluding version tags) + daily schedule (`build-devel` job) | Docker images (standard tags and `:devel`, from `Dockerfile.dev`) |
+| `docker.yml` | Version tag + any push, all branches (`build-standard` job); all branch pushes (excluding version tags) + daily schedule (`build-devel` job) | Docker images (standard tags and `:devel`, from `Dockerfile.dev`) |
 
 ## Release Workflow — Stable (Gitea/Forgejo Actions)
 
@@ -30851,7 +30889,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   PROJECT_NAME: {project_name}
@@ -30887,9 +30925,6 @@ jobs:
           - target: x86_64-unknown-freebsd
             os: freebsd
             arch: amd64
-          - target: aarch64-unknown-freebsd
-            os: freebsd
-            arch: arm64
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -30918,7 +30953,7 @@ jobs:
           BUILD_DATE: ${{ env.BUILD_DATE }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }}
+          cargo zigbuild --release --target ${{ matrix.target }}
           cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}${{ matrix.ext }} \
             ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
@@ -30931,21 +30966,19 @@ jobs:
           BUILD_DATE: ${{ env.BUILD_DATE }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
+          cargo zigbuild --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
           cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-cli${{ matrix.ext }} \
             ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
-        # v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/**') != ''
-        # v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
@@ -30961,8 +30994,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Download all artifacts
-        # v8.0.1
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           path: binaries
           merge-multiple: true
@@ -30990,14 +31022,27 @@ jobs:
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
             -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
+      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
+      # inside the container (never on the runner host); skip if already present
+      - name: Generate SBOM (CycloneDX)
+        run: |
+          docker run --rm -v "$PWD":/app -w /app casjaysdev/rust:latest \
+            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json'
+          set -- *.cdx.json
+          cp "$1" "binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-sbom.cdx.json"
+
+      - name: Generate checksums
+        run: |
+          cd "$GITHUB_WORKSPACE/binaries"
+          for f in *; do
+            sha256sum "$f" > "$f.sha256"
+          done
+
       - name: Create Release
-        # v3.0.1
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           files: binaries/*
-          generate_release_notes: true
-          make_latest: true
 ```
 
 ## Beta Workflow (Gitea/Forgejo Actions)
@@ -31017,13 +31062,30 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   PROJECT_NAME: {project_name}
 
 jobs:
+  # Compute VERSION once — matrix legs must never each compute their own timestamp
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - name: Compute version
+        id: set
+        run: |
+          if [ -f release.txt ]; then
+            echo "version=$(cat release.txt)" >> "$GITEA_OUTPUT"
+          else
+            echo "version=$(date -u +%Y%m%d%H%M%S)-beta" >> "$GITEA_OUTPUT"
+          fi
+
   build:
+    needs: [version]
     runs-on: ubuntu-latest
     container:
       image: casjaysdev/rust:latest
@@ -31053,20 +31115,13 @@ jobs:
           - target: x86_64-unknown-freebsd
             os: freebsd
             arch: amd64
-          - target: aarch64-unknown-freebsd
-            os: freebsd
-            arch: arm64
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Set build info
         run: |
-          if [ -f release.txt ]; then
-            echo "VERSION=$(cat release.txt)" >> $GITEA_ENV
-          else
-            echo "VERSION=$(date -u +"%Y%m%d%H%M%S")-beta" >> $GITEA_ENV
-          fi
+          echo "VERSION=${{ needs.version.outputs.version }}" >> $GITEA_ENV
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITEA_ENV
           echo "BUILD_DATE=$(date +"%a %b %d, %Y at %H:%M:%S %Z")" >> $GITEA_ENV
           # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
@@ -31084,7 +31139,7 @@ jobs:
           BUILD_DATE: ${{ env.BUILD_DATE }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }}
+          cargo zigbuild --release --target ${{ matrix.target }}
           cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}${{ matrix.ext }} \
             ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
@@ -31097,28 +31152,26 @@ jobs:
           BUILD_DATE: ${{ env.BUILD_DATE }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
+          cargo zigbuild --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
           cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-cli${{ matrix.ext }} \
             ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
-        # v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/**') != ''
-        # v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
 
   release:
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -31127,31 +31180,30 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Download all artifacts
-        # v8.0.1
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           path: binaries
           merge-multiple: true
 
       - name: Set version
-        run: |
-          if [ -f release.txt ]; then
-            echo "VERSION=$(cat release.txt)" >> $GITEA_ENV
-          else
-            echo "VERSION=$(date -u +"%Y%m%d%H%M%S")-beta" >> $GITEA_ENV
-          fi
+        run: echo "VERSION=${{ needs.version.outputs.version }}" >> $GITEA_ENV
 
       - name: Create version.txt
         run: echo "${{ env.VERSION }}" > binaries/version.txt
 
+      - name: Generate checksums
+        run: |
+          cd "$GITHUB_WORKSPACE/binaries"
+          for f in *; do
+            sha256sum "$f" > "$f.sha256"
+          done
+
       - name: Create Release
-        # v3.0.1
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
         with:
           tag_name: ${{ env.VERSION }}
           files: binaries/*
           prerelease: true
-          generate_release_notes: true
 ```
 
 ## Daily Workflow (Gitea/Forgejo Actions)
@@ -31176,13 +31228,30 @@ concurrency:
   cancel-in-progress: ${{ gitea.ref == 'refs/heads/main' || gitea.ref == 'refs/heads/master' || gitea.ref == 'refs/heads/devel' || gitea.ref == 'refs/heads/dev' || gitea.ref == 'refs/heads/beta' }}
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   PROJECT_NAME: {project_name}
 
 jobs:
+  # Compute VERSION once — matrix legs must never each compute their own timestamp
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - name: Compute version
+        id: set
+        run: |
+          if [ -f release.txt ]; then
+            echo "version=$(cat release.txt)" >> "$GITEA_OUTPUT"
+          else
+            echo "version=$(date -u +%Y%m%d%H%M%S)" >> "$GITEA_OUTPUT"
+          fi
+
   build:
+    needs: [version]
     runs-on: ubuntu-latest
     container:
       image: casjaysdev/rust:latest
@@ -31212,20 +31281,13 @@ jobs:
           - target: x86_64-unknown-freebsd
             os: freebsd
             arch: amd64
-          - target: aarch64-unknown-freebsd
-            os: freebsd
-            arch: arm64
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Set build info
         run: |
-          if [ -f release.txt ]; then
-            echo "VERSION=$(cat release.txt)" >> $GITEA_ENV
-          else
-            echo "VERSION=$(date -u +"%Y%m%d%H%M%S")" >> $GITEA_ENV
-          fi
+          echo "VERSION=${{ needs.version.outputs.version }}" >> $GITEA_ENV
           echo "COMMIT_ID=$(git rev-parse --short HEAD)" >> $GITEA_ENV
           echo "BUILD_DATE=$(date +"%a %b %d, %Y at %H:%M:%S %Z")" >> $GITEA_ENV
           # OFFICIAL_SITE (optional): site.txt wins; otherwise use repository secrets or leave empty
@@ -31243,7 +31305,7 @@ jobs:
           BUILD_DATE: ${{ env.BUILD_DATE }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }}
+          cargo zigbuild --release --target ${{ matrix.target }}
           cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}${{ matrix.ext }} \
             ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
@@ -31256,28 +31318,26 @@ jobs:
           BUILD_DATE: ${{ env.BUILD_DATE }}
           OFFICIAL_SITE: ${{ env.OFFICIAL_SITE }}
         run: |
-          cross build --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
+          cargo zigbuild --release --target ${{ matrix.target }} --bin ${{ env.PROJECT_NAME }}-cli
           cp target/${{ matrix.target }}/release/${{ env.PROJECT_NAME }}-cli${{ matrix.ext }} \
             ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload server artifact
-        # v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
       - name: Upload CLI artifact
         if: hashFiles('src/client/**') != ''
-        # v7.0.1
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-cli-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
 
   release:
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -31286,34 +31346,34 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
 
       - name: Download all artifacts
-        # v8.0.1
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           path: binaries
           merge-multiple: true
 
       - name: Set version
-        run: |
-          if [ -f release.txt ]; then
-            echo "VERSION=$(cat release.txt)" >> $GITEA_ENV
-          else
-            echo "VERSION=$(date -u +"%Y%m%d%H%M%S")" >> $GITEA_ENV
-          fi
+        run: echo "VERSION=${{ needs.version.outputs.version }}" >> $GITEA_ENV
 
       - name: Create version.txt
         run: echo "${{ env.VERSION }}" > binaries/version.txt
+
+      - name: Generate checksums
+        run: |
+          cd "$GITHUB_WORKSPACE/binaries"
+          for f in *; do
+            sha256sum "$f" > "$f.sha256"
+          done
 
       - name: Delete previous daily release
         run: |
           # Use Gitea API to delete previous daily release
           curl -X DELETE \
             -H "Authorization: token ${{ secrets.GITEA_TOKEN }}" \
-            "${{ gitea.server_url }}/api/{api_version}/repos/${{ gitea.repository }}/releases/tags/daily" || true
+            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/releases/tags/daily" || true
           git push origin :refs/tags/daily 2>/dev/null || true
 
       - name: Create Release
-        # v3.0.1
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
         with:
           tag_name: daily
           name: "Daily Build ${{ env.VERSION }}"
@@ -31389,7 +31449,8 @@ jobs:
           echo "YYMM=$(date +"%y%m")" >> $GITEA_ENV
           if [[ "${{ gitea.ref }}" == refs/tags/* ]]; then
             VERSION="${GITEA_REF_NAME}"
-            echo "VERSION=${VERSION#v}" >> $GITEA_ENV  # Strip 'v' prefix
+            # Strip 'v' prefix
+            echo "VERSION=${VERSION#v}" >> $GITEA_ENV
             echo "IS_TAG=true" >> $GITEA_ENV
           else
             echo "VERSION=$(git rev-parse --short HEAD)" >> $GITEA_ENV
@@ -31618,8 +31679,9 @@ stages:
 .rust-build-template: &rust-build
   image: $BUILD_IMAGE
   before_script:
-    # NOTE: all tooling (git, bash, cargo-audit, cargo-cyclonedx, cross, etc.) is pre-installed
-    # in casjaysdev/rust:latest — never `apk add` or `cargo install` inside a CI job.
+    # NOTE: all tooling (git, bash, cargo-audit, cargo-zigbuild, etc.) is pre-installed
+    # in casjaysdev/rust:latest — never `apk add` inside a CI job. Sole exception:
+    # cargo-cyclonedx (SBOM) is not in the image; the SBOM step installs it in-container.
     - export VERSION="${CI_COMMIT_TAG#v}"
     - export COMMIT_ID="${CI_COMMIT_SHORT_SHA}"
     - export BUILD_DATE="$(date +"%a %b %d, %Y at %H:%M:%S %Z")"
@@ -31640,9 +31702,9 @@ build:linux-amd64:
   <<: *rust-build
   stage: build
   script:
-    - cross build --release --target x86_64-unknown-linux-musl
+    - cargo zigbuild --release --target x86_64-unknown-linux-musl
     - cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-amd64
-    - if [ -d "src/client" ]; then cross build --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-amd64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-amd64; fi
   artifacts:
     paths:
       - ${PROJECT_NAME}-linux-amd64*
@@ -31654,9 +31716,9 @@ build:linux-arm64:
   <<: *rust-build
   stage: build
   script:
-    - cross build --release --target aarch64-unknown-linux-musl
+    - cargo zigbuild --release --target aarch64-unknown-linux-musl
     - cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-arm64
-    - if [ -d "src/client" ]; then cross build --release --target aarch64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-arm64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target aarch64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-arm64; fi
   artifacts:
     paths:
       - ${PROJECT_NAME}-linux-arm64*
@@ -31668,9 +31730,9 @@ build:darwin-amd64:
   <<: *rust-build
   stage: build
   script:
-    - cross build --release --target x86_64-apple-darwin
+    - cargo zigbuild --release --target x86_64-apple-darwin
     - cp target/x86_64-apple-darwin/release/${PROJECT_NAME} ${PROJECT_NAME}-darwin-amd64
-    - if [ -d "src/client" ]; then cross build --release --target x86_64-apple-darwin --bin ${PROJECT_NAME}-cli && cp target/x86_64-apple-darwin/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-darwin-amd64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-apple-darwin --bin ${PROJECT_NAME}-cli && cp target/x86_64-apple-darwin/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-darwin-amd64; fi
   artifacts:
     paths:
       - ${PROJECT_NAME}-darwin-amd64*
@@ -31682,9 +31744,9 @@ build:darwin-arm64:
   <<: *rust-build
   stage: build
   script:
-    - cross build --release --target aarch64-apple-darwin
+    - cargo zigbuild --release --target aarch64-apple-darwin
     - cp target/aarch64-apple-darwin/release/${PROJECT_NAME} ${PROJECT_NAME}-darwin-arm64
-    - if [ -d "src/client" ]; then cross build --release --target aarch64-apple-darwin --bin ${PROJECT_NAME}-cli && cp target/aarch64-apple-darwin/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-darwin-arm64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target aarch64-apple-darwin --bin ${PROJECT_NAME}-cli && cp target/aarch64-apple-darwin/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-darwin-arm64; fi
   artifacts:
     paths:
       - ${PROJECT_NAME}-darwin-arm64*
@@ -31696,9 +31758,9 @@ build:windows-amd64:
   <<: *rust-build
   stage: build
   script:
-    - cross build --release --target x86_64-pc-windows-gnu
+    - cargo zigbuild --release --target x86_64-pc-windows-gnu
     - cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}.exe ${PROJECT_NAME}-windows-amd64.exe
-    - if [ -d "src/client" ]; then cross build --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-cli && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-amd64.exe; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-cli && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-amd64.exe; fi
   artifacts:
     paths:
       - ${PROJECT_NAME}-windows-amd64*.exe
@@ -31710,9 +31772,9 @@ build:windows-arm64:
   <<: *rust-build
   stage: build
   script:
-    - cross build --release --target aarch64-pc-windows-gnullvm
+    - cargo zigbuild --release --target aarch64-pc-windows-gnullvm
     - cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}.exe ${PROJECT_NAME}-windows-arm64.exe
-    - if [ -d "src/client" ]; then cross build --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-cli && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-arm64.exe; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-cli && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-arm64.exe; fi
   artifacts:
     paths:
       - ${PROJECT_NAME}-windows-arm64*.exe
@@ -31724,26 +31786,12 @@ build:freebsd-amd64:
   <<: *rust-build
   stage: build
   script:
-    - cross build --release --target x86_64-unknown-freebsd
+    - cargo zigbuild --release --target x86_64-unknown-freebsd
     - cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME} ${PROJECT_NAME}-freebsd-amd64
-    - if [ -d "src/client" ]; then cross build --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-freebsd-amd64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-freebsd-amd64; fi
   artifacts:
     paths:
       - ${PROJECT_NAME}-freebsd-amd64*
-    expire_in: 1 week
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+/
-
-build:freebsd-arm64:
-  <<: *rust-build
-  stage: build
-  script:
-    - cross build --release --target aarch64-unknown-freebsd
-    - cp target/aarch64-unknown-freebsd/release/${PROJECT_NAME} ${PROJECT_NAME}-freebsd-arm64
-    - if [ -d "src/client" ]; then cross build --release --target aarch64-unknown-freebsd --bin ${PROJECT_NAME}-cli && cp target/aarch64-unknown-freebsd/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-freebsd-arm64; fi
-  artifacts:
-    paths:
-      - ${PROJECT_NAME}-freebsd-arm64*
     expire_in: 1 week
   rules:
     - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+/
@@ -31783,7 +31831,6 @@ release:
     - build:windows-amd64
     - build:windows-arm64
     - build:freebsd-amd64
-    - build:freebsd-arm64
     - test
   script:
     - echo "Creating release ${CI_COMMIT_TAG}"
@@ -31812,8 +31859,6 @@ release:
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${PROJECT_NAME}-windows-arm64.exe?job=build:windows-arm64"
         - name: "${PROJECT_NAME}-freebsd-amd64"
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${PROJECT_NAME}-freebsd-amd64?job=build:freebsd-amd64"
-        - name: "${PROJECT_NAME}-freebsd-arm64"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/raw/${PROJECT_NAME}-freebsd-arm64?job=build:freebsd-arm64"
   rules:
     - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+/
 
@@ -31829,24 +31874,22 @@ build:beta:
     - export COMMIT_ID="${CI_COMMIT_SHORT_SHA}"
     - export BUILD_DATE="$(date +"%a %b %d, %Y at %H:%M:%S %Z")"
   script:
-    # Build all 8 platforms via cross
-    - cross build --release --target x86_64-unknown-linux-musl && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-amd64
-    - cross build --release --target aarch64-unknown-linux-musl && cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-arm64
-    - cross build --release --target x86_64-apple-darwin && cp target/x86_64-apple-darwin/release/${PROJECT_NAME} ${PROJECT_NAME}-darwin-amd64
-    - cross build --release --target aarch64-apple-darwin && cp target/aarch64-apple-darwin/release/${PROJECT_NAME} ${PROJECT_NAME}-darwin-arm64
-    - cross build --release --target x86_64-pc-windows-gnu && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}.exe ${PROJECT_NAME}-windows-amd64.exe
-    - cross build --release --target aarch64-pc-windows-gnullvm && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}.exe ${PROJECT_NAME}-windows-arm64.exe
-    - cross build --release --target x86_64-unknown-freebsd && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME} ${PROJECT_NAME}-freebsd-amd64
-    - cross build --release --target aarch64-unknown-freebsd && cp target/aarch64-unknown-freebsd/release/${PROJECT_NAME} ${PROJECT_NAME}-freebsd-arm64
+    # Build all 7 platforms via cargo zigbuild
+    - cargo zigbuild --release --target x86_64-unknown-linux-musl && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-amd64
+    - cargo zigbuild --release --target aarch64-unknown-linux-musl && cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-arm64
+    - cargo zigbuild --release --target x86_64-apple-darwin && cp target/x86_64-apple-darwin/release/${PROJECT_NAME} ${PROJECT_NAME}-darwin-amd64
+    - cargo zigbuild --release --target aarch64-apple-darwin && cp target/aarch64-apple-darwin/release/${PROJECT_NAME} ${PROJECT_NAME}-darwin-arm64
+    - cargo zigbuild --release --target x86_64-pc-windows-gnu && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}.exe ${PROJECT_NAME}-windows-amd64.exe
+    - cargo zigbuild --release --target aarch64-pc-windows-gnullvm && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}.exe ${PROJECT_NAME}-windows-arm64.exe
+    - cargo zigbuild --release --target x86_64-unknown-freebsd && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME} ${PROJECT_NAME}-freebsd-amd64
     # Build CLI if exists
-    - if [ -d "src/client" ]; then cross build --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-amd64; fi
-    - if [ -d "src/client" ]; then cross build --release --target aarch64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-arm64; fi
-    - if [ -d "src/client" ]; then cross build --release --target x86_64-apple-darwin --bin ${PROJECT_NAME}-cli && cp target/x86_64-apple-darwin/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-darwin-amd64; fi
-    - if [ -d "src/client" ]; then cross build --release --target aarch64-apple-darwin --bin ${PROJECT_NAME}-cli && cp target/aarch64-apple-darwin/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-darwin-arm64; fi
-    - if [ -d "src/client" ]; then cross build --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-cli && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-amd64.exe; fi
-    - if [ -d "src/client" ]; then cross build --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-cli && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-arm64.exe; fi
-    - if [ -d "src/client" ]; then cross build --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-freebsd-amd64; fi
-    - if [ -d "src/client" ]; then cross build --release --target aarch64-unknown-freebsd --bin ${PROJECT_NAME}-cli && cp target/aarch64-unknown-freebsd/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-freebsd-arm64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-amd64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target aarch64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-arm64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-apple-darwin --bin ${PROJECT_NAME}-cli && cp target/x86_64-apple-darwin/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-darwin-amd64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target aarch64-apple-darwin --bin ${PROJECT_NAME}-cli && cp target/aarch64-apple-darwin/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-darwin-arm64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-cli && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-amd64.exe; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-cli && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-arm64.exe; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-freebsd-amd64; fi
   artifacts:
     paths:
       - ${PROJECT_NAME}-*
@@ -31855,7 +31898,7 @@ build:beta:
     - if: $CI_COMMIT_BRANCH == "beta"
 
 # =============================================================================
-# DAILY BUILDS (Scheduled + main/master push) - All 8 platforms
+# DAILY BUILDS (Scheduled + main/master push) - All 7 platforms
 # =============================================================================
 
 build:daily:
@@ -31866,24 +31909,22 @@ build:daily:
     - export COMMIT_ID="${CI_COMMIT_SHORT_SHA}"
     - export BUILD_DATE="$(date +"%a %b %d, %Y at %H:%M:%S %Z")"
   script:
-    # Build all 8 platforms via cross
-    - cross build --release --target x86_64-unknown-linux-musl && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-amd64
-    - cross build --release --target aarch64-unknown-linux-musl && cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-arm64
-    - cross build --release --target x86_64-apple-darwin && cp target/x86_64-apple-darwin/release/${PROJECT_NAME} ${PROJECT_NAME}-darwin-amd64
-    - cross build --release --target aarch64-apple-darwin && cp target/aarch64-apple-darwin/release/${PROJECT_NAME} ${PROJECT_NAME}-darwin-arm64
-    - cross build --release --target x86_64-pc-windows-gnu && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}.exe ${PROJECT_NAME}-windows-amd64.exe
-    - cross build --release --target aarch64-pc-windows-gnullvm && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}.exe ${PROJECT_NAME}-windows-arm64.exe
-    - cross build --release --target x86_64-unknown-freebsd && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME} ${PROJECT_NAME}-freebsd-amd64
-    - cross build --release --target aarch64-unknown-freebsd && cp target/aarch64-unknown-freebsd/release/${PROJECT_NAME} ${PROJECT_NAME}-freebsd-arm64
+    # Build all 7 platforms via cargo zigbuild
+    - cargo zigbuild --release --target x86_64-unknown-linux-musl && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-amd64
+    - cargo zigbuild --release --target aarch64-unknown-linux-musl && cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-arm64
+    - cargo zigbuild --release --target x86_64-apple-darwin && cp target/x86_64-apple-darwin/release/${PROJECT_NAME} ${PROJECT_NAME}-darwin-amd64
+    - cargo zigbuild --release --target aarch64-apple-darwin && cp target/aarch64-apple-darwin/release/${PROJECT_NAME} ${PROJECT_NAME}-darwin-arm64
+    - cargo zigbuild --release --target x86_64-pc-windows-gnu && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}.exe ${PROJECT_NAME}-windows-amd64.exe
+    - cargo zigbuild --release --target aarch64-pc-windows-gnullvm && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}.exe ${PROJECT_NAME}-windows-arm64.exe
+    - cargo zigbuild --release --target x86_64-unknown-freebsd && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME} ${PROJECT_NAME}-freebsd-amd64
     # Build CLI if exists
-    - if [ -d "src/client" ]; then cross build --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-amd64; fi
-    - if [ -d "src/client" ]; then cross build --release --target aarch64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-arm64; fi
-    - if [ -d "src/client" ]; then cross build --release --target x86_64-apple-darwin --bin ${PROJECT_NAME}-cli && cp target/x86_64-apple-darwin/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-darwin-amd64; fi
-    - if [ -d "src/client" ]; then cross build --release --target aarch64-apple-darwin --bin ${PROJECT_NAME}-cli && cp target/aarch64-apple-darwin/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-darwin-arm64; fi
-    - if [ -d "src/client" ]; then cross build --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-cli && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-amd64.exe; fi
-    - if [ -d "src/client" ]; then cross build --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-cli && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-arm64.exe; fi
-    - if [ -d "src/client" ]; then cross build --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-freebsd-amd64; fi
-    - if [ -d "src/client" ]; then cross build --release --target aarch64-unknown-freebsd --bin ${PROJECT_NAME}-cli && cp target/aarch64-unknown-freebsd/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-freebsd-arm64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-amd64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target aarch64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-arm64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-apple-darwin --bin ${PROJECT_NAME}-cli && cp target/x86_64-apple-darwin/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-darwin-amd64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target aarch64-apple-darwin --bin ${PROJECT_NAME}-cli && cp target/aarch64-apple-darwin/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-darwin-arm64; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-cli && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-amd64.exe; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-cli && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-arm64.exe; fi
+    - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-freebsd-amd64; fi
   artifacts:
     paths:
       - ${PROJECT_NAME}-*
@@ -32077,7 +32118,7 @@ Jenkins provides equivalent functionality to GitHub Actions, Gitea Actions, and 
 | Setting | Value |
 |---------|-------|
 | Agents | `arm64`, `amd64` (both required) |
-| Build | All 8 platforms in parallel |
+| Build | All 7 platforms in parallel |
 | Triggers | Tag push, beta branch, main/master, scheduled daily |
 
 ## Triggers (Matching GitHub Actions)
@@ -32191,7 +32232,7 @@ pipeline {
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
-                                cross build --release --target x86_64-unknown-linux-musl
+                                cargo zigbuild --release --target x86_64-unknown-linux-musl
                             cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME} ${BINDIR}/${PROJECT_NAME}-linux-amd64
                         '''
                     }
@@ -32209,7 +32250,7 @@ pipeline {
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
-                                cross build --release --target aarch64-unknown-linux-musl
+                                cargo zigbuild --release --target aarch64-unknown-linux-musl
                             cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME} ${BINDIR}/${PROJECT_NAME}-linux-arm64
                         '''
                     }
@@ -32228,7 +32269,7 @@ pipeline {
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
-                                cross build --release --target x86_64-apple-darwin
+                                cargo zigbuild --release --target x86_64-apple-darwin
                             cp target/x86_64-apple-darwin/release/${PROJECT_NAME} ${BINDIR}/${PROJECT_NAME}-darwin-amd64
                         '''
                     }
@@ -32246,7 +32287,7 @@ pipeline {
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
-                                cross build --release --target aarch64-apple-darwin
+                                cargo zigbuild --release --target aarch64-apple-darwin
                             cp target/aarch64-apple-darwin/release/${PROJECT_NAME} ${BINDIR}/${PROJECT_NAME}-darwin-arm64
                         '''
                     }
@@ -32265,7 +32306,7 @@ pipeline {
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
-                                cross build --release --target x86_64-pc-windows-gnu
+                                cargo zigbuild --release --target x86_64-pc-windows-gnu
                             cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}.exe ${BINDIR}/${PROJECT_NAME}-windows-amd64.exe
                         '''
                     }
@@ -32283,7 +32324,7 @@ pipeline {
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
-                                cross build --release --target aarch64-pc-windows-gnullvm
+                                cargo zigbuild --release --target aarch64-pc-windows-gnullvm
                             cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}.exe ${BINDIR}/${PROJECT_NAME}-windows-arm64.exe
                         '''
                     }
@@ -32302,26 +32343,8 @@ pipeline {
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
-                                cross build --release --target x86_64-unknown-freebsd
+                                cargo zigbuild --release --target x86_64-unknown-freebsd
                             cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME} ${BINDIR}/${PROJECT_NAME}-freebsd-amd64
-                        '''
-                    }
-                }
-                stage('FreeBSD ARM64') {
-                    agent { label 'amd64' }
-                    steps {
-                        sh '''
-                            docker run --rm \
-                                --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
-                                -v ${WORKSPACE}:/app \
-                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
-                                -w /app \
-                                casjaysdev/rust:latest \
-                                cross build --release --target aarch64-unknown-freebsd
-                            cp target/aarch64-unknown-freebsd/release/${PROJECT_NAME} ${BINDIR}/${PROJECT_NAME}-freebsd-arm64
                         '''
                     }
                 }
@@ -32347,7 +32370,7 @@ pipeline {
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
-                                cross build --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-cli
+                                cargo zigbuild --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-cli
                             cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${BINDIR}/${PROJECT_NAME}-cli-linux-amd64
                         '''
                     }
@@ -32365,7 +32388,7 @@ pipeline {
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
-                                cross build --release --target aarch64-unknown-linux-musl --bin ${PROJECT_NAME}-cli
+                                cargo zigbuild --release --target aarch64-unknown-linux-musl --bin ${PROJECT_NAME}-cli
                             cp target/aarch64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${BINDIR}/${PROJECT_NAME}-cli-linux-arm64
                         '''
                     }
@@ -32383,7 +32406,7 @@ pipeline {
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
-                                cross build --release --target x86_64-apple-darwin --bin ${PROJECT_NAME}-cli
+                                cargo zigbuild --release --target x86_64-apple-darwin --bin ${PROJECT_NAME}-cli
                             cp target/x86_64-apple-darwin/release/${PROJECT_NAME}-cli ${BINDIR}/${PROJECT_NAME}-cli-darwin-amd64
                         '''
                     }
@@ -32401,7 +32424,7 @@ pipeline {
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
-                                cross build --release --target aarch64-apple-darwin --bin ${PROJECT_NAME}-cli
+                                cargo zigbuild --release --target aarch64-apple-darwin --bin ${PROJECT_NAME}-cli
                             cp target/aarch64-apple-darwin/release/${PROJECT_NAME}-cli ${BINDIR}/${PROJECT_NAME}-cli-darwin-arm64
                         '''
                     }
@@ -32419,7 +32442,7 @@ pipeline {
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
-                                cross build --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-cli
+                                cargo zigbuild --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-cli
                             cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-cli.exe ${BINDIR}/${PROJECT_NAME}-cli-windows-amd64.exe
                         '''
                     }
@@ -32437,7 +32460,7 @@ pipeline {
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
-                                cross build --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-cli
+                                cargo zigbuild --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-cli
                             cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-cli.exe ${BINDIR}/${PROJECT_NAME}-cli-windows-arm64.exe
                         '''
                     }
@@ -32455,26 +32478,8 @@ pipeline {
                                 -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
                                 -w /app \
                                 casjaysdev/rust:latest \
-                                cross build --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-cli
+                                cargo zigbuild --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-cli
                             cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-cli ${BINDIR}/${PROJECT_NAME}-cli-freebsd-amd64
-                        '''
-                    }
-                }
-                stage('CLI FreeBSD ARM64') {
-                    agent { label 'amd64' }
-                    steps {
-                        sh '''
-                            docker run --rm \
-                                --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
-                                -v ${WORKSPACE}:/app \
-                                -v ${CARGO_CACHE:-$HOME/.cargo}:/usr/local/share/cargo \
-                                -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
-                                -v ${SCCACHE_CACHE:-$HOME/.cache/sccache}:/root/.cache/sccache \
-                                -v ${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}:/app/target \
-                                -w /app \
-                                casjaysdev/rust:latest \
-                                cross build --release --target aarch64-unknown-freebsd --bin ${PROJECT_NAME}-cli
-                            cp target/aarch64-unknown-freebsd/release/${PROJECT_NAME}-cli ${BINDIR}/${PROJECT_NAME}-cli-freebsd-arm64
                         '''
                     }
                 }
@@ -40720,7 +40725,7 @@ make dev
 make local
 # Output: binaries/{project_name}, binaries/{project_name}-cli (with version)
 
-# Full release (all 8 platforms)
+# Full release (all 7 platforms)
 make build
 # Output: binaries/{project_name}-{os}-{arch}, binaries/{project_name}-cli-{os}-{arch}
 ```
@@ -41702,7 +41707,7 @@ make docker
 - [ ] Static binary, no exceptions
 - [ ] Single binary with ALL assets embedded
 - [ ] No external runtime dependencies
-- [ ] Builds for 8 platforms (4 OS × 2 arch)
+- [ ] Builds for 7 platforms (3 OS × 2 arch + freebsd/amd64)
 - [ ] Binary handles ALL initialization (no setup scripts)
 - [ ] Creates directories on first run
 - [ ] Sets permissions based on run context
@@ -42357,7 +42362,7 @@ make docker
 
 ### Build Requirements
 
-- [ ] All 8 platforms built (4 OS × 2 arch)
+- [ ] All 7 platforms built (3 OS × 2 arch + freebsd/amd64)
 - [ ] Static binary for all builds
 - [ ] Version injected via build flags
 - [ ] Checksums generated (SHA256)
@@ -43069,7 +43074,7 @@ Implement the required client, then any project-specific optional features:
 ### Phase 3: Polish & Release
 
 1. **Run full test suite** - Ensure everything works
-2. **Build all 8 platforms** - Verify cross-platform builds
+2. **Build all 7 platforms** - Verify cross-platform builds
 3. **Test Docker images** - All compose files work
 4. **Complete README.md** - Production-first documentation
 5. **Complete LICENSE.md** - Include all embedded licenses
@@ -43119,7 +43124,7 @@ Implement the required client, then any project-specific optional features:
 - [ ] `ci.yml` and `release.yml` use `container: image: casjaysdev/rust:latest` — no `ensure-build-image` pre-flight, no `build-toolchain.yml`
 - [ ] CI/CD workflows configured
 - [ ] Automated builds work
-- [ ] Multi-platform builds work (8 platforms)
+- [ ] Multi-platform builds work (7 platforms)
 
 ### Documentation
 
@@ -43184,7 +43189,7 @@ Implement the required client, then any project-specific optional features:
 
 A successfully bootstrapped project should:
 
-✅ Compile to a single static binary for all 8 platforms
+✅ Compile to a single static binary for all 7 platforms
 ✅ Run in Docker with proper configuration
 ✅ Have working WebUI with theme support (light/dark/auto)
 ✅ Configure all server settings via `server.yml` (no admin web UI, no runtime mutation API)
