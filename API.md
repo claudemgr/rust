@@ -15966,7 +15966,27 @@ When a Tor request is detected, `get_url_vars(headers)` / `build_url(headers, pa
 
 This check is **priority 0** in the FQDN resolution table — evaluated before reverse proxy headers, always trusted, no IP check against `trusted_proxies` required.
 
-All server functionality works normally on Tor — only clearnet URLs and clearnet email addresses must not appear in responses.
+**Tor parity principle:** a Tor request MUST behave **exactly like the equivalent clearnet request** — same routes, same features, same responses — with only two classes of difference:
+
+1. **Clearnet-identifying data is swapped or omitted** — absolute URLs use `tor.onion_address`; the clearnet FQDN and clearnet contact email never appear (see "Tor Privacy Rules" below).
+2. **Operations genuinely impossible over Tor fail loudly, never silently** — when a feature cannot work for a Tor request (an OAuth provider that rejects `.onion` redirect URIs, a third-party API with no `.onion` while outbound Tor is disabled, etc.), return a clear error/warning whose message is written for that specific context and names the Tor-specific reason. Never degrade silently, never fall back to a clearnet URL, never report false success.
+
+Everything not covered by those two points works exactly as it does on clearnet.
+
+### Tor HTTP Semantics (No HTTPS Upgrade)
+
+Tor hidden services are always plain `http://` — the `.onion` address is itself the cryptographic identity and the Tor circuit provides end-to-end encryption, so TLS/HTTPS semantics do not apply. For every request detected as a Tor request:
+
+| HTTPS mechanism | Behavior on a Tor request |
+|-----------------|---------------------------|
+| **HTTP→HTTPS redirect** | Never issued — there is no HTTPS endpoint to redirect to; a redirect would break the hidden service. |
+| **`Strict-Transport-Security` (HSTS)** | Never sent — HSTS would make the browser refuse the `http://` onion, taking the site offline. |
+| **CSP `upgrade-insecure-requests`** | Omitted from the CSP for Tor responses — it would rewrite same-origin `http://{onion}` references to a nonexistent `https://{onion}`. |
+| **Clearnet HTTPS-only mode** | Never inherited — a clearnet port-443 / HTTPS-only configuration does NOT propagate to the onion; the onion stays `http://` regardless. |
+| **`Secure` cookie flag** | Still set — a `.onion` is a W3C "potentially trustworthy" secure context in Tor Browser, so `Secure` cookies are stored and sent normally; `secure: auto` treats a matched Tor request as a secure context. |
+| **Canonical / `Location` / absolute links** | Built via `build_url(headers, path)` → `http://{onion_address}`; never `https://`, never the clearnet host. |
+
+These rules apply only to requests detected as Tor requests. Clearnet requests keep full HTTPS enforcement (redirect, HSTS, upgrade-insecure-requests) unchanged.
 
 ### Tor Privacy Rules
 
