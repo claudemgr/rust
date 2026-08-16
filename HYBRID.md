@@ -40464,25 +40464,40 @@ pub fn default_tor_config() -> TorConfig {
 }
 
 // start_dedicated_tor starts a Tor process owned by this server binary.
-// tor_backend_port is a DEDICATED loopback listener the app binds specifically for
-// Tor backend traffic (PROXY-protocol-aware), separate from the public clearnet HTTP
-// listener. It is allocated with the same random-unused-port detection the server uses
-// for its own port (64000-64999), so it is never a fixed or user-facing port.
+// It resolves the tor binary first; if none is found it returns an error and NO
+// backend port is allocated (Tor stays disabled). Otherwise it allocates a DEDICATED
+// loopback listener (PROXY-protocol-aware) for Tor backend traffic, separate from the
+// public clearnet HTTP listener, using the same random-unused-port detection the server
+// uses for its own port (64000-64999).
 // cfg contains all Tor configuration settings (validated before calling).
-// The hidden service maps: .onion:{virtual_port} → 127.0.0.1:tor_backend_port
+// The hidden service maps: .onion:{virtual_port} → 127.0.0.1:{backend port}
 //
 // IMPORTANT: this is NOT the clearnet HTTP port. Because HiddenServiceExportCircuitID
 // haproxy prepends a PROXY-protocol header to every backend connection, the target MUST
 // be this dedicated listener — clearnet connections carry no PROXY header and would fail
 // to parse against it.
 // Hidden service is ALWAYS enabled if Tor binary is found.
-pub async fn start_dedicated_tor(tor_backend_port: u16, cfg: &TorConfig) -> anyhow::Result<TorService> {
+pub async fn start_dedicated_tor(cfg: &TorConfig) -> anyhow::Result<TorService> {
+    // Resolve the tor binary first: if none is found, Tor is simply not enabled
+    // and we return before allocating a port or writing any files.
+    let tor_binary = if cfg.binary.is_empty() {
+        which_tor().ok_or_else(|| anyhow!("tor binary not found on PATH"))?
+    } else {
+        PathBuf::from(&cfg.binary)
+    };
+
     let config_dir = paths::get_config_dir();
     let data_dir = paths::get_data_dir();
 
     // Ensure all Tor directories exist with proper permissions
     // Server binary owns all Tor files - correct owner/group/permissions enforced
     ensure_tor_dirs().await?;
+
+    // Allocate the dedicated PROXY-protocol loopback port only now that Tor is
+    // confirmed available, using the same random-unused-port detection the server
+    // uses for its own port (64000-64999). Not persisted: a fresh port is chosen
+    // each run and torrc is regenerated to match.
+    let tor_backend_port = get_random_available_port();
 
     // Paths
     let torrc_path = config_dir.join("tor").join("torrc");
@@ -40492,21 +40507,11 @@ pub async fn start_dedicated_tor(tor_backend_port: u16, cfg: &TorConfig) -> anyh
     // Generate torrc content from config (includes HiddenServiceDir/HiddenServicePort)
     let torrc_content = get_tor_config(cfg, tor_backend_port);
 
-    // Create torrc only if it doesn't exist (persistent)
-    // torrc is preserved across restarts - only operator-edited server.yml can update it
-    let created = ensure_torrc(&torrc_path, torrc_content.as_bytes()).await?;
-    if created {
-        tracing::info!("Created new torrc at {:?}", torrc_path);
-    } else {
-        tracing::info!("Using existing torrc at {:?}", torrc_path);
-    }
-
-    // Resolve Tor binary: config override or auto-detect on PATH
-    let tor_binary = if cfg.binary.is_empty() {
-        which_tor().ok_or_else(|| anyhow!("tor binary not found on PATH"))?
-    } else {
-        PathBuf::from(&cfg.binary)
-    };
+    // Regenerate torrc every startup: it is derived state from TorConfig + the
+    // current backend port. The .onion identity persists via the keys under
+    // HiddenServiceDir, NOT via torrc, so overwriting torrc is always safe.
+    update_torrc(&torrc_path, torrc_content.as_bytes()).await?;
+    tracing::info!("Regenerated torrc at {:?} (backend port {})", torrc_path, tor_backend_port);
 
     // Start OUR OWN Tor process - completely separate from system Tor
     // Server starts → Tor starts; Server stops → Tor stops
@@ -40903,17 +40908,15 @@ pub struct TorManager {
     service: Arc<Mutex<Option<TorService>>>,
     config: Arc<Mutex<TorConfig>>,
     data_dir: PathBuf,
-    tor_backend_port: u16,
 }
 
 impl TorManager {
     // new_tor_manager creates a new Tor manager with the given configuration
-    pub fn new(tor_backend_port: u16, config: TorConfig) -> Self {
+    pub fn new(config: TorConfig) -> Self {
         TorManager {
             service: Arc::new(Mutex::new(None)),
             config: Arc::new(Mutex::new(config)),
             data_dir: paths::get_data_dir().join("tor"),
-            tor_backend_port,
         }
     }
 
@@ -40927,7 +40930,7 @@ impl TorManager {
     // start_locked starts Tor (must be called with lock held)
     async fn start_locked(&self, svc: &mut Option<TorService>) -> anyhow::Result<()> {
         let cfg = self.config.lock().await;
-        let service = start_dedicated_tor(self.tor_backend_port, &cfg).await?;
+        let service = start_dedicated_tor(&cfg).await?;
         *svc = Some(service);
         Ok(())
     }
@@ -40956,16 +40959,8 @@ impl TorManager {
             existing.close().await?;
         }
 
-        // Regenerate torrc with new settings (overwrite existing)
-        let config_dir = paths::get_config_dir();
-        let torrc_path = config_dir.join("tor").join("torrc");
-        let torrc_content = get_tor_config(&config, self.tor_backend_port);
-
-        update_torrc(&torrc_path, torrc_content.as_bytes()).await
-            .map_err(|e| anyhow!("failed to update torrc: {}", e))?;
-        tracing::info!("Updated torrc with new settings");
-
-        // Start Tor with new config
+        // start_locked -> start_dedicated_tor regenerates torrc from the new config
+        // with a freshly allocated backend port, so no separate torrc write is needed.
         self.start_locked(&mut svc).await
     }
 
@@ -41051,19 +41046,15 @@ impl TorManager {
 ```rust
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Dedicated PROXY-protocol loopback listener for Tor backend traffic
-    // (separate from the public clearnet listener; carries the HAProxy PROXY v1
-    // header with the per-rendezvous circuit ID). Allocated with the same
-    // random-unused-port detection the server uses for its own port
-    // (64000-64999), so it is never a fixed or user-facing port.
-    let tor_backend_port = get_random_available_port();
-
     // Get Tor configuration (from config file)
     let tor_config = config.tor.clone();
 
-    // Start Tor - forwards .onion:{virtual_port} → 127.0.0.1:tor_backend_port
-    // TorConfig contains all settings including outbound network options
-    let tor_service = match start_dedicated_tor(tor_backend_port, &tor_config).await {
+    // Start Tor. start_dedicated_tor resolves the tor binary first; if none is found
+    // it returns an error and NO backend port is allocated (Tor stays disabled). When
+    // Tor is available it allocates a dedicated PROXY-protocol loopback port (same
+    // random-unused detection as the server's own port, 64000-64999) and forwards
+    // .onion:{virtual_port} → 127.0.0.1:{backend port}.
+    let tor_service = match start_dedicated_tor(&tor_config).await {
         Ok(svc) => Some(svc),
         Err(e) => {
             tracing::warn!("Tor disabled - {}", e);
@@ -41184,46 +41175,9 @@ pub async fn ensure_tor_dirs() -> anyhow::Result<()> {
     Ok(())
 }
 
-// ensure_torrc creates torrc only if it doesn't exist (persistent)
-// Returns true if file was created, false if it already existed
-pub async fn ensure_torrc(path: &std::path::Path, content: &[u8]) -> anyhow::Result<bool> {
-    // Ensure parent dir exists
-    if let Some(parent) = path.parent() {
-        tokio::fs::create_dir_all(parent).await
-            .map_err(|e| anyhow!("create parent dir: {}", e))?;
-    }
-
-    // Check if torrc already exists - DON'T overwrite
-    if path.exists() {
-        // File exists - preserve it, just fix permissions
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            tokio::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).await
-                .map_err(|e| anyhow!("chmod file: {}", e))?;
-        }
-        // Not created, already existed
-        return Ok(false);
-    }
-
-    // File doesn't exist - create it
-    tokio::fs::write(path, content).await
-        .map_err(|e| anyhow!("write file: {}", e))?;
-
-    // Enforce permissions
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        tokio::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).await
-            .map_err(|e| anyhow!("chmod file: {}", e))?;
-    }
-
-    // Created new file
-    Ok(true)
-}
-
-// update_torrc overwrites torrc with new content (for config changes)
-// Only called when the operator explicitly updates Tor config in server.yml
+// update_torrc (over)writes torrc with the given content.
+// Called at every startup to regenerate torrc from config (the backend port changes
+// each run) and whenever new Tor settings are saved.
 pub async fn update_torrc(path: &std::path::Path, content: &[u8]) -> anyhow::Result<()> {
     // Ensure parent dir exists
     if let Some(parent) = path.parent() {
