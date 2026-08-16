@@ -40050,7 +40050,7 @@ Tor integration drives the **external Tor binary** directly — the server gener
 
 **Key Architecture Points:**
 - **Server binary owns Tor** - starts, stops, and manages Tor process lifecycle
-- **Hidden service maps to server port** - `.onion:80` → `localhost:{server_port}`
+- **Hidden service maps to a dedicated Tor backend port** - `.onion:80` → `localhost:{tor_backend_port}` (a random-unused loopback port bound just for Tor, never the clearnet port)
 - **Server enforces permissions** - creates all dirs/files with correct owner/group/perms
 - **HiddenServiceVersion 3** - v3 onion addresses (56 characters, ed25519) via torrc `HiddenServiceDir`
 - **Localhost auto control port** - Tor control uses `127.0.0.1:auto` on all OSes
@@ -40243,16 +40243,16 @@ When `use_network` is enabled, the torrc includes `SocksPort auto` for outbound 
 
 ### All Platforms
 - **Control connection**: TCP `127.0.0.1:auto`
-- **Hidden service target**: Server's HTTP port via localhost (torrc `HiddenServicePort` mapping)
+- **Hidden service target**: dedicated PROXY-protocol Tor backend listener via localhost (torrc `HiddenServicePort` mapping)
 - **No fixed control ports** - Tor picks a free localhost port at startup
 
 | Feature | All OSes |
 |---------|----------|
 | Control connection | TCP `127.0.0.1:auto` |
-| Hidden service target | `localhost:{server_port}` |
+| Hidden service target | `localhost:{tor_backend_port}` |
 | Security | Control bound to localhost only |
 
-**Note:** The hidden service forwards to the server's HTTP port on ALL platforms, and the control connection uses the same localhost auto-port model on all platforms.
+**Note:** The hidden service forwards to a dedicated Tor backend loopback port (random-unused, PROXY-protocol-aware — never the clearnet HTTP port) on ALL platforms, and the control connection uses the same localhost auto-port model on all platforms.
 
 ## Tor Process Management
 
@@ -40397,8 +40397,8 @@ pub struct TorService {
     child: tokio::process::Child,
     // .onion address (without .onion suffix), read from the hostname file
     service_id: String,
-    // Server's HTTP port that hidden service forwards to
-    server_port: u16,
+    // Dedicated random-unused loopback port (PROXY-protocol) the hidden service forwards to
+    tor_backend_port: u16,
     // SOCKS listener address for outbound Tor connections (None if disabled)
     socks_addr: Option<String>,
 }
@@ -40464,14 +40464,19 @@ pub fn default_tor_config() -> TorConfig {
 }
 
 // start_dedicated_tor starts a Tor process owned by this server binary.
-// server_port is the server's HTTP port that the hidden service will forward to.
+// tor_backend_port is a DEDICATED loopback listener the app binds specifically for
+// Tor backend traffic (PROXY-protocol-aware), separate from the public clearnet HTTP
+// listener. It is allocated with the same random-unused-port detection the server uses
+// for its own port (64000-64999), so it is never a fixed or user-facing port.
 // cfg contains all Tor configuration settings (validated before calling).
-// The hidden service maps: .onion:{virtual_port} → 127.0.0.1:server_port
+// The hidden service maps: .onion:{virtual_port} → 127.0.0.1:tor_backend_port
 //
-// IMPORTANT: server_port is the port where the server's HTTP listener is ALREADY running.
-// Tor forwards incoming .onion connections to this existing listener.
+// IMPORTANT: this is NOT the clearnet HTTP port. Because HiddenServiceExportCircuitID
+// haproxy prepends a PROXY-protocol header to every backend connection, the target MUST
+// be this dedicated listener — clearnet connections carry no PROXY header and would fail
+// to parse against it.
 // Hidden service is ALWAYS enabled if Tor binary is found.
-pub async fn start_dedicated_tor(server_port: u16, cfg: &TorConfig) -> anyhow::Result<TorService> {
+pub async fn start_dedicated_tor(tor_backend_port: u16, cfg: &TorConfig) -> anyhow::Result<TorService> {
     let config_dir = paths::get_config_dir();
     let data_dir = paths::get_data_dir();
 
@@ -40485,7 +40490,7 @@ pub async fn start_dedicated_tor(server_port: u16, cfg: &TorConfig) -> anyhow::R
     let hostname_path = tor_data_dir.join("site").join("hostname");
 
     // Generate torrc content from config (includes HiddenServiceDir/HiddenServicePort)
-    let torrc_content = get_tor_config(cfg, server_port);
+    let torrc_content = get_tor_config(cfg, tor_backend_port);
 
     // Create torrc only if it doesn't exist (persistent)
     // torrc is preserved across restarts - only operator-edited server.yml can update it
@@ -40526,7 +40531,7 @@ pub async fn start_dedicated_tor(server_port: u16, cfg: &TorConfig) -> anyhow::R
     let mut svc = TorService {
         child,
         service_id: service_id.clone(),
-        server_port,
+        tor_backend_port,
         socks_addr: None,
     };
 
@@ -40544,7 +40549,7 @@ pub async fn start_dedicated_tor(server_port: u16, cfg: &TorConfig) -> anyhow::R
         }
     }
 
-    tracing::info!("Tor hidden service started: {}.onion:{} → 127.0.0.1:{}", service_id, cfg.virtual_port, server_port);
+    tracing::info!("Tor hidden service started: {}.onion:{} → 127.0.0.1:{}", service_id, cfg.virtual_port, tor_backend_port);
     Ok(svc)
 }
 
@@ -40688,15 +40693,15 @@ impl TorService {
               │ connects to
               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│ Server's HTTP Listener                                              │
-│ 127.0.0.1:{server_port}  (server's existing HTTP port)             │
+│ Dedicated Tor Backend Listener (PROXY protocol)                    │
+│ 127.0.0.1:{tor_backend_port}  (random-unused; NOT the clearnet port)   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-- **torrc `HiddenServicePort`** declares the port mapping: `80 → 127.0.0.1:{server_port}`
-- **Tor forwards to server's existing HTTP port** - no new listener created
+- **torrc `HiddenServicePort`** declares the port mapping: `80 → 127.0.0.1:{tor_backend_port}`
+- **Tor forwards to a dedicated PROXY-protocol backend listener** - separate from the public clearnet port; carries the HAProxy PROXY v1 header with the per-circuit ID
 - **Same on ALL platforms** - control uses the same localhost auto-port model
-- **Server port is NOT a Tor port** - it's the server's normal HTTP listener
+- **Backend port is a random-unused loopback port** - allocated like the server's own port (64000-64999), bound just for Tor, never network-exposed
 
 **Control connection:**
 - **All OSes**: TCP on `127.0.0.1:auto` - localhost only
@@ -40707,11 +40712,11 @@ impl TorService {
 
 ### Tor Configuration Optimizations
 
-**Hidden Service → Server Port Mapping:**
+**Hidden Service → Tor Backend Port Mapping:**
 - **Uses torrc `HiddenServiceDir` + `HiddenServicePort`** - Tor creates and persists the keys
-- Hidden service forwards `.onion:80` → `127.0.0.1:{server_port}` (server's existing HTTP port)
-- Port mapping specified via port key-val: virtual port 80 → target `127.0.0.1:{server_port}`
-- Tor connects to server's existing HTTP listener - no new ports opened
+- Hidden service forwards `.onion:80` → `127.0.0.1:{tor_backend_port}` (dedicated PROXY-protocol backend listener)
+- Port mapping specified via port key-val: virtual port 80 → target `127.0.0.1:{tor_backend_port}`
+- Tor connects to a dedicated loopback listener bound just for Tor - a random-unused port, not the clearnet HTTP port
 
 ```rust
 // get_tor_config generates torrc content from TorConfig settings
@@ -40726,7 +40731,7 @@ impl TorService {
 //   queries the SOCKS listener via GETINFO net/listeners/socks
 //
 // NEVER uses default Tor ports (9050, 9051) - uses localhost auto ports
-pub fn get_tor_config(cfg: &TorConfig, server_port: u16) -> String {
+pub fn get_tor_config(cfg: &TorConfig, tor_backend_port: u16) -> String {
     let tor_data_dir = paths::get_data_dir().join("tor");
     // All OSes use the same localhost auto-port control connection.
     // "auto" = Tor picks an available high port at runtime (never saved)
@@ -40812,7 +40817,7 @@ FetchDirInfoExtraEarly 1
 
 # Reduce memory usage
 DisableDebuggerAttachment 1
-"#, socks_config, control_config, tor_data_dir.display(), cfg.virtual_port, tor_data_dir.display(), cfg.virtual_port, server_port, cfg.num_intro_points, safe_logging, cfg.bandwidth_rate, cfg.bandwidth_burst, accounting_config)
+"#, socks_config, control_config, tor_data_dir.display(), cfg.virtual_port, tor_data_dir.display(), cfg.virtual_port, tor_backend_port, cfg.num_intro_points, safe_logging, cfg.bandwidth_rate, cfg.bandwidth_burst, accounting_config)
 }
 ```
 
@@ -40841,7 +40846,7 @@ The hidden service is declared in the generated torrc; Tor creates and persists 
 | Setting | How Applied | Description |
 |---------|-------------|-------------|
 | Version 3 | `HiddenServiceVersion 3` | v3 onion (56 chars, ed25519) |
-| Target port | `HiddenServicePort 80 127.0.0.1:{port}` | Forwards to server's HTTP port |
+| Target port | `HiddenServicePort 80 127.0.0.1:{port}` | Forwards to the dedicated Tor backend listener |
 | Virtual port | First value of `HiddenServicePort` (e.g., `80`) | `.onion` port users connect to |
 | Key persistence | `{data_dir}/tor/site/hs_ed25519_secret_key` | Tor creates/loads key for persistent address |
 | Hostname | `{data_dir}/tor/site/hostname` | Tor writes the .onion address; server reads it |
@@ -40898,17 +40903,17 @@ pub struct TorManager {
     service: Arc<Mutex<Option<TorService>>>,
     config: Arc<Mutex<TorConfig>>,
     data_dir: PathBuf,
-    server_port: u16,
+    tor_backend_port: u16,
 }
 
 impl TorManager {
     // new_tor_manager creates a new Tor manager with the given configuration
-    pub fn new(server_port: u16, config: TorConfig) -> Self {
+    pub fn new(tor_backend_port: u16, config: TorConfig) -> Self {
         TorManager {
             service: Arc::new(Mutex::new(None)),
             config: Arc::new(Mutex::new(config)),
             data_dir: paths::get_data_dir().join("tor"),
-            server_port,
+            tor_backend_port,
         }
     }
 
@@ -40922,7 +40927,7 @@ impl TorManager {
     // start_locked starts Tor (must be called with lock held)
     async fn start_locked(&self, svc: &mut Option<TorService>) -> anyhow::Result<()> {
         let cfg = self.config.lock().await;
-        let service = start_dedicated_tor(self.server_port, &cfg).await?;
+        let service = start_dedicated_tor(self.tor_backend_port, &cfg).await?;
         *svc = Some(service);
         Ok(())
     }
@@ -40954,7 +40959,7 @@ impl TorManager {
         // Regenerate torrc with new settings (overwrite existing)
         let config_dir = paths::get_config_dir();
         let torrc_path = config_dir.join("tor").join("torrc");
-        let torrc_content = get_tor_config(&config, self.server_port);
+        let torrc_content = get_tor_config(&config, self.tor_backend_port);
 
         update_torrc(&torrc_path, torrc_content.as_bytes()).await
             .map_err(|e| anyhow!("failed to update torrc: {}", e))?;
@@ -41046,15 +41051,19 @@ impl TorManager {
 ```rust
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Server's HTTP port (already listening)
-    let server_port: u16 = 8080;
+    // Dedicated PROXY-protocol loopback listener for Tor backend traffic
+    // (separate from the public clearnet listener; carries the HAProxy PROXY v1
+    // header with the per-rendezvous circuit ID). Allocated with the same
+    // random-unused-port detection the server uses for its own port
+    // (64000-64999), so it is never a fixed or user-facing port.
+    let tor_backend_port = get_random_available_port();
 
     // Get Tor configuration (from config file)
     let tor_config = config.tor.clone();
 
-    // Start Tor - forwards .onion:{virtual_port} → 127.0.0.1:server_port
+    // Start Tor - forwards .onion:{virtual_port} → 127.0.0.1:tor_backend_port
     // TorConfig contains all settings including outbound network options
-    let tor_service = match start_dedicated_tor(server_port, &tor_config).await {
+    let tor_service = match start_dedicated_tor(tor_backend_port, &tor_config).await {
         Ok(svc) => Some(svc),
         Err(e) => {
             tracing::warn!("Tor disabled - {}", e);

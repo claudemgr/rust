@@ -50388,7 +50388,7 @@ Tor integration uses **external Tor binary** via `libtor-sys` or process-based m
 
 **Key Architecture Points:**
 - **Server binary owns Tor** - starts, stops, and manages Tor process lifecycle
-- **Hidden service maps to server port** - `.onion:80` → `localhost:{server_port}`
+- **Hidden service maps to a dedicated Tor backend port** - `.onion:80` → `localhost:{tor_backend_port}` (a random-unused loopback port bound just for Tor, never the clearnet port)
 - **Server enforces permissions** - creates all dirs/files with correct owner/group/perms
 - **HiddenServiceVersion 3** - v3 onion addresses (56 characters, ed25519) via torrc `HiddenServiceDir`
 - **Localhost auto control port** - Tor control uses `127.0.0.1:auto` on all OSes
@@ -50633,10 +50633,10 @@ When `use_network` or `allow_user_preference` is enabled, the torrc includes `So
 | Feature | All OSes |
 |---------|----------|
 | Control connection | TCP `127.0.0.1:auto` |
-| Hidden service target | `localhost:{server_port}` |
+| Hidden service target | `localhost:{tor_backend_port}` |
 | Security | Control bound to localhost only |
 
-**Note:** The hidden service forwards to the server's HTTP port on ALL platforms, and the control connection uses the same localhost auto-port model on all platforms.
+**Note:** The hidden service forwards to a dedicated Tor backend loopback port (random-unused, PROXY-protocol-aware — never the clearnet HTTP port) on ALL platforms, and the control connection uses the same localhost auto-port model on all platforms.
 
 ## Tor Process Management
 
@@ -50787,7 +50787,7 @@ use tracing::{info, warn};
 pub struct TorService {
     process: Child,
     service_id: String,
-    server_port: u16,
+    tor_backend_port: u16,
     /// SOCKS5 proxy address for outbound connections (None if disabled)
     socks_addr: Option<String>,
 }
@@ -50886,14 +50886,20 @@ impl Default for TorConfig {
 
 /// Starts a dedicated Tor process owned by this server binary.
 ///
-/// `server_port` is the server's HTTP port the hidden service will forward to.
-/// The hidden service maps: `.onion:{virtual_port}` → `127.0.0.1:server_port`
+/// `tor_backend_port` is a DEDICATED loopback listener the app binds specifically
+/// for Tor backend traffic (PROXY-protocol-aware), separate from the public
+/// clearnet HTTP listener. It is allocated with the same random-unused-port
+/// detection the server uses for its own port (64000-64999), so it is never a
+/// fixed or user-facing port.
+/// The hidden service maps: `.onion:{virtual_port}` → `127.0.0.1:tor_backend_port`
 ///
-/// IMPORTANT: `server_port` is the port where the server's HTTP listener is ALREADY running.
-/// Tor forwards incoming .onion connections to this existing listener.
+/// IMPORTANT: this is NOT the clearnet HTTP port. Because `HiddenServiceExportCircuitID
+/// haproxy` prepends a PROXY-protocol header to every backend connection, the target
+/// MUST be this dedicated listener — clearnet connections carry no PROXY header and
+/// would fail to parse against it.
 /// Hidden service is ALWAYS enabled if the Tor binary is found.
 pub async fn start_dedicated_tor(
-    server_port: u16,
+    tor_backend_port: u16,
     cfg: &TorConfig,
     config_dir: &Path,
     data_dir: &Path,
@@ -50905,7 +50911,7 @@ pub async fn start_dedicated_tor(
     let hs_dir = data_dir.join("tor").join("site");
     let control_port_path = data_dir.join("tor").join("control_port");
 
-    let torrc_content = get_tor_config(cfg, data_dir, server_port, cfg.virtual_port);
+    let torrc_content = get_tor_config(cfg, data_dir, tor_backend_port, cfg.virtual_port);
 
     let created = ensure_torrc(&torrc_path, torrc_content.as_bytes())?;
     if created {
@@ -50945,13 +50951,13 @@ pub async fn start_dedicated_tor(
 
     info!(
         "Tor hidden service started: {}.onion:{} → 127.0.0.1:{}",
-        service_id, cfg.virtual_port, server_port
+        service_id, cfg.virtual_port, tor_backend_port
     );
 
     Ok(TorService {
         process: child,
         service_id,
-        server_port,
+        tor_backend_port,
         socks_addr,
     })
 }
@@ -51187,11 +51193,11 @@ async fn read_onion_hostname(hs_dir: &Path) -> Result<String, AppError> {
               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ Dedicated Tor Backend Listener (PROXY protocol)                    │
-│ 127.0.0.1:{server_port}  (dedicated to Tor, not clearnet)          │
+│ 127.0.0.1:{tor_backend_port}  (dedicated to Tor, not clearnet)          │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-- **torrc `HiddenServicePort`** with port mapping: `{virtual_port} → 127.0.0.1:{server_port}`
+- **torrc `HiddenServicePort`** with port mapping: `{virtual_port} → 127.0.0.1:{tor_backend_port}`
 - **Tor forwards to a dedicated PROXY-protocol backend listener** - separate from the clearnet listener
 - **Same on ALL platforms** - control uses the same localhost auto-port model
 - **The Tor backend port is a dedicated loopback listener** - PROXY-protocol-aware, not shared with clearnet
@@ -51205,9 +51211,9 @@ async fn read_onion_hostname(hs_dir: &Path) -> Result<String, AppError> {
 
 ### Tor Configuration Optimizations
 
-**Hidden Service → Server Port Mapping:**
+**Hidden Service → Tor Backend Port Mapping:**
 - **Declared in torrc** via `HiddenServiceDir` + `HiddenServicePort` - NOT the `ADD_ONION` control command
-- Hidden service forwards `.onion:{virtual_port}` → `127.0.0.1:{server_port}` (dedicated PROXY-protocol Tor backend listener)
+- Hidden service forwards `.onion:{virtual_port}` → `127.0.0.1:{tor_backend_port}` (dedicated PROXY-protocol Tor backend listener)
 - Tor connects to a dedicated loopback listener the app binds for Tor - separate from the clearnet listener
 
 ```rust
@@ -51226,7 +51232,7 @@ async fn read_onion_hostname(hs_dir: &Path) -> Result<String, AppError> {
 ///   `127.0.0.1:{port}` address there; helpers read this file to connect
 ///
 /// NEVER uses default Tor ports (9050, 9051) — uses localhost auto ports.
-pub fn get_tor_config(cfg: &TorConfig, data_dir: &Path, server_port: u16, virtual_port: u16) -> String {
+pub fn get_tor_config(cfg: &TorConfig, data_dir: &Path, tor_backend_port: u16, virtual_port: u16) -> String {
     // HiddenServiceDir is where Tor creates/persists the service key + hostname.
     let hs_dir = data_dir.join("tor").join("site");
 
@@ -51279,7 +51285,7 @@ pub fn get_tor_config(cfg: &TorConfig, data_dir: &Path, server_port: u16, virtua
 
 # Hidden service (v3) - forwards .onion:{virtual_port} → dedicated PROXY-protocol backend listener
 HiddenServiceDir {hs_dir}
-HiddenServicePort {virtual_port} 127.0.0.1:{server_port}
+HiddenServicePort {virtual_port} 127.0.0.1:{tor_backend_port}
 HiddenServiceVersion 3
 # Export per-rendezvous-circuit ID via HAProxy PROXY protocol (opaque token, not an IP)
 HiddenServiceExportCircuitID haproxy
@@ -51317,7 +51323,7 @@ DisableDebuggerAttachment 1
         control_config = control_config,
         hs_dir = hs_dir.display(),
         virtual_port = virtual_port,
-        server_port = server_port,
+        tor_backend_port = tor_backend_port,
         safe_logging = safe_logging,
         bandwidth_rate = cfg.bandwidth_rate,
         bandwidth_burst = cfg.bandwidth_burst,
@@ -51363,11 +51369,11 @@ The hidden service is declared in the generated torrc; Tor creates and persists 
 
 `HiddenServiceExportCircuitID haproxy` makes Tor prepend a HAProxy **PROXY-protocol v1 header** to *every* connection it forwards to the hidden-service target, encoding the 64-bit rendezvous-circuit ID in the source address (`fc00::/8` IPv6 range). This ID is the opaque per-session token the committed Tor logging/audit/rate-limit rules key on as `tor:{circuit_id}` — never an IP, never deanonymizing.
 
-Because the PROXY header is sent on every connection, the `HiddenServicePort` target MUST be a **dedicated loopback listener** the app binds specifically for Tor (`127.0.0.1:{server_port}`), **separate from the public clearnet listener** — clearnet connections carry no PROXY header and would fail to parse against a listener that requires one. The app:
+Because the PROXY header is sent on every connection, the `HiddenServicePort` target MUST be a **dedicated loopback listener** the app binds specifically for Tor (`127.0.0.1:{tor_backend_port}`), **separate from the public clearnet listener** — clearnet connections carry no PROXY header and would fail to parse against a listener that requires one. The app:
 
 - binds the dedicated Tor backend listener and parses the PROXY-protocol header on its accept path (Rust: the `proxy-protocol` or `ppp` crate),
 - reads the circuit ID from that header and uses it as the `tor:{circuit_id}` key for logs, audit trails, admin UI, and rate limiting,
-- points `HiddenServicePort {virtual_port} 127.0.0.1:{server_port}` at this listener (not the clearnet HTTP port).
+- points `HiddenServicePort {virtual_port} 127.0.0.1:{tor_backend_port}` at this listener (not the clearnet HTTP port).
 
 `VanguardsLiteEnabled 1` keeps Tor's built-in layer-2 vanguards on (guard-discovery-attack defense for the service); it is never disabled. Full layer-3 vanguards/bandguards/rendguard, if ever wanted, are control-protocol operations the app can drive itself — no external tool.
 
@@ -51422,16 +51428,16 @@ pub struct TorManager {
     service: Arc<Mutex<Option<TorService>>>,
     config: Arc<Mutex<TorConfig>>,
     data_dir: PathBuf,
-    server_port: u16,
+    tor_backend_port: u16,
 }
 
 impl TorManager {
-    pub fn new(server_port: u16, config: TorConfig, data_dir: PathBuf) -> Self {
+    pub fn new(tor_backend_port: u16, config: TorConfig, data_dir: PathBuf) -> Self {
         Self {
             service: Arc::new(Mutex::new(None)),
             config: Arc::new(Mutex::new(config)),
             data_dir,
-            server_port,
+            tor_backend_port,
         }
     }
 
@@ -51440,7 +51446,7 @@ impl TorManager {
     pub async fn start(&self, config_dir: &Path) -> Result<(), AppError> {
         let mut svc = self.service.lock().await;
         let cfg = self.config.lock().await;
-        let tor_svc = start_dedicated_tor(self.server_port, &cfg, config_dir, &self.data_dir).await?;
+        let tor_svc = start_dedicated_tor(self.tor_backend_port, &cfg, config_dir, &self.data_dir).await?;
         *svc = Some(tor_svc);
         Ok(())
     }
@@ -51453,7 +51459,7 @@ impl TorManager {
         }
         *svc = None;
         let cfg = self.config.lock().await;
-        let tor_svc = start_dedicated_tor(self.server_port, &cfg, config_dir, &self.data_dir).await?;
+        let tor_svc = start_dedicated_tor(self.tor_backend_port, &cfg, config_dir, &self.data_dir).await?;
         *svc = Some(tor_svc);
         Ok(())
     }
@@ -51477,7 +51483,7 @@ impl TorManager {
             *cfg = new_config.clone();
         }
 
-        let tor_svc = start_dedicated_tor(self.server_port, &new_config, config_dir, &self.data_dir).await?;
+        let tor_svc = start_dedicated_tor(self.tor_backend_port, &new_config, config_dir, &self.data_dir).await?;
         *svc = Some(tor_svc);
         Ok(())
     }
@@ -51494,7 +51500,7 @@ impl TorManager {
         fs::remove_dir_all(&keys_dir).ok();
 
         let cfg = self.config.lock().await;
-        let tor_svc = start_dedicated_tor(self.server_port, &cfg, config_dir, &self.data_dir).await?;
+        let tor_svc = start_dedicated_tor(self.tor_backend_port, &cfg, config_dir, &self.data_dir).await?;
         let addr = tor_svc.onion_address();
         *svc = Some(tor_svc);
         Ok(addr)
@@ -51514,7 +51520,7 @@ impl TorManager {
         save_onion_key(&key_path, private_key)?;
 
         let cfg = self.config.lock().await;
-        let tor_svc = start_dedicated_tor(self.server_port, &cfg, config_dir, &self.data_dir).await?;
+        let tor_svc = start_dedicated_tor(self.tor_backend_port, &cfg, config_dir, &self.data_dir).await?;
         let addr = tor_svc.onion_address();
         *svc = Some(tor_svc);
         Ok(addr)
@@ -51555,13 +51561,18 @@ impl TorManager {
 ```rust
 #[tokio::main]
 async fn main() -> Result<(), AppError> {
-    let server_port: u16 = 8080;
+    // Dedicated PROXY-protocol loopback listener for Tor backend traffic
+    // (separate from the public clearnet listener; carries the HAProxy PROXY v1
+    // header with the per-rendezvous circuit ID). Allocated with the same
+    // random-unused-port detection the server uses for its own port
+    // (64000-64999), so it is never a fixed or user-facing port.
+    let tor_backend_port = get_random_available_port();
 
     // Get Tor configuration (from config file)
     let tor_config = config.tor.clone();
 
-    // Start Tor — forwards .onion:{virtual_port} → 127.0.0.1:server_port
-    let tor_manager = Arc::new(TorManager::new(server_port, tor_config, data_dir.clone()));
+    // Start Tor — forwards .onion:{virtual_port} → 127.0.0.1:tor_backend_port
+    let tor_manager = Arc::new(TorManager::new(tor_backend_port, tor_config, data_dir.clone()));
     match tor_manager.start(&config_dir).await {
         Ok(()) => {}
         Err(e) => {
