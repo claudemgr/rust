@@ -459,7 +459,7 @@ Before I proceed, can you confirm [specific question]?
 | `project-rules.md` | Application & Server Model, Project Structure & OS-Specific Paths, Runtime Mode Selection & Privilege Escalation (PARTs 2, 3, 4) |
 | `config-rules.md` | Configuration, Toolchain/Build & Packaging, Version/Site & Build Metadata (PARTs 5, 6, 7) |
 | `binary-rules.md` | Server Binary CLI & Client (PART 8) |
-| `backend-rules.md` | Error Handling & Caching, Database, Security/Logging & Privacy, Tor Hidden Service (PARTs 9, 10, 11, 27) |
+| `backend-rules.md` | Error Handling & Caching, Database, Security/Logging & Privacy, Overlay Networks (Tor & I2P) (PARTs 9, 10, 11, 27) |
 | `api-rules.md` | Server Configuration/Health/Versioning, API Structure, SSL/TLS & Let's Encrypt (PARTs 12, 13, 14) |
 | `frontend-rules.md` | Web Frontend (PART 15) |
 | `features-rules.md` | Email & Notifications, Scheduler, GeoIP, Metrics, Backup & Restore, Update Command (PARTs 16-21) |
@@ -1960,7 +1960,7 @@ PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+
 │       ├── project-rules.md    # PART 2, 3, 4: Application & Server Model, Project Structure & OS-Specific Paths, Runtime Mode Selection & Privilege Escalation
 │       ├── config-rules.md     # PART 5, 6, 7: Configuration, Toolchain/Build & Packaging, Version/Site & Build Metadata
 │       ├── binary-rules.md     # PART 8: Server Binary CLI & Client
-│       ├── backend-rules.md    # PART 9, 10, 11, 27: Error Handling & Caching, Database, Security/Logging/Privacy, Tor Hidden Service
+│       ├── backend-rules.md    # PART 9, 10, 11, 27: Error Handling & Caching, Database, Security/Logging/Privacy, Overlay Networks (Tor & I2P)
 │       ├── api-rules.md        # PART 12, 13, 14: Server Configuration/Health/Versioning, API Structure, SSL/TLS & Let's Encrypt
 │       ├── frontend-rules.md   # PART 15: Web Frontend
 │       ├── features-rules.md   # PART 16-21: Email & Notifications, Scheduler, GeoIP, Metrics, Backup & Restore, Update Command
@@ -8444,7 +8444,9 @@ PHASE 5: Server startup (actual server start)
     │   └─ ... and others (see PART 17)
     └─ Start scheduler async task
 
-17. Start Tor (if tor binary available and not already spawned in step 8g) - see PART 27:
+17. Start overlay networks - see PART 27:
+
+    17a. Start Tor (if tor binary available and not already spawned in step 8g) - see PART 27.1:
     ├─ Root mode → Tor already running (spawned in step 8g with {internal_name}:{internal_name} setuid credentials before the drop); skip
     ├─ tor not found in PATH → log INFO "Tor not available", skip
     ├─ tor found:
@@ -8456,6 +8458,15 @@ PHASE 5: Server startup (actual server start)
     │   ├─ Wait for bootstrap (up to 3 min)
     │   ├─ Create hidden service, log .onion address
     │   └─ Error → log WARN, continue without Tor (non-fatal)
+
+    17b. Start I2P (OPT-IN; only if features.i2p.enabled) - see PART 27.2:
+    ├─ features.i2p.enabled false (default) → skip entirely (no port, no config)
+    ├─ enabled, resolve provider:
+    │   ├─ i2pd binary found → Model A: create {config_dir}/i2p/, {data_dir}/i2p/site/;
+    │   │   allocate backend port; regenerate {config_dir}/i2p/tunnels.conf; start i2pd
+    │   ├─ else SAM (127.0.0.1:7656) reachable → Model B: SAM SESSION CREATE + STREAM FORWARD
+    │   └─ neither → log WARN "no I2P provider", continue without I2P (non-fatal)
+    └─ Wait for destination, log .b32.i2p address
 
 18. Start HTTP server:
     ├─ For each configured port:
@@ -9778,6 +9789,17 @@ async fn build_health_response(state: &AppState) -> HealthResponse {
                 status: state.tor_manager.status(),
                 hostname: state.tor_manager.hostname(),
             },
+            i2p: I2PInfo {
+                // OPT-IN: false unless features.i2p.enabled
+                enabled: state.config.features.i2p.enabled,
+                running: state.i2p_manager.is_running().await,
+                // "healthy", "disabled", "error:..."
+                status: state.i2p_manager.status().await,
+                // "abc...uv.b32.i2p" (empty when disabled)
+                hostname: state.i2p_manager.eepsite_address().await,
+                // "i2pd", "sam", or "none"
+                provider: state.i2p_manager.provider().await,
+            },
         },
 
         // Component checks (ok/error only - no details)
@@ -9788,6 +9810,8 @@ async fn build_health_response(state: &AppState) -> HealthResponse {
             scheduler: check_scheduler(state),
             // Only when Tor is enabled (Option field, skipped when None)
             tor: state.config.features.tor.enabled.then(|| check_tor(state)),
+            // Only when I2P is opt-in enabled (Option field, skipped when None)
+            i2p: state.config.features.i2p.enabled.then(|| check_i2p(state)),
         },
 
         // Stats (public-safe aggregates only)
@@ -17045,6 +17069,8 @@ All of these headers are supported regardless of proxy vendor (Nginx, Caddy, HAP
 
 **Tor exception:** Tor requests bypass this gate entirely. When `tor.onion_address` is set and the incoming `Host` matches it, FQDN/proto/port are resolved from `tor.*` config — no proxy header inspection, no IP check. See "Tor Hidden Service Configuration" below.
 
+**I2P exception:** identical to the Tor exception. When I2P is opt-in enabled and `i2p.b32_address` is set, a request whose `Host` matches it is resolved from `i2p.*` config — always `http://`, no proxy header inspection, no IP check (the eepsite backend is a plain loopback listener with no PROXY header). When I2P is disabled or the address is unset, `.b32.i2p` Host headers are treated like any other host. See **PART 27.2 → "I2P Eepsite"**.
+
 | Always trusted (no config required) | Reason |
 |--------------------------------------|--------|
 | `127.0.0.0/8`, `::1` | Loopback |
@@ -17178,7 +17204,9 @@ Expires: {expiry_date}
 - `Preferred-Languages:` line is **omitted** (locale fingerprinting risk on Tor)
 - Served per-request via `build_url(headers, path)`; never cached or frozen at startup
 
-> **Full Tor implementation:** The above covers request detection, `build_url` integration, and privacy rules only. For Tor binary lifecycle, hidden service setup, outbound routing, and external tor binary integration, see **PART 27 → "Tor Hidden Service"**.
+> **Full Tor implementation:** The above covers request detection, `build_url` integration, and privacy rules only. For Tor binary lifecycle, hidden service setup, outbound routing, and external tor binary integration, see **PART 27.1 → "Tor Hidden Service"**.
+>
+> **Full I2P implementation:** the same overlay HTTP semantics apply to `.b32.i2p` (always `http://`, no cert, no HSTS, no upgrade). For the opt-in eepsite provider lifecycle (i2pd process or SAM bridge), `tunnels.conf` generation, and destination-key persistence, see **PART 27.2 → "I2P Eepsite"**.
 
 ## Rate Limiting
 
@@ -18463,8 +18491,11 @@ pub struct BuildInfo {
 // For project-specific optional features, add fields here when implemented.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeaturesInfo {
-    // PART 27: Tor Hidden Service
+    // PART 27.1: Tor Hidden Service
     pub tor: TorInfo,
+
+    // PART 27.2: I2P Eepsite (OPTIONAL - opt-in)
+    pub i2p: I2PInfo,
 
     // PART 18: GeoIP
     // true = enabled, false = disabled
@@ -18473,7 +18504,7 @@ pub struct FeaturesInfo {
     // APP-SPECIFIC: Add your app's features with enabled/disabled status
 }
 
-// TorInfo - from Tor manager (PART 27)
+// TorInfo - from Tor manager (PART 27.1)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TorInfo {
     // Tor binary found and running
@@ -18484,6 +18515,21 @@ pub struct TorInfo {
     pub status: String,
     // "abc123...xyz.onion" (56 chars, v3)
     pub hostname: String,
+}
+
+// I2PInfo - from I2P manager (PART 27.2). OPT-IN: all zero-value when disabled.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct I2PInfo {
+    // features.i2p.enabled (opt-in; false by default)
+    pub enabled: bool,
+    // Eepsite active
+    pub running: bool,
+    // "healthy", "disabled", "starting", "error"
+    pub status: String,
+    // "abc...uv.b32.i2p" (empty when disabled)
+    pub hostname: String,
+    // "i2pd", "sam", or "none"
+    pub provider: String,
 }
 
 // ChecksInfo - component health (ok/error only - no details)
@@ -18498,8 +18544,11 @@ pub struct ChecksInfo {
     // PART 17: "ok" or "error"
     pub scheduler: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    // PART 27: "ok" or "error" (if enabled)
+    // PART 27.1: "ok" or "error" (if enabled)
     pub tor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    // PART 27.2: "ok" or "error" (only when I2P opt-in enabled)
+    pub i2p: Option<String>,
     // APP-SPECIFIC: Add your checks here
     // Example: pub storage: Option<String>,
 }
@@ -18535,13 +18584,15 @@ pub struct StatsInfo {
 | `uptime` | `format_uptime(start_time)` | - |
 | `mode` | `cfg.server.mode` | 4 |
 | `timestamp` | `chrono::Utc::now()` | - |
-| `features.tor.*` | `tor_manager.*` | 26 |
+| `features.tor.*` | `tor_manager.*` | 27.1 |
+| `features.i2p.*` | `i2p_manager.*` | 27.2 |
 | `features.geoip` | `cfg.geoip.enabled` (true/false) | 18 |
 | `features.*` (project-specific) | Show actual status when project-specific optional features used | - |
 | `checks.database` | `check_database()` | 10 |
 | `checks.cache` | `check_cache()` | 10 |
 | `checks.scheduler` | `check_scheduler()` | 17 |
-| `checks.tor` | `check_tor()` | 26 |
+| `checks.tor` | `check_tor()` | 27.1 |
+| `checks.i2p` | `check_i2p()` (only when I2P opt-in enabled) | 27.2 |
 | `stats.*` | `stats_collector.*` | - |
 
 #### Frontend Display Order
@@ -18901,6 +18952,11 @@ features.tor.enabled: true
 features.tor.running: true
 features.tor.status: healthy
 features.tor.hostname: abc123xyz456abcdef789xyz456abcdef789xyz456abcdef789xyz.onion
+features.i2p.enabled: false
+features.i2p.running: false
+features.i2p.status: disabled
+features.i2p.hostname:
+features.i2p.provider: none
 features.geoip: true
 # 6. Checks
 checks.database: ok
@@ -18945,6 +19001,11 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 | `features.tor.running` | Tor process currently running |
 | `features.tor.status` | healthy, starting, error |
 | `features.tor.hostname` | Onion address (if running) |
+| `features.i2p.enabled` | I2P eepsite enabled (OPT-IN; false by default) |
+| `features.i2p.running` | I2P provider currently running |
+| `features.i2p.status` | disabled, healthy, error:{short message} |
+| `features.i2p.hostname` | `.b32.i2p` address (if running) |
+| `features.i2p.provider` | i2pd, sam, or none |
 | `checks.*` | Service health (ok, error) |
 | `stats.requests_total` | Total requests served |
 | `stats.requests_24h` | Requests in last 24 hours |
@@ -27017,6 +27078,7 @@ When the operator sets `custom_html` in `server.yml`, the server logs at startup
 | `{project_version}` | Application version |
 | `{build_datetime}` | Build date/time (`%B %d, %Y at %H:%M:%S %Z`) |
 | `{onion_address}` | Tor `.onion` address (only when Tor is enabled, running, and an address is published; empty otherwise) |
+| `{i2p_address}` | I2P `.b32.i2p` address (only when I2P is enabled, running, and an address is published; empty otherwise) |
 
 ### Default Application Footer (Always Shown)
 
@@ -27028,6 +27090,15 @@ When the operator sets `custom_html` in `server.yml`, the server logs at startup
     <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
     <code class="onion-address">{onion_address}</code>
     <button type="button" class="copy-btn" data-copy="{onion_address}" aria-live="polite" aria-label="Copy onion address">📋</button>
+  </p>
+  {% endif %}
+
+  <!-- I2P address (only shown if I2P is enabled, running, and a .b32.i2p address is published) -->
+  {% if i2p_enabled && i2p_running && !i2p_address.is_empty() %}
+  <p class="footer-i2p">
+    <a href="/server/help#i2p-access" aria-label="I2P Support">🔗</a>
+    <code class="i2p-address">{i2p_address}</code>
+    <button type="button" class="copy-btn" data-copy="{i2p_address}" aria-live="polite" aria-label="Copy I2P address">📋</button>
   </p>
   {% endif %}
 
@@ -27491,6 +27562,7 @@ pub fn tracking_script(headers: &HeaderMap, cfg: &Config) -> askama::MarkupDispl
 
 **Note:** Tor address is NOT shown here. Tor access is available via:
 - **Footer**: "Tor Support" link → `/server/help#tor-access` (shown when Tor is enabled)
+- **Footer**: "I2P Support" link → `/server/help#i2p-access` (shown when I2P is enabled and running)
 - **`/server/help`**: Tor Access section with .onion address, copy button, and setup instructions
 - **`/server/healthz`**: Tor status and .onion address (technical/status view)
 
@@ -27845,6 +27917,7 @@ When the admin panel is enabled (PART 28) these are editable at `/server/{admin_
 | Features | How to use key features |
 | API Documentation | Links to Swagger (`/server/docs/swagger`) and GraphQL (`/server/docs/graphql`) — UIs fetch from `/api/swagger` and `/api/graphql` aliases |
 | Tor Access | How to access via Tor (only shown if Tor enabled) |
+| I2P Access | How to access via I2P (only shown if I2P enabled and running) |
 | FAQ | Frequently asked questions |
 | Troubleshooting | Common issues and solutions |
 
@@ -27961,6 +28034,34 @@ curl -H "Accept: application/xml" https://jokes.example.com/api/v1/joke</code></
   </ol>
 
   <p class="note">Using Tor provides additional privacy by hiding your IP address and encrypting your connection through the Tor network.</p>
+</section>
+{% endif %}
+```
+
+**I2P Access section (only shown if I2P is enabled, running, and a `.b32.i2p` address is published):**
+```html
+{% if i2p_enabled && i2p_running && !i2p_address.is_empty() %}
+<section id="i2p-access" class="i2p-access">
+  <h3>I2P Access</h3>
+  <p>This application is available as an I2P eepsite for enhanced privacy.</p>
+
+  <h4>I2P Address</h4>
+  <div class="code-block">
+    <code class="code-content">{{ i2p_address }}</code>
+    <button type="button" class="copy-btn" data-copy="{{ i2p_address }}" aria-label="Copy to clipboard">
+      <span class="copy-icon">📋</span>
+      <span class="copy-text" aria-live="polite">Copy</span>
+    </button>
+  </div>
+
+  <h4>How to Connect</h4>
+  <ol>
+    <li>Install <a href="https://geti2p.net/en/download" target="_blank" rel="noopener">I2P</a> or <a href="https://i2pd.website/" target="_blank" rel="noopener">i2pd</a> and wait for it to integrate with the network</li>
+    <li>Configure your browser to use the I2P HTTP proxy (default <code>127.0.0.1:4444</code>)</li>
+    <li>Copy the <code>.b32.i2p</code> address above and paste it into your browser address bar</li>
+  </ol>
+
+  <p class="note">Using I2P provides additional privacy by routing your connection through the I2P network. Eepsites are served over <code>http://</code> — the I2P tunnel provides the transport encryption, so no TLS certificate is used.</p>
 </section>
 {% endif %}
 ```
@@ -28744,6 +28845,7 @@ Every project MUST include these scheduled tasks:
 | `backup_hourly` | Hourly | Hourly incremental (disabled by default) | Yes |
 | `healthcheck_self` | Every 5 minutes | Self-health verification | No |
 | `tor_health` | Every 10 minutes | Check Tor connectivity, restart if needed | No (when Tor installed) |
+| `i2p_health` | Every 10 minutes | Check I2P provider, restart if needed | No (only when I2P opt-in enabled) |
 
 ### Task Configuration
 
@@ -38980,6 +39082,9 @@ pub struct LocaleFS;
     "open_tor": "Abra Tor Browser y espere a que se conecte",
     "paste_onion": "Copie la dirección onion arriba y péguela en la barra de direcciones de Tor Browser",
     "tor_privacy": "Usar Tor proporciona privacidad adicional...",
+    "i2p_access": "Acceso I2P",
+    "i2p_address": "Dirección I2P",
+    "i2p_privacy": "Usar I2P proporciona privacidad adicional a través de la red I2P...",
     "faq": "Preguntas frecuentes",
     "troubleshooting": "Solución de problemas"
   },
@@ -40030,7 +40135,11 @@ mod tests {
 
 ---
 
-# PART 27: TOR HIDDEN SERVICE
+# PART 27: OVERLAY NETWORKS (TOR & I2P)
+
+> **This PART covers two overlay-network integrations:** **PART 27.1 (Tor Hidden Service)** — REQUIRED, auto-enabled when the `tor` binary is found, no toggle — and **PART 27.2 (I2P Eepsite)** — OPTIONAL, opt-in (default off). Both serve the app over an anonymity network at an `http://` address that is itself the cryptographic identity; neither ever uses HTTPS, HSTS, or an upgrade redirect (see PART 12 → overlay HTTP semantics). The dedicated backend port for each is allocated smartly — only after a provider is confirmed available, so "no provider → no port, no generated config."
+
+## PART 27.1: Tor Hidden Service
 
 > **Trust chain integration:** Tor detection is priority 0 in the FQDN resolution table — evaluated before reverse proxy headers, always trusted, no IP check required. See **PART 12 → "Tor Hidden Service Configuration"** for request detection rules, `build_url` / `get_url_vars` behavior, privacy rules, and the Tor security.txt variant.
 
@@ -41302,6 +41411,362 @@ Tor Hidden Service: Connected
 
 ---
 
+## PART 27.2: I2P Eepsite (OPTIONAL — opt-in)
+
+> **Trust chain integration:** an `.b32.i2p` request is trusted for FQDN resolution exactly like a `.onion` request — the eepsite host is served by the app's own I2P provider, so no reverse-proxy header or IP check applies. See **PART 12 → overlay HTTP semantics** for request detection, `build_url` / `get_url_vars` behavior, and the privacy rules (no HTTPS upgrade, no HSTS, no cert).
+
+### Overview
+
+**I2P support is OPTIONAL and opt-in — disabled by default.** This is the deliberate difference from Tor (PART 27.1), which is auto-enabled whenever the `tor` binary is found. The eepsite is created **only** when I2P is explicitly enabled (`features.i2p.enabled: true` / `I2P_ENABLED=true` / `--i2p`) **and** a provider is available.
+
+**I2P provides one capability here:**
+1. **Eepsite** — server-side `.b32.i2p` hosting over the I2P network.
+
+**I2P is NOT used for:**
+- Outbound anonymized requests (that is Tor's job — see PART 27.1 "Outbound Network").
+- I2P floodfill / router relay functionality.
+- SOCKS/HTTP client proxying through I2P.
+
+**Two providers (i2pd preferred, SAM fallback).** When enabled, `start_dedicated_i2p` selects a provider in this order:
+1. **Model A — i2pd (preferred).** If an `i2pd` binary resolves, the app spawns and manages a **dedicated i2pd process** and regenerates its `tunnels.conf` server-tunnel on every startup (the exact parallel to torrc regeneration). i2pd persists the destination keyfile; the `.b32.i2p` address derives from it.
+2. **Model B — external SAM bridge.** Else, if a SAMv3 bridge is reachable (`127.0.0.1:7656` by default — an already-running i2pd or Java I2P router), the app talks raw SAMv3 over TCP (no new dependency): it creates a `STREAM` session from a persisted destination and issues `STREAM FORWARD` so the router forwards incoming eepsite connections to the app's backend port.
+3. **Neither available → log a warning and skip** (mirrors Tor's "binary not found → disabled, not an error").
+
+**Key Architecture Points:**
+- **Opt-in, default off** — no eepsite, no port, no `tunnels.conf`, no SAM session unless enabled.
+- **Server binary owns the provider** — Model A: full i2pd process lifecycle; Model B: the SAM session lifecycle.
+- **Dedicated backend port** — the eepsite maps `.b32.i2p:{virtual_port}` → `127.0.0.1:{i2p_backend_port}`, a random-unused loopback port. **Unlike Tor, there is no PROXY-protocol header** (SAM/i2pd do not prepend one), so the backend is a **plain loopback listener**, separate from the clearnet port.
+- **Destination identity persists** — the key lives under `{data_dir}/i2p/site/`; the `.b32.i2p` address survives restarts. `tunnels.conf` is derived state, regenerated each run.
+- **Server enforces permissions** — creates all dirs/files with correct owner/group/perms (0700 dirs, 0600 keys).
+
+### Configuration
+
+**I2P is opt-in.** No provider is contacted and no port is allocated unless `enabled: true`.
+
+```yaml
+server:
+  i2p:
+    # OPT-IN: disabled by default. Unlike Tor (auto-enabled when the binary is
+    # found), the eepsite is created only when this is true.
+    enabled: false
+
+    # Path to the i2pd binary (auto-detected if empty). When an i2pd binary is
+    # present the app spawns/manages a dedicated i2pd process (Model A). If no
+    # i2pd binary is found, the app falls back to an external SAM bridge (Model B).
+    binary: ""
+
+    # SAM bridge address for Model B (external I2P router). Used only when no
+    # i2pd binary is available. Default is the I2P SAMv3 default port.
+    sam_address: "127.0.0.1:7656"
+
+    # Virtual port the eepsite listens on (what users connect to)
+    virtual_port: 80
+
+    # --- Tunnel settings (privacy vs latency trade-off) ---
+    # Hops per tunnel (0-7; higher = more anonymity, more latency)
+    inbound_length: 3
+    outbound_length: 3
+    # Parallel tunnels (1-16; higher = more resilient, more router load)
+    inbound_quantity: 5
+    outbound_quantity: 5
+
+    # SAM/destination signature type (7 = EdDSA-SHA512-Ed25519, modern default)
+    signature_type: 7
+
+    # Bootstrap timeout in seconds (wait for the destination + tunnels)
+    bootstrap_timeout: 300
+```
+
+**Notes:**
+- **Opt-in only** — never auto-enabled; selecting it requires an explicit config/flag/env.
+- Model A uses the external `i2pd` binary (not embedded), keeping a single static binary with no extra crate.
+- Model B needs no dependency — SAMv3 is spoken over a `tokio::net::TcpStream`.
+- **I2P directories are NOT configurable** — always derived: config `{config_dir}/i2p/`, data `{data_dir}/i2p/`, log `{log_dir}/i2pd.log` (Model A only).
+
+### Provider Model
+
+```
+1. I2P enabled? (features.i2p.enabled)
+   └─ NO  → skip entirely (no port, no config, no session)
+   └─ YES → continue
+
+2. Resolve provider:
+   ├─ Find i2pd binary (cfg.binary → common locations → $PATH)
+   │    └─ FOUND → Model A (spawn i2pd + tunnels.conf)
+   ├─ Else probe SAM (cfg.sam_address, default 127.0.0.1:7656)
+   │    └─ REACHABLE → Model B (external SAM bridge)
+   └─ NEITHER → log WARN, disable I2P, continue (not an error)
+
+3. Allocate dedicated backend port (only now that a provider is confirmed)
+4. Load/persist destination key under {data_dir}/i2p/site/
+5. Model A: write {config_dir}/i2p/tunnels.conf, start i2pd
+   Model B: SAM SESSION CREATE + STREAM FORWARD → backend port
+6. Derive/read .b32.i2p address
+```
+
+**Note:** Unlike Tor, the eepsite backend is a plain loopback listener — I2P provides no per-connection PROXY-protocol header, so the proxy-protocol parser is NOT used for I2P.
+
+### I2P Process Management
+
+**When Model A is selected, the application MUST start its OWN dedicated i2pd process. NEVER reconfigure a system i2pd.** When Model B is selected, the app connects to an existing router's SAM bridge and does not manage the router.
+
+```
+Find i2pd binary:
+   ├─ Check config `server.i2p.binary` path
+   ├─ Check common locations:
+   │   ├─ Linux: /usr/bin/i2pd, /usr/sbin/i2pd, /usr/local/bin/i2pd
+   │   ├─ macOS: /usr/local/bin/i2pd, /opt/homebrew/bin/i2pd
+   │   └─ BSD: /usr/local/bin/i2pd
+   ├─ Check PATH for `i2pd`
+   └─ NOT FOUND: fall back to SAM (Model B); if SAM unreachable, disable I2P
+```
+
+**Why a dedicated i2pd process (Model A)?** Same rationale as Tor: isolation from any system I2P router, app-owned lifecycle (i2pd starts/stops with the server), and full control over the server-tunnel definition and key location.
+
+### Implementation
+
+No new dependency for the wire protocol. Model A uses `tokio::process::Command` to run i2pd; Model B speaks SAMv3 over a `tokio::net::TcpStream`. The `.b32.i2p` address is computed as `base32(sha256(destination)) + ".b32.i2p"` (the `sha2` + `base32` crates).
+
+```rust
+/// I2P-related configuration from server config. OPT-IN via `enabled`.
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct I2PConfig {
+    // OPT-IN: I2P eepsite is created only when this is true.
+    #[serde(default)]
+    pub enabled: bool,
+    // i2pd binary path (empty = auto-detect). Model A when found.
+    #[serde(default)]
+    pub binary: String,
+    // SAM bridge address for Model B (used only when no i2pd binary is found).
+    #[serde(default = "default_sam_address")]
+    pub sam_address: String,
+    #[serde(default = "default_i2p_virtual_port")]
+    pub virtual_port: u16,
+    #[serde(default = "default_tunnel_length")]
+    pub inbound_length: u8,
+    #[serde(default = "default_tunnel_length")]
+    pub outbound_length: u8,
+    #[serde(default = "default_tunnel_quantity")]
+    pub inbound_quantity: u8,
+    #[serde(default = "default_tunnel_quantity")]
+    pub outbound_quantity: u8,
+    #[serde(default = "default_signature_type")]
+    pub signature_type: u16,
+    #[serde(default = "default_i2p_bootstrap_timeout")]
+    pub bootstrap_timeout: u64,
+}
+
+impl Default for I2PConfig {
+    /// Returns the default (disabled) I2P configuration.
+    fn default() -> Self {
+        Self {
+            enabled: false, // OPT-IN: default off
+            binary: String::new(),
+            sam_address: "127.0.0.1:7656".into(),
+            virtual_port: 80,
+            inbound_length: 3,
+            outbound_length: 3,
+            inbound_quantity: 5,
+            outbound_quantity: 5,
+            signature_type: 7,
+            bootstrap_timeout: 300,
+        }
+    }
+}
+
+/// Creates the eepsite when I2P is enabled AND a provider is available. It
+/// resolves the provider FIRST (i2pd binary, else a reachable SAM bridge); if
+/// neither is available it returns an error and NO backend port is allocated.
+/// Only after a provider is confirmed does it allocate a DEDICATED plain
+/// loopback listener the eepsite forwards to.
+pub async fn start_dedicated_i2p(
+    cfg: &I2PConfig,
+    config_dir: &Path,
+    data_dir: &Path,
+    log_dir: &Path,
+) -> Result<I2PService, AppError> {
+    if !cfg.enabled {
+        return Err(AppError::Internal("i2p disabled (opt-in) - eepsite not started".into()));
+    }
+    // Resolve provider FIRST. No provider → return before allocating a port.
+    let (provider, i2pd_binary) = match resolve_i2pd_binary(cfg) {
+        Ok(bin) => (I2PProvider::I2pd, Some(bin)),
+        Err(_) if sam_reachable(&cfg.sam_address) => (I2PProvider::Sam, None),
+        Err(_) => {
+            return Err(AppError::Internal(format!(
+                "i2p enabled but no provider available (no i2pd binary, SAM {} unreachable)",
+                cfg.sam_address
+            )));
+        }
+    };
+    ensure_i2p_dirs(config_dir, data_dir)?;
+    // Allocate the dedicated plain loopback port only now that a provider is
+    // confirmed (same random-unused detection as the server's own port).
+    let i2p_backend_port = get_random_available_port();
+    // Model A → start i2pd + regenerate tunnels.conf; Model B → SAM SESSION
+    // CREATE + STREAM FORWARD. Both persist the destination under
+    // {data_dir}/i2p/site/ and derive the .b32.i2p from it.
+    build_i2p_service(cfg, provider, i2pd_binary, config_dir, data_dir, log_dir, i2p_backend_port).await
+}
+
+/// Derives the .b32.i2p address: base32(sha256(destination)) without padding,
+/// lowercased, plus the ".b32.i2p" suffix.
+pub fn b32_address(dest_binary: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let sum = Sha256::digest(dest_binary);
+    let enc = base32::encode(base32::Alphabet::Rfc4648 { padding: false }, &sum);
+    format!("{}.b32.i2p", enc.to_lowercase())
+}
+```
+
+**tunnels.conf (Model A)** is derived state, regenerated on every startup from `I2PConfig` + the current backend port. The destination identity persists via `keys` (`site-keys.dat`), NOT via `tunnels.conf`:
+
+```ini
+[site]
+type = server
+host = 127.0.0.1
+port = {i2p_backend_port}
+keys = {data_dir}/i2p/site/site-keys.dat
+inbound.length = 3
+outbound.length = 3
+inbound.quantity = 5
+outbound.quantity = 5
+signaturetype = 7
+```
+
+**SAM session (Model B)** — raw SAMv3 over a `tokio::net::TcpStream`, no dependency:
+
+```
+HELLO VERSION MIN=3.0 MAX=3.3
+DEST GENERATE SIGNATURE_TYPE=7            (only if no persisted key)
+SESSION CREATE STYLE=STREAM ID=site DESTINATION=<PRIV b64> ...
+STREAM FORWARD ID=site PORT={i2p_backend_port} HOST=127.0.0.1
+```
+
+**`I2PManager`** mirrors `TorManager` (`start` / `update_config` / `regenerate_address` / `close` / `eepsite_address`); it stores NO backend port — the dedicated port is allocated inside `start_dedicated_i2p` only when I2P is enabled AND a provider is available. `monitor_i2p` runs a 30s health ticker and restarts the provider if it dies. `ensure_i2p_dirs` creates `{config_dir}/i2p/`, `{data_dir}/i2p/`, `{data_dir}/i2p/site/` (0700) before any file is written.
+
+#### Storage Locations
+
+| Data | Location | Notes |
+|------|----------|-------|
+| I2P config directory | `{config_dir}/i2p/` | Server creates with 0700 |
+| I2P tunnels file | `{config_dir}/i2p/tunnels.conf` | Server generates with 0600 (Model A) |
+| I2P data directory | `{data_dir}/i2p/` | Server creates with 0700 (Model A) |
+| Destination key | `{data_dir}/i2p/site/site-keys.dat` | Server creates with 0600 |
+| i2pd PID | `{data_dir}/i2p/i2pd.pid` | Model A only |
+| i2pd log file | `{log_dir}/i2pd.log` | Model A only |
+
+**Model B** owns no i2pd files — only `{data_dir}/i2p/site/site-keys.dat` (the persisted destination) is written by the app.
+
+### Admin Panel
+
+**I2P is opt-in — this page includes an Enable toggle** (Tor's page does not, since Tor is auto-enabled). Applies only when the server admin feature is enabled (PART 28).
+
+#### /server/{admin_path}/config/network/i2p (WebUI)
+
+##### Status Section (Read-Only)
+
+| Element | Type | Description |
+|---------|------|-------------|
+| I2P Status | Indicator | ● Running / ○ Disabled / ○ No Provider / ⚠ Error |
+| Provider | Read-only text | `i2pd` (Model A) / `sam` (Model B) / none |
+| Binary Path | Read-only text | Detected i2pd binary (Model A) |
+| SAM Address | Read-only text | SAM bridge (Model B) |
+| .b32.i2p Address | Read-only text | Full address with copy button |
+| Uptime | Read-only text | Time since the eepsite started |
+
+##### Configuration Settings (with Validation)
+
+| Setting | Type | Default | Validation | Description |
+|---------|------|---------|------------|-------------|
+| `enabled` | Boolean | `false` | - | **Opt-in** — enable the I2P eepsite |
+| `binary` | String | `""` | path or empty | i2pd binary (empty = auto-detect) |
+| `sam_address` | String | `"127.0.0.1:7656"` | `host:port` | SAM bridge (Model B fallback) |
+| `virtual_port` | Integer | `80` | 1-65535 | Virtual port (.b32.i2p port) |
+| `inbound_length` | Integer | `3` | 0-7 | Inbound tunnel hops |
+| `outbound_length` | Integer | `3` | 0-7 | Outbound tunnel hops |
+| `inbound_quantity` | Integer | `5` | 1-16 | Parallel inbound tunnels |
+| `outbound_quantity` | Integer | `5` | 1-16 | Parallel outbound tunnels |
+| `signature_type` | Integer | `7` | 0,7 | Destination signature type |
+| `bootstrap_timeout` | Integer | `300` | 30-600 | Bootstrap timeout (seconds) |
+
+`validate_i2p_config` enforces the ranges above (mirrors `validate_tor_config`).
+
+##### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/config/network/i2p` | GET | Get I2P status, config, and .b32.i2p address |
+| `/api/{api_version}/server/{admin_path}/config/network/i2p` | PATCH | Update I2P settings (validates; toggles opt-in) |
+| `/api/{api_version}/server/{admin_path}/config/network/i2p/validate` | POST | Validate config without saving |
+| `/api/{api_version}/server/{admin_path}/config/network/i2p/regenerate` | POST | Regenerate .b32.i2p address |
+| `/api/{api_version}/server/{admin_path}/config/network/i2p/restart` | POST | Restart the I2P provider |
+
+##### Response Format
+
+**GET `/api/{api_version}/server/{admin_path}/config/network/i2p`**
+
+```json
+{
+  "status": {
+    "state": "running",
+    "provider": "i2pd",
+    "binary_path": "/usr/bin/i2pd",
+    "sam_address": "127.0.0.1:7656",
+    "eepsite_address": "examplei2paddressbase32fordemoabcdefghijklmnopqrstuv.b32.i2p",
+    "uptime_seconds": 192600
+  },
+  "config": {
+    "enabled": true,
+    "binary": "",
+    "sam_address": "127.0.0.1:7656",
+    "virtual_port": 80,
+    "inbound_length": 3,
+    "outbound_length": 3,
+    "inbound_quantity": 5,
+    "outbound_quantity": 5,
+    "signature_type": 7,
+    "bootstrap_timeout": 300
+  }
+}
+```
+
+### Behavior
+
+| Scenario | Behavior |
+|----------|----------|
+| I2P disabled (default) | No provider contacted, no port, no config — eepsite off |
+| Enabled, i2pd found | Model A: i2pd spawned, tunnels.conf regenerated, `.b32.i2p` derived from `site-keys.dat` |
+| Enabled, no i2pd, SAM reachable | Model B: SAM session + STREAM FORWARD to backend port |
+| Enabled, no provider | Log WARN, continue without I2P (not an error) |
+| Subsequent runs | Same `.b32.i2p` (destination key persists in `{data_dir}/i2p/site/`) |
+| Regenerate address | Old key deleted, new destination generated, provider restarts |
+
+### CLI
+
+When I2P is enabled and running, the `--status` output includes an eepsite line beside the Tor line:
+
+```
+$ myapp --status
+
+Server Status: Running
+  Port: 8080
+  Mode: production
+
+Tor Hidden Service: Connected
+  Address: abcd1234...wxyz.onion
+
+I2P Eepsite: Running (i2pd)
+  Address: examplei2p...uv.b32.i2p
+```
+
+| Field | Description |
+|-------|-------------|
+| I2P Eepsite | Running (provider) / Disabled / No Provider / Error |
+| Address | Full `.b32.i2p` address |
+
+---
+
 # PART 28: ADMIN PANEL (OPTIONAL - DISABLED BY DEFAULT; NON-NEGOTIABLE WHEN ENABLED)
 
 **This PART is OPTIONAL and DISABLED BY DEFAULT.** It applies ONLY when IDEA.md `## Business logic` enables the server admin feature. When the feature is NOT enabled, this entire PART is inert: the admin routes (`/server/{admin_path}/**` and `/api/{api_version}/server/{admin_path}/**`) MUST NOT exist, and no server admin account is created. When the feature IS enabled, everything in this PART is NON-NEGOTIABLE and MUST be implemented in full. The admin panel is a server-persona surface of the single binary (PART 2) — it exists only when the binary runs as a server; the native GUI/TUI/CLI personas are unaffected.
@@ -42262,6 +42727,7 @@ On first run, a one-time setup token is generated and displayed in console. Admi
 | `/server/{admin_path}/config/security/firewall` | Firewall | IP allow/block lists |
 | `/server/{admin_path}/config/security/allowlist` | Allowlist | Trusted IPs (bypass blocklist/ratelimit/geoip) |
 | `/server/{admin_path}/config/network/tor` | Tor | View .onion address, status (auto-enabled if installed) |
+| `/server/{admin_path}/config/network/i2p` | I2P | Enable toggle, view .b32.i2p address, provider status (opt-in) |
 | `/server/{admin_path}/config/network/geoip` | GeoIP | Country blocking, database updates |
 | `/server/{admin_path}/config/network/blocklists` | Blocklists | IP/domain blocklists |
 | `/server/{admin_path}/config/system-users` | System Users | Read-only view of `system_users` (username, uid, token status, last_used_at, rotated_at) |
@@ -43178,6 +43644,18 @@ The admin panel MUST include a scheduler section with:
 | `/api/{api_version}/server/{admin_path}/config/network/tor/vanity` | DELETE | Cancel vanity generation |
 | `/api/{api_version}/server/{admin_path}/config/network/tor/vanity/apply` | POST | Apply vanity address |
 | `/api/{api_version}/server/{admin_path}/config/network/tor/import` | POST | Import external keys |
+
+### Admin - I2P (`/api/{api_version}/server/{admin_path}/config/network/i2p/`)
+
+**OPT-IN:** all endpoints return `enabled: false` / `provider: none` until I2P is enabled.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/{api_version}/server/{admin_path}/config/network/i2p` | GET | Get I2P status, config, and .b32.i2p address |
+| `/api/{api_version}/server/{admin_path}/config/network/i2p` | PATCH | Update I2P settings (validates; toggles opt-in) |
+| `/api/{api_version}/server/{admin_path}/config/network/i2p/validate` | POST | Validate config without saving |
+| `/api/{api_version}/server/{admin_path}/config/network/i2p/regenerate` | POST | Regenerate .b32.i2p address |
+| `/api/{api_version}/server/{admin_path}/config/network/i2p/restart` | POST | Restart the I2P provider |
 
 ### Admin - Web (`/api/{api_version}/server/{admin_path}/config/web/`)
 

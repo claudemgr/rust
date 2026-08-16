@@ -1232,7 +1232,7 @@ Claude Code creates `.claude/rules/` on first session (see PART 0: Session Initi
 | `project-rules.md` | 2, 3, 4 | License & Attribution, Project Structure, OS-Specific Paths |
 | `config-rules.md` | 5, 6, 12 | Configuration, Application Modes, Server Configuration |
 | `binary-rules.md` | 7, 8, 32 | Binary Requirements, Server Binary CLI, Client |
-| `backend-rules.md` | 9, 10, 11, 31 | Error Handling & Caching, Database, Security & Logging, Tor Hidden Service |
+| `backend-rules.md` | 9, 10, 11, 31 | Error Handling & Caching, Database, Security & Logging, Overlay Networks (Tor & I2P) |
 | `api-rules.md` | 13, 14, 15 | Health & Versioning, API Structure, SSL/TLS & Let's Encrypt |
 | `frontend-rules.md` | 16 | Web Frontend |
 | `features-rules.md` | 17-22 | Email & Notifications, Scheduler, GeoIP, Metrics, Backup & Restore, Update Command |
@@ -1242,7 +1242,7 @@ Claude Code creates `.claude/rules/` on first session (see PART 0: Session Initi
 | `cicd-rules.md` | 27 | CI/CD Workflows |
 | `testing-rules.md` | 28, 29, 30 | Testing & Development, ReadTheDocs Documentation, I18N & A11Y |
 
-**Note:** PART 33 (IDEA.md Reference) and FINAL (Compliance Checklist) are reference-only, not rule files. PART 31 (Tor Hidden Service) is REQUIRED - auto-enabled when Tor binary is found.
+**Note:** PART 33 (IDEA.md Reference) and FINAL (Compliance Checklist) are reference-only, not rule files. PART 31.1 (Tor Hidden Service) is REQUIRED - auto-enabled when Tor binary is found; PART 31.2 (I2P Eepsite) is OPTIONAL - opt-in, default off.
 
 **Rules File Features:**
 - All `.md` files in `rules/` are automatically discovered recursively
@@ -1418,7 +1418,7 @@ Cursor uses `.mdc` files. Create the same logical groupings:
 | `project-rules.mdc` | 2, 3, 4 | License & Attribution, Project Structure, OS-Specific Paths |
 | `config-rules.mdc` | 5, 6, 12 | Configuration, Application Modes, Server Configuration |
 | `binary-rules.mdc` | 7, 8, 32 | Binary Requirements, Server Binary CLI, Client |
-| `backend-rules.mdc` | 9, 10, 11, 31 | Error Handling & Caching, Database, Security & Logging, Tor Hidden Service |
+| `backend-rules.mdc` | 9, 10, 11, 31 | Error Handling & Caching, Database, Security & Logging, Overlay Networks (Tor & I2P) |
 | `api-rules.mdc` | 13, 14, 15 | Health & Versioning, API Structure, SSL/TLS & Let's Encrypt |
 | `frontend-rules.mdc` | 16 | Web Frontend |
 | `features-rules.mdc` | 17-22 | Email & Notifications, Scheduler, GeoIP, Metrics, Backup & Restore, Update Command |
@@ -2220,16 +2220,16 @@ server:
 
 ## How to Read This Large File
 
-**rust/API.md is ~1.6MB and ~43,000 lines. You CANNOT read it all at once. Follow these procedures.**
+**rust/API.md is ~1.7MB and ~45,000 lines. You CANNOT read it all at once. Follow these procedures.**
 
 ### File Size Reality
 
 | Constraint | Value |
 |------------|-------|
-| File size | ~1.6MB |
-| Line count | ~43,000 lines |
+| File size | ~1.7MB |
+| Line count | ~45,000 lines |
 | Read limit | ~500 lines per read |
-| Full reads needed | ~86 reads (impractical) |
+| Full reads needed | ~90 reads (impractical) |
 
 **Use the PART index to find relevant sections, then read each section COMPLETELY.**
 
@@ -2239,41 +2239,41 @@ server:
 
 | PART | Line | Topic | When to Read |
 |------|------|-------|--------------|
-| 0 | ~2354 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
-| 1 | ~4164 | Critical Rules | **ALWAYS READ FIRST** |
-| 2 | ~5428 | License & Attribution | License requirements |
-| 3 | ~5757 | Project Structure | Setting up new project, **CI/CD badge detection** |
-| 4 | ~6619 | OS-Specific Paths | Path handling |
-| 5 | ~6815 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
-| 6 | ~8569 | Application Modes | Mode handling, debug endpoints |
-| 7 | ~9071 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~9786 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags**, **Resource Owner Tokens** |
-| 9 | ~12673 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~13097 | Database | Database work |
-| 11 | ~13512 | Security & Logging | Security features, **Context Detection** |
-| 12 | ~15526 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~16924 | Health & Versioning | Health endpoints |
-| 14 | ~17559 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~19277 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~20222 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~22676 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~23247 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~23672 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~23779 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~25065 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~25606 | Update Command | Update feature |
-| 23 | ~26109 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~26731 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~27056 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~27867 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~28962 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~31609 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~33355 | ReadTheDocs Documentation | Documentation |
-| 30 | ~34149 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~35512 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 32 | ~36804 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~39953 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | — | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 0 | ~2368 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
+| 1 | ~4181 | Critical Rules | **ALWAYS READ FIRST** |
+| 2 | ~5445 | License & Attribution | License requirements |
+| 3 | ~5779 | Project Structure | Setting up new project, **CI/CD badge detection** |
+| 4 | ~6703 | OS-Specific Paths | Path handling |
+| 5 | ~6899 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
+| 6 | ~8666 | Application Modes | Mode handling, debug endpoints |
+| 7 | ~9182 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
+| 8 | ~9853 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags**, **Resource Owner Tokens** |
+| 9 | ~12838 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~13340 | Database | Database work |
+| 11 | ~13755 | Security & Logging | Security features, **Context Detection** |
+| 12 | ~15787 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~17242 | Health & Versioning | Health endpoints |
+| 14 | ~17954 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~19698 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~20661 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~23974 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~24551 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~24979 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~25100 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~26438 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~26938 | Update Command | Update feature |
+| 23 | ~27466 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~28088 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~28413 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~29243 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~30215 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~33484 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~35322 | ReadTheDocs Documentation | Documentation |
+| 30 | ~36116 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~37511 | Overlay Networks (Tor & I2P) | Tor (required) + I2P eepsite (opt-in) |
+| 32 | ~39663 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~42819 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~43056 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File
 
@@ -2577,7 +2577,7 @@ Before I proceed, can you confirm [specific question]?
 | `.claude/rules/project-rules.md` | 2, 3, 4 | License & Attribution, Project Structure, OS-Specific Paths |
 | `.claude/rules/config-rules.md` | 5, 6, 12 | Configuration, Application Modes, Server Configuration |
 | `.claude/rules/binary-rules.md` | 7, 8, 32 | Binary Requirements, Server Binary CLI, Client |
-| `.claude/rules/backend-rules.md` | 9, 10, 11, 31 | Error Handling & Caching, Database, Security & Logging, Tor Hidden Service |
+| `.claude/rules/backend-rules.md` | 9, 10, 11, 31 | Error Handling & Caching, Database, Security & Logging, Overlay Networks (Tor & I2P) |
 | `.claude/rules/api-rules.md` | 13, 14, 15 | Health & Versioning, API Structure, SSL/TLS & Let's Encrypt |
 | `.claude/rules/frontend-rules.md` | 16 | Web Frontend |
 | `.claude/rules/features-rules.md` | 17-22 | Email & Notifications, Scheduler, GeoIP, Metrics, Backup & Restore, Update Command |
@@ -3955,7 +3955,7 @@ ls -la docker/
 | 28 | Testing & Development | Implement fully |
 | 29 | ReadTheDocs Documentation | Implement fully |
 | 30 | I18N & A11Y | Implement fully |
-| 31 | Tor Hidden Service | Implement fully |
+| 31 | Overlay Networks (Tor & I2P) | Tor fully; I2P opt-in |
 | 32 | Client | Implement fully |
 | 33 | IDEA.md Reference | Reference only |
 | FINAL | Compliance Checklist | Verify all items |
@@ -5943,7 +5943,7 @@ PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+
 │       ├── project-rules.md    # PART 2, 3, 4: License & Attribution, Project Structure, OS-Specific Paths
 │       ├── config-rules.md     # PART 5, 6, 12: Configuration, Application Modes, Server Configuration
 │       ├── binary-rules.md     # PART 7, 8, 32: Binary Requirements, Server Binary CLI, Client
-│       ├── backend-rules.md    # PART 9, 10, 11, 31: Error Handling & Caching, Database, Security & Logging, Tor Hidden Service
+│       ├── backend-rules.md    # PART 9, 10, 11, 31: Error Handling & Caching, Database, Security & Logging, Overlay Networks (Tor & I2P)
 │       ├── api-rules.md        # PART 13, 14, 15: Health & Versioning, API Structure, SSL/TLS & Let's Encrypt
 │       ├── frontend-rules.md   # PART 16: Web Frontend
 │       ├── features-rules.md   # PART 17-22: Email & Notifications, Scheduler, GeoIP, Metrics, Backup & Restore, Update Command
@@ -10567,7 +10567,9 @@ PHASE 5: Server startup (actual server start)
     │   └─ ... and others (see PART 18)
     └─ Start scheduler async task
 
-17. Start Tor (if tor binary available and not already spawned in step 8g) - see PART 31:
+17. Start overlay networks - see PART 31:
+
+    17a. Start Tor (if tor binary available and not already spawned in step 8g) - see PART 31.1:
     ├─ Root mode → Tor already running (spawned in step 8g with {internal_name}:{internal_name} setuid credentials before the drop); skip
     ├─ tor not found in PATH → log INFO "Tor not available", skip
     ├─ tor found:
@@ -10579,6 +10581,15 @@ PHASE 5: Server startup (actual server start)
     │   ├─ Wait for bootstrap (up to 3 min)
     │   ├─ Create hidden service, log .onion address
     │   └─ Error → log WARN, continue without Tor (non-fatal)
+
+    17b. Start I2P (OPT-IN; only if features.i2p.enabled) - see PART 31.2:
+    ├─ features.i2p.enabled false (default) → skip entirely (no port, no config)
+    ├─ enabled, resolve provider:
+    │   ├─ i2pd binary found → Model A: create {config_dir}/i2p/, {data_dir}/i2p/site/;
+    │   │   allocate backend port; regenerate {config_dir}/i2p/tunnels.conf; start i2pd
+    │   ├─ else SAM (127.0.0.1:7656) reachable → Model B: SAM SESSION CREATE + STREAM FORWARD
+    │   └─ neither → log WARN "no I2P provider", continue without I2P (non-fatal)
+    └─ Wait for destination, log .b32.i2p address
 
 18. Start HTTP server:
     ├─ For each configured port:
@@ -11780,6 +11791,7 @@ const RESTART_REQUIRED_SETTINGS: &[&str] = &[
     "ssl.",
     "database.",
     "tor.",
+    "i2p.",
 ];
 
 fn categorize_changes(changes: &[String]) -> (Vec<String>, Vec<String>) {
@@ -11884,6 +11896,17 @@ async fn build_health_response(state: &AppState) -> HealthResponse {
                 running: state.tor_manager.is_running(),
                 status: state.tor_manager.status(),
                 hostname: state.tor_manager.hostname(),
+            },
+            // OPT-IN: all zero-value unless features.i2p.enabled
+            i2p: I2PInfo {
+                enabled: state.config.features.i2p.enabled,
+                running: state.i2p_manager.is_running(),
+                // "healthy", "disabled", "starting", "error"
+                status: state.i2p_manager.status(),
+                // "abc...uv.b32.i2p" (empty when disabled)
+                hostname: state.i2p_manager.eepsite_address(),
+                // "i2pd", "sam", or "none"
+                provider: state.i2p_manager.provider().to_string(),
             },
         },
 
@@ -15919,6 +15942,8 @@ All of these headers are supported regardless of proxy vendor (Nginx, Caddy, HAP
 
 **Tor exception:** Tor requests bypass this gate entirely. When `tor.onion_address` is set and the incoming `Host` matches it, FQDN/proto/port are resolved from `tor.*` config — no proxy header inspection, no IP check. See "Tor Hidden Service Configuration" below.
 
+**I2P exception:** identical to the Tor exception. When I2P is opt-in enabled and `i2p.b32_address` is set, a request whose `Host` matches it is resolved from `i2p.*` config — always `http://`, no proxy header inspection, no IP check (the eepsite backend is a plain loopback listener with no PROXY header). When I2P is disabled or the address is unset, `.b32.i2p` Host headers are treated like any other host. See **PART 31.2 → "I2P Eepsite"**.
+
 | Always trusted (no config required) | Reason |
 |--------------------------------------|--------|
 | `127.0.0.0/8`, `::1` | Loopback |
@@ -16052,7 +16077,9 @@ Expires: {expiry_date}
 - `Preferred-Languages:` line is **omitted** (locale fingerprinting risk on Tor)
 - Served per-request via `build_url(headers, path)`; never cached or frozen at startup
 
-> **Full Tor implementation:** The above covers request detection, `build_url` integration, and privacy rules only. For Tor binary lifecycle, hidden service setup, outbound routing, and external tor binary integration, see **PART 31 → "Tor Hidden Service"**.
+> **Full Tor implementation:** The above covers request detection, `build_url` integration, and privacy rules only. For Tor binary lifecycle, hidden service setup, outbound routing, and external tor binary integration, see **PART 31.1 → "Tor Hidden Service"**.
+
+> **Full I2P implementation:** the same overlay HTTP semantics apply to `.b32.i2p` (always `http://`, no cert, no HSTS, no upgrade). For the opt-in eepsite provider lifecycle (i2pd process or SAM bridge), `tunnels.conf` generation, and destination-key persistence, see **PART 31.2 → "I2P Eepsite"**.
 
 ## Rate Limiting
 
@@ -17339,8 +17366,11 @@ pub struct BuildInfo {
 // For project-specific optional features, add fields here when implemented.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeaturesInfo {
-    // PART 31: Tor Hidden Service
+    // PART 31.1: Tor Hidden Service
     pub tor: TorInfo,
+
+    // PART 31.2: I2P Eepsite (OPTIONAL - opt-in)
+    pub i2p: I2PInfo,
 
     // PART 19: GeoIP
     // true = enabled, false = disabled
@@ -17349,7 +17379,7 @@ pub struct FeaturesInfo {
     // APP-SPECIFIC: Add your app's features with enabled/disabled status
 }
 
-// TorInfo - from Tor manager (PART 31)
+// TorInfo - from Tor manager (PART 31.1)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TorInfo {
     // Tor binary found and running
@@ -17360,6 +17390,21 @@ pub struct TorInfo {
     pub status: String,
     // "abc123...xyz.onion" (56 chars, v3)
     pub hostname: String,
+}
+
+// I2PInfo - from I2P manager (PART 31.2). OPT-IN: all zero-value when disabled.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct I2PInfo {
+    // features.i2p.enabled (opt-in; false by default)
+    pub enabled: bool,
+    // Eepsite active
+    pub running: bool,
+    // "healthy", "disabled", "starting", "error"
+    pub status: String,
+    // "abc...uv.b32.i2p" (empty when disabled)
+    pub hostname: String,
+    // "i2pd", "sam", or "none"
+    pub provider: String,
 }
 
 // ChecksInfo - component health (ok/error only - no details)
@@ -17374,8 +17419,11 @@ pub struct ChecksInfo {
     // PART 18: "ok" or "error"
     pub scheduler: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    // PART 31: "ok" or "error" (if enabled)
+    // PART 31.1: "ok" or "error" (if enabled)
     pub tor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    // PART 31.2: "ok" or "error" (only when I2P opt-in enabled)
+    pub i2p: Option<String>,
     // APP-SPECIFIC: Add your checks here
     // Example: pub storage: Option<String>,
 }
@@ -17411,13 +17459,15 @@ pub struct StatsInfo {
 | `uptime` | `format_uptime(start_time)` | - |
 | `mode` | `cfg.server.mode` | 6 |
 | `timestamp` | `chrono::Utc::now()` | - |
-| `features.tor.*` | `tor_manager.*` | 31 |
+| `features.tor.*` | `tor_manager.*` | 31.1 |
+| `features.i2p.*` | `i2p_manager.*` (opt-in; zero-value when disabled) | 31.2 |
 | `features.geoip` | `cfg.geoip.enabled` (true/false) | 19 |
 | `features.*` (project-specific) | Show actual status when project-specific optional features used | - |
 | `checks.database` | `check_database()` | 10 |
 | `checks.cache` | `check_cache()` | 10 |
 | `checks.scheduler` | `check_scheduler()` | 18 |
-| `checks.tor` | `check_tor()` | 31 |
+| `checks.tor` | `check_tor()` | 31.1 |
+| `checks.i2p` | `check_i2p()` (only when I2P opt-in enabled) | 31.2 |
 | `stats.*` | `stats_collector.*` | - |
 
 #### Frontend Display Order
@@ -17692,6 +17742,13 @@ pub struct StatsInfo {
       "status": "healthy",
       "hostname": "abc123xyz456abcdef789xyz456abcdef789xyz456abcdef789xyz.onion"
     },
+    "i2p": {
+      "enabled": true,
+      "running": true,
+      "status": "healthy",
+      "hostname": "abc123def456ghi789jkl012mno345pqr678stu901vwx234yz.b32.i2p",
+      "provider": "i2pd"
+    },
     "geoip": true
   },
   "checks": {
@@ -17699,7 +17756,8 @@ pub struct StatsInfo {
     "cache": "ok",
     "disk": "ok",
     "scheduler": "ok",
-    "tor": "ok"
+    "tor": "ok",
+    "i2p": "ok"
   },
   "stats": {
     "requests_total": 1234567,
@@ -17772,6 +17830,11 @@ features.tor.enabled: true
 features.tor.running: true
 features.tor.status: healthy
 features.tor.hostname: abc123xyz456abcdef789xyz456abcdef789xyz456abcdef789xyz.onion
+features.i2p.enabled: true
+features.i2p.running: true
+features.i2p.status: healthy
+features.i2p.hostname: abc123def456ghi789jkl012mno345pqr678stu901vwx234yz.b32.i2p
+features.i2p.provider: i2pd
 features.geoip: true
 # 6. Checks
 checks.database: ok
@@ -17779,6 +17842,7 @@ checks.cache: ok
 checks.disk: ok
 checks.scheduler: ok
 checks.tor: ok
+checks.i2p: ok
 
 # 7. Stats
 stats.requests_total: 1234567
@@ -17816,6 +17880,11 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 | `features.tor.running` | Tor process currently running |
 | `features.tor.status` | healthy, starting, error |
 | `features.tor.hostname` | Onion address (if running) |
+| `features.i2p.enabled` | I2P eepsite enabled (OPT-IN via `features.i2p.enabled`; false by default) |
+| `features.i2p.running` | I2P eepsite currently running |
+| `features.i2p.status` | healthy, disabled, starting, error |
+| `features.i2p.hostname` | `.b32.i2p` address (if running; empty when disabled) |
+| `features.i2p.provider` | i2pd, sam, or none |
 | `checks.*` | Service health (ok, error) |
 | `stats.requests_total` | Total requests served |
 | `stats.requests_24h` | Requests in last 24 hours |
@@ -23173,6 +23242,9 @@ pub fn validate_footer_html(html: &str) -> Result<String> {
 | `tor_enabled` | `bool` | Tor is configured |
 | `tor_running` | `bool` | Tor process is active |
 | `tor_address` | `String` | `.onion` hostname |
+| `i2p_enabled` | `bool` | I2P is configured (opt-in) |
+| `i2p_running` | `bool` | I2P process/session is active |
+| `i2p_address` | `String` | `.b32.i2p` hostname |
 | `app_name` | `String` | Application name |
 | `app_version` | `String` | Semver string |
 
@@ -23189,6 +23261,13 @@ pub fn validate_footer_html(html: &str) -> Result<String> {
       <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
       <code class="onion-address">{{ tor_address }}</code>
       <button type="button" class="copy-btn" data-copy="{{ tor_address }}" aria-live="polite" aria-label="Copy onion address">📋</button>
+    </p>
+  {% endif %}
+  {% if i2p_enabled and i2p_running and i2p_address %}
+    <p class="footer-i2p">
+      <a href="/server/help#i2p-access" aria-label="I2P Support">🔗</a>
+      <code class="i2p-address">{{ i2p_address }}</code>
+      <button type="button" class="copy-btn" data-copy="{{ i2p_address }}" aria-live="polite" aria-label="Copy I2P address">📋</button>
     </p>
   {% endif %}
   <p class="footer-links">
@@ -23492,6 +23571,9 @@ General help and FAQ page. Includes a Tor access section when Tor is configured 
 | `tor_enabled` | `bool` | Tor is configured |
 | `tor_running` | `bool` | Tor process is active |
 | `tor_address` | `String` | `.onion` hostname |
+| `i2p_enabled` | `bool` | I2P is configured (opt-in) |
+| `i2p_running` | `bool` | I2P process/session is active |
+| `i2p_address` | `String` | `.b32.i2p` hostname |
 
 ```html
 {% if tor_enabled and tor_running and tor_address %}
@@ -23500,6 +23582,18 @@ General help and FAQ page. Includes a Tor access section when Tor is configured 
   <div class="code-block">
     <code class="code-content">{{ tor_address }}</code>
     <button type="button" class="copy-btn" data-copy="{{ tor_address }}" aria-label="Copy to clipboard">
+      <span class="copy-icon">📋</span>
+      <span class="copy-text" aria-live="polite">Copy</span>
+    </button>
+  </div>
+</section>
+{% endif %}
+{% if i2p_enabled and i2p_running and i2p_address %}
+<section id="i2p-access" class="i2p-access">
+  <h4>I2P Address</h4>
+  <div class="code-block">
+    <code class="code-content">{{ i2p_address }}</code>
+    <button type="button" class="copy-btn" data-copy="{{ i2p_address }}" aria-label="Copy to clipboard">
       <span class="copy-icon">📋</span>
       <span class="copy-text" aria-live="polite">Copy</span>
     </button>
@@ -24542,6 +24636,7 @@ Every project MUST include these scheduled tasks:
 | `backup_hourly` | Hourly | Hourly incremental (disabled by default) | Yes |
 | `healthcheck_self` | Every 5 minutes | Self-health verification | No |
 | `tor_health` | Every 10 minutes | Check Tor connectivity, restart if needed | No (when Tor installed) |
+| `i2p_health` | Every 10 minutes | Check I2P provider, restart if needed | No (only when I2P opt-in enabled) |
 
 ### Task Configuration
 
@@ -36360,6 +36455,9 @@ pub struct LocaleFS;
     "open_tor": "Abra Tor Browser y espere a que se conecte",
     "paste_onion": "Copie la dirección onion arriba y péguela en la barra de direcciones de Tor Browser",
     "tor_privacy": "Usar Tor proporciona privacidad adicional...",
+    "i2p_access": "Acceso I2P",
+    "i2p_address": "Dirección I2P",
+    "i2p_privacy": "Usar I2P proporciona privacidad adicional a través de la red I2P...",
     "faq": "Preguntas frecuentes",
     "troubleshooting": "Solución de problemas"
   },
@@ -37410,7 +37508,11 @@ mod tests {
 
 ---
 
-# PART 31: TOR HIDDEN SERVICE
+# PART 31: OVERLAY NETWORKS (TOR & I2P)
+
+> **This PART covers two overlay-network integrations:** **PART 31.1 (Tor Hidden Service)** — REQUIRED, auto-enabled when the `tor` binary is found, no toggle — and **PART 31.2 (I2P Eepsite)** — OPTIONAL, opt-in (default off). Both serve the app over an anonymity network at an `http://` address that is itself the cryptographic identity; neither ever uses HTTPS, HSTS, or an upgrade redirect (see PART 12 → overlay HTTP semantics). The dedicated backend port for each is allocated smartly — only after a provider is confirmed available, so "no provider → no port, no generated config."
+
+## PART 31.1: Tor Hidden Service
 
 > **Trust chain integration:** Tor detection is priority 0 in the FQDN resolution table — evaluated before reverse proxy headers, always trusted, no IP check required. See **PART 12 → "Tor Hidden Service Configuration"** for request detection rules, `build_url` / `get_url_vars` behavior, privacy rules, and the Tor security.txt variant.
 
@@ -38679,6 +38781,881 @@ Tor Hidden Service: Connected
 | Mode | production, development, or debug |
 | Uptime | Human-readable uptime |
 | Tor | Connected/disabled and onion address |
+
+## PART 31.2: I2P Eepsite (OPTIONAL — opt-in)
+
+> **Trust chain integration:** an `.b32.i2p` request is trusted for FQDN resolution exactly like a `.onion` request — the eepsite host is served by the app's own I2P provider, so no reverse-proxy header or IP check applies. See **PART 12 → overlay HTTP semantics** for request detection, `build_url` / `get_url_vars` behavior, and the privacy rules (no HTTPS upgrade, no HSTS, no cert).
+
+### Overview
+
+**I2P support is OPTIONAL and opt-in — disabled by default.** This is the deliberate difference from Tor (PART 31.1), which is auto-enabled whenever the `tor` binary is found. The eepsite is created **only** when I2P is explicitly enabled (`features.i2p.enabled: true` / `I2P_ENABLED=true` / `--i2p`) **and** a provider is available.
+
+**I2P provides one capability here:**
+1. **Eepsite** — server-side `.b32.i2p` hosting over the I2P network.
+
+**I2P is NOT used for:**
+- Outbound anonymized requests (that is Tor's job — see PART 31.1 "Tor Network for Outbound Connections").
+- I2P floodfill / router relay functionality.
+- SOCKS/HTTP client proxying through I2P.
+
+**Two providers (i2pd preferred, SAM fallback).** When enabled, `start_dedicated_i2p` selects a provider in this order:
+1. **Model A — i2pd (preferred).** If an `i2pd` binary resolves, the app spawns and manages a **dedicated i2pd process** and regenerates its `tunnels.conf` server-tunnel on every startup (the exact parallel to torrc regeneration). i2pd persists the destination keyfile; the `.b32.i2p` address derives from it.
+2. **Model B — external SAM bridge.** Else, if a SAMv3 bridge is reachable (`127.0.0.1:7656` by default — an already-running i2pd or Java I2P router), the app talks raw SAMv3 over TCP (no new dependency): it creates a `STREAM` session from a persisted destination and issues `STREAM FORWARD` so the router forwards incoming eepsite connections to the app's backend port.
+3. **Neither available → log a warning and skip** (mirrors Tor's "binary not found → disabled, not an error").
+
+**Key Architecture Points:**
+- **Opt-in, default off** — no eepsite, no port, no `tunnels.conf`, no SAM session unless enabled.
+- **Server binary owns the provider** — Model A: full i2pd process lifecycle; Model B: the SAM session lifecycle.
+- **Dedicated backend port** — the eepsite maps `.b32.i2p:{virtual_port}` → `127.0.0.1:{i2p_backend_port}`, a random-unused loopback port. **Unlike Tor, there is no PROXY-protocol header** (SAM/i2pd do not prepend one), so the backend is a **plain loopback listener**, separate from the clearnet port.
+- **Destination identity persists** — the key lives under `{data_dir}/i2p/site/`; the `.b32.i2p` address survives restarts. `tunnels.conf` is derived state, regenerated each run.
+- **Server enforces permissions** — creates all dirs/files with correct owner/group/perms (0700 dirs, 0600 keys).
+
+### Configuration
+
+**I2P is opt-in.** No provider is contacted and no port is allocated unless `enabled: true`.
+
+```yaml
+server:
+  i2p:
+    # OPT-IN: disabled by default. Unlike Tor (auto-enabled when the binary is
+    # found), the eepsite is created only when this is true.
+    enabled: false
+
+    # Path to the i2pd binary (auto-detected if empty). When an i2pd binary is
+    # present the app spawns/manages a dedicated i2pd process (Model A). If no
+    # i2pd binary is found, the app falls back to an external SAM bridge (Model B).
+    binary: ""
+
+    # SAM bridge address for Model B (external I2P router). Used only when no
+    # i2pd binary is available. Default is the I2P SAMv3 default port.
+    sam_address: "127.0.0.1:7656"
+
+    # Virtual port the eepsite listens on (what users connect to)
+    virtual_port: 80
+
+    # --- Tunnel settings (privacy vs latency trade-off) ---
+    # Hops per tunnel (0-7; higher = more anonymity, more latency)
+    inbound_length: 3
+    outbound_length: 3
+    # Parallel tunnels (1-16; higher = more resilient, more router load)
+    inbound_quantity: 5
+    outbound_quantity: 5
+
+    # SAM/destination signature type (7 = EdDSA-SHA512-Ed25519, modern default)
+    signature_type: 7
+
+    # Bootstrap timeout (wait for the destination + tunnels to become ready)
+    bootstrap_timeout: 5m
+```
+
+**Notes:**
+- **Opt-in only** — never auto-enabled; selecting it requires an explicit config/flag/env.
+- Model A uses the external `i2pd` binary (not embedded), keeping the single static binary dependency-free.
+- Model B needs no dependency — SAMv3 is spoken over a plain `tokio::net::TcpStream`.
+- **App handles EVERYTHING** for Model A — directory creation, permissions, `tunnels.conf` generation, i2pd process management. For Model B the external router owns tunnels; the app owns only the SAM session and the persisted destination key.
+- **I2P directories are NOT configurable** — always derived: config `{config_dir}/i2p/`, data `{data_dir}/i2p/`, log `{log_dir}/i2pd.log` (Model A only).
+
+### Provider Model
+
+```
+1. I2P enabled? (features.i2p.enabled)
+   └─ NO  → skip entirely (no port, no config, no session)
+   └─ YES → continue
+
+2. Resolve provider:
+   ├─ Find i2pd binary (cfg.binary → common locations → $PATH)
+   │    └─ FOUND → Model A (spawn i2pd + tunnels.conf)
+   ├─ Else probe SAM (cfg.sam_address, default 127.0.0.1:7656)
+   │    └─ REACHABLE → Model B (external SAM bridge)
+   └─ NEITHER → log WARN, disable I2P, continue (not an error)
+
+3. Allocate dedicated backend port (only now that a provider is confirmed)
+4. Load/persist destination key under {data_dir}/i2p/site/
+5. Model A: write {config_dir}/i2p/tunnels.conf, start i2pd
+   Model B: SAM SESSION CREATE + STREAM FORWARD → backend port
+6. Derive/read .b32.i2p address
+```
+
+### Platform-Specific Requirements
+
+| Feature | All OSes |
+|---------|----------|
+| Model A control | i2pd child process (owned by server binary) |
+| Model B control | SAMv3 over TCP to `sam_address` (default `127.0.0.1:7656`) |
+| Eepsite target | `127.0.0.1:{i2p_backend_port}` (plain loopback listener — no PROXY header) |
+| Security | Backend port loopback-only; keys 0600 under `{data_dir}/i2p/site/` |
+
+**Note:** Unlike Tor, the eepsite backend is a plain loopback listener — I2P provides no per-connection PROXY-protocol header, so no PROXY-protocol parser is used for I2P.
+
+### I2P Process Management
+
+**When Model A is selected, the application MUST start its OWN dedicated i2pd process. NEVER reconfigure a system i2pd.** When Model B is selected, the app connects to an existing router's SAM bridge and does not manage the router.
+
+```
+Find i2pd binary:
+   ├─ Check config `server.i2p.binary` path
+   ├─ Check common locations:
+   │   ├─ Linux: /usr/bin/i2pd, /usr/sbin/i2pd, /usr/local/bin/i2pd
+   │   ├─ macOS: /usr/local/bin/i2pd, /opt/homebrew/bin/i2pd
+   │   └─ BSD: /usr/local/bin/i2pd
+   ├─ Check PATH for `i2pd`
+   └─ NOT FOUND: fall back to SAM (Model B); if SAM unreachable, disable I2P
+```
+
+**Why a dedicated i2pd process (Model A)?** Same rationale as Tor: isolation from any system I2P router, app-owned lifecycle (i2pd starts/stops with the server), and full control over the server-tunnel definition and key location.
+
+**i2pd logging:** i2pd logs to `{log_dir}/i2pd.log` at `warn` level by default (configurable). Model B logging is owned by the external router.
+
+**Process ownership:** the server binary creates all Model-A directories/files with the current uid/gid and enforces 0700/0600 permissions before starting i2pd.
+
+### Implementation
+
+#### Library
+
+No new heavy dependency. Model A uses `std::process::Command` to run i2pd; Model B speaks SAMv3 over a `tokio::net::TcpStream`. The `.b32.i2p` address is computed as `base32(sha256(destination)) + ".b32.i2p"` using the `sha2` and `base32` crates (both already available — see PART 31.1 for `sha2`).
+
+```rust
+use std::fs;
+use std::io;
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command};
+use std::sync::Arc;
+use std::time::Duration;
+
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+use tokio::sync::Mutex;
+use tracing::{info, warn};
+
+/// Identifies which backend created the eepsite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum I2PProvider {
+    /// No provider was available (I2P disabled).
+    None,
+    /// Spawns and manages a dedicated i2pd process (Model A).
+    I2pd,
+    /// Uses an external SAMv3 bridge (Model B).
+    Sam,
+}
+
+/// Manages the I2P eepsite. Server binary owns the provider lifecycle.
+pub struct I2PService {
+    provider: I2PProvider,
+    /// Full .b32.i2p address, derived from the persisted destination
+    eepsite_address: String,
+    /// Dedicated plain loopback port the eepsite forwards to
+    i2p_backend_port: u16,
+    /// Model A: the managed i2pd process (None for Model B)
+    i2pd: Option<Child>,
+    /// Model B: the live SAM control connection (None for Model A)
+    sam_conn: Option<TcpStream>,
+}
+
+/// I2P-related configuration from server config.
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct I2PConfig {
+    /// OPT-IN: I2P eepsite is created only when this is true.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// i2pd binary path (empty = auto-detect). Model A when found.
+    #[serde(default)]
+    pub binary: String,
+
+    /// SAM bridge address for Model B (used only when no i2pd binary is found).
+    #[serde(default = "default_sam_address")]
+    pub sam_address: String,
+
+    /// Virtual port the eepsite listens on (1-65535, default 80)
+    #[serde(default = "default_i2p_virtual_port")]
+    pub virtual_port: u16,
+
+    /// Inbound tunnel hops (0-7, default 3)
+    #[serde(default = "default_tunnel_length")]
+    pub inbound_length: u8,
+
+    /// Outbound tunnel hops (0-7, default 3)
+    #[serde(default = "default_tunnel_length")]
+    pub outbound_length: u8,
+
+    /// Parallel inbound tunnels (1-16, default 5)
+    #[serde(default = "default_tunnel_quantity")]
+    pub inbound_quantity: u8,
+
+    /// Parallel outbound tunnels (1-16, default 5)
+    #[serde(default = "default_tunnel_quantity")]
+    pub outbound_quantity: u8,
+
+    /// SAM/destination signature type (7 = EdDSA-SHA512-Ed25519)
+    #[serde(default = "default_signature_type")]
+    pub signature_type: u16,
+
+    /// Bootstrap timeout in seconds (30-600, default 300)
+    #[serde(default = "default_i2p_bootstrap_timeout")]
+    pub bootstrap_timeout: u64,
+}
+
+fn default_sam_address() -> String { "127.0.0.1:7656".into() }
+fn default_i2p_virtual_port() -> u16 { 80 }
+fn default_tunnel_length() -> u8 { 3 }
+fn default_tunnel_quantity() -> u8 { 5 }
+fn default_signature_type() -> u16 { 7 }
+fn default_i2p_bootstrap_timeout() -> u64 { 300 }
+
+impl Default for I2PConfig {
+    /// Returns the default (disabled) I2P configuration.
+    fn default() -> Self {
+        Self {
+            // OPT-IN: default off
+            enabled: false,
+            binary: String::new(),
+            sam_address: "127.0.0.1:7656".into(),
+            virtual_port: 80,
+            inbound_length: 3,
+            outbound_length: 3,
+            inbound_quantity: 5,
+            outbound_quantity: 5,
+            signature_type: 7,
+            bootstrap_timeout: 300,
+        }
+    }
+}
+
+/// Locates the i2pd executable: an explicit `cfg.binary` override wins, then
+/// common install locations, then $PATH. Returns an error when no i2pd binary is
+/// available — in which case the caller falls back to SAM (Model B).
+fn resolve_i2pd_binary(cfg: &I2PConfig) -> Result<PathBuf, AppError> {
+    if !cfg.binary.is_empty() {
+        let path = PathBuf::from(&cfg.binary);
+        if path.is_file() {
+            return Ok(path);
+        }
+        return Err(AppError::Internal(format!(
+            "configured i2pd binary not found: {}",
+            path.display()
+        )));
+    }
+    for candidate in ["/usr/bin/i2pd", "/usr/sbin/i2pd", "/usr/local/bin/i2pd", "/opt/homebrew/bin/i2pd"] {
+        let path = PathBuf::from(candidate);
+        if path.is_file() {
+            return Ok(path);
+        }
+    }
+    which::which("i2pd").map_err(|_| AppError::Internal("i2pd binary not found".into()))
+}
+
+/// Reports whether a SAMv3 bridge is accepting connections at `addr`.
+fn sam_reachable(addr: &str) -> bool {
+    use std::net::ToSocketAddrs;
+    let Ok(mut addrs) = addr.to_socket_addrs() else {
+        return false;
+    };
+    let Some(sock) = addrs.next() else {
+        return false;
+    };
+    std::net::TcpStream::connect_timeout(&sock, Duration::from_secs(3)).is_ok()
+}
+
+/// Creates the eepsite when I2P is enabled AND a provider is available.
+///
+/// It resolves the provider FIRST (i2pd binary, else a reachable SAM bridge); if
+/// neither is available it returns an error and NO backend port is allocated
+/// (I2P stays disabled). Only after a provider is confirmed does it allocate a
+/// DEDICATED plain loopback listener the eepsite forwards to — using the same
+/// random-unused port detection the server uses for its own port (64000-64999).
+/// The eepsite maps: `.b32.i2p:{virtual_port}` → `127.0.0.1:{backend port}`.
+///
+/// Unlike Tor, the backend carries NO PROXY-protocol header, so the target is a
+/// plain loopback listener separate from the clearnet HTTP port.
+pub async fn start_dedicated_i2p(
+    cfg: &I2PConfig,
+    config_dir: &Path,
+    data_dir: &Path,
+    log_dir: &Path,
+) -> Result<I2PService, AppError> {
+    if !cfg.enabled {
+        return Err(AppError::Internal("i2p disabled (opt-in) - eepsite not started".into()));
+    }
+
+    // Resolve provider FIRST. No provider → return before allocating a port or
+    // writing any files (mirrors the Tor smart-port gate).
+    let (provider, i2pd_binary) = match resolve_i2pd_binary(cfg) {
+        Ok(bin) => (I2PProvider::I2pd, Some(bin)),
+        Err(_) if sam_reachable(&cfg.sam_address) => (I2PProvider::Sam, None),
+        Err(_) => {
+            return Err(AppError::Internal(format!(
+                "i2p enabled but no provider available (no i2pd binary, SAM {} unreachable)",
+                cfg.sam_address
+            )));
+        }
+    };
+
+    ensure_i2p_dirs(config_dir, data_dir)?;
+
+    // Allocate the dedicated plain loopback port only now that a provider is
+    // confirmed, using the same random-unused-port detection as the server's own
+    // port (64000-64999). Not persisted: a fresh port each run.
+    let i2p_backend_port = get_random_available_port();
+
+    // The destination key persists here; the .b32.i2p address derives from it.
+    let keys_path = data_dir.join("i2p").join("site").join("site-keys.dat");
+
+    let mut svc = I2PService {
+        provider,
+        eepsite_address: String::new(),
+        i2p_backend_port,
+        i2pd: None,
+        sam_conn: None,
+    };
+
+    match provider {
+        // Model A: regenerate tunnels.conf every startup (derived state), then
+        // start a dedicated i2pd. i2pd persists the destination in keys_path.
+        I2PProvider::I2pd => {
+            let binary = i2pd_binary.expect("i2pd binary resolved above");
+            let addr = start_i2pd(cfg, &binary, config_dir, data_dir, log_dir, &keys_path, i2p_backend_port, &mut svc).await?;
+            svc.eepsite_address = addr;
+        }
+        // Model B: create a STREAM session from the persisted destination and
+        // STREAM FORWARD incoming connections to the backend port.
+        I2PProvider::Sam => {
+            let addr = start_sam_eepsite(cfg, &keys_path, i2p_backend_port, &mut svc).await?;
+            svc.eepsite_address = addr;
+        }
+        I2PProvider::None => unreachable!("provider resolved to None"),
+    }
+
+    info!(
+        "I2P eepsite started ({}): {}:{} → 127.0.0.1:{}",
+        provider_name(provider), svc.eepsite_address, cfg.virtual_port, i2p_backend_port
+    );
+    Ok(svc)
+}
+
+impl I2PService {
+    /// Returns the full .b32.i2p address.
+    pub fn eepsite_address(&self) -> String {
+        self.eepsite_address.clone()
+    }
+
+    /// Returns the active provider.
+    pub fn provider(&self) -> I2PProvider {
+        self.provider
+    }
+
+    /// Shuts down the provider (i2pd process or SAM session).
+    pub fn close(&mut self) -> io::Result<()> {
+        // Dropping the SAM control connection tears down the STREAM session.
+        self.sam_conn = None;
+        if let Some(ref mut child) = self.i2pd {
+            child.kill()?;
+        }
+        self.i2pd = None;
+        Ok(())
+    }
+}
+
+/// Maps a provider to its health-string name ("i2pd", "sam", or "none").
+fn provider_name(p: I2PProvider) -> &'static str {
+    match p {
+        I2PProvider::I2pd => "i2pd",
+        I2PProvider::Sam => "sam",
+        I2PProvider::None => "none",
+    }
+}
+
+// The destination key is generated once and persisted under {data_dir}/i2p/site/
+// (i2pd writes site-keys.dat; the SAM path writes the DEST PRIV there) — the
+// .b32.i2p address is stable across restarts.
+```
+
+#### Port Allocation
+
+| Resource | Model A (i2pd) | Model B (SAM) |
+|----------|----------------|---------------|
+| Control | i2pd child process | SAMv3 TCP `sam_address` |
+| Eepsite backend | `127.0.0.1:{i2p_backend_port}` (plain) | `127.0.0.1:{i2p_backend_port}` (plain) |
+| Destination key | `{data_dir}/i2p/site/site-keys.dat` | `{data_dir}/i2p/site/site-keys.dat` |
+
+**How eepsite forwarding works:**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ External I2P User (I2P browser / eepsite proxy)                     │
+└─────────────┬───────────────────────────────────────────────────────┘
+              │ connects to  {b32}.b32.i2p:{virtual_port}
+              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ I2P Network                                                         │
+└─────────────┬───────────────────────────────────────────────────────┘
+              │ forwards to (via server tunnel / SAM STREAM FORWARD)
+              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ Provider:  Model A i2pd process   |   Model B external SAM router   │
+└─────────────┬───────────────────────────────────────────────────────┘
+              │ connects to (NO PROXY-protocol header)
+              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ Dedicated plain backend listener                                    │
+│ 127.0.0.1:{i2p_backend_port}  (SEPARATE from clearnet port)         │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+- **Backend port is loopback-only** and receives plain HTTP (no PROXY header to parse).
+- **Same backend port model as Tor** — dedicated, random-unused, never the clearnet port — but without a PROXY-protocol parser.
+
+#### tunnels.conf Generation (Model A)
+
+`tunnels.conf` is derived state, regenerated on every startup from `I2PConfig` + the current backend port. The destination identity persists via `keys` (`site-keys.dat`), NOT via `tunnels.conf`, so overwriting it is always safe.
+
+```rust
+/// Generates the i2pd server-tunnel definition. The eepsite is declared here via
+/// a [site] server tunnel pointing at the dedicated backend port; i2pd persists
+/// the destination in `keys_path` and derives the .b32.i2p.
+pub fn get_i2p_tunnels_conf(cfg: &I2PConfig, keys_path: &Path, i2p_backend_port: u16) -> String {
+    format!(
+        "[site]\n\
+         type = server\n\
+         host = 127.0.0.1\n\
+         port = {port}\n\
+         keys = {keys}\n\
+         inbound.length = {inb_len}\n\
+         outbound.length = {out_len}\n\
+         inbound.quantity = {inb_qty}\n\
+         outbound.quantity = {out_qty}\n\
+         signaturetype = {sigtype}\n",
+        port = i2p_backend_port,
+        keys = keys_path.display(),
+        inb_len = cfg.inbound_length,
+        out_len = cfg.outbound_length,
+        inb_qty = cfg.inbound_quantity,
+        out_qty = cfg.outbound_quantity,
+        sigtype = cfg.signature_type,
+    )
+}
+
+/// Writes tunnels.conf (regenerated each run) and starts a dedicated i2pd child
+/// process, then reads the .b32.i2p once the destination is ready. i2pd
+/// creates/persists site-keys.dat at `keys_path`.
+#[allow(clippy::too_many_arguments)]
+async fn start_i2pd(
+    cfg: &I2PConfig,
+    binary: &Path,
+    config_dir: &Path,
+    data_dir: &Path,
+    log_dir: &Path,
+    keys_path: &Path,
+    i2p_backend_port: u16,
+    svc: &mut I2PService,
+) -> Result<String, AppError> {
+    let tunnels_path = config_dir.join("i2p").join("tunnels.conf");
+    let i2p_data_dir = data_dir.join("i2p");
+    let log_path = log_dir.join("i2pd.log");
+
+    let conf = get_i2p_tunnels_conf(cfg, keys_path, i2p_backend_port);
+    // Regenerate every startup (derived state); identity lives in keys_path.
+    update_i2p_tunnels(&tunnels_path, conf.as_bytes())?;
+    info!("Regenerated tunnels.conf at {} (backend port {})", tunnels_path.display(), i2p_backend_port);
+
+    let child = Command::new(binary)
+        .arg("--datadir").arg(&i2p_data_dir)
+        .arg("--tunconf").arg(&tunnels_path)
+        .arg("--log").arg("file")
+        .arg("--logfile").arg(&log_path)
+        .spawn()
+        .map_err(|e| AppError::Internal(format!("failed to start i2pd: {e}")))?;
+    svc.i2pd = Some(child);
+
+    // Wait for i2pd to publish the destination, then derive the address.
+    let timeout = Duration::from_secs(cfg.bootstrap_timeout);
+    match wait_for_i2pd_address(keys_path, timeout).await {
+        Ok(addr) => Ok(addr),
+        Err(e) => {
+            if let Some(ref mut c) = svc.i2pd {
+                let _ = c.kill();
+            }
+            Err(e)
+        }
+    }
+}
+```
+
+#### SAM Session (Model B)
+
+Raw SAMv3 over a `tokio::net::TcpStream` — no new dependency. The destination is generated once and persisted; the session issues `STREAM FORWARD` so the router delivers incoming eepsite connections to the backend port.
+
+```rust
+/// Opens a SAMv3 control connection, loads (or generates and persists) the
+/// destination, creates a STREAM session, and forwards incoming streams to the
+/// dedicated backend port. Returns the .b32.i2p address.
+async fn start_sam_eepsite(
+    cfg: &I2PConfig,
+    keys_path: &Path,
+    i2p_backend_port: u16,
+    svc: &mut I2PService,
+) -> Result<String, AppError> {
+    let mut conn = TcpStream::connect(&cfg.sam_address)
+        .await
+        .map_err(|e| AppError::Internal(format!("failed to dial SAM {}: {e}", cfg.sam_address)))?;
+
+    // 1. Handshake
+    conn.write_all(b"HELLO VERSION MIN=3.0 MAX=3.3\n")
+        .await
+        .map_err(|e| AppError::Internal(format!("SAM HELLO failed: {e}")))?;
+    read_sam_reply(&mut conn, "HELLO REPLY").await?;
+
+    // 2. Load persisted destination or generate + persist a new one.
+    let dest = load_or_create_sam_destination(&mut conn, keys_path, cfg.signature_type).await?;
+
+    // 3. Create the STREAM session bound to that destination.
+    let session = format!(
+        "SESSION CREATE STYLE=STREAM ID=site DESTINATION={dest} \
+         inbound.length={inb_len} outbound.length={out_len} \
+         inbound.quantity={inb_qty} outbound.quantity={out_qty}\n",
+        dest = dest.priv_key,
+        inb_len = cfg.inbound_length,
+        out_len = cfg.outbound_length,
+        inb_qty = cfg.inbound_quantity,
+        out_qty = cfg.outbound_quantity,
+    );
+    conn.write_all(session.as_bytes())
+        .await
+        .map_err(|e| AppError::Internal(format!("SAM SESSION CREATE failed: {e}")))?;
+    read_sam_reply(&mut conn, "SESSION STATUS").await?;
+
+    // 4. Forward incoming eepsite streams to the backend port.
+    let forward = format!("STREAM FORWARD ID=site PORT={i2p_backend_port} HOST=127.0.0.1\n");
+    conn.write_all(forward.as_bytes())
+        .await
+        .map_err(|e| AppError::Internal(format!("SAM STREAM FORWARD failed: {e}")))?;
+    read_sam_reply(&mut conn, "STREAM STATUS").await?;
+
+    let addr = b32_address(&dest.public_key);
+    // Keep the control connection open for the session lifetime.
+    svc.sam_conn = Some(conn);
+    Ok(addr)
+}
+
+/// Derives the .b32.i2p address: base32(sha256(destination)) without padding,
+/// lowercased, plus the ".b32.i2p" suffix.
+pub fn b32_address(dest_binary: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let sum = Sha256::digest(dest_binary);
+    let enc = base32::encode(base32::Alphabet::Rfc4648 { padding: false }, &sum);
+    format!("{}.b32.i2p", enc.to_lowercase())
+}
+```
+
+#### I2P Lifecycle
+
+| Event | Action | Notes |
+|-------|--------|-------|
+| **App Start** | (if enabled) resolve provider → start eepsite → derive address | No-op when disabled |
+| **App Running** | Monitor provider, restart if it dies | Model A: watch i2pd; Model B: watch SAM conn |
+| **App Shutdown** | Stop i2pd / close SAM session, then exit | Server owns the lifecycle |
+| **Config change** | Stop → Start with new config (regenerates tunnels.conf) | |
+| **Regenerate address** | Stop → delete `{data_dir}/i2p/site/` → Start | New destination |
+
+#### Restart Implementation
+
+```rust
+/// Handles all I2P lifecycle operations. It stores NO backend port — the
+/// dedicated port is allocated inside `start_dedicated_i2p` (only when I2P is
+/// enabled AND a provider is available), not by the caller.
+pub struct I2PManager {
+    service: Arc<Mutex<Option<I2PService>>>,
+    config: Arc<Mutex<I2PConfig>>,
+    data_dir: PathBuf,
+    log_dir: PathBuf,
+}
+
+impl I2PManager {
+    pub fn new(config: I2PConfig, data_dir: PathBuf, log_dir: PathBuf) -> Self {
+        Self {
+            service: Arc::new(Mutex::new(None)),
+            config: Arc::new(Mutex::new(config)),
+            data_dir,
+            log_dir,
+        }
+    }
+
+    /// Initializes the eepsite if I2P is enabled and a provider is available.
+    /// A disabled config (opt-in default) returns Ok without starting anything.
+    pub async fn start(&self, config_dir: &Path) -> Result<(), AppError> {
+        let cfg = self.config.lock().await.clone();
+        if !cfg.enabled {
+            return Ok(());
+        }
+        let svc = start_dedicated_i2p(&cfg, config_dir, &self.data_dir, &self.log_dir).await?;
+        *self.service.lock().await = Some(svc);
+        Ok(())
+    }
+
+    /// Stops and restarts the provider (for recovery / config changes).
+    pub async fn restart(&self, config_dir: &Path) -> Result<(), AppError> {
+        {
+            let mut svc = self.service.lock().await;
+            if let Some(ref mut s) = *svc {
+                let _ = s.close();
+            }
+            *svc = None;
+        }
+        self.start(config_dir).await
+    }
+
+    /// Applies new settings and restarts I2P. `start` → `start_dedicated_i2p`
+    /// regenerates tunnels.conf (with a freshly allocated backend port) from the
+    /// new config. If the new config disables I2P, the eepsite stays down.
+    pub async fn update_config(&self, new_config: I2PConfig, config_dir: &Path) -> Result<(), AppError> {
+        {
+            let mut svc = self.service.lock().await;
+            if let Some(ref mut s) = *svc {
+                let _ = s.close();
+            }
+            *svc = None;
+        }
+        *self.config.lock().await = new_config;
+        // Opt-in respected: start() returns early when the new config is disabled.
+        self.start(config_dir).await
+    }
+
+    /// Creates a new random .b32.i2p destination.
+    pub async fn regenerate_address(&self, config_dir: &Path) -> Result<String, AppError> {
+        {
+            let mut svc = self.service.lock().await;
+            if let Some(ref mut s) = *svc {
+                let _ = s.close();
+            }
+            *svc = None;
+        }
+        let site_dir = self.data_dir.join("i2p").join("site");
+        fs::remove_dir_all(&site_dir).ok();
+        self.start(config_dir).await?;
+        Ok(self.eepsite_address().await)
+    }
+
+    /// Returns the current .b32.i2p address (empty if not running).
+    pub async fn eepsite_address(&self) -> String {
+        self.service.lock().await.as_ref().map(|s| s.eepsite_address()).unwrap_or_default()
+    }
+
+    /// Returns the active provider name ("i2pd", "sam", or "none").
+    pub async fn provider(&self) -> String {
+        self.service
+            .lock()
+            .await
+            .as_ref()
+            .map(|s| provider_name(s.provider()).to_string())
+            .unwrap_or_else(|| "none".to_string())
+    }
+
+    /// Returns true when the eepsite is live.
+    pub async fn is_running(&self) -> bool {
+        self.service.lock().await.is_some()
+    }
+
+    /// Returns the opt-in enabled flag from the current config.
+    pub async fn is_enabled(&self) -> bool {
+        self.config.lock().await.enabled
+    }
+
+    /// Health string for the health endpoint: "disabled", "healthy", or "error".
+    pub async fn status(&self) -> String {
+        if !self.is_enabled().await {
+            return "disabled".to_string();
+        }
+        if self.is_running().await {
+            "healthy".to_string()
+        } else {
+            "error".to_string()
+        }
+    }
+
+    /// Shuts down the provider.
+    pub async fn close(&self) -> io::Result<()> {
+        let mut svc = self.service.lock().await;
+        if let Some(ref mut s) = *svc {
+            s.close()?;
+        }
+        *svc = None;
+        Ok(())
+    }
+}
+```
+
+#### Signal Handling
+
+```rust
+#[tokio::main]
+async fn main() -> Result<(), AppError> {
+    let i2p_config = config.i2p.clone();
+
+    // Start I2P. start() returns early (no port, no config) when I2P is disabled
+    // (opt-in default) or no provider is available; both are logged, neither is
+    // fatal.
+    let i2p_manager = Arc::new(I2PManager::new(i2p_config, data_dir.clone(), log_dir.clone()));
+    if let Err(e) = i2p_manager.start(&config_dir).await {
+        warn!("I2P not started - {e}");
+        // Continue without I2P (opt-in)
+    }
+
+    // Handle shutdown signals
+    tokio::signal::ctrl_c().await.expect("signal handler");
+    tracing::info!("Shutting down...");
+
+    // Stop the I2P provider (server owns the lifecycle)
+    if let Err(e) = i2p_manager.close().await {
+        warn!("Error stopping I2P: {e}");
+    }
+
+    Ok(())
+}
+```
+
+#### I2P Monitoring
+
+```rust
+/// Monitors the I2P provider and restarts it if it dies. Only supervises when
+/// I2P is opt-in enabled (mirrors monitor_tor).
+pub async fn monitor_i2p(
+    i2p_manager: Arc<I2PManager>,
+    config_dir: PathBuf,
+    mut shutdown: tokio::sync::watch::Receiver<bool>,
+) {
+    let mut interval = tokio::time::interval(Duration::from_secs(30));
+
+    loop {
+        tokio::select! {
+            _ = interval.tick() => {
+                if i2p_manager.is_enabled().await && !i2p_manager.is_running().await {
+                    warn!("I2P provider unresponsive, restarting...");
+                    if let Err(e) = i2p_manager.restart(&config_dir).await {
+                        warn!("Failed to restart I2P: {e}");
+                    }
+                }
+            }
+            _ = shutdown.changed() => {
+                if *shutdown.borrow() {
+                    return;
+                }
+            }
+        }
+    }
+}
+```
+
+#### Storage Locations
+
+**I2P dirs are ALWAYS under the app's dirs (Model A; server binary owns i2pd):**
+
+| Data | Location | Notes |
+|------|----------|-------|
+| I2P config directory | `{config_dir}/i2p/` | Server creates with 0700 |
+| I2P tunnels file | `{config_dir}/i2p/tunnels.conf` | Server generates with 0600 (Model A) |
+| I2P data directory | `{data_dir}/i2p/` | Server creates with 0700 (Model A) |
+| Destination key | `{data_dir}/i2p/site/site-keys.dat` | Server creates with 0600 |
+| i2pd process PID | `{data_dir}/i2p/i2pd.pid` | Model A only |
+| i2pd log file | `{log_dir}/i2pd.log` | Model A only |
+
+**Model B** owns no i2pd files — only `{data_dir}/i2p/site/site-keys.dat` (the persisted destination) is written by the app.
+
+#### Runtime Directory Handling
+
+```rust
+/// Creates all I2P directories with correct permissions BEFORE any file is
+/// written (mirrors ensure_tor_dirs).
+pub fn ensure_i2p_dirs(config_dir: &Path, data_dir: &Path) -> Result<(), AppError> {
+    let dirs = [
+        config_dir.join("i2p"),
+        data_dir.join("i2p"),
+        data_dir.join("i2p").join("site"),
+    ];
+
+    for dir in &dirs {
+        fs::create_dir_all(dir)?;
+        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))?;
+
+        #[cfg(unix)]
+        {
+            let uid = unsafe { libc::getuid() };
+            let gid = unsafe { libc::getgid() };
+            std::os::unix::fs::chown(dir, Some(uid), Some(gid))
+                .map_err(|e| AppError::Internal(format!("chown i2p dir {}: {e}", dir.display())))?;
+        }
+    }
+
+    Ok(())
+}
+
+/// (Over)writes tunnels.conf with the given content. Called at every startup to
+/// regenerate it from config (the backend port changes each run) and whenever
+/// the admin saves new I2P settings. Identity lives in site-keys.dat, so
+/// overwriting tunnels.conf is always safe.
+pub fn update_i2p_tunnels(path: &Path, content: &[u8]) -> Result<(), AppError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    fs::write(path, content)?;
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
+
+    #[cfg(unix)]
+    {
+        let uid = unsafe { libc::getuid() };
+        let gid = unsafe { libc::getgid() };
+        std::os::unix::fs::chown(path, Some(uid), Some(gid))
+            .map_err(|e| AppError::Internal(format!("chown tunnels.conf: {e}")))?;
+    }
+
+    Ok(())
+}
+```
+
+
+**I2P is configured via `server.yml` and CLI only. No REST API for I2P configuration.**
+
+| Operation | CLI Command |
+|-----------|-------------|
+| View status | `{project_name} i2p status` |
+| Validate config | `{project_name} i2p validate` |
+| Restart I2P | `{project_name} i2p restart` |
+| Regenerate .b32.i2p address | `{project_name} i2p regenerate` |
+
+### Behavior
+
+| Scenario | Behavior |
+|----------|----------|
+| I2P disabled (default) | No provider contacted, no port, no config — eepsite off |
+| Enabled, i2pd found | Model A: i2pd spawned, tunnels.conf regenerated, `.b32.i2p` derived from `site-keys.dat` |
+| Enabled, no i2pd, SAM reachable | Model B: SAM session + STREAM FORWARD to backend port |
+| Enabled, no provider | Log WARN, continue without I2P (not an error) |
+| Subsequent runs | Same `.b32.i2p` (destination key persists in `{data_dir}/i2p/site/`) |
+| Regenerate address | Old key deleted, new destination generated, provider restarts |
+
+### CLI
+
+When I2P is enabled and running, the `--status` output includes an eepsite line beside the Tor line:
+
+```
+$ myapp --status
+
+Server Status: Running
+  Port: 8080
+  Mode: production
+
+Tor Hidden Service: Connected
+  Address: abcd1234...wxyz.onion
+
+I2P Eepsite: Running (i2pd)
+  Address: examplei2p...uv.b32.i2p
+```
+
+| Field | Description |
+|-------|-------------|
+| I2P Eepsite | Running (provider) / Disabled / No Provider / Error |
+| Address | Full `.b32.i2p` address |
+
 
 ---
 
@@ -42592,9 +43569,9 @@ make docker
 
 ### Phase 11: Conditional & Project-Specific Features (PARTS 31-32)
 
-**Interpretation:** PART 31 is conditional on Tor availability, PART 32 is required for all projects.
+**Interpretation:** PART 31.1 (Tor) is conditional on Tor availability and auto-enabled, PART 31.2 (I2P) is optional and opt-in, PART 32 is required for all projects.
 
-**PART 31: Tor Hidden Service**
+**PART 31.1: Tor Hidden Service**
 - [ ] Auto-enabled when tor binary found
 - [ ] Dedicated tor process (not system tor)
 - [ ] .onion address generation
@@ -42607,6 +43584,21 @@ make docker
   - [ ] `features.tor.running` (yes/no)
   - [ ] `features.tor.status` (healthy/error:{message})
   - [ ] `features.tor.hostname` ({onion_address})
+
+**PART 31.2: I2P Eepsite (OPTIONAL — opt-in)**
+- [ ] Disabled by default; enabled only via `features.i2p.enabled` / `I2P_ENABLED=true` / `--i2p`
+- [ ] Provider resolution: i2pd binary preferred, external SAM bridge fallback
+- [ ] Dedicated i2pd process (Model A, not a system router) when i2pd found
+- [ ] `.b32.i2p` address generation from persisted destination key
+- [ ] `tunnels.conf` regenerated each startup (Model A); key persists at `{data_dir}/i2p/site/`
+- [ ] I2P config in `{config_dir}/i2p/tunnels.conf`
+- [ ] I2P data in `{data_dir}/i2p/`
+- [ ] I2P fields in `/api/{api_version}/server/healthz`:
+  - [ ] `features.i2p.enabled` (yes/no)
+  - [ ] `features.i2p.running` (yes/no)
+  - [ ] `features.i2p.status` (disabled/healthy/error:{message})
+  - [ ] `features.i2p.hostname` ({i2p_address})
+  - [ ] `features.i2p.provider` (i2pd/sam/none)
 
 **PART 32: Client**
 
@@ -43648,7 +44640,7 @@ Implement remaining required parts:
 14. **PART 24:** Service Support
 15. **PART 28:** Testing & Development
 16. **PART 30:** I18N & A11Y
-17. **PART 31:** Tor Hidden Service
+17. **PART 31:** Overlay Networks (Tor & I2P)
 
 **Test after each part:** Verify the feature works before moving to next
 
@@ -43823,16 +44815,16 @@ When stuck:
 
 ## How to Read This Large File
 
-**rust/API.md is ~1.6MB and ~43,000 lines. You CANNOT read it all at once. Follow these procedures.**
+**rust/API.md is ~1.7MB and ~45,000 lines. You CANNOT read it all at once. Follow these procedures.**
 
 ### File Size Reality
 
 | Constraint | Value |
 |------------|-------|
-| File size | ~1.6MB |
-| Line count | ~43,000 lines |
+| File size | ~1.7MB |
+| Line count | ~45,000 lines |
 | Read limit | ~500 lines per read |
-| Full reads needed | ~86 reads (impractical) |
+| Full reads needed | ~90 reads (impractical) |
 
 **Use the PART index to find relevant sections, then read each section COMPLETELY.**
 
@@ -43842,41 +44834,41 @@ When stuck:
 
 | PART | Line | Topic | When to Read |
 |------|------|-------|--------------|
-| 0 | ~2354 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
-| 1 | ~4164 | Critical Rules | **ALWAYS READ FIRST** |
-| 2 | ~5428 | License & Attribution | License requirements |
-| 3 | ~5757 | Project Structure | Setting up new project, **CI/CD badge detection** |
-| 4 | ~6619 | OS-Specific Paths | Path handling |
-| 5 | ~6815 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
-| 6 | ~8569 | Application Modes | Mode handling, debug endpoints |
-| 7 | ~9071 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~9786 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags**, **Resource Owner Tokens** |
-| 9 | ~12673 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~13097 | Database | Database work |
-| 11 | ~13512 | Security & Logging | Security features, **Context Detection** |
-| 12 | ~15526 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~16924 | Health & Versioning | Health endpoints |
-| 14 | ~17559 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~19277 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~20222 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~22676 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~23247 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~23672 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~23779 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~25065 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~25606 | Update Command | Update feature |
-| 23 | ~26109 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~26731 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~27056 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~27867 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~28962 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~31609 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~33355 | ReadTheDocs Documentation | Documentation |
-| 30 | ~34149 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~35512 | Tor Hidden Service | Tor support, **binary controls Tor** |
-| 32 | ~36804 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~39953 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | — | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 0 | ~2368 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
+| 1 | ~4181 | Critical Rules | **ALWAYS READ FIRST** |
+| 2 | ~5445 | License & Attribution | License requirements |
+| 3 | ~5779 | Project Structure | Setting up new project, **CI/CD badge detection** |
+| 4 | ~6703 | OS-Specific Paths | Path handling |
+| 5 | ~6899 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
+| 6 | ~8666 | Application Modes | Mode handling, debug endpoints |
+| 7 | ~9182 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
+| 8 | ~9853 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags**, **Resource Owner Tokens** |
+| 9 | ~12838 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~13340 | Database | Database work |
+| 11 | ~13755 | Security & Logging | Security features, **Context Detection** |
+| 12 | ~15787 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~17242 | Health & Versioning | Health endpoints |
+| 14 | ~17954 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~19698 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~20661 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~23974 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~24551 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~24979 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~25100 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~26438 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~26938 | Update Command | Update feature |
+| 23 | ~27466 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~28088 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~28413 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~29243 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~30215 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~33484 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~35322 | ReadTheDocs Documentation | Documentation |
+| 30 | ~36116 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~37511 | Overlay Networks (Tor & I2P) | Tor (required) + I2P eepsite (opt-in) |
+| 32 | ~39663 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~42819 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~43056 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File
 
