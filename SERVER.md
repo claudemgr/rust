@@ -50390,7 +50390,7 @@ Tor integration uses **external Tor binary** via `libtor-sys` or process-based m
 - **Server binary owns Tor** - starts, stops, and manages Tor process lifecycle
 - **Hidden service maps to server port** - `.onion:80` → `localhost:{server_port}`
 - **Server enforces permissions** - creates all dirs/files with correct owner/group/perms
-- **HiddenServiceVersion 3** - v3 onion addresses (56 characters, ed25519) via ADD_ONION
+- **HiddenServiceVersion 3** - v3 onion addresses (56 characters, ed25519) via torrc `HiddenServiceDir`
 - **Localhost auto control port** - Tor control uses `127.0.0.1:auto` on all OSes
 - **SafeLogging enabled** - Scrubs sensitive info from Tor logs
 
@@ -50627,7 +50627,7 @@ When `use_network` or `allow_user_preference` is enabled, the torrc includes `So
 
 ### All Platforms
 - **Control connection**: TCP `127.0.0.1:auto`
-- **Hidden service target**: Server's HTTP port via localhost (ADD_ONION control command)
+- **Hidden service target**: dedicated PROXY-protocol Tor backend listener via localhost (torrc `HiddenServicePort`)
 - **No fixed control ports** - Tor picks a free localhost port at startup
 
 | Feature | All OSes |
@@ -50671,7 +50671,7 @@ This prevents conflicts with any existing Tor installation on the system.
    ├─ SocksPort: auto (if outbound enabled) or 0 (hidden service only)
    ├─ Completely isolated from system Tor
    ├─ Wait for bootstrap completion
-   ├─ Create hidden service via ADD_ONION
+   ├─ Hidden service declared in torrc (HiddenServiceDir); read .onion from hostname file
    └─ Initialize SOCKS dialer (if outbound enabled)
 
 5. On application shutdown:
@@ -50902,10 +50902,10 @@ pub async fn start_dedicated_tor(
 
     let torrc_path = config_dir.join("tor").join("torrc");
     let tor_data_dir = data_dir.join("tor");
-    let key_path = data_dir.join("tor").join("site").join("hs_ed25519_secret_key");
+    let hs_dir = data_dir.join("tor").join("site");
     let control_port_path = data_dir.join("tor").join("control_port");
 
-    let torrc_content = get_tor_config(cfg, data_dir);
+    let torrc_content = get_tor_config(cfg, data_dir, server_port, cfg.virtual_port);
 
     let created = ensure_torrc(&torrc_path, torrc_content.as_bytes())?;
     if created {
@@ -50939,9 +50939,9 @@ pub async fn start_dedicated_tor(
         None
     };
 
-    // Create hidden service via ADD_ONION control command
-    let service_id =
-        add_onion_service(&control_port_path, server_port, cfg.virtual_port, &key_path).await?;
+    // The hidden service is declared in the generated torrc; Tor creates and
+    // persists the key + hostname under HiddenServiceDir. Read the address back.
+    let service_id = read_onion_hostname(&hs_dir).await?;
 
     info!(
         "Tor hidden service started: {}.onion:{} → 127.0.0.1:{}",
@@ -51130,51 +51130,29 @@ async fn read_socks_addr(control_port_path: &Path) -> Result<String, AppError> {
         .ok_or_else(|| AppError::Internal(format!("could not parse SOCKS address from: {}", line.trim())))
 }
 
-/// Creates (or restores) the hidden service via the `ADD_ONION` control
-/// command, mapping `.onion:{virtual_port}` → `127.0.0.1:{server_port}`.
-/// If `key_path` already holds a saved ED25519-V3 key, restores that
-/// identity (`ADD_ONION ED25519-V3:{key}`); otherwise requests a new key
-/// (`ADD_ONION NEW:ED25519-V3`) and persists it via `save_onion_key`.
-async fn add_onion_service(
-    control_port_path: &Path,
-    server_port: u16,
-    virtual_port: u16,
-    key_path: &Path,
-) -> Result<String, AppError> {
-    let mut stream = open_control_conn(control_port_path, Duration::from_secs(10)).await?;
+/// Reads the v3 `.onion` service ID that Tor writes under `HiddenServiceDir`
+/// once the hidden service (declared in the generated torrc) is established.
+/// Tor creates and persists the ED25519-V3 key (`hs_ed25519_secret_key`) and
+/// the `hostname` file itself, so the app only reads the address back; the
+/// returned value is the service ID with the `.onion` suffix stripped.
+async fn read_onion_hostname(hs_dir: &Path) -> Result<String, AppError> {
+    let hostname_path = hs_dir.join("hostname");
 
-    let key_arg = match fs::read(key_path) {
-        Ok(existing) => format!("ED25519-V3:{}", base64::encode(existing)),
-        Err(_) => "NEW:ED25519-V3".to_string(),
-    };
-
-    let cmd = format!(
-        "ADD_ONION {key_arg} Flags=Detach Port={virtual_port},127.0.0.1:{server_port}\r\n"
-    );
-    stream
-        .write_all(cmd.as_bytes())
-        .await
-        .map_err(|e| AppError::Internal(format!("tor control ADD_ONION failed: {e}")))?;
-
-    let mut buf = vec![0u8; 1024];
-    let n = stream
-        .read(&mut buf)
-        .await
-        .map_err(|e| AppError::Internal(format!("tor control read failed: {e}")))?;
-    let response = String::from_utf8_lossy(&buf[..n]);
-
-    let service_id = response
-        .lines()
-        .find_map(|l| l.strip_prefix("250-ServiceID="))
-        .ok_or_else(|| AppError::Internal(format!("ADD_ONION did not return a ServiceID: {}", response.trim())))?
-        .trim()
-        .to_string();
-
-    if let Some(priv_key) = response.lines().find_map(|l| l.strip_prefix("250-PrivateKey=ED25519-V3:")) {
-        save_onion_key(key_path, &base64::decode(priv_key.trim()).unwrap_or_default())?;
+    // Tor writes the hostname shortly after publishing the descriptor; poll briefly.
+    for _ in 0..60 {
+        if let Ok(contents) = fs::read_to_string(&hostname_path) {
+            let onion = contents.trim();
+            if let Some(service_id) = onion.strip_suffix(".onion") {
+                return Ok(service_id.to_string());
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
     }
 
-    Ok(service_id)
+    Err(AppError::Internal(format!(
+        "Tor did not write {} within timeout",
+        hostname_path.display()
+    )))
 }
 ```
 
@@ -51199,24 +51177,24 @@ async fn add_onion_service(
 │ Tor Network                                                         │
 │ xyz...abc.onion:80                                                  │
 └─────────────┬───────────────────────────────────────────────────────┘
-              │ forwards to (via ADD_ONION)
+              │ forwards to (via HiddenServicePort)
               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ Server's Tor Process (owned by server binary)                      │
 │ Control: 127.0.0.1:auto                                             │
 └─────────────┬───────────────────────────────────────────────────────┘
-              │ connects to
+              │ connects to (PROXY-protocol header w/ circuit ID)
               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│ Server's HTTP Listener                                              │
-│ 127.0.0.1:{server_port}  (server's existing HTTP port)             │
+│ Dedicated Tor Backend Listener (PROXY protocol)                    │
+│ 127.0.0.1:{server_port}  (dedicated to Tor, not clearnet)          │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-- **ADD_ONION control command** with port mapping: `80 → 127.0.0.1:{server_port}`
-- **Tor forwards to server's existing HTTP port** - no new listener created
+- **torrc `HiddenServicePort`** with port mapping: `{virtual_port} → 127.0.0.1:{server_port}`
+- **Tor forwards to a dedicated PROXY-protocol backend listener** - separate from the clearnet listener
 - **Same on ALL platforms** - control uses the same localhost auto-port model
-- **Server port is NOT a Tor port** - it's the server's normal HTTP listener
+- **The Tor backend port is a dedicated loopback listener** - PROXY-protocol-aware, not shared with clearnet
 
 **Control connection:**
 - **All OSes**: TCP on `127.0.0.1:auto` - localhost only
@@ -51228,15 +51206,18 @@ async fn add_onion_service(
 ### Tor Configuration Optimizations
 
 **Hidden Service → Server Port Mapping:**
-- **Uses `ADD_ONION` control command** - NOT torrc-based HiddenServiceDir
-- Hidden service forwards `.onion:80` → `127.0.0.1:{server_port}` (server's existing HTTP port)
-- Tor connects to server's existing HTTP listener - no new ports opened
+- **Declared in torrc** via `HiddenServiceDir` + `HiddenServicePort` - NOT the `ADD_ONION` control command
+- Hidden service forwards `.onion:{virtual_port}` → `127.0.0.1:{server_port}` (dedicated PROXY-protocol Tor backend listener)
+- Tor connects to a dedicated loopback listener the app binds for Tor - separate from the clearnet listener
 
 ```rust
-/// Generates torrc content from `TorConfig` settings.
+/// Generates torrc content from `TorConfig` settings, including the v3 hidden
+/// service declaration (`HiddenServiceDir` + `HiddenServicePort`).
 ///
-/// NOTE: The hidden service is created via `ADD_ONION` control command, NOT via torrc.
-/// The torrc only configures Tor daemon settings, not the hidden service itself.
+/// NOTE: The hidden service is DECLARED in this torrc; Tor creates and persists
+/// its ED25519-V3 key and `hostname` under `HiddenServiceDir`.
+/// `HiddenServiceExportCircuitID haproxy` prepends a PROXY-protocol header
+/// carrying the per-rendezvous-circuit ID to each backend connection.
 ///
 /// PORT DETECTION: All ports use runtime detection via "auto" — never saved/hardcoded.
 /// - `SocksPort auto`: Tor picks an available high port at startup
@@ -51245,11 +51226,14 @@ async fn add_onion_service(
 ///   `127.0.0.1:{port}` address there; helpers read this file to connect
 ///
 /// NEVER uses default Tor ports (9050, 9051) — uses localhost auto ports.
-pub fn get_tor_config(cfg: &TorConfig, data_dir: &Path) -> String {
+pub fn get_tor_config(cfg: &TorConfig, data_dir: &Path, server_port: u16, virtual_port: u16) -> String {
+    // HiddenServiceDir is where Tor creates/persists the service key + hostname.
+    let hs_dir = data_dir.join("tor").join("site");
+
     // All OSes use the same localhost auto-port control connection.
     // "auto" = Tor picks an available high port at runtime (never saved).
     // Tor writes the actual chosen address to the control_port file, which
-    // wait_for_bootstrap/add_onion_service read to discover the port.
+    // wait_for_bootstrap reads to discover the port.
     let control_port_file = data_dir.join("tor").join("control_port");
     let control_config = format!(
         "ControlPort 127.0.0.1:auto\nControlPortWriteToFile {}",
@@ -51293,8 +51277,17 @@ pub fn get_tor_config(cfg: &TorConfig, data_dir: &Path) -> String {
 # NEVER uses default port 9051 - uses runtime localhost port on all OSes
 {control_config}
 
+# Hidden service (v3) - forwards .onion:{virtual_port} → dedicated PROXY-protocol backend listener
+HiddenServiceDir {hs_dir}
+HiddenServicePort {virtual_port} 127.0.0.1:{server_port}
+HiddenServiceVersion 3
+# Export per-rendezvous-circuit ID via HAProxy PROXY protocol (opaque token, not an IP)
+HiddenServiceExportCircuitID haproxy
+
 # Security Hardening
 SafeLogging {safe_logging}
+# Guard-discovery-attack defense (vanguards-lite) - built into Tor >= 0.4.7; keep enabled, never disable
+VanguardsLiteEnabled 1
 
 # Circuit limits
 MaxCircuitDirtiness 600
@@ -51310,7 +51303,7 @@ ExitPolicy reject *:*
 ORPort 0
 DirPort 0
 
-# Hidden service optimizations (actual HS created via ADD_ONION)
+# Hidden service optimizations (HS declared above via HiddenServiceDir)
 HiddenServiceSingleHopMode 0
 
 # Faster startup
@@ -51322,6 +51315,9 @@ DisableDebuggerAttachment 1
 "#,
         socks_config = socks_config,
         control_config = control_config,
+        hs_dir = hs_dir.display(),
+        virtual_port = virtual_port,
+        server_port = server_port,
         safe_logging = safe_logging,
         bandwidth_rate = cfg.bandwidth_rate,
         bandwidth_burst = cfg.bandwidth_burst,
@@ -51349,14 +51345,31 @@ DisableDebuggerAttachment 1
 - `ControlPort 127.0.0.1:auto` → Tor picks available high port on localhost
 - `ControlPortWriteToFile {data_dir}/tor/control_port` → Tor writes the chosen control address; server reads this file before connecting
 
-**Hidden Service Settings (via `ADD_ONION` control command, not torrc):**
+**Hidden Service Settings (declared in torrc):**
+
+The hidden service is declared in the generated torrc; Tor creates and persists everything under `HiddenServiceDir`:
 
 | Setting | How Applied | Description |
 |---------|-------------|-------------|
-| Version 3 | `ADD_ONION ED25519-V3` | v3 onion (56 chars, ed25519) |
-| Target port | `Port=80,127.0.0.1:{port}` | Forwards to server's HTTP port |
-| Virtual port | First value in port mapping (e.g., `80`) | `.onion` port users connect to |
-| Key persistence | `{data_dir}/tor/site/hs_ed25519_secret_key` | Server saves/loads key for persistent address |
+| Version 3 | `HiddenServiceVersion 3` | v3 onion (56 chars, ed25519) |
+| Target port | `HiddenServicePort {virtual_port} 127.0.0.1:{port}` | Forwards to the dedicated Tor backend listener |
+| Virtual port | First value of `HiddenServicePort` (e.g., `80`) | `.onion` port users connect to |
+| Key persistence | `{data_dir}/tor/site/hs_ed25519_secret_key` | Tor creates/loads key for persistent address |
+| Hostname | `{data_dir}/tor/site/hostname` | Tor writes the .onion address; server reads it |
+| Circuit-ID export | `HiddenServiceExportCircuitID haproxy` | Per-rendezvous-circuit ID via PROXY protocol (opaque token, not an IP) |
+| Guard-discovery defense | `VanguardsLiteEnabled 1` | vanguards-lite (built into Tor); never disabled |
+
+### Circuit-ID Export & PROXY-Protocol Backend Listener
+
+`HiddenServiceExportCircuitID haproxy` makes Tor prepend a HAProxy **PROXY-protocol v1 header** to *every* connection it forwards to the hidden-service target, encoding the 64-bit rendezvous-circuit ID in the source address (`fc00::/8` IPv6 range). This ID is the opaque per-session token the committed Tor logging/audit/rate-limit rules key on as `tor:{circuit_id}` — never an IP, never deanonymizing.
+
+Because the PROXY header is sent on every connection, the `HiddenServicePort` target MUST be a **dedicated loopback listener** the app binds specifically for Tor (`127.0.0.1:{server_port}`), **separate from the public clearnet listener** — clearnet connections carry no PROXY header and would fail to parse against a listener that requires one. The app:
+
+- binds the dedicated Tor backend listener and parses the PROXY-protocol header on its accept path (Rust: the `proxy-protocol` or `ppp` crate),
+- reads the circuit ID from that header and uses it as the `tor:{circuit_id}` key for logs, audit trails, admin UI, and rate limiting,
+- points `HiddenServicePort {virtual_port} 127.0.0.1:{server_port}` at this listener (not the clearnet HTTP port).
+
+`VanguardsLiteEnabled 1` keeps Tor's built-in layer-2 vanguards on (guard-discovery-attack defense for the service); it is never disabled. Full layer-3 vanguards/bandguards/rendguard, if ever wanted, are control-protocol operations the app can drive itself — no external tool.
 
 **Required crates:**
 ```toml
@@ -51367,6 +51380,8 @@ reqwest = { version = "0.12", features = ["socks"] }
 tokio = { version = "1", features = ["full"] }
 # Structured logging
 tracing = "0.1"
+# Parse the HAProxy PROXY-protocol header (circuit-ID export) on the Tor backend listener
+proxy-protocol = "0.5"
 ```
 
 ### Tor Process Lifecycle

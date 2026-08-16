@@ -40776,14 +40776,18 @@ pub fn get_tor_config(cfg: &TorConfig, server_port: u16) -> String {
 ControlPortWriteToFile {}/control_port
 CookieAuthentication 1
 
-# Hidden service (v3) - forwards .onion:{} → server's HTTP port
+# Hidden service (v3) - forwards .onion:{} → dedicated PROXY-protocol backend listener
 HiddenServiceDir {}/site
 HiddenServicePort {} 127.0.0.1:{}
 HiddenServiceVersion 3
 HiddenServiceNumIntroductionPoints {}
+# Export per-rendezvous-circuit ID via HAProxy PROXY protocol (opaque token, not an IP)
+HiddenServiceExportCircuitID haproxy
 
 # Security Hardening
 SafeLogging {}
+# Guard-discovery-attack defense (vanguards-lite) - built into Tor >= 0.4.7; keep enabled, never disable
+VanguardsLiteEnabled 1
 
 # Circuit limits
 MaxCircuitDirtiness 600
@@ -40841,6 +40845,20 @@ The hidden service is declared in the generated torrc; Tor creates and persists 
 | Virtual port | First value of `HiddenServicePort` (e.g., `80`) | `.onion` port users connect to |
 | Key persistence | `{data_dir}/tor/site/hs_ed25519_secret_key` | Tor creates/loads key for persistent address |
 | Hostname | `{data_dir}/tor/site/hostname` | Tor writes the .onion address; server reads it |
+| Circuit-ID export | `HiddenServiceExportCircuitID haproxy` | Per-rendezvous-circuit ID via PROXY protocol (opaque token, not an IP) |
+| Guard-discovery defense | `VanguardsLiteEnabled 1` | vanguards-lite (built into Tor); never disabled |
+
+### Circuit-ID Export & PROXY-Protocol Backend Listener
+
+`HiddenServiceExportCircuitID haproxy` makes Tor prepend a HAProxy **PROXY-protocol v1 header** to *every* connection it forwards to the hidden-service target, encoding the 64-bit rendezvous-circuit ID in the source address (`fc00::/8` IPv6 range). This ID is the opaque per-session token the committed Tor logging/audit/rate-limit rules key on as `tor:{circuit_id}` — never an IP, never deanonymizing.
+
+Because the PROXY header is sent on every connection, the `HiddenServicePort` target MUST be a **dedicated loopback listener** the app binds specifically for Tor (`127.0.0.1:{tor_backend_port}`), **separate from the public clearnet listener** — clearnet connections carry no PROXY header and would fail to parse against a listener that requires one. The app:
+
+- binds the dedicated Tor backend listener and parses the PROXY-protocol header on its accept path (Rust: the `proxy-protocol` or `ppp` crate),
+- reads the circuit ID from that header and uses it as the `tor:{circuit_id}` key for logs, audit trails, admin UI, and rate limiting,
+- points `HiddenServicePort {virtual_port} 127.0.0.1:{tor_backend_port}` at this listener (not the clearnet HTTP port).
+
+`VanguardsLiteEnabled 1` keeps Tor's built-in layer-2 vanguards on (guard-discovery-attack defense for the service); it is never disabled. Full layer-3 vanguards/bandguards/rendguard, if ever wanted, are control-protocol operations the app can drive itself — no external tool.
 
 ### Tor Process Lifecycle
 
