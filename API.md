@@ -22125,6 +22125,14 @@ if ('serviceWorker' in navigator) {
 
 ### Service Worker Lifecycle
 
+> **Service worker safety — every response MUST resolve to a real `Response` (NON-NEGOTIABLE).**
+> When a service worker calls `event.respondWith()` it owns that response completely. If the promise it passes **resolves to `undefined`** (a cache miss on the last fallback) or **rejects** (an uncaught network failure), the browser shows **`net::ERR_FAILED`** — a dead tab — instead of a page. A transient network blip on a page navigation MUST degrade to a real offline/error page, never a broken site. The handler below, and any service worker a project ships, MUST obey:
+>
+> - **Navigations are network-first** — fetch the network first so a new build's HTML is seen immediately (and the `Clear-Site-Data` build-purge has nothing stale to fight); only on failure fall back to the cached page, then to a **synthesized** `Response`.
+> - **Every `respondWith()` branch ends in a guaranteed `Response`** — a terminal `.catch()` returning a real `Response` (a synthesized 503 offline page for navigations, a 504 for subresources). Never end a chain on `cached || caches.match('/offline')`: that link can itself miss and resolve `undefined`.
+> - **Only intercept same-origin GET.** Let API calls, cross-origin requests, and non-GET methods fall through untouched — never call `respondWith()` for them.
+> - **The service worker is an enhancement, never a dependency** — the site stays fully usable if it never installs (the No-JS-first rule above).
+
 ```javascript
 // static/sw.js
 // Cache name MUST embed the running version - see Cache Versioning below
@@ -22153,19 +22161,64 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
+// Every response path MUST resolve to a real Response. A promise that
+// resolves to undefined - or rejects - makes the browser render
+// net::ERR_FAILED instead of a page. Every branch ends in a guaranteed Response.
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Only same-origin GET is handled; everything else falls through to the browser
+  if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+
+  // API calls are network-only - never intercept
+  if (url.pathname.startsWith('/api/')) return;
+
+  // Navigations: network-first, then cache, then a GUARANTEED synthesized page
+  // so a transient failure renders a real page, never net::ERR_FAILED
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+          return response;
+        })
+        .catch(async () =>
+          (await caches.match(request))
+            || (await caches.match('/offline'))
+            || offlineFallbackResponse()
+        )
+    );
+    return;
+  }
+
+  // Everything else: cache-first, then network, then a GUARANTEED 504 -
+  // never let respondWith reject
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      const network = fetch(event.request).then(response => {
+    caches.match(request)
+      .then(cached => cached || fetch(request).then(response => {
         const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
         return response;
-      });
-      return cached || network.catch(() => caches.match('/offline'));
-    })
+      }))
+      .catch(() => new Response('', { status: 504, statusText: 'Gateway Timeout' }))
   );
 });
+
+// GUARANTEED last-resort page - synthesized in the worker so it can never miss
+function offlineFallbackResponse() {
+  return new Response(
+    '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+      + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+      + '<title>Offline</title></head><body><main>'
+      + '<h1>You are offline</h1><p>This page could not be loaded and no '
+      + 'cached copy is available. Check your connection and try again.</p>'
+      + '</main></body></html>',
+    { status: 503, statusText: 'Service Unavailable',
+      headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+  );
+}
 ```
 
 
@@ -22384,6 +22437,7 @@ static/
 - [ ] Service worker registered
 - [ ] HTTPS enforced (or `localhost`)
 - [ ] Offline page at `/offline`
+- [ ] Service worker `respondWith` never resolves `undefined` or rejects — every branch ends in a guaranteed `Response` (offline page, not `net::ERR_FAILED`)
 - [ ] Maskable icon provided
 - [ ] `apple-touch-icon` provided
 - [ ] `theme-color` meta tag present
@@ -22779,6 +22833,7 @@ template/
 - Show appropriate error message (not stack traces in production)
 - Provide helpful action (go home, go back, contact support)
 - NO generic browser error pages - always render themed template
+- **Every request MUST terminate in a rendered response — the error path itself must never fail the request.** A panic/`catch_unwind` guard and a template-render failure MUST both fall back to a minimal, hardcoded error response (correct status code, short body, honoring content negotiation — HTML for browsers, JSON for API clients) instead of a blank body, a dropped connection, or a leaked stack trace. The failure handler must never be the thing that breaks the site — the backend mirror of the service-worker guaranteed-`Response` rule.
 
 **Error page structure:**
 ```
