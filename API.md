@@ -22332,6 +22332,8 @@ The operator token is never stored in the browser — not in localStorage and no
 
 This helper is for pure client-only state the server must never receive automatically. Server-relevant preferences (theme, language, consent, announcement dismissals) are cookies — the server reads them to render the correct page (see the "Client-Side Preferences" storage table in PART 0).
 
+**Cross-device preference sync (export/import — stateless, no preferences table required):** only `theme` and `lang` are portable across browsers/devices — never `cookie_consent`, `ccpa_opt_out` (per-browser legal acknowledgments), or `owner_token`/build-stamp cookies. Since preferences aren't tied to identity, the same values always produce the same code/URL — the code/URL *is* the state, not a lookup key, so nothing is ever stored server-side. `GET /prefs/export` returns both a full import URL (`https://{host}/prefs/import?theme=dark&lang=fr`, plain query string, stable across schema changes) and a short code (`base64url` of the same query string, for manual retyping without paste). `GET /prefs/import?theme=dark&lang=fr` validates each value against its normal enum/BCP-47 allowlist — an imported value is still untrusted input — sets the matching cookies, and `303 See Other`s to a clean URL so the code never lingers in the address bar or history.
+
 ```javascript
 const prefs = {
   get(key, fallback = null) {
