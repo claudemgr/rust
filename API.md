@@ -545,6 +545,12 @@ let primary_ip = "192.168.1.50";
 - Provide sensible defaults that work on minimal systems (1 CPU, 512MB RAM)
 - Allow config overrides for users who want manual control
 
+**Concurrency & connection scale requirement:**
+- MUST sustain at least 500,000 concurrent active connections with no degradation — no dropped connections, no unbounded latency growth, no crashes, no OOM
+- Achieve this with async I/O on tokio's epoll-backed reactor, bounded task pools, backpressure/load shedding once saturated, and keep-alive/idle timeouts that reclaim dead connections
+- Scale horizontally behind a load balancer once a single instance's OS file-descriptor limit or hardware ceiling is reached — the code itself must not be the bottleneck
+- This is why the security and resource-safety rules elsewhere in this spec are non-negotiable: bounded queues, closed file handles/sockets, capped async tasks, `catch_unwind` boundaries, and leak-free code are what keeps a fault that's harmless at 100 connections from becoming an outage at 500,000
+
 **Example scaling:**
 ```rust
 // Worker pool scales to available CPUs
@@ -43977,6 +43983,7 @@ make docker
 - [ ] Async task count stable
 - [ ] Connection pool sized correctly
 - [ ] File handles closed properly
+- [ ] Sustains 500,000+ concurrent active connections without degradation
 
 ### Caching
 
