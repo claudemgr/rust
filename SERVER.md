@@ -41730,11 +41730,10 @@ jobs:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
-      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is pre-installed in casjaysdev/rust:latest)
       - name: Generate SBOM
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
         run: |
-          command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
           cargo cyclonedx --format json --override-filename ${{ env.PROJECT_NAME }}-sbom
 
       - name: Upload SBOM artifact
@@ -41988,11 +41987,10 @@ jobs:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
-      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is pre-installed in casjaysdev/rust:latest)
       - name: Generate SBOM
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
         run: |
-          command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
           cargo cyclonedx --format json --override-filename ${{ env.PROJECT_NAME }}-sbom
 
       - name: Upload SBOM artifact
@@ -42210,11 +42208,10 @@ jobs:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
-      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is pre-installed in casjaysdev/rust:latest)
       - name: Generate SBOM
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
         run: |
-          command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
           cargo cyclonedx --format json --override-filename ${{ env.PROJECT_NAME }}-sbom
 
       - name: Upload SBOM artifact
@@ -42858,11 +42855,10 @@ jobs:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
-      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is pre-installed in casjaysdev/rust:latest)
       - name: Generate SBOM
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
         run: |
-          command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
           cargo cyclonedx --format json --override-filename ${{ env.PROJECT_NAME }}-sbom
 
       - name: Upload SBOM artifact
@@ -43104,11 +43100,10 @@ jobs:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
-      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is pre-installed in casjaysdev/rust:latest)
       - name: Generate SBOM
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
         run: |
-          command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
           cargo cyclonedx --format json --override-filename ${{ env.PROJECT_NAME }}-sbom
 
       - name: Upload SBOM artifact
@@ -43313,11 +43308,10 @@ jobs:
           name: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ env.PROJECT_NAME }}-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
 
-      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+      # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is pre-installed in casjaysdev/rust:latest)
       - name: Generate SBOM
         if: matrix.os == 'linux' && matrix.arch == 'amd64'
         run: |
-          command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
           cargo cyclonedx --format json --override-filename ${{ env.PROJECT_NAME }}-sbom
 
       - name: Upload SBOM artifact
@@ -43866,8 +43860,7 @@ build:linux-amd64:
     - cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-amd64
     - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-amd64; fi
     - if [ -d "src/agent" ]; then cargo zigbuild --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-agent && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-agent ${PROJECT_NAME}-agent-linux-amd64; fi
-    # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
-    - command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
+    # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx is pre-installed in casjaysdev/rust:latest)
     - cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom
     # Export RELEASE_VERSION via dotenv so the release job's declarative
     # release: block (script-local vars aren't visible there) consumes the exact
@@ -44101,8 +44094,7 @@ build:beta:
     - if [ -d "src/agent" ]; then cargo zigbuild --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-agent && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-agent.exe ${PROJECT_NAME}-agent-windows-amd64.exe; fi
     - if [ -d "src/agent" ]; then cargo zigbuild --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-agent && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-agent.exe ${PROJECT_NAME}-agent-windows-arm64.exe; fi
     - if [ -d "src/agent" ]; then cargo zigbuild --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-agent && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-agent ${PROJECT_NAME}-agent-freebsd-amd64; fi
-    # SBOM ships in every channel (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
-    - command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
+    # SBOM ships in every channel (cargo-cyclonedx is pre-installed in casjaysdev/rust:latest)
     - cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom
     # Export VERSION via dotenv so release:beta consumes the exact value the
     # binaries were built with instead of recomputing its own timestamp
@@ -44210,8 +44202,7 @@ build:daily:
     - if [ -d "src/agent" ]; then cargo zigbuild --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-agent && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-agent.exe ${PROJECT_NAME}-agent-windows-amd64.exe; fi
     - if [ -d "src/agent" ]; then cargo zigbuild --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-agent && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-agent.exe ${PROJECT_NAME}-agent-windows-arm64.exe; fi
     - if [ -d "src/agent" ]; then cargo zigbuild --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-agent && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-agent ${PROJECT_NAME}-agent-freebsd-amd64; fi
-    # SBOM ships in every channel (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
-    - command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
+    # SBOM ships in every channel (cargo-cyclonedx is pre-installed in casjaysdev/rust:latest)
     - cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom
   artifacts:
     paths:
@@ -45164,7 +45155,7 @@ pipeline {
                         cp "$f" ${RELDIR}/
                     done
 
-                    # SBOM ships in every channel (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+                    # SBOM ships in every channel (cargo-cyclonedx is pre-installed in casjaysdev/rust:latest)
                     docker run --rm \
                         --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                         -v ${WORKSPACE}:/app \
@@ -45174,7 +45165,7 @@ pipeline {
                         -w /app \
                         -e PROJECT_NAME="${PROJECT_NAME}" \
                         casjaysdev/rust:latest \
-                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom'
+                        sh -c 'cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom'
                     cp ${PROJECT_NAME}-sbom.cdx.json ${RELDIR}/
 
                     tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
@@ -45206,7 +45197,7 @@ pipeline {
                         cp "$f" ${RELDIR}/
                     done
 
-                    # SBOM ships in every channel (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+                    # SBOM ships in every channel (cargo-cyclonedx is pre-installed in casjaysdev/rust:latest)
                     docker run --rm \
                         --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                         -v ${WORKSPACE}:/app \
@@ -45216,7 +45207,7 @@ pipeline {
                         -w /app \
                         -e PROJECT_NAME="${PROJECT_NAME}" \
                         casjaysdev/rust:latest \
-                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom'
+                        sh -c 'cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom'
                     cp ${PROJECT_NAME}-sbom.cdx.json ${RELDIR}/
 
                     tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
@@ -45248,7 +45239,7 @@ pipeline {
                         cp "$f" ${RELDIR}/
                     done
 
-                    # SBOM ships in every channel (cargo-cyclonedx is not preinstalled in the image - install it pinned via cargo)
+                    # SBOM ships in every channel (cargo-cyclonedx is pre-installed in casjaysdev/rust:latest)
                     docker run --rm \
                         --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                         -v ${WORKSPACE}:/app \
@@ -45258,7 +45249,7 @@ pipeline {
                         -w /app \
                         -e PROJECT_NAME="${PROJECT_NAME}" \
                         casjaysdev/rust:latest \
-                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom'
+                        sh -c 'cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-sbom'
                     cp ${PROJECT_NAME}-sbom.cdx.json ${RELDIR}/
 
                     tar --exclude='.git' --exclude='.github' --exclude='.gitea' \

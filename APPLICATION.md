@@ -833,14 +833,17 @@ All three compose files live under `docker/` (per `dockerfile_conventions.md` �
 - Latest stable toolchain + nightly (minimal profile with miri and rust-src)
 - Components: `rustfmt`, `clippy`, `rust-src`, `rust-analyzer`, `llvm-tools-preview`
 - `cargo-binstall` for fast tool installation without source compilation
-- C/C++ toolchain: `build-base`, `musl-dev`, `clang`, `lld`, `llvm`, `cmake`, `gdb`
+- C/C++ toolchain: `build-base`, `musl-dev`, `clang`, `clang-dev`, `llvm-dev`, `lld`, `cmake`, `make`, `perl`, `openssl-dev`, `openssl-libs-static`, `pkgconf`, `gdb`
 - Cross-compile linker: `mingw-w64-gcc` (Windows GNU), `zig` (cargo-zigbuild), `binaryen` (WASM optimisation)
+- `perf` — Linux performance counters, required by `flamegraph`/`samply` for profiling
 - Cross-compile targets: musl Linux (x86_64, aarch64, i686, armv7, riscv64), glibc Linux (x86_64, aarch64, i686, armv7, arm, riscv64, ppc64le, s390x), Windows GNU (x86_64, i686, aarch64), macOS (x86_64, aarch64), FreeBSD, WebAssembly (wasm32-unknown-unknown, wasip1, wasip2, emscripten), embedded ARM/RISC-V, Android (aarch64)
 - `cargo-audit`, `cargo-deny`, `cargo-tarpaulin`, `cargo-llvm-cov`, `grcov` — security and coverage
 - `cargo-nextest`, `cargo-make`, `just` — testing and task runners
 - `cargo-zigbuild`, `cross`, `cargo-ndk` — cross-compilation runners
 - `sccache` — compiler cache
 - `cargo-release`, `cargo-dist`, `cargo-deb` — release tooling
+- `cargo-generate` — scaffold new projects from templates
+- `flip-link` — zero-cost stack overflow protection for embedded targets
 - `cargo-edit`, `cargo-watch`, `cargo-outdated`, `cargo-update`, `cargo-expand` — development workflow
 - `cargo-semver-checks`, `cargo-msrv`, `cargo-machete`, `cargo-udeps` — API and dependency analysis
 - `cargo-fuzz`, `cargo-mutants`, `cargo-careful` — testing depth

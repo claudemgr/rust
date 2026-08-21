@@ -30668,12 +30668,10 @@ jobs:
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
             -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
-      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-      # inside the container (never on the runner host); skip if already present
       - name: Generate SBOM (CycloneDX)
         run: |
           docker run --rm -v "$PWD":/app -w /app casjaysdev/rust:latest \
-            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json'
+            sh -c 'cargo cyclonedx --format json'
           set -- *.cdx.json
           cp "$1" "binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-sbom.cdx.json"
 
@@ -30855,12 +30853,10 @@ jobs:
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
             -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
-      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-      # inside the container (never on the runner host); skip if already present
       - name: Generate SBOM (CycloneDX)
         run: |
           docker run --rm -v "$PWD":/app -w /app casjaysdev/rust:latest \
-            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json'
+            sh -c 'cargo cyclonedx --format json'
           set -- *.cdx.json
           cp "$1" "binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-sbom.cdx.json"
 
@@ -31044,12 +31040,10 @@ jobs:
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
             -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
-      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-      # inside the container (never on the runner host); skip if already present
       - name: Generate SBOM (CycloneDX)
         run: |
           docker run --rm -v "$PWD":/app -w /app casjaysdev/rust:latest \
-            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json'
+            sh -c 'cargo cyclonedx --format json'
           set -- *.cdx.json
           cp "$1" "binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-sbom.cdx.json"
 
@@ -31520,12 +31514,10 @@ jobs:
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
             -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
-      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-      # inside the container (never on the runner host); skip if already present
       - name: Generate SBOM (CycloneDX)
         run: |
           docker run --rm -v "$PWD":/app -w /app casjaysdev/rust:latest \
-            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json'
+            sh -c 'cargo cyclonedx --format json'
           set -- *.cdx.json
           cp "$1" "binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-sbom.cdx.json"
 
@@ -31697,12 +31689,10 @@ jobs:
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
             -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
-      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-      # inside the container (never on the runner host); skip if already present
       - name: Generate SBOM (CycloneDX)
         run: |
           docker run --rm -v "$PWD":/app -w /app casjaysdev/rust:latest \
-            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json'
+            sh -c 'cargo cyclonedx --format json'
           set -- *.cdx.json
           cp "$1" "binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-sbom.cdx.json"
 
@@ -31877,12 +31867,10 @@ jobs:
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
             -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
-      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-      # inside the container (never on the runner host); skip if already present
       - name: Generate SBOM (CycloneDX)
         run: |
           docker run --rm -v "$PWD":/app -w /app casjaysdev/rust:latest \
-            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json'
+            sh -c 'cargo cyclonedx --format json'
           set -- *.cdx.json
           cp "$1" "binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-sbom.cdx.json"
 
@@ -32214,9 +32202,8 @@ stages:
 .rust-build-template: &rust-build
   image: $BUILD_IMAGE
   before_script:
-    # NOTE: all tooling (git, bash, cargo-audit, cargo-zigbuild, etc.) is pre-installed
-    # in casjaysdev/rust:latest — never `apk add` inside a CI job. Sole exception:
-    # cargo-cyclonedx (SBOM) is not in the image; the SBOM step installs it in-container.
+    # NOTE: all tooling (git, bash, cargo-audit, cargo-cyclonedx, cargo-zigbuild, etc.)
+    # is pre-installed in casjaysdev/rust:latest — never `apk add` inside a CI job.
     - export VERSION="${CI_COMMIT_TAG#v}"
     - export COMMIT_ID="${CI_COMMIT_SHORT_SHA}"
     # BUILD_EPOCH is the only time value cargo build needs; BUILD_DATE (for the
@@ -32243,8 +32230,7 @@ build:linux-amd64:
     - cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME} ${PROJECT_NAME}-linux-amd64
     - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-unknown-linux-musl --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-linux-musl/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-linux-amd64; fi
     # SBOM is release-level - generate once on the linux/amd64 leg (cargo-cyclonedx
-    # is not preinstalled in casjaysdev/rust:latest - install it pinned via cargo)
-    - command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
+    # is pre-installed in casjaysdev/rust:latest)
     - cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-${CI_COMMIT_TAG#v}-sbom
     # Export the stripped tag via dotenv so the downstream release job (needs:
     # this job) uses the exact same identity in its script AND its declarative
@@ -32469,9 +32455,7 @@ build:beta:
     - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-cli && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-amd64.exe; fi
     - if [ -d "src/client" ]; then cargo zigbuild --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-cli && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-arm64.exe; fi
     - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-freebsd-amd64; fi
-    # SBOM ships in every channel (cargo-cyclonedx is not preinstalled in
-    # casjaysdev/rust:latest - install it pinned via cargo)
-    - command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
+    # SBOM ships in every channel (cargo-cyclonedx is pre-installed in casjaysdev/rust:latest)
     - cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-${VERSION}-sbom
     - echo "${VERSION}" > version.txt
     # Create source archive (matches GH/Gitea/Jenkins form)
@@ -32571,9 +32555,7 @@ build:daily:
     - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-pc-windows-gnu --bin ${PROJECT_NAME}-cli && cp target/x86_64-pc-windows-gnu/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-amd64.exe; fi
     - if [ -d "src/client" ]; then cargo zigbuild --release --target aarch64-pc-windows-gnullvm --bin ${PROJECT_NAME}-cli && cp target/aarch64-pc-windows-gnullvm/release/${PROJECT_NAME}-cli.exe ${PROJECT_NAME}-cli-windows-arm64.exe; fi
     - if [ -d "src/client" ]; then cargo zigbuild --release --target x86_64-unknown-freebsd --bin ${PROJECT_NAME}-cli && cp target/x86_64-unknown-freebsd/release/${PROJECT_NAME}-cli ${PROJECT_NAME}-cli-freebsd-amd64; fi
-    # SBOM ships in every channel (cargo-cyclonedx is not preinstalled in
-    # casjaysdev/rust:latest - install it pinned via cargo)
-    - command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx
+    # SBOM ships in every channel (cargo-cyclonedx is pre-installed in casjaysdev/rust:latest)
     - cargo cyclonedx --format json --override-filename ${PROJECT_NAME}-${VERSION}-sbom
     - echo "${VERSION}" > version.txt
     # Create source archive (matches GH/Gitea/Jenkins form)
@@ -33252,14 +33234,12 @@ pipeline {
                         --exclude='*.tar.gz' --exclude='target' \
                         -czf ${RELDIR}/${PROJECT_NAME}-${VERSION}-source.tar.gz .
 
-                    # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-                    # inside the container (never on the runner host); skip if already present
                     docker run --rm \
                         --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                         -v ${WORKSPACE}:/app \
                         -w /app \
                         casjaysdev/rust:latest \
-                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json'
+                        sh -c 'cargo cyclonedx --format json'
                     set -- *.cdx.json
                     cp "$1" ${RELDIR}/${PROJECT_NAME}-${VERSION}-sbom.cdx.json
 
@@ -33292,14 +33272,12 @@ pipeline {
                         --exclude='*.tar.gz' --exclude='target' \
                         -czf ${RELDIR}/${PROJECT_NAME}-${VERSION}-source.tar.gz .
 
-                    # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-                    # inside the container (never on the runner host); skip if already present
                     docker run --rm \
                         --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                         -v ${WORKSPACE}:/app \
                         -w /app \
                         casjaysdev/rust:latest \
-                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json'
+                        sh -c 'cargo cyclonedx --format json'
                     set -- *.cdx.json
                     cp "$1" ${RELDIR}/${PROJECT_NAME}-${VERSION}-sbom.cdx.json
 
@@ -33332,14 +33310,12 @@ pipeline {
                         --exclude='*.tar.gz' --exclude='target' \
                         -czf ${RELDIR}/${PROJECT_NAME}-${VERSION}-source.tar.gz .
 
-                    # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-                    # inside the container (never on the runner host); skip if already present
                     docker run --rm \
                         --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
                         -v ${WORKSPACE}:/app \
                         -w /app \
                         casjaysdev/rust:latest \
-                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json'
+                        sh -c 'cargo cyclonedx --format json'
                     set -- *.cdx.json
                     cp "$1" ${RELDIR}/${PROJECT_NAME}-${VERSION}-sbom.cdx.json
 

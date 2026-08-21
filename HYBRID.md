@@ -6449,14 +6449,17 @@ All three compose files live under `docker/`. A top-level `docker-compose.yml` s
 - Latest stable toolchain + nightly (minimal profile with miri and rust-src)
 - Components: `rustfmt`, `clippy`, `rust-src`, `rust-analyzer`, `llvm-tools-preview`
 - `cargo-binstall` for fast tool installation without source compilation
-- C/C++ toolchain: `build-base`, `musl-dev`, `clang`, `lld`, `llvm`, `cmake`, `gdb`
+- C/C++ toolchain: `build-base`, `musl-dev`, `clang`, `clang-dev`, `llvm-dev`, `lld`, `cmake`, `make`, `perl`, `openssl-dev`, `openssl-libs-static`, `pkgconf`, `gdb`
 - Cross-compile linker: `mingw-w64-gcc` (Windows GNU), `zig` (cargo-zigbuild), `binaryen` (WASM optimisation)
+- `perf` — Linux performance counters, required by `flamegraph`/`samply` for profiling
 - Cross-compile targets: musl Linux (x86_64, aarch64, i686, armv7, riscv64), glibc Linux (x86_64, aarch64, i686, armv7, arm, riscv64, ppc64le, s390x), Windows GNU (x86_64, i686, aarch64), macOS (x86_64, aarch64), FreeBSD, WebAssembly (wasm32-unknown-unknown, wasip1, wasip2, emscripten), embedded ARM/RISC-V, Android (aarch64)
 - `cargo-audit`, `cargo-deny`, `cargo-tarpaulin`, `cargo-llvm-cov`, `grcov` — security and coverage
 - `cargo-nextest`, `cargo-make`, `just` — testing and task runners
 - `cargo-zigbuild`, `cross`, `cargo-ndk` — cross-compilation runners
 - `sccache` — compiler cache
 - `cargo-release`, `cargo-dist`, `cargo-deb` — release tooling
+- `cargo-generate` — scaffold new projects from templates
+- `flip-link` — zero-cost stack overflow protection for embedded targets
 - `cargo-edit`, `cargo-watch`, `cargo-outdated`, `cargo-update`, `cargo-expand` — development workflow
 - `cargo-semver-checks`, `cargo-msrv`, `cargo-machete`, `cargo-udeps` — API and dependency analysis
 - `cargo-fuzz`, `cargo-mutants`, `cargo-careful` — testing depth
@@ -34321,11 +34324,11 @@ for TARGET in x86_64-unknown-linux-musl aarch64-unknown-linux-musl; do
 done
 
 # Generate the SBOM (CycloneDX) — published alongside the release artifacts.
-# cargo-cyclonedx is not preinstalled in the image — install it in-container if
-# missing. `--override-filename bom` writes `bom.cdx.json` next to Cargo.toml;
+# cargo-cyclonedx is pre-installed in casjaysdev/rust:latest.
+# `--override-filename bom` writes `bom.cdx.json` next to Cargo.toml;
 # rename into binaries/ for inclusion in the release.
 docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
-  sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+  sh -c 'cargo cyclonedx --format json --override-filename bom'
 cp bom.cdx.json "binaries/{project_name}-bom.json"
 
 # FILES is pre-captured so sha256.txt and sha512.txt cover the identical
@@ -34792,14 +34795,12 @@ jobs:
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
             -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
-      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-      # inside the container (never on the runner host); skip if already present
       - name: Generate SBOM
         run: |
           docker run --rm --name "${{ env.PROJECT_NAME }}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
             -v "$PWD":/app -w /app \
             casjaysdev/rust:latest \
-            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+            sh -c 'cargo cyclonedx --format json --override-filename bom'
           cp bom.cdx.json "binaries/${{ env.PROJECT_NAME }}-bom.json"
 
       # FILES is pre-captured so sha256.txt and sha512.txt cover the identical
@@ -34990,14 +34991,12 @@ jobs:
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
             -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
-      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-      # inside the container (never on the runner host); skip if already present
       - name: Generate SBOM
         run: |
           docker run --rm --name "${{ env.PROJECT_NAME }}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
             -v "$PWD":/app -w /app \
             casjaysdev/rust:latest \
-            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+            sh -c 'cargo cyclonedx --format json --override-filename bom'
           cp bom.cdx.json "binaries/${{ env.PROJECT_NAME }}-bom.json"
 
       # FILES is pre-captured so sha256.txt and sha512.txt cover the identical
@@ -35191,14 +35190,12 @@ jobs:
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
             -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
-      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-      # inside the container (never on the runner host); skip if already present
       - name: Generate SBOM
         run: |
           docker run --rm --name "${{ env.PROJECT_NAME }}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
             -v "$PWD":/app -w /app \
             casjaysdev/rust:latest \
-            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+            sh -c 'cargo cyclonedx --format json --override-filename bom'
           cp bom.cdx.json "binaries/${{ env.PROJECT_NAME }}-bom.json"
 
       # FILES is pre-captured so sha256.txt and sha512.txt cover the identical
@@ -35710,14 +35707,12 @@ jobs:
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
             -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
-      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-      # inside the container (never on the runner host); skip if already present
       - name: Generate SBOM
         run: |
           docker run --rm --name "${{ env.PROJECT_NAME }}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
             -v "$PWD":/app -w /app \
             casjaysdev/rust:latest \
-            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+            sh -c 'cargo cyclonedx --format json --override-filename bom'
           cp bom.cdx.json "binaries/${{ env.PROJECT_NAME }}-bom.json"
 
       # FILES is pre-captured so sha256.txt and sha512.txt cover the identical
@@ -35899,14 +35894,12 @@ jobs:
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
             -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
-      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-      # inside the container (never on the runner host); skip if already present
       - name: Generate SBOM
         run: |
           docker run --rm --name "${{ env.PROJECT_NAME }}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
             -v "$PWD":/app -w /app \
             casjaysdev/rust:latest \
-            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+            sh -c 'cargo cyclonedx --format json --override-filename bom'
           cp bom.cdx.json "binaries/${{ env.PROJECT_NAME }}-bom.json"
 
       # FILES is pre-captured so sha256.txt and sha512.txt cover the identical
@@ -36092,14 +36085,12 @@ jobs:
             --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
             -czf binaries/${{ env.PROJECT_NAME }}-${{ env.VERSION }}-source.tar.gz .
 
-      # cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest — install it
-      # inside the container (never on the runner host); skip if already present
       - name: Generate SBOM
         run: |
           docker run --rm --name "${{ env.PROJECT_NAME }}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
             -v "$PWD":/app -w /app \
             casjaysdev/rust:latest \
-            sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+            sh -c 'cargo cyclonedx --format json --override-filename bom'
           cp bom.cdx.json "binaries/${{ env.PROJECT_NAME }}-bom.json"
 
       # FILES is pre-captured so sha256.txt and sha512.txt cover the identical
@@ -37453,9 +37444,6 @@ pipeline {
                         --exclude='*.tar.gz' --exclude='target' \
                         -czf ${RELDIR}/${PROJECT_NAME}-${VERSION}-source.tar.gz .
                 '''
-                // cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest -
-                // install it inside the container (never on the agent host); skip
-                // if already present
                 sh '''
                     docker run --rm \
                         --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
@@ -37464,7 +37452,7 @@ pipeline {
                         -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
                         -w /app \
                         casjaysdev/rust:latest \
-                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+                        sh -c 'cargo cyclonedx --format json --override-filename bom'
                     cp bom.cdx.json ${RELDIR}/${PROJECT_NAME}-bom.json
                 '''
                 sh '''
@@ -37497,9 +37485,6 @@ pipeline {
                         --exclude='*.tar.gz' --exclude='target' \
                         -czf ${RELDIR}/${PROJECT_NAME}-${VERSION}-source.tar.gz .
                 '''
-                // cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest -
-                // install it inside the container (never on the agent host); skip
-                // if already present
                 sh '''
                     docker run --rm \
                         --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
@@ -37508,7 +37493,7 @@ pipeline {
                         -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
                         -w /app \
                         casjaysdev/rust:latest \
-                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+                        sh -c 'cargo cyclonedx --format json --override-filename bom'
                     cp bom.cdx.json ${RELDIR}/${PROJECT_NAME}-bom.json
                 '''
                 sh '''
@@ -37541,9 +37526,6 @@ pipeline {
                         --exclude='*.tar.gz' --exclude='target' \
                         -czf ${RELDIR}/${PROJECT_NAME}-${VERSION}-source.tar.gz .
                 '''
-                // cargo-cyclonedx is not preinstalled in casjaysdev/rust:latest -
-                // install it inside the container (never on the agent host); skip
-                // if already present
                 sh '''
                     docker run --rm \
                         --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
@@ -37552,7 +37534,7 @@ pipeline {
                         -v ${RUSTUP_CACHE:-$HOME/.rustup}:/usr/local/share/rustup \
                         -w /app \
                         casjaysdev/rust:latest \
-                        sh -c 'command -v cargo-cyclonedx >/dev/null 2>&1 || cargo install --locked cargo-cyclonedx; cargo cyclonedx --format json --override-filename bom'
+                        sh -c 'cargo cyclonedx --format json --override-filename bom'
                     cp bom.cdx.json ${RELDIR}/${PROJECT_NAME}-bom.json
                 '''
                 sh '''
