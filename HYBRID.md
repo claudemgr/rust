@@ -41830,7 +41830,7 @@ I2P Eepsite: Running (i2pd)
 
 **The admin panel is completely isolated from the public site.**
 
-**Note:** `/server/admin` is the default admin root. `{admin_path}` is configurable via `server.admin_path`. See "Configurable Admin Path" section below.
+**Note:** `/server/administration` is the default admin root (unambiguous — avoids confusion with a Linux `admin`/`sudo` group or account). `{admin_path}` is configurable via `server.admin_path`. See "Configurable Admin Path" section below.
 
 | Rule | Description |
 |------|-------------|
@@ -41849,6 +41849,17 @@ I2P Eepsite: Running (i2pd)
 | **System user (token holder)** | API routes per PART 8 | Per-system-user `sys_` token (`system_users` table) |
 
 **The admin token (`server.token`) is stored in `server.yml` ONLY (PART 11), never in the database. There are no admin passwords.**
+
+### Access Control on Admin Routes
+
+Any request to `/server/{admin_path}/**` is gated identically regardless of HTTP method or sub-path:
+
+| Requester | Result |
+|-----------|--------|
+| **Unauthenticated (no valid admin token/session)** | Redirect to the shared `/server/auth/login` form — same as any other protected route, no admin-specific hint |
+| **Authenticated Server Admin** | Request proceeds normally |
+
+HYBRID has no application-level Normal User account type by default (identity is the OS per PART 8), so there is no authenticated-non-admin case to redirect elsewhere. If PART 34 Multi-User is enabled, follow the SERVER-style pattern instead: an authenticated non-admin user is redirected to their own dashboard, never shown the login form again and never given a hint that an admin panel exists.
 
 ### Testing Admin Routes
 
@@ -42013,24 +42024,24 @@ fn validate_admin_route(path: &str, current_admin_username: &str) -> Result<(), 
 
 ## Configurable Admin Path
 
-**The default `/server/admin` admin root can be changed for security (obscurity).**
+**The default `/server/administration` admin root can be changed for security (obscurity).**
 
 ### Configuration
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `server.admin_path` | `admin` | Path segment for admin panel (no leading slash) |
+| `server.admin_path` | `administration` | Path segment for admin panel (no leading slash) |
 
 **When changed, ALL admin routes update:**
-- `/server/admin/**` → `/server/{admin_path}/**`
-- `/api/{api_version}/server/admin/**` → `/api/{api_version}/server/{admin_path}/**`
+- `/server/administration/**` → `/server/{admin_path}/**`
+- `/api/{api_version}/server/administration/**` → `/api/{api_version}/server/{admin_path}/**`
 
 ### Validation Rules
 
 | Rule | Action |
 |------|--------|
-| **Cannot conflict with existing routes** | Error and revert to `admin` |
-| **Reserved paths blocked** | `api`, `static`, `assets`, `health`, `version`, etc. |
+| **Cannot conflict with existing routes** | Error and revert to `administration` |
+| **Reserved paths blocked** | `api`, `static`, `assets`, `health`, `version`, etc. — `administration` itself (the default) is NEVER added to this list, since the revert-on-error fallback above depends on `administration` always remaining a valid value |
 | **Valid characters only** | `[a-z0-9-]` (lowercase, numbers, hyphens) |
 | **Min/max length** | 2-32 characters |
 | **No leading/trailing hyphens** | `my-admin` ✓, `-admin-` ✗ |
@@ -42048,6 +42059,8 @@ fn validate_admin_path(new_path: &str, registered_routes: &[String]) -> Result<(
     let new_path = normalize_path(new_path);
 
     // 1. Check reserved paths
+    // "administration" is the documented default admin_path and MUST NEVER
+    // be added here — doing so would make the default config reject itself.
     let reserved = [
         "api", "health", "healthz", "metrics", "version", ".well-known",
         "about", "privacy", "contact", "help", "terms", "preferences",
@@ -42132,7 +42145,7 @@ async function changeAdminPath(newPath) {
 ```rust
 // Global admin path accessor
 pub fn admin_path(cfg: &Config) -> &str {
-    // default: "admin"
+    // default: "administration"
     &cfg.server.admin_path
 }
 
@@ -42919,7 +42932,7 @@ On first run, a one-time setup token is generated and displayed in console. Admi
 
 | Setting | Control | Default | Restart | Description |
 |---------|---------|---------|---------|-------------|
-| `admin_path` | Text | `admin` | Reload | Custom admin panel path (see PART 28) |
+| `admin_path` | Text | `administration` | Reload | Custom admin panel path (see PART 28) |
 | `rate_limit.enabled` | Toggle | On | No | Enable rate limiting |
 | `rate_limit.read.requests` | Number | `120` | No | Read (GET/HEAD) requests per window, per IP |
 | `rate_limit.write.requests` | Number | `10` | No | Write (POST/PUT/PATCH/DELETE) requests per window, per IP |
