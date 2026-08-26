@@ -31227,7 +31227,7 @@ Admin clicks "Invite New Admin"
 │  └─────────────────────────────────────────────────────┘    │
 │  [Copy URL]                                                 │
 │                                                             │
-│  ⚠️  This link will only work ONCE and expires in 24 hours. │
+│  ⚠️  This link will only work ONCE and expires in 7 days.   │
 │  The new admin will set their own password on first use.    │
 │                                                             │
 │  [Done]                                                     │
@@ -31235,8 +31235,8 @@ Admin clicks "Invite New Admin"
 ```
 
 **Invite Rules:**
-- Invite link is single-use (invalidated after first use or expiry)
-- Default expiry: 24 hours (configurable: 1h, 6h, 24h, 48h, 7d)
+- Invite link is single-use by default (`max_uses` = 1, invalidated after first use or expiry); admin may raise `max_uses` (0 = unlimited)
+- Default expiry: 7 days (configurable: 1h, 6h, 24h, 48h, 7d)
 - New admin can set their own username (username blocklist ignored for admins)
 - New admin sets their own password and optional 2FA
 - API token generated and shown once
@@ -58477,7 +58477,7 @@ Admin clicks "Invite New User"
 │  └─────────────────────────────────────────────────────────┘    │
 │  [Copy URL]                                                     │
 │                                                                 │
-│  ⚠️  This link will only work ONCE and expires in 24 hours.     │
+│  ⚠️  This link will only work ONCE and expires in 7 days.       │
 │  The new user will set their own password on first use.         │
 │                                                                 │
 │  [Done]                                                         │
@@ -58492,8 +58492,8 @@ Admin clicks "Invite New User"
 5. Account active after password set
 
 **Invite Rules (same as Server Admin invites):**
-- Limited-use per `max_uses` (default 1; 0 = unlimited); invalidated after uses are exhausted or expiry
-- Default expiry: 7 days (`invite_expiration_days: 7`, configurable)
+- Single-use by default (`max_uses` = 1, invalidated after first use or expiry); admin may raise `max_uses` (0 = unlimited)
+- Default expiry: 7 days (configurable: 1h, 6h, 24h, 48h, 7d)
 - Only Server Admin can generate invites (users cannot invite other users)
 
 **Invite mode behavior:**
@@ -60801,7 +60801,7 @@ PATCH /api/{api_version}/users/settings
 | `Bearer` | `Authorization: Bearer adm_…` / `usr_…` / `org_…` (or agent variants) | `tokens` table; SHA-256 hash compared (PART 11 → "API Token Security") | token creation flow |
 | `Reset token` | one-shot URL param (`/server/auth/password/reset?token=…`) | hashed in `password_resets` table; single-use; expires per `auth.password_reset_ttl` (default 1h) | `/server/auth/password/forgot` flow (sent via email) |
 | `Verify token` | one-shot URL param (`/server/auth/verify/{token}`) | hashed in `email_verifications` table; single-use; expires per `auth.email_verify_ttl` (default 48h) | sent via email on registration / email change |
-| `Invite token` | one-shot URL param (`/server/auth/invite/{user|server}/{token}`) | hashed in `invites` table; limited-use per `max_uses` (default 1, 0 = unlimited); expires per `invites.ttl` (default 7d) | admin issues from `/server/{admin_path}/config/admins` (server invite) or user from `/users/orgs/{slug}/invites` (org invite) |
+| `Invite token` | one-shot URL param (`/server/auth/invite/{user|server}/{token}`) | hashed in `invites` table; single-use by default (`max_uses` = 1, 0 = unlimited); expires per `invite_expiration_days` (default 7d) | admin issues from `/server/{admin_path}/config/admins` (server invite) or user from `/users/orgs/{slug}/invites` (org invite) |
 | `Tracking token` | one-shot URL param (`/server/security/report/{tracking_id}?token=…`) | per-tracking-id token; single-use-per-day (researcher can refresh by re-clicking the email link); expires 30 days after report closes | sent via email when researcher submits a security report (PART 11 → "Security Reports") |
 | `Partial-session` | short-lived cookie issued mid-flow (post-password-correct, pre-2FA) | `partial_sessions` table; consumed when 2FA / recovery completes; expires per `auth.partial_session_ttl` (default 5m) | `/server/auth/login` flow when 2FA is required |
 
