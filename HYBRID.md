@@ -444,11 +444,13 @@ Before I proceed, can you confirm [specific question]?
 2. If IDEA.md is missing and either loader file contains project-specific content: migrate that content into IDEA.md before proceeding
 3. Check if .claude/rules/ directory exists
 4. If missing or outdated: CREATE/UPDATE all rule files (see table below)
-5. If CLAUDE.md is missing: create the efficient loader version
-6. If a Claude loader file exists and starts with "# Project SPEC": treat it as the standard loader format; update only if references/rules are stale
-7. If a Claude loader file exists but is not in the standard loader format: migrate project-specific content to IDEA.md, then merge remaining valid loader guidance into the efficient loader structure - NEVER overwrite blindly
-8. If TODO.AI.md or TODO.md exists: read both and check for needed updates (treat both files the same; never delete or empty the human-owned TODO.md)
-9. Commit all COMMIT, NEVER, and MUST rules to memory
+5. Check if .claude/memory/ directory exists; if missing, create it with an empty .claude/memory/MEMORY.md index (do not fabricate entries - it starts empty and grows only from real project-specific discoveries)
+6. If CLAUDE.md is missing: create the efficient loader version
+7. If a Claude loader file exists and starts with "# Project SPEC": treat it as the standard loader format; update only if references/rules are stale
+8. If a Claude loader file exists but is not in the standard loader format: migrate project-specific content to IDEA.md, then merge remaining valid loader guidance into the efficient loader structure - NEVER overwrite blindly
+9. If TODO.AI.md or TODO.md exists: read both and check for needed updates (treat both files the same; never delete or empty the human-owned TODO.md)
+10. Read .claude/memory/MEMORY.md (if non-empty) and load referenced files as needed
+11. Commit all COMMIT, NEVER, and MUST rules to memory
 ```
 
 **Rule Files to Create/Update** (`.claude/rules/*.md`, one per PART cluster — header `# {Topic} Rules (PART X, Y, Z)`, a `⚠️ These rules are NON-NEGOTIABLE. Violations are bugs. ⚠️` warning, `## CRITICAL - NEVER DO`, `## CRITICAL - ALWAYS DO`, a key-rules summary, and a `For complete details, see AI.md PART X, Y, Z` reference):
@@ -467,6 +469,8 @@ Before I proceed, can you confirm [specific question]?
 | `cicd-rules.md` | CI/CD, Releases & Automation (PART 24) |
 
 **Trigger conditions:** `.claude/rules/` missing → create all files. AI.md modified more recently than rule files → update all files. User explicitly requests regeneration → update all files. **This is NOT optional** — rule files enable efficient context loading without re-reading the entire AI.md every session.
+
+**Project Memory (.claude/memory/):** distinct from `.claude/rules/` above (spec-derived cheatsheets, regenerated when AI.md changes): `.claude/memory/` holds durable, project-specific knowledge discovered during development — decisions, gotchas, conventions unique to this codebase — that AI.md never covers. Committed to the repo, not gitignored. Format: one markdown file per topic with YAML frontmatter (`name`, `description`, `type: project`), indexed by `.claude/memory/MEMORY.md`, read on demand. Same credential-masking rule as everywhere else — never store secrets. `~/.claude/**` (global) stays read-only, deployed only via `claudemgr/config`'s `install.sh`; `.claude/memory/` here is read/write in this repo directly. Full treatment: see SERVER.md § Claude Code Project Memory.
 
 ### Task → PART Reference
 
