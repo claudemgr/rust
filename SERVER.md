@@ -669,7 +669,7 @@ let cache_size = (avail_mem / 10)
 | **VERSION precedence** | `release.txt` wins when present; otherwise use the workflow/build-specific fallback (tag, beta timestamp, etc.) |
 | **RUSTFLAGS** | `-C strip=symbols -C link-arg=-s` (rustc flags only); `--release --target {target}` go on the cargo command line, not in RUSTFLAGS |
 | **Docker builds on EVERY push** | Any branch push triggers Docker image build |
-| **Docker tags** | Any push → `{commit}`; beta → adds `beta`; tag → `{version}`, `latest`, `YYMM`, `{commit}`; `devel` is built by the `build-devel` job inside the same `docker.yml` workflow (schedule + non-tag push, gated by `if:`) — never a separate file |
+| **Docker tags** | Any push → `{commit_id}`; beta → adds `beta`; tag → `{version}`, `latest`, `{yymm}`, `{commit_id}`; `devel` is built by the `build-devel` job inside the same `docker.yml` workflow (schedule + non-tag push, gated by `if:`) — never a separate file |
 | **Workflow permissions** | Default to read-only / least privilege; grant write only to the specific release/publish job that needs it |
 | **Third-party action pinning** | External actions MUST be pinned to a full commit SHA — never float on `@main`, `@master`, or broad tags; verify runtime and maintenance status on every SHA update |
 | **Unsafe PR triggers forbidden by default** | Do NOT use `pull_request_target` for untrusted code execution, build, test, or artifact upload paths |
@@ -33334,7 +33334,7 @@ Time: {timestamp}
 ```
 Subject: Welcome to {app_name}
 ---
-WELCOME TO {APP_NAME}
+WELCOME TO {app_name}
 
 This email was sent to: {recipient_email}
 From: {app_name} ({fqdn})
@@ -41515,8 +41515,8 @@ networks:
 |-----|-------------|---------|
 | `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:latest` | Latest stable release | `ghcr.io/myorg/myapp:latest` |
 | `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{version}` | Specific version | `ghcr.io/myorg/myapp:1.2.3` |
-| `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{YYMM}` | Year/month tag | `ghcr.io/myorg/myapp:2512` |
-| `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{commit}` | Git commit (7 char) | `ghcr.io/myorg/myapp:abc1234` |
+| `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{yymm}` | Year/month tag | `ghcr.io/myorg/myapp:2512` |
+| `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{commit_id}` | Git commit (7 char) | `ghcr.io/myorg/myapp:abc1234` |
 
 ### Development Tags (Local)
 
@@ -42410,13 +42410,13 @@ jobs:
 |---------|---------------|-----------------|
 | **Any push** (all branches) | `{commit_id}` | `{commit_id}-aio` |
 | Push to beta branch | `beta`, `{commit_id}` | `beta-aio`, `{commit_id}-aio` |
-| Version tag (`v*`, `*.*.*`) | `{version}`, `latest`, `YYMM` | `{version}-aio`, `latest-aio`, `YYMM-aio` |
+| Version tag (`v*`, `*.*.*`) | `{version}`, `latest`, `{yymm}` | `{version}-aio`, `latest-aio`, `{yymm}-aio` |
 
 **Note:** `:devel` is built by the `build-devel` job inside this same `docker.yml` workflow, from `docker/Dockerfile.dev`, on a daily schedule (`cron: '0 4 * * *'`) and on every non-tag push, plus `workflow_dispatch`. Standard image only — no `docker/Dockerfile.dev.aio` variant exists, so there is no `:devel-aio` tag.
 
 **Notes:**
 - `{commit_id}` = short SHA (7 characters) from `git rev-parse --short=7 HEAD`
-- `YYMM` = year/month (e.g., `2512`)
+- `{yymm}` = year/month (e.g., `2512`)
 - Built for `linux/amd64` and `linux/arm64` using `docker buildx`
 - Registry: `ghcr.io`
 - Standard uses `latest`, All-in-One uses `latest-aio`
@@ -49646,7 +49646,7 @@ pub struct LocaleAssets;
       "test_email": "Correo de prueba - {app_name}"
     },
     "body": {
-      "welcome_heading": "BIENVENIDO A {APP_NAME}",
+      "welcome_heading": "BIENVENIDO A {app_name}",
       "admin_setup_heading": "CONFIGURACIÓN DE ADMINISTRADOR COMPLETADA",
       "password_reset_heading": "SOLICITUD DE RESTABLECIMIENTO DE CONTRASEÑA",
       "email_verification_heading": "VERIFICACIÓN DE CORREO ELECTRÓNICO",

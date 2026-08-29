@@ -7329,8 +7329,8 @@ rm -rf "$TEMP_DIR"
 |-----|-------------|---------|
 | `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:latest` | Latest stable release | `ghcr.io/myorg/myapp:latest` |
 | `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{version}` | Specific version | `ghcr.io/myorg/myapp:1.2.3` |
-| `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{YYMM}` | Year/month tag | `ghcr.io/myorg/myapp:2512` |
-| `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{commit}` | Git commit (7 char) | `ghcr.io/myorg/myapp:abc1234` |
+| `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{yymm}` | Year/month tag | `ghcr.io/myorg/myapp:2512` |
+| `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{commit_id}` | Git commit (7 char) | `ghcr.io/myorg/myapp:abc1234` |
 
 **Development Tags (Local):**
 
@@ -24474,9 +24474,9 @@ function hideOfflineIndicator() {
 **Complete manifest.json:**
 ```json
 {
-  "name": "{App Name}",
+  "name": "{app_name}",
   "short_name": "{app_name}",
-  "description": "{App description}",
+  "description": "{app_description}",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
@@ -24678,7 +24678,7 @@ function showIOSInstallInstructions() {
 
   if (isIOS && !isInStandalone) {
     showModal({
-      title: 'Install {App Name}',
+      title: 'Install {app_name}',
       content: `
         <ol>
           <li>Tap the Share button <img src="/static/icons/ios-share.svg" alt="Share"></li>
@@ -24727,7 +24727,7 @@ async function requestPersistentStorage() {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#000000">
-  <meta name="description" content="{App description}">
+  <meta name="description" content="{app_description}">
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/manifest.json">
@@ -24742,7 +24742,7 @@ async function requestPersistentStorage() {
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="{app_name}">
 
-  <title>{App Name}</title>
+  <title>{app_name}</title>
   <link rel="stylesheet" href="{{ asset("css/app.css") }}">
 </head>
 <body>
@@ -35337,13 +35337,13 @@ jobs:
 |---------|------|
 | **Any push** (all branches) | `{commit_id}` |
 | Push to beta branch | `beta`, `{commit_id}` |
-| Version tag (`v*`, `*.*.*`) | `{version}`, `latest`, `YYMM` |
+| Version tag (`v*`, `*.*.*`) | `{version}`, `latest`, `{yymm}` |
 
 > **Note:** `:devel` is not tagged by `build-standard`. It is built by the `build-devel` job in the same `docker.yml` workflow (below) from `docker/Dockerfile.dev`, triggered on every non-tag push and on a daily schedule.
 
 **Notes:**
 - `{commit_id}` = short SHA (7 characters) from `git rev-parse --short=7 HEAD`
-- `YYMM` = year/month (e.g., `2512`)
+- `{yymm}` = year/month (e.g., `2512`)
 - Built for `linux/amd64` and `linux/arm64` using `docker buildx`
 - Registry: `ghcr.io`
 - `docker.yml` also runs on a daily schedule (`0 4 * * *`) so the `build-devel` job keeps `:devel` fresh even without new pushes

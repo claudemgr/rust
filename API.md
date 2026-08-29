@@ -666,7 +666,7 @@ let cache_size = (avail_mem / 10)
 | **VERSION precedence** | `release.txt` wins when present; otherwise use the workflow/build-specific fallback (tag, beta timestamp, etc.) |
 | **Build metadata** | Passed as env vars (VERSION, COMMIT_ID, BUILD_EPOCH, OFFICIAL_SITE) and embedded via `build.rs` → `option_env!("APP_*")`: version, commit ID, build epoch, official site; `BUILD_DATE` is derived from `BUILD_EPOCH` (build systems for the Docker OCI label, `build_date()` in-app) — never independently captured |
 | **Docker builds on EVERY push** | Any branch push triggers Docker image build |
-| **Docker tags** | Any push → `{commit}`; beta → adds `beta`; tag → `{version}`, `latest`, `YYMM`, `{commit}`; `devel` = built by the `build-devel` job in `docker.yml` from `docker/Dockerfile.dev`, on every non-tag push and on a daily schedule |
+| **Docker tags** | Any push → `{commit_id}`; beta → adds `beta`; tag → `{version}`, `latest`, `{yymm}`, `{commit_id}`; `devel` = built by the `build-devel` job in `docker.yml` from `docker/Dockerfile.dev`, on every non-tag push and on a daily schedule |
 | **Workflow permissions** | Default to read-only / least privilege; grant write only to the specific release/publish job that needs it |
 | **Third-party action pinning** | External actions MUST be pinned to a full commit SHA — never float on `@main`, `@master`, or broad tags; verify runtime and maintenance status on every SHA update |
 | **Unsafe PR triggers forbidden by default** | Do NOT use `pull_request_target` for untrusted code execution, build, test, or artifact upload paths |
@@ -30366,8 +30366,8 @@ rm -rf "$TEMP_DIR"
 |-----|-------------|---------|
 | `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:latest` | Latest stable release | `ghcr.io/myorg/myapp:latest` |
 | `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{version}` | Specific version | `ghcr.io/myorg/myapp:1.2.3` |
-| `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{YYMM}` | Year/month tag | `ghcr.io/myorg/myapp:2512` |
-| `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{commit}` | Git commit (7 char) | `ghcr.io/myorg/myapp:abc1234` |
+| `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{yymm}` | Year/month tag | `ghcr.io/myorg/myapp:2512` |
+| `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:{commit_id}` | Git commit (7 char) | `ghcr.io/myorg/myapp:abc1234` |
 
 ### Development Tags (Local)
 
@@ -31185,13 +31185,13 @@ jobs:
 |---------|------|
 | **Any push** (all branches) | `{commit_id}` |
 | Push to beta branch | `beta`, `{commit_id}` |
-| Version tag (`v*`, `*.*.*`) | `{version}`, `latest`, `YYMM` |
+| Version tag (`v*`, `*.*.*`) | `{version}`, `latest`, `{yymm}` |
 
 > **Note:** `docker.yml` tags `:devel` via its `build-devel` job, built from `docker/Dockerfile.dev`, on every push (all branches, excluding version tags) and on a daily schedule — as a second job in the same workflow file as the standard-image build above.
 
 **Notes:**
 - `{commit_id}` = short SHA (7 characters) from `git rev-parse --short=7 HEAD`
-- `YYMM` = year/month (e.g., `2512`)
+- `{yymm}` = year/month (e.g., `2512`)
 - Built for `linux/amd64` and `linux/arm64` using `docker buildx`
 - Registry: `ghcr.io`
 
@@ -33724,7 +33724,7 @@ rm -rf "$TEMP_DIR"
 | `./volumes/` | ❌ NEVER in the source repo | Pollutes project directory |
 | `./docker/rootfs/` | ❌ NEVER for runtime | Build-time overlay only |
 | `$TEMP_DIR/volumes/` | ✅ ALWAYS | Proper temp directory isolation |
-| `/tmp/{org}/{project}-XXXXXX/volumes/` | ✅ ALWAYS | Full path equivalent |
+| `/tmp/{project_org}/{internal_name}-XXXXXX/volumes/` | ✅ ALWAYS | Full path equivalent |
 
 ### Summary
 
@@ -43417,8 +43417,8 @@ make docker
 **File Locations:**
 | Type | Development/Test | Production |
 |------|------------------|------------|
-| Config | `/tmp/{org}/{proj}-XXX/volumes/config/` | `/etc/{org}/{proj}/` (Linux) |
-| Data | `/tmp/{org}/{proj}-XXX/volumes/data/` | `/var/lib/{org}/{proj}/` (Linux) |
+| Config | `/tmp/{project_org}/{internal_name}-XXX/volumes/config/` | `/etc/{internal_org}/{internal_name}/` (Linux) |
+| Data | `/tmp/{project_org}/{internal_name}-XXX/volumes/data/` | `/var/lib/{internal_org}/{internal_name}/` (Linux) |
 | Binary | `binaries/{project_name}` | `/usr/local/bin/{project_name}` |
 
 ---
