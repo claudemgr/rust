@@ -5220,7 +5220,7 @@ For code that runs in the application, NEVER use bare `/path`. Always use `{fqdn
 | **JavaScript** | `fetch('/api/{api_version}/users')` | `fetch(\`${window.location.origin}/api/${apiVersion}/users\`)` |
 | **Askama templates** | `href="/api/docs"` | handler passes `build_url(headers, "/api/docs")` as a template variable |
 | **Config files** | `url: /callback` | `url: https://{fqdn}/callback` |
-| **Email templates** | `<a href="/verify">` | `<a href="{{ verify_url }}">` (handler builds URL via `build_url`) |
+| **Email templates** | `<a href="/verify">` | `<a href="{verify_url}">` (PART 18: `{variable}` syntax, not Askama/Tera templates; handler builds URL via `build_url`) |
 
 **Why:** Bare paths break when:
 - Behind reverse proxy with different base path
@@ -5294,7 +5294,7 @@ if cfg.server.healthz.root.enabled {
 | docs/*.md | `{official_site}/path` | `curl -q -LSsf https://api.example.com/api/v1/users` |
 | Rust code | request-aware full URL | `build_url(headers, "/path")` (PART 8) |
 | JS code | `origin/path` | `${window.location.origin}/path` |
-| Email templates | handler-built full URL | `{{ verify_url }}` (from `build_url(headers, "/verify")`) |
+| Email templates | `{variable}` syntax (PART 18, not Askama/Tera templates) | `{verify_url}` (from `build_url(headers, "/verify")`) |
 | Router registration | `/path` | `.route("/api/v1/users", get(...))` (internal only) |
 
 **Platform-Specific URLs:**

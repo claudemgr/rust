@@ -5015,7 +5015,7 @@ For code that runs in the application, NEVER use bare `/path`. Always build a fu
 | **JavaScript** | `fetch('/api/{api_version}/items')` | `fetch(\`${window.location.origin}/api/${apiVersion}/items\`)` |
 | **HTML templates** | `href="/api/docs"` | `href="{{ docs_url }}"` (handler computes via `build_url`) |
 | **Config files** | `url: /callback` | `url: https://{fqdn}/callback` |
-| **Email templates** | `<a href="/server/alert">` | `<a href="{{ alert_url }}">` (handler computes via `build_url`) |
+| **Email templates** | `<a href="/server/alert">` | `<a href="{alert_url}">` (PART 17: `{variable}` syntax, not Askama/Tera templates; handler computes via `build_url`) |
 
 **Why:** Bare paths break when:
 - Behind reverse proxy with different base path
@@ -5082,7 +5082,7 @@ Router::new()
 | docs/*.md | `{official_site}/path` | `curl -q -LSsf https://api.example.com/api/v1/items` |
 | Rust code | `build_url()` | `build_url(req.headers(), "/path")` |
 | JS code | `origin/path` | `${window.location.origin}/path` |
-| Email templates | precomputed URL | `{{ report_url }}` (handler computes via `build_url`) |
+| Email templates | `{variable}` syntax (PART 17, not Askama/Tera templates) | `{report_url}` (handler computes via `build_url`) |
 | Router registration | `/path` | `.route("/api/v1/items", get(handle_items))` (internal only) |
 
 **Platform-Specific URLs:**
