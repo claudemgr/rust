@@ -33288,6 +33288,8 @@ Time: {timestamp}
 - Body: Plain text with variables
 - Variables: `{variable_name}` syntax
 
+**Translation:** this engine does plain substitution only — it cannot call functions, so `{{ t "key" }}`/`{{ tf "key" ... }}` do NOT work here. Per PART 31's i18n mandate, resolve every translated string server-side (`translate`/`tf`) BEFORE rendering, then pass the already-translated result as a plain `{variable}` value — see PART 31 § "Email Template Translation" for the full pattern.
+
 ## Global Variables (Available in All Templates)
 
 | Variable | Description |
