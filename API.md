@@ -23428,58 +23428,65 @@ pub fn validate_footer_html(html: &str) -> Result<String> {
 <iframe src="https://evil.com"></iframe>
 ```
 
-### Footer Template Variables
+### Available Footer Variables
 
-| Variable | Type | Description |
-|---|---|---|
-| `footer_custom_html` | `String` | Pre-sanitized custom branding HTML rendered above the Application Footer (`web.footer.custom_html`) |
-| `tor_enabled` | `bool` | Tor is configured |
-| `tor_running` | `bool` | Tor process is active |
-| `tor_address` | `String` | `.onion` hostname |
-| `i2p_enabled` | `bool` | I2P is configured (opt-in) |
-| `i2p_running` | `bool` | I2P process/session is active |
-| `i2p_address` | `String` | `.b32.i2p` hostname |
-| `app_name` | `String` | Application name |
-| `app_version` | `String` | Semver string |
+| Variable | Description |
+|----------|-------------|
+| `{footer_custom_html}` | Pre-sanitized custom branding HTML rendered above the Application Footer (`web.footer.custom_html`) |
+| `{project_name}` | Application name |
+| `{project_version}` | Application version |
+| `{build_datetime}` | Build date/time (`%B %d, %Y at %H:%M:%S %Z`) |
+| `{onion_address}` | Tor `.onion` address (only when Tor is enabled, running, and an address is published; empty otherwise) |
+| `{i2p_address}` | I2P `.b32.i2p` address (only when I2P is enabled, running, and an address is published; empty otherwise) |
 
 ### Default Application Footer (Always Shown)
 
 ```html
 <footer class="footer">
-  {# Custom branding HTML (sanitized) rendered above the Application Footer #}
+  <!-- Custom branding HTML (sanitized) rendered above the Application Footer -->
   {% if footer_custom_html %}
-    {{ footer_custom_html | safe }}
+  {footer_custom_html}
   {% endif %}
-  {% if tor_enabled and tor_running and tor_address %}
-    <p class="footer-onion">
-      <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
-      <code class="onion-address">{{ tor_address }}</code>
-      <button type="button" class="copy-btn" data-copy="{{ tor_address }}" aria-live="polite" aria-label="Copy onion address">📋</button>
-    </p>
+
+  <!-- Onion address (only shown if Tor is enabled, running, and an onion address is published) -->
+  {% if tor_enabled && tor_running && !tor_address.is_empty() %}
+  <p class="footer-onion">
+    <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
+    <code class="onion-address">{onion_address}</code>
+    <button type="button" class="copy-btn" data-copy="{onion_address}" aria-live="polite" aria-label="Copy onion address">📋</button>
+  </p>
   {% endif %}
-  {% if i2p_enabled and i2p_running and i2p_address %}
-    <p class="footer-i2p">
-      <a href="/server/help#i2p-access" aria-label="I2P Support">🔗</a>
-      <code class="i2p-address">{{ i2p_address }}</code>
-      <button type="button" class="copy-btn" data-copy="{{ i2p_address }}" aria-live="polite" aria-label="Copy I2P address">📋</button>
-    </p>
+
+  <!-- I2P address (only shown if I2P is enabled, running, and a .b32.i2p address is published) -->
+  {% if i2p_enabled && i2p_running && !i2p_address.is_empty() %}
+  <p class="footer-i2p">
+    <a href="/server/help#i2p-access" aria-label="I2P Support">🔗</a>
+    <code class="i2p-address">{i2p_address}</code>
+    <button type="button" class="copy-btn" data-copy="{i2p_address}" aria-live="polite" aria-label="Copy I2P address">📋</button>
+  </p>
   {% endif %}
-  <p class="footer-links">
+
+  <!-- Standard page links -->
+  <p>
     <a href="/server/about">About</a>
-    <span aria-hidden="true">•</span>
+    <span>•</span>
     <a href="/server/privacy">Privacy</a>
-    <span aria-hidden="true">•</span>
+    <span>•</span>
     <a href="/server/contact">Contact</a>
-    <span aria-hidden="true">•</span>
+    <span>•</span>
     <a href="/server/help">Help</a>
   </p>
-  <p class="footer-meta">
+
+  <!-- Application branding -->
+  <p>
     <a href="{PLATFORM_REPO_URL}" target="_blank">Made with</a> ❤️
-    <span aria-hidden="true">•</span>
-    <span>{{ app_version }}</span>
+    <span>•</span>
+    <span>{project_version}</span>
   </p>
-  <p class="footer-build">
-    <a href="/server/healthz">Last update: {{ build_datetime }}</a>
+
+  <!-- Build stamp -->
+  <p>
+    <a href="/server/healthz">Last update: {build_datetime}</a>
   </p>
 </footer>
 ```
