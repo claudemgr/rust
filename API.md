@@ -23083,6 +23083,45 @@ template/
 </html>
 ```
 
+### Nav vs Footer
+
+| Element | Position | Purpose | Contents |
+|---------|----------|---------|----------|
+| `<nav>` | TOP | Navigation | Links to app sections |
+| Header `.header-actions` | TOP | Cross-cutting UI state | Theme toggle, Preferences link |
+| `<footer>` | BOTTOM | Information | About, Privacy, Contact, Help, Preferences, GitHub, version |
+
+**Nav contains (app navigation):**
+- Home link
+- App-specific sections (project-defined)
+
+**Nav does NOT contain:**
+- API link (users access via `/server/docs/swagger` if needed)
+- Help link (belongs in footer)
+- Preferences link (lives next to the theme toggle in the header, not in nav — it's UI state, not app content; also always present in the footer for discoverability)
+
+**Default `header.html.tera`:**
+
+```html
+<!-- Header bar: site name + theme toggle + preferences -->
+<header class="header">
+  <a href="/" class="site-brand">{{ project_name }}</a>
+
+  <!-- Theme toggle + Preferences (always visible, far right) -->
+  <div class="header-actions">
+    <button type="button" class="btn btn-icon theme-toggle" aria-label="Toggle theme" aria-pressed="false">
+      <svg class="icon-sun"  aria-hidden="true">…</svg>
+      <svg class="icon-moon" aria-hidden="true">…</svg>
+    </button>
+    <a href="/server/preferences" class="header-link" aria-label="Preferences" title="Preferences">
+      <svg class="icon-preferences" aria-hidden="true"><!-- gear icon --></svg>
+    </a>
+  </div>
+</header>
+```
+
+No JS required for the theme toggle — see "System Theme Detection" above: the server reads the `theme` cookie and renders the correct class before the first byte of CSS, and a no-JS visitor can still switch theme via a `<noscript>` form POSTing to the theme endpoint. The `.header-link` to Preferences is a plain `<a>`, works with JS disabled by definition.
+
 ### Static Assets Organization
 
 ```
@@ -23573,6 +23612,8 @@ pub fn validate_footer_html(html: &str) -> Result<String> {
     <a href="/server/contact">Contact</a>
     <span>•</span>
     <a href="/server/help">Help</a>
+    <span>•</span>
+    <a href="/server/preferences">Preferences</a>
   </p>
 
   <!-- Application branding -->
