@@ -917,6 +917,10 @@ src/scheduler/              # Background task scheduler
 src/scheduler/mod.rs
 src/client/                 # Client binary (REQUIRED - all projects)
 src/client/mod.rs
+deps/                       # OPTIONAL - committed, project-specific support
+                             # files not part of build/release output (e.g.
+                             # scripts or Dockerfiles for building a
+                             # dependency) - never a cache or temp/output dir
 docker/                     # Docker files (REQUIRED)
 docker/Dockerfile           # Multi-stage Dockerfile
 docker/docker-compose.yml   # Production docker-compose
@@ -1935,6 +1939,7 @@ Instructions for how this agent should behave...
 | `docs/` | ✓ | MkDocs documentation only | No |
 | `scripts/` | ✓ | Production/install scripts | No |
 | `tests/` | ✓ | Repository-root executable integration test scripts (`run_tests.sh`, `docker.sh`, `incus.sh`, `e2e.sh`, optional helpers). Rust unit tests live alongside code as `#[cfg(test)]` modules | No |
+| `deps/` | | Optional, committed, project-specific support files not part of build/release output (e.g. scripts or Dockerfiles for building a dependency) — never a cache or temp/output dir | No |
 | `.github/` | If GitHub / public repo | GitHub Actions, community files, templates | No |
 | `.gitea/` | If Gitea | Gitea Actions, templates | No |
 | `.claude/` | Auto | Claude Code config — team config (settings, rules, agents, hooks) committed; personal/runtime files gitignored | Partial |

@@ -2030,6 +2030,7 @@ PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+
 │   ├── support/                # cross-cutting helpers
 │   └── assets.rs               # compile-time asset embedding (rust-embed / include_bytes!)
 ├── assets/                  # BUILD-TIME ONLY: source tree embedded into the binary at compile time
+├── deps/                    # OPTIONAL: committed, project-specific support files not part of build/release output (e.g. scripts or Dockerfiles for building a dependency) — never a cache or temp/output dir
 ├── packaging/               # installer/manifests/bundle metadata
 ├── scripts/                 # Production/install scripts + host-side Docker wrapper scripts; MUST NOT contain application logic
 ├── xtask/                   # Rust-based build/release automation crate (executed inside Docker)

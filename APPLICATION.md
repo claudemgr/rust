@@ -780,6 +780,10 @@ src/
     ├── tui/
     └── cli/
 assets/                 # BUILD-TIME ONLY: source tree embedded into the binary at compile time
+deps/                   # OPTIONAL: committed, project-specific support files
+                         # not part of build/release output (e.g. scripts or
+                         # Dockerfiles for building a dependency) — never a
+                         # cache or temp/output dir
 docker/                 # REQUIRED: Dockerfile, docker-compose.yml, rootfs/usr/local/bin/entrypoint.sh, README.md
 packaging/              # installer/manifests/bundle metadata
 scripts/                # optional helper scripts that wrap Docker invocations (host-side wrappers); MUST NOT contain application logic
