@@ -23088,7 +23088,7 @@ template/
 | Element | Position | Purpose | Contents |
 |---------|----------|---------|----------|
 | `<nav>` | TOP | Navigation | Links to app sections |
-| Header `.header-actions` | TOP | Cross-cutting UI state | Theme toggle, Preferences link |
+| Header `.header-actions` | TOP | Cross-cutting UI state | Profile/preferences zone (always `/server/preferences`; contents vary if an `owner_token` cookie exists), then theme toggle — in that order, right of the centered nav links |
 | `<footer>` | BOTTOM | Information | About, Privacy, Contact, Help, Preferences, GitHub, version |
 
 **Nav contains (app navigation):**
@@ -23100,24 +23100,97 @@ template/
 - Help link (belongs in footer)
 - Preferences link (lives next to the theme toggle in the header, not in nav — it's UI state, not app content; also always present in the footer for discoverability)
 
+**Header Layout — single row, 4 zones, in this exact order:**
+
+```
+{logo/text}          {links}          {profile/preferences}  {theme_toggle}
+```
+
+Brand sits left, nav links are horizontally centered (not pushed right against
+the actions), and the actions cluster (profile/preferences, then theme toggle)
+sits right. Do NOT split header/nav into two separate rows on desktop — that
+pushes links flush right against the header edge with no centering.
+
 **Default `header.html.tera`:**
 
 ```html
-<!-- Header bar: site name + theme toggle + preferences -->
+<!-- Header bar: single row — brand | centered links | profile/preferences | theme toggle -->
 <header class="header">
   <a href="/" class="site-brand">{{ project_name }}</a>
 
-  <!-- Theme toggle + Preferences (always visible, far right) -->
+  <!-- Hidden checkbox controls mobile menu state - NO JavaScript -->
+  <input type="checkbox" id="nav-toggle" class="nav-checkbox" hidden>
+
+  <!-- Desktop: inline links, centered | Mobile: hamburger only -->
+  <nav class="nav-links">
+    <a href="/">Home</a>
+    <!-- App-specific sections (project-defined) -->
+  </nav>
+
+  <!-- Mobile: hamburger toggle (checkbox label) -->
+  <label for="nav-toggle" class="nav-toggle" aria-label="Toggle navigation">☰</label>
+
+  <!-- Slide-in panel for mobile (links only — actions below stay in header) -->
+  <div class="nav-panel">
+    <label for="nav-toggle" class="nav-close" aria-label="Close menu">✕</label>
+    <a href="/">Home</a>
+    <!-- App-specific sections (project-defined) -->
+  </div>
+  <label for="nav-toggle" class="nav-overlay"></label>
+
+  <!-- Actions: profile/preferences zone, then theme toggle (always visible, far right) -->
   <div class="header-actions">
+    <!-- Profile/preferences zone — state-dependent. Route is always
+         /server/preferences regardless of state; only the menu CONTENTS
+         change with whether an owner_token cookie exists. -->
+    {% if owner_token_cookie_exists %}
+      <div class="dropdown">
+        <button type="button" class="dropdown-toggle header-link" aria-label="Preferences and resource management">
+          <svg class="icon-preferences" aria-hidden="true"><!-- gear icon --></svg>
+        </button>
+        <div class="dropdown-menu">
+          <a href="{{ owned_resource_url }}" class="dropdown-item" role="menuitem">Manage my {{ resource_label }}</a>
+          <div class="dropdown-divider" role="separator"></div>
+          <a href="/server/preferences" class="dropdown-item" role="menuitem">Preferences</a>
+        </div>
+      </div>
+    {% else %}
+      <a href="/server/preferences" class="header-link" aria-label="Preferences" title="Preferences">
+        <svg class="icon-preferences" aria-hidden="true"><!-- gear icon --></svg>
+      </a>
+    {% endif %}
     <button type="button" class="btn btn-icon theme-toggle" aria-label="Toggle theme" aria-pressed="false">
       <svg class="icon-sun"  aria-hidden="true">…</svg>
       <svg class="icon-moon" aria-hidden="true">…</svg>
     </button>
-    <a href="/server/preferences" class="header-link" aria-label="Preferences" title="Preferences">
-      <svg class="icon-preferences" aria-hidden="true"><!-- gear icon --></svg>
-    </a>
   </div>
 </header>
+```
+
+```css
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  /* Centers the link cluster in the remaining space between brand and actions */
+  flex: 1;
+  justify-content: center;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  /* Actions stay right-aligned without pushing nav-links off-center */
+  flex: 0 0 auto;
+}
 ```
 
 No JS required for the theme toggle — see "System Theme Detection" above: the server reads the `theme` cookie and renders the correct class before the first byte of CSS, and a no-JS visitor can still switch theme via a `<noscript>` form POSTing to the theme endpoint. The `.header-link` to Preferences is a plain `<a>`, works with JS disabled by definition.
