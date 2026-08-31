@@ -22138,27 +22138,62 @@ document.querySelectorAll(".site-banner form").forEach((form) => {
 
 ### Theme Toggle
 
-```html
-<button type="button" class="btn btn-icon theme-toggle" aria-label="Toggle theme" aria-pressed="false">
-  <svg class="icon-sun"  aria-hidden="true">…</svg>
-  <svg class="icon-moon" aria-hidden="true">…</svg>
-</button>
+| Feature | Description |
+|---------|-------------|
+| **Options** | Dark / Light / Auto (follows OS preference) |
+| **Persistence** | `theme` cookie (`light` \| `dark` \| `auto`) — server-readable, so `detect_theme()` (see "System Theme Detection") renders the class on `<html>` with no init JS and no FOUC |
+| **Cycle order** | dark → light → auto → dark (wraps) — see "Theme Cycle Logic" below |
+| **No-JS fallback** | Auto theming works from pure CSS (`prefers-color-scheme`); the button IS a form submit, so switching without JS works identically to switching with JS |
+
+**Theme Cycle Logic (this is what makes repeated clicks keep working):** the button's POST target is never a hardcoded value — it is always the *next* mode after whatever the server just rendered, computed server-side from the current `theme` cookie via `next_theme()`. A hardcoded target (e.g. a button that always submits `"light"`) is the classic bug: the first click changes the theme away from the default, but every click after that resubmits the same value and nothing changes. Computing the target from actual current state on every render is what prevents that.
+
+```rust
+// next_theme returns the next mode in the cycle: dark -> light -> auto -> dark.
+// Called when rendering the toggle button so its target is always derived
+// from the theme actually in effect for this request - never a fixed value.
+fn next_theme(current: &str) -> &'static str {
+    match current {
+        "dark" => "light",
+        "light" => "auto",
+        _ => "dark", // "auto" or empty/unset
+    }
+}
 ```
 
-Theme preference is a `theme=light|dark|auto` COOKIE — server-readable, so `detect_theme()` (see "System Theme Detection") renders the correct class on `<html>` before the first byte of CSS applies: no FOUC, and theme selection works without JavaScript. `auto` (or no cookie) renders no override class; pure CSS `@media (prefers-color-scheme: light)` overrides the dark-default custom properties, so a no-JS visitor gets correct auto theming purely from CSS. There is no client-side init and no `matchMedia` script — the only JS is the toggle click handler (external file):
+```html
+<!-- {{ next_theme(theme) }} is a Tera call to the next_theme() helper above -->
+<form action="/preferences" method="POST" class="theme-toggle-form">
+  <input type="hidden" name="theme" value="{{ next_theme(theme) }}">
+  <button type="submit" class="btn btn-icon theme-button" aria-label="Switch theme (currently {{ theme }})" title="Switch theme">
+    <svg class="icon-theme" aria-hidden="true"><!-- reflects theme: moon/sun/circle-half --></svg>
+  </button>
+</form>
+```
+
+There is no client-side init and no `matchMedia` script. The only JS is an optional instant-preview enhancement (external file) — it does not intercept or replace the submit, so the cookie is always set server-side on every click, with or without JS:
 
 ```javascript
-// static/js/theme.js — enhancement only; the server already rendered the
-// correct theme class from the theme cookie, so there is no init code
-const toggle = document.querySelector('.theme-toggle');
-const root   = document.documentElement;
+// static/js/theme.js — instant-preview enhancement only; the real POST still
+// happens on submit. Recomputes the next mode from the LIVE <html> class on
+// every click rather than trusting the form's hidden value (rendered once at
+// page load, and stale after the first JS-driven switch) - this is what keeps
+// repeated clicks cycling instead of sticking after the first one.
+// `auto` = no class, CSS prefers-color-scheme rules apply.
+const THEME_CYCLE = ['dark', 'light', 'auto'];
 
-toggle?.addEventListener('click', () => {
-  const next = root.classList.contains('theme-light') ? 'dark' : 'light';
-  root.classList.remove('theme-dark', 'theme-light');
-  root.classList.add(`theme-${next}`);
-  toggle.setAttribute('aria-pressed', next === 'light' ? 'true' : 'false');
-  document.cookie = `theme=${next}; path=/; max-age=${60*60*24*365}; SameSite=Lax; Secure`;
+function currentTheme() {
+  if (document.documentElement.classList.contains('theme-dark')) return 'dark';
+  if (document.documentElement.classList.contains('theme-light')) return 'light';
+  return 'auto';
+}
+
+document.querySelectorAll('.theme-toggle-form').forEach((form) => {
+  form.addEventListener('submit', () => {
+    // Does NOT call preventDefault() - the form still submits normally so the
+    // server sets the cookie and re-renders with the correct next target.
+    const next = THEME_CYCLE[(THEME_CYCLE.indexOf(currentTheme()) + 1) % THEME_CYCLE.length];
+    document.documentElement.className = next === 'auto' ? '' : `theme-${next}`;
+  });
 });
 ```
 
@@ -23159,10 +23194,16 @@ pushes links flush right against the header edge with no centering.
         <svg class="icon-preferences" aria-hidden="true"><!-- gear icon --></svg>
       </a>
     {% endif %}
-    <button type="button" class="btn btn-icon theme-toggle" aria-label="Toggle theme" aria-pressed="false">
-      <svg class="icon-sun"  aria-hidden="true">…</svg>
-      <svg class="icon-moon" aria-hidden="true">…</svg>
-    </button>
+    <!-- Theme toggle: a form whose target is the SERVER-COMPUTED next mode
+         (next_theme(), see "Theme Toggle" → "Theme Cycle Logic"), never a
+         hardcoded value - that's what makes repeated clicks keep cycling
+         instead of sticking after the first one. -->
+    <form action="/preferences" method="POST" class="theme-toggle-form">
+      <input type="hidden" name="theme" value="{{ next_theme(theme) }}">
+      <button type="submit" class="btn btn-icon theme-button" aria-label="Switch theme (currently {{ theme }})" title="Switch theme">
+        <svg class="icon-theme" aria-hidden="true"><!-- reflects theme: moon/sun/circle-half --></svg>
+      </button>
+    </form>
   </div>
 </header>
 ```
@@ -24367,11 +24408,16 @@ widgets with the hex values from `dark_palette()`/`light_palette()`.
 ```
 
 **Theme Switching:**
-- Provide theme toggle in UI (☀️ Light / 🌙 Dark / 🔄 Auto)
+- Provide theme toggle in UI (☀️ Light / 🌙 Dark / 🔄 Auto) — see "Theme Toggle" above
 - Store preference in the `theme` cookie (per-user DB preference when logged in) — server-readable, so every full page load renders correctly
-- Apply theme class to `<html>` element: `theme-light`, `theme-dark`
-- Without JS: the toggle is a small POST form — server sets the cookie and redirects back
-- With JS: NO page reload required - instant switching via CSS classes (enhancement only)
+- Apply theme class to `<html>` element: `theme-light`, `theme-dark` (no class for `auto`)
+- The toggle's target is always the NEXT mode computed from the current cookie
+  (`next_theme()`, dark → light → auto → dark) — never a hardcoded value. This
+  is what makes repeated clicks keep cycling instead of only working once.
+- Without JS: the toggle is a form — server sets the cookie and redirects back
+- With JS: gives an instant visual preview on click, but does not prevent the
+  real submit — the form always POSTs so a logged-in user's DB preference is
+  actually persisted
 - All components (Swagger, GraphQL, admin) switch simultaneously
 
 **Accessibility Requirements:**

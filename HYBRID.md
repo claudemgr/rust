@@ -23566,17 +23566,32 @@ document.querySelectorAll(".site-banner .site-banner-dismiss").forEach((form) =>
 | **Options** | Dark / Light / Auto (follows OS preference) |
 | **Persistence** | `theme` cookie (`light` \| `dark` \| `auto`) — server-readable, so the theme class is rendered on `<html>` with no init JS and no FOUC |
 | **Keyboard** | Enter/Space cycles modes |
-| **No-JS fallback** | Auto theming works from pure CSS (`prefers-color-scheme`); switching without JS uses a small `<noscript>` form POSTing to the theme endpoint |
+| **Cycle order** | dark → light → auto → dark (wraps) — see "Theme Cycle Logic" below |
+| **No-JS fallback** | Auto theming works from pure CSS (`prefers-color-scheme`); the button IS a form submit, so switching without JS works identically to switching with JS |
+
+**Theme Cycle Logic (this is what makes repeated clicks keep working):** the button's POST target is never a hardcoded value — it is always the *next* mode after whatever the server just rendered, computed server-side from the current `theme` cookie via `next_theme()`. A hardcoded target (e.g. a button that always submits `"light"`) is the classic bug: the first click changes the theme away from the default, but every click after that resubmits the same value and nothing changes. Computing the target from actual current state on every render is what prevents that.
+
+```rust
+// next_theme returns the next mode in the cycle: dark -> light -> auto -> dark.
+// Called when rendering the toggle button so its target is always derived
+// from the theme actually in effect for this request - never a fixed value.
+fn next_theme(current: &str) -> &'static str {
+    match current {
+        "dark" => "light",
+        "light" => "auto",
+        _ => "dark", // "auto" or empty/unset
+    }
+}
+```
 
 **HTML Structure:**
 ```html
-<div class="theme-toggle" aria-label="Theme toggle">
-  <button class="theme-button" aria-label="Switch theme">
-    <svg class="icon-dark"><!-- moon --></svg>
-    <svg class="icon-light"><!-- sun --></svg>
-    <svg class="icon-auto"><!-- circle-half --></svg>
+<form action="/server/preferences" method="POST" class="theme-toggle-form">
+  <input type="hidden" name="theme" value="{{ next_theme(theme) }}">
+  <button type="submit" class="theme-button" aria-label="Switch theme (currently {{ theme }})" title="Switch theme">
+    <svg class="icon-theme"><!-- reflects theme: moon/sun/circle-half --></svg>
   </button>
-</div>
+</form>
 ```
 
 **CSS for Header Actions:**
@@ -23587,7 +23602,12 @@ document.querySelectorAll(".site-banner .site-banner-dismiss").forEach((form) =>
   gap: 1rem;
 }
 
-.theme-toggle {
+.theme-toggle-form {
+  display: flex;
+  align-items: center;
+}
+
+.theme-button {
   background: none;
   border: none;
   cursor: pointer;
@@ -25540,18 +25560,59 @@ html.theme-light {
 | Public (user) | `user_preferences.theme` | `dark` |
 | Admin | `admin_preferences.theme` | `dark` |
 
+The server resolves whichever of these applies into a single `theme` template
+variable before render (see "Theme Detection Flow" below). The toggle
+button's POST target is never a hardcoded value — it is always the *next*
+mode after `theme`, computed server-side via `next_theme()`. A hardcoded
+target is the classic bug: the first click changes the theme, but every click
+after that resubmits the same value and nothing changes. Computing the target
+from actual current state on every render is what keeps repeated clicks
+cycling.
+
+```rust
+// next_theme returns the next mode in the cycle: dark -> light -> auto -> dark.
+// Called when rendering the toggle button so its target is always derived
+// from the resolved cookie/DB preference - never a fixed value.
+fn next_theme(current: &str) -> &'static str {
+    match current {
+        "dark" => "light",
+        "light" => "auto",
+        _ => "dark", // "auto" or empty/unset
+    }
+}
+```
+
 **Theme switching (shared):**
 
-**Note:** Per "HTML5 & CSS Over JavaScript" rules - CSS does all theming via variables. The SERVER reads the `theme` cookie and renders the class on `<html>` — no FOUC, no JS required to load the correct theme. `auto` renders no explicit class; pure CSS `prefers-color-scheme` handles it — no `matchMedia` needed. Without JS the toggle is a small POST form (server sets the cookie and redirects back). JavaScript ONLY makes the toggle apply without a page reload:
+**Note:** Per "HTML5 & CSS Over JavaScript" rules - CSS does all theming via variables. The SERVER reads the `theme` cookie (or DB preference) and renders the class on `<html>` — no FOUC, no JS required to load the correct theme. `auto` renders no explicit class; pure CSS `prefers-color-scheme` handles it — no `matchMedia` needed. The toggle itself is a small POST form whose hidden value is always the server-computed `next_theme()` result; external JS only enhances it with an instant visual preview on click, it does not intercept or replace the submit, since logged-in and admin users' preference must reach the server to persist in the DB:
 
 ```javascript
-// Same function works for both public and admin - progressive enhancement only.
-// JS only swaps the class and stores the cookie; the server renders the class
-// on the next full page load. `auto` = no class, CSS prefers-color-scheme rules apply.
+// Same function works for both public and admin - instant-preview enhancement
+// only; the real POST still happens on submit. Recomputes the next mode from
+// the LIVE <html> class on every click rather than trusting the form's hidden
+// value (rendered once at page load, and stale after the first JS-driven
+// switch) - this is what keeps repeated clicks cycling instead of sticking
+// after the first one. `auto` = no class, CSS prefers-color-scheme rules apply.
+const THEME_CYCLE = ['dark', 'light', 'auto'];
+
+function currentTheme() {
+  if (document.documentElement.classList.contains('theme-dark')) return 'dark';
+  if (document.documentElement.classList.contains('theme-light')) return 'light';
+  return 'auto';
+}
+
 function setTheme(theme) {
   document.documentElement.className = theme === 'auto' ? '' : `theme-${theme}`;
-  document.cookie = `theme=${theme}; path=/; max-age=31536000; SameSite=Lax`;
 }
+
+document.querySelectorAll('.theme-toggle-form').forEach((form) => {
+  form.addEventListener('submit', () => {
+    // Does NOT call preventDefault() - the form still submits normally so the
+    // server persists the new value and re-renders with the correct next target.
+    const next = THEME_CYCLE[(THEME_CYCLE.indexOf(currentTheme()) + 1) % THEME_CYCLE.length];
+    setTheme(next);
+  });
+});
 ```
 
 ### Layout Partials
@@ -25894,9 +25955,18 @@ Mobile:
         <svg class="icon-preferences"><!-- gear icon --></svg>
       </a>
     {% endif %}
-    <button class="theme-button" aria-label="Switch theme" title="Toggle theme">
-      <svg class="icon-theme"><!-- theme icon --></svg>
-    </button>
+    <!-- Theme toggle: a form whose target is the SERVER-COMPUTED next mode
+         (next_theme(), see "Theme preference source" → cycle logic above),
+         never a hardcoded value - that's what makes repeated clicks keep
+         cycling instead of sticking after the first one. `theme` is the
+         single resolved value (cookie for public, DB preference for
+         logged-in/admin users). -->
+    <form action="/server/preferences" method="POST" class="theme-toggle-form">
+      <input type="hidden" name="theme" value="{{ next_theme(theme) }}">
+      <button type="submit" class="theme-button" aria-label="Switch theme (currently {{ theme }})" title="Switch theme">
+        <svg class="icon-theme"><!-- reflects theme: moon/sun/circle-half --></svg>
+      </button>
+    </form>
   </div>
 </header>
 ```
@@ -26487,11 +26557,15 @@ widgets with the hex values from `dark_palette()`/`light_palette()`.
 ```
 
 **Theme Switching:**
-- Provide theme toggle in UI (☀️ Light / 🌙 Dark / 🔄 Auto)
-- Store preference in the `theme` cookie — server-readable, so every full page load renders correctly
-- Apply theme class to `<html>` element: `theme-light`, `theme-dark`
-- Without JS: the toggle is a small POST form — server sets the cookie and redirects back
-- With JS: NO page reload required - instant switching via CSS classes (enhancement only)
+- Provide theme toggle in UI (☀️ Light / 🌙 Dark / 🔄 Auto) as a POST form that sets the `theme` cookie (public) or saves the DB preference (logged-in/admin) - works without JS
+- Apply theme class to `<html>` element: `theme-light`, `theme-dark` (no class for `auto`)
+- The toggle's target is always the NEXT mode computed server-side from the
+  current preference (`next_theme()`, dark → light → auto → dark) - never a
+  hardcoded value. This is what makes repeated clicks keep cycling instead of
+  only working once.
+- Optional JS gives an instant visual preview on click, but does not prevent
+  the real submit - the form always POSTs so a logged-in/admin user's DB
+  preference is actually persisted
 - All components (Swagger, GraphQL, admin) switch simultaneously
 
 **Accessibility Requirements:**
