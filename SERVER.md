@@ -23446,9 +23446,8 @@ format_url(host, 8443, true);
 │  🔒 Running in mode: production                           │
 ├───────────────────────────────────────────────────────────┤
 │  🧅 Tor:   http://{onion_address}                         │
-│  🔐 HTTPS: {proto}://{fqdn}                               │
 ├───────────────────────────────────────────────────────────┤
-│  📡 Listening on {proto}://{address}                      │
+│  📡 Listening on {proto}://{fqdn}                         │
 │  ✅ Server started on {startup_datetime}                  │
 ╰───────────────────────────────────────────────────────────╯
 ```
@@ -23464,9 +23463,7 @@ format_url(host, 8443, true);
 │  🔗 I2P:   http://{i2p_address}                           │
 │  📧 SMTP:  {smtp_address}:{smtp_port}                     │
 ├───────────────────────────────────────────────────────────┤
-│  📡 Listening on {proto}://{address}                      │
-├───────────────────────────────────────────────────────────┤
-│  🔐 Website: {proto}://{fqdn}                             │
+│  📡 Listening on {proto}://{fqdn}                         │
 ├───────────────────────────────────────────────────────────┤
 │  ✅ Server started on {startup_datetime}                  │
 ╰───────────────────────────────────────────────────────────╯
@@ -23479,9 +23476,7 @@ format_url(host, 8443, true);
 ├───────────────────────────────────────────────────────────┤
 │  🔒 Running in mode: production                           │
 ├───────────────────────────────────────────────────────────┤
-│  🌐 HTTP:  {proto}://{fqdn}:{port}                        │
-├───────────────────────────────────────────────────────────┤
-│  📡 Listening on {proto}://{address}:{port}               │
+│  📡 Listening on {proto}://{fqdn}:{port}                  │
 │  ✅ Server started on {startup_datetime}                  │
 ╰───────────────────────────────────────────────────────────╯
 ```
@@ -23521,9 +23516,7 @@ format_url(host, 8443, true);
 ├───────────────────────────────────────────────────────────┤
 │  🔒 Running in mode: production                           │
 ├───────────────────────────────────────────────────────────┤
-│  🌐 HTTP:  {proto}://{fqdn}                               │
-├───────────────────────────────────────────────────────────┤
-│  📡 Listening on {proto}://{address}                      │
+│  📡 Listening on {proto}://{fqdn}                         │
 │  ✅ Server started on {startup_datetime}                  │
 ╰───────────────────────────────────────────────────────────╯
 ```
@@ -23535,9 +23528,7 @@ format_url(host, 8443, true);
 ├───────────────────────────────────────────────────────────┤
 │  🔒 Running in mode: {app_mode} [debugging]               │
 ├───────────────────────────────────────────────────────────┤
-│  🌐 HTTP:  {proto}://{fqdn}                               │
-├───────────────────────────────────────────────────────────┤
-│  📡 Listening on {proto}://{address}                      │
+│  📡 Listening on {proto}://{fqdn}                         │
 │  ✅ Server started on {startup_datetime}                  │
 ╰───────────────────────────────────────────────────────────╯
 ```
@@ -23579,8 +23570,7 @@ format_url(host, 8443, true);
 ```
 🚀 {PROJECT_NAME} v{project_version}
 🔒 Mode: {app_mode}
-🌐 {proto}://{fqdn}
-📡 Listening: {proto}://{address}:{port}
+📡 Listening: {proto}://{fqdn}:{port}
 ✅ Started: {startup_datetime}
 ```
 
@@ -23627,8 +23617,7 @@ SETUP: {setup_token}
 ```
 {PROJECT_NAME} v{project_version}
 Mode: {app_mode}
-URL: {proto}://{fqdn}
-Listening: {proto}://{address}:{port}
+Listening: {proto}://{fqdn}:{port}
 Started: {startup_datetime}
 ```
 
@@ -49831,8 +49820,7 @@ pub struct LocaleAssets;
     "daemon_started": "Demonio iniciado con PID {pid}",
     "already_running": "Ya en ejecución (pid {pid})",
     "running_in_mode": "Ejecutando en modo: {app_mode}",
-    "http_address": "HTTP: {proto}://{fqdn}:{port}",
-    "listening_on": "Escuchando en {proto}://{address}:{port}",
+    "listening_on": "Escuchando en {proto}://{fqdn}:{port}",
     "server_started_on": "Servidor iniciado en {startup_datetime}",
     "server_started_ok": "Servidor iniciado exitosamente",
     "received_signal": "Recibida señal {signal}, iniciando apagado graceful...",
