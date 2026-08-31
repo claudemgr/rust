@@ -2259,6 +2259,12 @@ Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI fai
 
 All gates run inside the project Docker image — never on the host.
 
+**Commit-time lint gate:** running `cargo clippy` directly satisfies the quality bar
+shown here, but does NOT satisfy `gitcommit`'s pre-commit lint gate —
+`lint-agent-mark.sh` only records the gate as passed when the `rust-lint` agent
+itself reports a clean result. Invoke the `rust-lint` agent before running
+`gitcommit`; a raw `cargo clippy` invocation leaves the commit permanently blocked.
+
 - [ ] `cargo fmt --all --check` (Docker-wrapped)
 - [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` (Docker-wrapped)
 - [ ] `cargo test --workspace --all-features` (Docker-wrapped)

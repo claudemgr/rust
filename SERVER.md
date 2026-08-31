@@ -1907,7 +1907,7 @@ Both files use the same structure. Settings are merged: `settings.local.json` ov
 **CRITICAL Rules:**
 - NEVER allow `Bash(sudo *)` - privilege escalation should be explicit and manual
 - NEVER allow `Bash(rm -rf *)` or similar destructive patterns
-- ALWAYS deny `Bash(git commit *)` and `Bash(git push *)` - plain git commit/push are blocked because they bypass the signed-commit wrapper. AI commits via `gitcommit <command>` instead (the `gitcommit` wrapper is resolved from PATH)
+- ALWAYS deny `Bash(git commit *)` and `Bash(git push *)` - plain git commit/push are blocked because they bypass the signed-commit wrapper. AI commits via `gitcommit --dir {project_dir} all` instead (the `gitcommit` wrapper is resolved from PATH)
 - Use `PreToolUse` hooks to enforce project standards (formatting, no vendor names)
 - The `env` section sets environment variables for ALL Bash commands in the session
 - Settings are merged: project settings extend/override global `~/.claude/settings.json`
