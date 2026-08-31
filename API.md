@@ -23401,7 +23401,30 @@ All pages include:
 
 <!-- Canonical -->
 <link rel="canonical" href="{{ canonical_url }}">
+
+<!-- Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "{{ site_name }}",
+  "description": "{{ page_description }}",
+  "url": "{{ canonical_url }}"
+}
+</script>
 ```
+
+### Robots Directive
+
+`{{ robots_directive }}` is computed server-side per route, never hardcoded:
+
+| Route type | Value |
+|------------|-------|
+| Public pages (homepage, docs, about) | `index,follow` |
+| `/admin`, `/api/*`, auth pages (login, register, reset) | `noindex,nofollow` |
+| Internal/health/debug endpoints | `noindex,nofollow` |
+
+Default to `index,follow` only for routes explicitly marked public; every other route defaults to `noindex,nofollow` (fail closed).
 
 ### Site Verification Meta Tags
 
@@ -44353,6 +44376,9 @@ make docker
 - [ ] `<meta name="author">` present (if configured)
 - [ ] OpenGraph tags present (og:title, og:description, og:image, og:url)
 - [ ] Twitter Card tags present (twitter:card, twitter:title, twitter:description)
+- [ ] `<link rel="canonical">` present and correct
+- [ ] `<meta name="robots">` present, correct index/noindex per route
+- [ ] JSON-LD structured data present and valid
 - [ ] All meta content properly escaped (XSS prevention)
 
 ### Static Files
