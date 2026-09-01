@@ -24029,6 +24029,7 @@ Displays server information, software version, and operator contact.
 | `uptime` | `String` | Human-readable uptime |
 | `rust_version` | `String` | Rust version (from `rustc --version`) |
 | `build_date` | `String` | ISO 8601 build timestamp |
+| `attribution` | `Vec<String>` | Required third-party license notices (GeoIP DB-IP/NRO CC BY 4.0 — see PART 20: GEOIP; any others required by dependencies), rendered verbatim, not hidden behind a click-through |
 
 ### /server/privacy
 
@@ -25555,7 +25556,7 @@ All databases come from [sapics/ip-location-db](https://github.com/sapics/ip-loc
 | Country | CC BY 4.0 | NRO (RIR whois + geofeed + ASN data, merged) |
 | City | CC BY 4.0 | DB-IP |
 
-**Required, verbatim, on a page reachable from every screen that displays GeoIP-derived data (e.g. an "About" or footer link) AND in `LICENSE.md`'s third-party attribution section (see PART 2):**
+**Required, verbatim, on `/server/about` (see "Standard Pages" → /server/about) AND in `LICENSE.md`'s third-party attribution section (see PART 2):**
 
 ```html
 <a href="https://db-ip.com/">IP Geolocation by DB-IP</a>
