@@ -24030,7 +24030,7 @@ Displays server information, software version, and operator contact.
 | `uptime` | `String` | Human-readable uptime |
 | `rust_version` | `String` | Rust version (from `rustc --version`) |
 | `build_date` | `String` | ISO 8601 build timestamp |
-| `attribution` | `Vec<String>` | Required third-party license notices (GeoIP DB-IP/NRO CC BY 4.0 — see PART 20: GEOIP; any others required by dependencies), rendered verbatim, not hidden behind a click-through |
+| `attribution` | `Vec<String>` | Required third-party license notices (GeoIP DB-IP/NRO CC BY 4.0 — see PART 19: GEOIP; any others required by dependencies), rendered verbatim, not hidden behind a click-through |
 
 ### /server/privacy
 
