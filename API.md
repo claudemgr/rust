@@ -18349,7 +18349,7 @@ GET /api/{api_version}/items?status=active            ✓ Filtering
 | **Indentation** | 2 spaces — never tabs, never 4 spaces |
 | **Trailing newline** | Every JSON response ends with exactly one `\n` |
 | **No bare arrays at root** | Never emit a top-level JSON array — always wrap: `{ "data": [...] }`. Bare arrays cannot grow new sibling fields (pagination, metadata) without a breaking change, and some older clients reject them as JSON. |
-| **Success shape** | `{ "ok": true, "data": { ... } }` — `ok` is the discriminator; `data` carries the payload. Exception: health endpoints return the bare health object (see PART 13). |
+| **Success shape** | `{ "ok": true, "data": { ... } }` — `ok` is the discriminator; `data` carries the payload (object or array); list responses add a sibling `pagination` object (see "Standard Response Formats"). Exception: health endpoints return the bare health object (see PART 13). |
 | **Error shape** | `{ "ok": false, "error": "CODE", "message": "...", "details": {} }` — see PART 14 |
 
 ```rust
@@ -19805,6 +19805,7 @@ Need additional compatible endpoints?"
 
 ```json
 {
+  "ok": true,
   "data": [],
   "pagination": {
     "page": 1,
