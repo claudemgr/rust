@@ -1643,7 +1643,10 @@ In addition to the workflows, every repository ships:
 - `vuln-scan` (cargo audit) — conditional on `Cargo.lock` present
 - `image-scan` (Trivy) — conditional on Dockerfile present; runs after image build
 
+**Container-job user rule:** every `container:` job MUST set `options: "--user 0:0"`. The runner (and actions/checkout's post-job cleanup) execs into the job container — e.g. `cat /etc/*release` for OS diagnostics — as a user the image's `/etc/passwd` may not define, which fails or flakes the job after all real work already passed, wasting the entire run. Numeric `0:0` needs no `/etc/passwd` lookup at all, so it is immune regardless of the image's user table.
+
 **GitHub Actions job ordering (`needs:`):**
+
 - `ci.yml`: `lint` and `test` run in parallel → `build` needs: test → `upload-artifacts` needs: build; security jobs (`secret-scan`, `workflow-policy`, `vuln-scan`, `image-scan`) run in parallel with each other
 - `release.yml`: `build` → `release` (needs: build); release job always re-runs its own build inline
 - Cross-workflow ordering via branch protection; never `workflow_run`
@@ -1782,6 +1785,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: casjaysdev/rust:latest
+      options: "--user 0:0"
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
       - name: Capture build epoch
