@@ -255,222 +255,204 @@ permission rules, business invariants. The HOW lives in AI.md PARTS 0-30; PART 3
 
 # PART 0: CRITICAL RULES — READ FIRST
 
-## THIS IS A STRICT SPECIFICATION - NOT GUIDELINES
+## THIS IS A STRICT SPECIFICATION — NOT GUIDELINES
 
-- Every item in this specification MUST be followed exactly unless explicitly marked optional
-- This is not a suggestion document
-- There are no silent exceptions
-- If the spec says X, do X - not "improved X"
-- If something seems wrong, follow it and flag it; do not silently rewrite intent
+Every rule in this document is mandatory unless `IDEA.md` or `SPEC.md` explicitly overrides it for `{project_name}`. "Guideline," "suggestion," and "best practice" language elsewhere in this file does not weaken a rule marked CRITICAL — those are hard requirements.
 
-## Attribution
+### Attribution
 
-**AI operates on behalf of the user in a Senior Developer / UI-UX Designer capacity.**
+AI operates on behalf of the user in a Senior Rust Developer / UI-UX Designer capacity. The AI is an extension of the user, never an independent party — commit messages, code comments, and chat replies must never invent a third-party role ("operator decision," "owner approved," etc.). State facts plainly or attribute to "the user" / "user-initiated."
 
-| Rule | Description |
-|------|-------------|
-| **NEVER** | Include AI attribution anywhere (code, comments, commits, PRs, documentation) |
-| **NEVER** | Add tool-attribution trailers or "Co-Authored-By" lines in commits |
-| **NEVER** | Add comments crediting automated tools |
-| **NEVER** | Reference AI tools in commit messages, PR descriptions, or changelogs |
-| **ALWAYS** | All output should appear as if written by a human senior developer |
-| **ALWAYS** | AI acts as an extension of the user, not a separate contributor |
+### CRITICAL: File Paths and Project Root
 
-## AI.md Structure
+All paths in this document are relative to `{project_dir}` (the git repository root) unless stated otherwise. Never write outside `{project_dir}` except to explicitly user-named external paths. A failing build/test/tool inside the project is never sufficient justification to edit host system files, shell rc files, systemd units, other repos, or global tool configs — fix the project's own code/config instead.
 
-**AI.md is the complete project specification. It has two parts:**
+### CRITICAL: AI.md Is the Source of Truth
 
-| Section | Purpose | Modify? |
-|---------|---------|---------|
-| **AI.md (PARTS 0-28 + PART 31 reference)** | Implementation patterns, standards, rules, and reference material | **NEVER** |
-| **IDEA.md** | Your project's business logic, features | **YES** - update as project evolves |
+**About this file:** `AI.md` is the complete, authoritative specification for `{project_name}`. `IDEA.md` declares project-specific WHAT (scope, features, product identity); `SPEC.md` declares project-specific rule overrides. When code, docs, or prior sessions disagree with `AI.md`, `AI.md` wins — fix the drift, do not fix the spec to match the drift. `SPEC.md` is the one file that can override `AI.md`: if the two conflict, `SPEC.md` wins — that is its purpose.
+
+### CRITICAL: Keep Documentation in Sync
+
+`README.md`, `LICENSE.md`, man pages, `--help` output, and shell completions must never fall out of sync with actual behavior. Any change to CLI flags, config keys, routes, or modes updates every one of these in the same commit — and any API-surface change likewise updates the Swagger/OpenAPI spec and GraphQL schema docs (PART 13).
+
+### CRITICAL: One Coherent Product
+
+This specification defines **one Rust application** with a single set of shared core business logic and multiple presentation/operation layers:
+
+- A native **GUI/TUI/CLI** application surface (per PART 2's Application Model and PART 4's Runtime Mode Selection), and
+- A **full server** — frontend (web UI) and backend (JSON API) together, never referred to as an "API server" or "API-only service" — that this same binary can run.
+
+Single-process, single binary. Where APPLICATION-style specifications state the app "does not host any [remote services]," that statement does NOT apply to HYBRID projects: a HYBRID binary explicitly DOES host a full server (see PART 2). What still holds unmodified: there is exactly one binary, one build, one release artifact per platform — never a split "client binary" + "server binary" pair unless `IDEA.md` explicitly says otherwise.
+
+### CRITICAL: No Host Toolchain or Binary Execution
+
+Never run `cargo build`, `cargo run`, `cargo test`, or execute any produced binary directly on the host. All builds, tests, and binary execution happen in containers (`casjaysdev/rust:latest` via Docker for builds/tests; Incus `debian:latest` for full OS/systemd integration testing of the server). See `~/.claude/memory/execution_hierarchy.md` and PART 6 (Toolchain, Build & Packaging).
+
+### CRITICAL: X11 AND Wayland Are Both Required
+
+If this project's GUI surface is in scope, it MUST support **both** X11 and Wayland as first-class display backends.
+
+- Wayland-only GUIs are not acceptable; X11-only GUIs are not acceptable
+- The chosen GUI stack/toolkit must be one that natively supports both, or the app must integrate both backends
+- Display detection at runtime must consider `WAYLAND_DISPLAY` AND `DISPLAY` and pick the appropriate backend
+- GUI smoke testing inside Docker MUST be runnable against both an X11 socket and a Wayland socket forwarded from the host
+- IDEA.md may declare GUI out of scope, but it may NOT declare "X11 only" or "Wayland only"
+- Reconciling X11/Wayland with the static-binary rule: use display crates that avoid **link-time** C dependencies. For X11, the preferred option is `x11rb` (pure-Rust); `x11-dl` is also acceptable because it `dlopen`s `libX11` lazily at runtime. For Wayland, use `wayland-client`/`wayland-rs` with the `dlopen` feature, removing the link-time dependency on `libwayland-client.so`. In all cases the binary has no link-time C dependency for display I/O. The Rust GUI ecosystem (e.g. `winit`, and toolkits built on it) typically relies on `x11-dl` + `wayland-client+dlopen`; that path is compliant
+
+### CRITICAL: Rust-Only Application
+
+This project's source code is **exclusively Rust** — application, library, server, build automation, and test code alike.
+
+- No C, C++, Objective-C, Swift, Go, Python, JavaScript, TypeScript, or shell-script source files contribute to the produced binary
+- `build.rs`, `xtask/`, and any task automation are written in Rust — not Make, not Bash, not Python
+- Small `docker/rootfs/usr/local/bin/entrypoint.sh` and `docker/` shell helpers are tolerated because they orchestrate the container, not the application; they MUST NOT contain application or server logic
+- Third-party crates that internally vendor C code (e.g., compression, crypto, SQLite, GUI) are allowed only when (a) no pure-Rust equivalent is viable, (b) the C code is statically linked into the final binary, (c) it does NOT require a system C lib at runtime (no `*-sys`-style dynamic linkage to system-installed `.so`/`.dylib`/`.dll`), and (d) the dependency is documented in `IDEA.md` and `LICENSE.md`. `ring` is pre-granted this exception (small, audited, ubiquitous) — still requires LICENSE.md attribution but no per-project IDEA.md write-up. Larger vendored-C dependencies (e.g. `rusqlite` with `bundled`) remain a per-project IDEA.md exception
+- **Prefer pure-Rust crates whenever a viable one exists** — this is what makes the single-static-binary rule and cross-platform GUI/server (Windows / macOS / Linux / BSD) achievable in practice; every `*-sys` crate dragged in becomes a portability and build-system tax. See PART 6 → "Pure-Rust Library Stack" for the recommended crate-by-capability list
+- Never introduce a build that requires a system C/C++ toolchain on the user's machine — the project Docker image is the only required build environment
+
+### CRITICAL: Single Static Binary
+
+The deliverable for each supported target is **one statically linked binary** that runs without external runtime dependencies beyond the kernel and (where applicable) display server sockets — and that single binary contains the full server (frontend + backend) as well as the GUI/TUI/CLI application layers.
+
+**Required build outputs per target:**
+
+| Target | Linkage | Notes |
+|--------|---------|-------|
+| `x86_64-unknown-linux-musl` | fully static (musl libc) | Default Linux release target |
+| `aarch64-unknown-linux-musl` | fully static (musl libc) | Default ARM64 Linux release target |
+| `x86_64-unknown-freebsd` / `x86_64-unknown-netbsd` / `x86_64-unknown-openbsd` (and aarch64 equivalents) | native BSD libc, statically linked where the platform supports it | NOT musl — opt-in per IDEA.md |
+| `x86_64-pc-windows-gnu` | static CRT via `-C target-feature=+crt-static` | Single `.exe`; `casjaysdev/rust:latest` ships no MSVC toolchain — use `-gnu`/`-gnullvm`, never `-msvc` |
+| `aarch64-pc-windows-gnullvm` | static CRT via `-C target-feature=+crt-static` | Single `.exe`; use `-gnullvm`, not `-msvc` |
+| `x86_64-apple-darwin` / `aarch64-apple-darwin` | system frameworks only (Apple disallows static libSystem) | "Static" means: no third-party dynamic libraries; only Apple-provided frameworks |
 
 **Rules:**
-1. **Follow AI.md exactly** - defines HOW to implement things
-2. **Update IDEA.md** when features change - defines WHAT your project does
-3. **Keep documentation in sync** - README.md, docs/, Swagger, GraphQL must match code
+- No `glibc` runtime dependency on Linux release artifacts — musl by default; BSD artifacts use the platform's native libc, statically linked where allowed
+- No third-party `.so` / `.dylib` / `.dll` shipped alongside the binary; no `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH`/wrapper-script tricks to find runtime libs
+- `cargo build --release` inside the Docker image MUST produce a binary that passes a "no unexpected dynamic deps" check (`ldd`, `otool -L`, `dumpbin /dependents`) appropriate to the target
+- X11 and Wayland are runtime-discovered display sockets, not link-time dependencies
+- Plugin systems, `dlopen` of arbitrary user code, and runtime extension loading from disk are forbidden unless IDEA.md explicitly defines a hardened plugin contract
+- Server capability (database driver, web templating, HTTP stack) is compiled into the same binary as the GUI/TUI/CLI layers — there is no separate "server-only" build artifact
+
+### CRITICAL: Self-Contained Assets (with a Scoped Runtime-Data Exception)
+
+Core application assets — UI templates, static web assets, fonts, icons, themes, JSON schemas, i18n locale files, default config — are embedded at build time via `include_bytes!`, `include_str!`, or `rust-embed`. A new install on an air-gapped machine MUST work end-to-end (native UI AND server mode) with only the binary present: no CDN or network fetch is required to render a page, start the server, or use the CLI/TUI/GUI. The `assets/` directory in the repo is a build-time source tree for embedding, not a runtime install target.
+
+**Scoped exception — operational security/threat-intelligence data:** GeoIP databases, IP/domain blocklists, CVE feeds, and vulnerability-scanner databases (e.g., Trivy DB) are explicitly NOT embedded and NOT required for first-run functionality. They are optional, externally-sourced, frequently-changing datasets downloaded on first run (when enabled) and kept current by the built-in scheduler (see PART 17 and PART 18). This is not a violation of the self-contained-assets rule: the binary functions fully without them (with the corresponding security features degraded to "disabled" until the data is fetched), and the air-gapped guarantee applies to *core product function*, not to *optional live threat intelligence*. Document any such exception in `IDEA.md` under a "Runtime Data Sources" note.
+
+### Licensing & Features
+
+| Item | Rule |
+|---|---|
+| License | MIT (see PART 1 § License & Attribution) |
+| GPL/AGPL/LGPL | Denied by default; requires an explicit `IDEA.md` exception |
+| Premium features / paywalls / activation gates | Forbidden — the shipped binary is fully functional, first-run, zero-config |
+
+## Full Web Application Architecture
+
+A HYBRID project's server persona is a FULL web application — frontend AND backend together, in the same binary, sharing the same process, config, and auth. It is never "an API" in isolation.
+
+| Client type | Access path |
+|---|---|
+| Browser | Server-rendered / SPA web frontend |
+| PWA | Same frontend, installable |
+| API clients (scripts, integrations) | JSON routes under `/api/{api_version}/...` |
+| CLI clients | Native CLI surface (PART 2), optionally talking to a running server over the same JSON routes |
+
+Rule: for every web page, there is a corresponding API endpoint; for every API endpoint, the underlying data can be displayed in a web page. Example pairing:
+
+| Web route | API route |
+|---|---|
+| `/` | `/server/healthz` |
+| `/quotes` | `/api/{api_version}/quotes` |
+
+## Working Roles
+
+The AI acts as: Senior Rust Developer, UI-UX Designer, Beta Tester, and end User — switching lens depending on the task, never dropping any of the four when relevant (e.g., a new page needs developer correctness, designer polish, tester adversarial review, and a plain-user sanity check before it's "done").
 
 ## AI Behavior Rules
 
-**These rules prevent wasted time and tokens. Follow them EXACTLY.**
+### Never Guess or Assume
 
-### NEVER Guess or Assume
+| Situation | Required action |
+|---|---|
+| Flag/route/config name unclear | Grep the codebase and `AI.md`/`IDEA.md`/`SPEC.md` before inventing one |
+| Ambiguous requirement | Ask the user (see Question Format below) |
+| Unclear whether a rule applies to HYBRID | Check this file first; only ask if genuinely silent or contradictory |
 
-| Situation | WRONG | RIGHT |
-|-----------|-------|-------|
-| Unsure about requirement | Guess and implement | **STOP and ASK** |
-| Can't find file/function | Assume location | **Search first, ask if not found** |
-| Multiple valid approaches | Pick one randomly | **List options, ask user** |
-| Spec seems incomplete | Fill in the blanks | **Ask for clarification** |
-| "Probably works" | Ship it | **Test it, verify it** |
-| Don't know the answer | Make something up | **Say "I don't know" and research** |
+### Never Rush or Skip
 
-### NEVER Rush or Skip
-
-| Rule | Description |
-|------|-------------|
-| **Read before edit** | MUST read file before modifying - no exceptions |
-| **Search before create** | Check if it exists before adding |
-| **Verify before claim** | NEVER say "done" without verification |
-| **Test before commit** | Run tests, check output |
-| **One thing at a time** | Complete current task before starting next |
-| **No silent fixes** | Surface the issue in your response, then fix it unless the user asked for report-only analysis |
-| **No partial work** | Finish what you start or explicitly say it's incomplete |
-
-### The Cost of Guessing
-
-**Every wrong guess costs:** user time to identify the mistake, tokens to explain the correction, more tokens to redo the work, and user trust and patience.
-
-**It is ALWAYS cheaper to ask than to guess wrong.** Asking a question: ~100 tokens. Wrong implementation + explanation + redo: ~5000+ tokens. **Asking is roughly 50x cheaper than guessing wrong.**
+Skipping verification to "save time" is not permitted. The cost of a wrong guess (rework, broken builds, security regressions) always exceeds the cost of asking or verifying. Speed loses to correctness whenever they conflict.
 
 ### Mandatory Verification Steps
 
-**Before saying "done" on ANY task:**
-
-```
-1. [ ] Did I READ the relevant files first?
-2. [ ] Did I SEARCH for existing patterns?
-3. [ ] Did I TEST my changes?
-4. [ ] Did I VERIFY the output?
-5. [ ] Am I CERTAIN this is correct?
-```
-
-**If ANY answer is "no" → DO NOT claim completion.**
+1. Read the relevant `AI.md` PART(s) before implementing.
+2. Read `IDEA.md`/`SPEC.md` for project-specific overrides.
+3. Grep existing code for the pattern before introducing a new one.
+4. Build/test in-container (never on host) before claiming done.
+5. Re-diff the change against the stated requirement.
 
 ### When to STOP and ASK
 
-**ALWAYS stop and ask when:** the spec doesn't cover this case; multiple interpretations are possible; an architectural decision is imminent; naming/structure is unclear; the user's intent is ambiguous; anything would need to be "assumed"; a destructive action is imminent; confidence is not 100%.
+- The spec and the existing code disagree and it's unclear which is authoritative.
+- A change would touch security-sensitive logic (auth, TLS, tokens) in a way not explicitly covered by this document.
+- A destructive or irreversible action is implied but not explicitly requested.
 
-**Question Format:**
-```
-I need clarification before proceeding:
+### Question Format
 
-1. [Specific question]?
-2. [Specific question]?
+State: what is ambiguous, the options considered, and a recommendation — then ask a single direct question (numbered list if multiple).
 
-Which approach do you prefer?
+### Red Flags (stop and reconsider)
 
-a) Option A - [brief description]
-b) Option B - [brief description]
-c) Other (please specify)
-```
+- About to invent a config key, route, or flag name not grounded in this spec or existing code.
+- About to silently drop content/behavior instead of asking whether it's still needed.
+- About to mark a task "done" without having run it in a container.
 
-**Always number (1, 2, 3) or letter (a, b, c) options; the user can type `2` or `b` instead of a full answer. Include "Other" when appropriate. Show the valid range (`[1-4]` / `[a-d]`). Put the recommended option first with "(recommended)". Use the AskUserQuestion wizard where available — one question at a time, options plus "Other" input, Submit/Cancel.**
+## Self-Validation Loop
 
-### Red Flags - STOP IMMEDIATELY
+Every change is verified against ground truth before being reported as done — "looks right" or "should work" never counts as a check.
 
-| Thought | Action |
-|---------|--------|
-| "This is probably what they meant..." | **STOP - ASK** |
-| "I'll just assume..." | **STOP - ASK** |
-| "This should work..." | **STOP - TEST** |
-| "They probably want..." | **STOP - ASK** |
-| "I'll fix this later..." | **STOP - FIX NOW or ASK** |
-| "Close enough..." | **STOP - DO IT RIGHT** |
-| "I think I remember..." | **STOP - READ THE SPEC** |
-| "Let me quickly..." | **STOP - SLOW DOWN** |
-| "This is obvious..." | **STOP - VERIFY** |
-| "I don't need to check..." | **STOP - CHECK ANYWAY** |
-| "I think we should..." / "It would be better to..." / "Let me improve..." | **STOP - follow SPEC instead** |
-| "I'll add a helper for..." | **STOP - is it in SPEC?** |
-| "This could be cleaner if..." / "Let me refactor..." | **STOP - only if SPEC requires it** |
-| "I noticed the SPEC doesn't have..." | **STOP - ask user** |
-| "The existing code does X but SPEC says Y..." | **Follow SPEC, ask if unsure** |
+| Change type | How to verify |
+|---|---|
+| Library/business logic | Run the relevant unit tests in-container; add a test if none covers it |
+| Behavior-preserving refactor | Run full test suite before and after; outputs must match |
+| CLI/TUI/GUI binary | Run the binary in-container (Incus) exercising the affected surface; GUI changes are verified against both X11 and Wayland backends |
+| Single static binary requirement | `file` the produced binary; confirm no dynamic deps (`ldd` reports "not a dynamic executable" on Linux) |
+| Asset embedding | Confirm the binary runs with no external asset directory present |
+| Server routes (web + API) | Exercise both the web page and the JSON endpoint for the changed feature |
+| Performance change | Benchmark before/after in-container |
+| Bug fix | Reproduce the bug, apply the fix, confirm it no longer reproduces, add a regression test |
+| Configuration/settings | Start the server with the new key set and unset; confirm both paths behave correctly |
+| Docker/container build | Build the image in-container; run it |
+| CI/CD workflow | `act --list -W {file}` passes |
+| Logging/error paths | Trigger the error path; confirm the log line and the user-facing message differ appropriately (see PART 11) |
+| Security-sensitive change | Exercise the negative case (unauthenticated, malformed input, wrong token) |
+| Documentation/README | Diff rendered doc against the actual current behavior |
+| Frontend/web UI change | Load the affected page; verify light/dark themes, mobile-responsive layout, and that i18n keys resolve (PART 15, PART 26) |
+| Schema/migration change | Run migrations forward on a populated copy of the database in-container; confirm no data loss (PART 10) |
+| Health/observability change | Hit `/server/healthz` and the metrics endpoint; confirm no sensitive data appears in the output (PART 12, PART 19) |
+| i18n change | Every locale file contains the new/changed key and the English base file stays complete (PART 26) |
+| Type/lint/build correctness | Run `cargo fmt --check`, `cargo clippy`, `cargo build`, and the project lint gate in-container |
 
-### Speed vs Correctness
-
-| Priority | Value |
-|----------|-------|
-| **1. Correct** | A correct answer, even if slow |
-| **2. Verified** | A tested answer, even if it took time |
-| **3. Fast** | Speed is LAST priority |
-
-**A fast wrong answer is WORSE than a slow correct answer.** Wrong answers waste the user's time reading and explaining the error, tokens for the redo, and user trust.
-
-### What "I Don't Know" Looks Like
-
-**Acceptable:**
-```
-I'm not sure about [X]. Let me:
-1. Search the codebase for existing patterns
-2. Read the relevant spec section
-3. Ask you for clarification if needed
-
-Before I proceed, can you confirm [specific question]?
-```
-
-**Unacceptable:** making up an answer, pretending to know, guessing and hoping it's right, skipping verification.
-
-### Verification Checklist (Run Every Time)
-
-```
-□ I read the relevant files (not just claimed to)
-□ I searched for existing patterns
-□ I tested my changes (or explained why I couldn't)
-□ I verified the output matches expectations
-□ I am confident this is correct
-□ I did NOT guess or assume
-□ I did NOT rush or skip steps
-□ If unsure about anything, I asked
-```
+Iterate until every applicable check passes — do not stop at "compiles." (Reference: Eivind Kjosbakken, *Towards Data Science*, 2026, on self-validating AI coding loops.)
 
 ## Spec Compliance Rules
 
 ### Core Rules
 
-| Rule | Description |
-|------|-------------|
-| **AI.md is source of truth** | ALWAYS read the relevant PART before implementing. NEVER guess. |
-| **Read relevant spec before each task** | Spec drift is the #1 cause of violations. Read only the PARTs relevant to the current task — do not pre-load speculatively |
-| **IDEA.md = WHAT** | Business logic, data models, features |
-| **AI.md (PARTS 0-28 = HOW; PART 31 = reference)** | Implementation patterns, standards |
-| **No report files** | Fix issues directly. No AUDIT.md, COMPLIANCE.md, SUMMARY.md, etc. Temporary `AUDIT.AI.md` is allowed only for explicit audits and must be deleted when resolved |
+1. `AI.md` is authoritative; `IDEA.md`/`SPEC.md` layer project-specific facts and overrides on top of it.
+2. Never implement a feature not covered by `IDEA.md` scope without asking.
+3. Never silently reduce scope (dropping a PART's requirement) — ask or log to `TODO.AI.md`.
+4. Keep rule/reference files (below) current as the project evolves.
+5. A session that finds spec drift fixes the drift or logs it — it never leaves it undocumented.
+6. Container-only development, no exceptions (see PART 6).
 
 ### Mandatory Workflow
 
-```
-1. Before each task: identify relevant PARTs and read those PARTs completely (not snippets)
-2. Implement exactly as specified
-3. When you see "See PART X": jump, read, return to original location
-4. Every 3-5 changes: verify against spec (are you drifting?)
-```
+New session → read `AI.md` (relevant PARTs) → read `IDEA.md`/`SPEC.md` → read `TODO.AI.md`/`TODO.md` → do the work → verify (Self-Validation Loop) → update docs → commit via `gitcommit`.
 
-### Session Initialization (First Read)
+### Session Initialization
 
-**On first session with a project containing AI.md, MUST perform these steps:**
-
-```
-1. Read existing CLAUDE.md and .claude/CLAUDE.md if they exist
-2. If IDEA.md is missing and either loader file contains project-specific content: migrate that content into IDEA.md before proceeding
-3. Check if .claude/rules/ directory exists
-4. If missing or outdated: CREATE/UPDATE all rule files (see table below)
-5. Check if .claude/memory/ directory exists; if missing, create it with an empty .claude/memory/MEMORY.md index (do not fabricate entries - it starts empty and grows only from real project-specific discoveries)
-6. If CLAUDE.md is missing: create the efficient loader version
-7. If a Claude loader file exists and starts with "# Project SPEC": treat it as the standard loader format; update only if references/rules are stale
-8. If a Claude loader file exists but is not in the standard loader format: migrate project-specific content to IDEA.md, then merge remaining valid loader guidance into the efficient loader structure - NEVER overwrite blindly
-9. If TODO.AI.md or TODO.md exists: read both and check for needed updates (treat both files the same; never delete or empty the human-owned TODO.md)
-10. Read .claude/memory/MEMORY.md (if non-empty) and load referenced files as needed
-11. Commit all COMMIT, NEVER, and MUST rules to memory
-```
-
-**Rule Files to Create/Update** (`.claude/rules/*.md`, one per PART cluster — header `# {Topic} Rules (PART X, Y, Z)`, a `⚠️ These rules are NON-NEGOTIABLE. Violations are bugs. ⚠️` warning, `## CRITICAL - NEVER DO`, `## CRITICAL - ALWAYS DO`, a key-rules summary, and a `For complete details, see AI.md PART X, Y, Z` reference):
-
-| File | Covers |
-|------|--------|
-| `ai-rules.md` | Critical Rules, Project Files, Governance & License (PARTs 0, 1) |
-| `project-rules.md` | Application & Server Model, Project Structure & OS-Specific Paths, Runtime Mode Selection & Privilege Escalation (PARTs 2, 3, 4) |
-| `config-rules.md` | Configuration, Toolchain/Build & Packaging, Version/Site & Build Metadata (PARTs 5, 6, 7) |
-| `binary-rules.md` | Server Binary CLI & Client (PART 8) |
-| `backend-rules.md` | Error Handling & Caching, Database, Security/Logging & Privacy, Overlay Networks (Tor & I2P) (PARTs 9, 10, 11, 27) |
-| `api-rules.md` | Server Configuration/Health/Versioning, API Structure, SSL/TLS & Let's Encrypt (PARTs 12, 13, 14) |
-| `frontend-rules.md` | Web Frontend (PART 15) |
-| `features-rules.md` | Email & Notifications, Scheduler, GeoIP, Metrics, Backup & Restore, Update Command (PARTs 16-21) |
-| `testing-rules.md` | Testing/Quality & Debugging, Documentation/License/ReadTheDocs, I18N & A11Y, Checklists, IDEA.md Reference (PARTs 23, 25, 26, 30, 31) |
-| `cicd-rules.md` | CI/CD, Releases & Automation (PART 24) |
-
-**Trigger conditions:** `.claude/rules/` missing → create all files. AI.md modified more recently than rule files → update all files. User explicitly requests regeneration → update all files. **This is NOT optional** — rule files enable efficient context loading without re-reading the entire AI.md every session.
-
-**Project Memory (.claude/memory/):** distinct from `.claude/rules/` above (spec-derived cheatsheets, regenerated when AI.md changes): `.claude/memory/` holds durable, project-specific knowledge discovered during development — decisions, gotchas, conventions unique to this codebase — that AI.md never covers. Committed to the repo, not gitignored. Format: one markdown file per topic with YAML frontmatter (`name`, `description`, `type: project`), indexed by `.claude/memory/MEMORY.md`, read on demand. Same credential-masking rule as everywhere else — never store secrets. `~/.claude/**` (global) stays read-only, deployed only via `claudemgr/config`'s `install.sh`; `.claude/memory/` here is read/write in this repo directly. Full treatment: see SERVER.md § Claude Code Project Memory.
+On first read of a HYBRID project: (1) locate `AI.md`, confirm it is this specification; (2) read `IDEA.md` fully; (3) read `SPEC.md` if present; (4) read `TODO.AI.md`/`TODO.md`/`PLAN.AI.md`/`PLAN.md` if present; (5) check `git status --porcelain` for uncommitted drift; (6) confirm the project's actual directory layout matches PART 3; (7) confirm the build system matches PART 6; (8) confirm config matches PART 5; (9) proceed with the requested task.
 
 ### Task → PART Reference
 
@@ -485,51 +467,36 @@ Before I proceed, can you confirm [specific question]?
 | CLI | — | PART 8 |
 | Translation/i18n | — | PART 26 |
 
-### Prohibited Actions
+### Rule Files to Create/Update
 
-- Guess or assume values a command can produce — use `date`, `basename "$PWD"`, `git config user.email`, `git rev-parse --short=7 HEAD`, `uname -m`, etc. When no command applies, read the spec or ask the user
-- "Improve" or "optimize" the spec
-- Create patterns not in spec
-- Create report/analysis files (fix directly instead)
-- Rely on memory — read the spec sections relevant to the current task instead of guessing
-- Add unrequested features
-- Edit AI.md content (READ-ONLY). Project changes belong in IDEA.md
-- Read an image larger than 1000×1000 directly. Always check dimensions and resize to ≤1000×1000 first (see "Large Image Handling")
-- Treat a non-conforming IDEA.md as authoritative without migration (see "IDEA.md Migration")
-- Modify PARTS 0-28 — implementation patterns are fixed, NEVER modify
+As the project grows, maintain focused rule files under `.claude/` (or the project's chosen location) mapping to HYBRID PARTs — e.g. `ai-rules.md` (PART 0), `project-rules.md` (PART 1), `app-server-rules.md` (PART 2), `structure-rules.md` (PART 3), `mode-rules.md` (PART 4), `config-rules.md` (PART 5), `build-rules.md` (PART 6), `metadata-rules.md` (PART 7), `binary-cli-rules.md` (PART 8), `error-cache-rules.md` (PART 9), `db-rules.md` (PART 10), `security-rules.md` (PART 11), `server-config-rules.md` (PART 12), `api-rules.md` (PART 13), `tls-rules.md` (PART 14), `frontend-rules.md` (PART 15), `notifications-rules.md` (PART 16), `scheduler-rules.md` (PART 17), `geoip-rules.md` (PART 18), `metrics-rules.md` (PART 19), `backup-rules.md` (PART 20), `update-rules.md` (PART 21), `testing-rules.md` (PART 23), `cicd-rules.md` (PART 24), `docs-rules.md` (PART 25), `i18n-rules.md` (PART 26), `tor-rules.md` (PART 27). Only create the ones the project actually needs.
 
-### Large Image Handling
+### Project Memory (.claude/memory/)
 
-**Problem:** images larger than ~1000×1000 push enough tokens into context to cause errors, slow inference, or crash a turn outright.
+Distinct from `.claude/rules/` above (spec-derived cheatsheets, regenerated when AI.md changes): `.claude/memory/` holds durable, project-specific knowledge discovered during development — decisions, gotchas, conventions unique to this codebase — that AI.md never covers. Committed to the repo, not gitignored. Format: one markdown file per topic with YAML frontmatter (`name`, `description`, `type: project`), indexed by `.claude/memory/MEMORY.md`, read on demand. Same credential-masking rule as everywhere else — never store secrets. `~/.claude/**` (global) stays read-only, deployed only via `claudemgr/config`'s `install.sh`; `.claude/memory/` here is read/write in this repo directly. Full treatment: see SERVER.md § Claude Code Project Memory.
 
-**Rule:** before reading any image file, check its dimensions. If either dimension exceeds 1000 px, produce a downscaled copy in `${TMPDIR:-/tmp}` and read THAT copy. The original is never modified.
+## Prohibited Actions
 
-**Detection (no guessing — use a command):**
+- Running `cargo build`/`cargo run`/`cargo test`/produced binaries on the host.
+- Plain `git commit` / `git push` (use `gitcommit` — see Commit Workflow in global rules).
+- Subagents committing on their own initiative.
+- Inventing a wire protocol, config format, or auth scheme instead of using an existing standard.
+- AI attribution anywhere (commits, comments, docs, chat).
+- Network/CDN fetches at first run for anything other than the explicitly-scoped operational security data (see above).
+- Calling the server "an API" or "an API server" anywhere in code, docs, or UI copy — it is "the server."
 
-```bash
-img="$1"
-dims=$(identify -format '%w %h' "$img" 2>/dev/null \
-    || magick identify -format '%w %h' "$img" 2>/dev/null \
-    || gm identify -format '%w %h' "$img" 2>/dev/null \
-    || vipsheader -f width "$img" 2>/dev/null && echo " $(vipsheader -f height "$img")" \
-    || sips -g pixelWidth -g pixelHeight "$img" 2>/dev/null | awk '/pixel(Width|Height):/ {print $2}' | xargs \
-    || ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=\ :p=0 "$img" 2>/dev/null \
-    || file "$img" | grep -oE '[0-9]+ ?x ?[0-9]+' | head -1 | tr -d ' ' | tr 'x' ' ')
-read -r w h <<< "$dims"
+## Large Image Handling
+
+When an image (screenshot, diagram) exceeds a comfortable context size, check dimensions first and downscale before reading:
+
+```
+# or: file file.png
+identify -format "%wx%h" file.png
 ```
 
-**Resize fallback chain** (first tool installed wins): ImageMagick 7 `magick "$img" -resize '1000x1000>' "$out"` → ImageMagick 6 `convert "$img" -resize '1000x1000>' "$out"` → GraphicsMagick `gm convert "$img" -resize '1000x1000>' "$out"` → libvips `vipsthumbnail "$img" --size=1000x1000 -o "$out"` → macOS `sips -Z 1000 "$img" --out "$out"` → ffmpeg `ffmpeg -y -i "$img" -vf "scale='min(1000,iw)':'min(1000,ih)':force_original_aspect_ratio=decrease" "$out"`.
+Resize with the first available tool in this order: `imagemagick` (`convert`/`magick`) → `graphicsmagick` (`gm convert`) → `libvips` (`vipsthumbnail`) → `sips` (macOS) → `ffmpeg`. Target a max dimension that keeps the image well under the read limit before invoking Read.
 
-**Rules:**
-- Always check dimensions BEFORE reading — reading first to "see what's in it" is the failure mode this rule prevents
-- Never assume an image is small because of its filename or extension — run the dimension check
-- If no resizer is installed, do NOT silently fall back to reading the original — STOP and tell the user which tool to install
-- The resized copy goes in `${TMPDIR:-/tmp}` and is the file actually read into context; the original is read-only
-- 1000×1000 is the ceiling, not a target — the long edge lands at exactly 1000 with aspect ratio preserved
-- Multi-page formats (PDF, GIF, multi-frame TIFF) — apply the same rule per page/frame, or extract a single page first
-- This rule applies to images the AI itself opens for analysis; images served by the application at runtime are governed by PART 15 (Web Frontend)
-
-### IDEA.md Migration
+## IDEA.md Migration
 
 **When this kicks in:** AI reads `IDEA.md` and finds it does NOT have all three required top-level sections (`## Project description`, `## Project variables`, `## Business logic`) in that order.
 
@@ -557,454 +524,49 @@ fi
 
 **Rules:** migration is one-time per project — do not re-run once in the three-section format. If old content doesn't fit cleanly, ASK — never invent a fourth section or silently drop content. If `internal_name` already differed from `project_name`, KEEP the existing value (the freeze rule applies). Verify the new `## Project variables` section is complete after migration.
 
-### Translation Rule (ALL Code Changes)
+## Translation Rule
 
-**Every time AI writes or modifies code that contains user-facing text, it MUST be translated.**
+Every piece of user-facing text (UI labels, error messages shown to users, email templates, CLI help text) is a translation target under PART 26 (I18N & A11Y). Exceptions: internal logs, test fixtures, machine-readable output (JSON keys, exit codes).
 
-| Trigger | Required Action |
-|---------|-----------------|
-| New error response (`AppError`) | Use an `errors.*` translation key — never hardcoded English |
-| `eprintln!`/`println!` with user-visible text | Use `i18n::t(lang, "key")` or `i18n::tf(lang, "key", args)` |
-| New web page/section | Add translation keys for ALL labels, buttons, messages, tooltips |
-| New CLI command/flag/feature | Add `cli.*` translation keys for help text, status, and output |
-| New notification type | Add notification translation key |
-| New error type | Add `errors.*` translation key |
-| New config with user-visible default | Ensure default falls back to a translation key |
-| HTML templates | Use the Tera `t` function — never hardcoded text |
-| JavaScript UI text | Use `translations[key]` from the loaded locale |
-| Modifying `<html>` | Use `lang="{{ lang }}" dir="{{ dir }}"` — never hardcoded `lang="en"` |
+## If the Spec Seems Wrong
 
-**After adding translation keys:** add the key to the Spanish (`es.json`) example (PART 26); note all other language files need the same key; ensure the key exists in the English base file.
+1. Re-read the relevant PART fully — most apparent contradictions are resolved by context elsewhere in the same PART.
+2. Check `IDEA.md`/`SPEC.md` for a project-specific override.
+3. If still contradictory or silent, ask the user with the Question Format above.
+4. Never silently pick an interpretation and proceed on a security-sensitive or irreversible decision.
 
-**If unsure whether text is user-facing → treat it as user-facing and translate it.**
+## Editing AI.md
 
-Exceptions (do NOT translate): log messages, internal error messages passed to `tracing::error!()`/`tracing::warn!()`, test assertion strings, machine-readable responses (health check `OK`, HTTP status codes), system commands/code snippets, technical identifiers (config keys, header names, MIME types).
+`AI.md` is normally read-only for a project session. A project records deviations in `SPEC.md`, not by hand-editing `AI.md`.
 
-### If Spec Seems Wrong
+## Check Files Process vs. Audit
 
-1. STOP implementation
-2. Tell the user what seems wrong
-3. Ask for explicit permission to deviate
-4. Document the deviation if approved
+"Check files" (discovery only — report drift, do not fix) is distinct from "Audit" (explicit-command-only, fixes issues directly, tracks >5 findings in `AUDIT.AI.md`). Never run a full audit workflow when only a discovery check was requested, and vice versa.
 
-### Editing AI.md
+### Audit (explicit-command-only)
 
-1. Search first: `grep -n "keyword" AI.md`
-2. Read the PART completely
-3. Update existing content (don't duplicate)
-4. Update PART index line numbers after edits
+When explicitly asked to audit: (1) Code Compliance vs. this spec; (2) File Sync (docs vs. code); (3) Infrastructure Accuracy (Docker/CI vs. actual behavior); (4) AI Tool Configuration; (5) Documentation Sync; (6) final checkpoint — re-verify all of the above together against the PART 30 checklists; (7) fix issues found; (8) track remaining/large-batch issues in `AUDIT.AI.md`; (9) report to the user.
 
-## Check Files Process (Discovery)
+## Common Drift Patterns
 
-**Check Files is about understanding WHAT a project is — NOT about compliance.**
+| Pattern | Fix |
+|---|---|
+| Docs describe a flag/route that no longer exists | Remove from docs or restore the behavior — ask which |
+| Code has a feature `IDEA.md` doesn't mention | Add to `IDEA.md` or remove the feature — ask |
+| Calling the server "the API" in new code/docs | Rename to "the server" |
+| `TODO.AI.md` item marked done but not verified | Re-run Self-Validation Loop before closing |
 
-**When to Check Files:** first encounter with a project, before migration, when asked "what is this project?", or when needing to understand project structure.
+## Attribution (repeat, applies everywhere)
 
-**Check Files does NOT:** verify compliance with spec, fix issues, compare against PART requirements, or sync documentation. For compliance verification, use the Audit process (explicit "audit" command required).
-
-**Check Files output:**
-```
-Project: {name}
-Type: Rust server (frontend + backend) with native GUI/TUI/CLI surfaces
-Structure:
-  - src/ - Rust source code
-  - docker/ - Docker configuration
-  - docs/ - Documentation
-  X tests/ - Missing
-Files:
-  - AI.md
-  - Cargo.toml
-  - Makefile
-  X README.md - Missing
-Purpose: {inferred from code/config}
-```
-
-## Audit (Explicit Command Only)
-
-**Audit is a FULL compliance verification, ONLY triggered when the user explicitly says "audit" (also "check compliance" / "verify project"). NOT triggered by Check Files, migration, or normal development.**
-
-### Step 1: Code Compliance
-
-| Check | Source | Verify |
-|-------|--------|--------|
-| Project structure | PART 3 | Directories exist, layout correct |
-| File/directory rules | PART 0/1 | No forbidden files/dirs, naming correct |
-| Code patterns | Relevant PARTs | Config, server, application, API patterns match |
-| Business logic | IDEA.md | Features implemented match what IDEA.md defines |
-| Threat model / abuse model | IDEA.md → `## Business logic` | Trust boundaries, data sensitivity, abuse cases, and security exceptions are documented and code matches them |
-| Well-known namespace | PART 11 / web routes | `/.well-known/**` only serves documented allowlisted entries, unsupported entries 404 |
-| Rate limiting | PART 11 | Read, write, health, and global burst limits configured; defaults applied when unset |
-| CLI interface | PART 8 | Flags, commands, help output match spec |
-| Client scope | PART 8 | `src/client/` exists for all projects |
-| Untrusted content handling | PART 11, PART 15 | User-controlled files/markdown/HTML render as escaped text or sanitized markdown |
-| Single static binary | PART 0, PART 2 | One binary embeds GUI/TUI/CLI AND the full server (frontend + backend) |
-
-### Step 2: File Sync Verification
-
-| File Set | Must Match |
-|----------|------------|
-| Code vs IDEA.md | Business logic |
-| Code vs README.md | User-facing features |
-| Code vs Swagger | API routes |
-| Code vs GraphQL | Schema/types/resolvers |
-| Code vs docs/ | All documentation |
-| Code vs CLI `--help` | Commands/flags |
-| Code vs `.github/` policy files | CONTRIBUTING, SECURITY, issue templates, PR template, CODEOWNERS |
-
-### Step 3: Infrastructure File Accuracy
-
-Docker files, `.github/CODEOWNERS`, `.github/SECURITY.md`, issue templates, CI/CD workflows (GitHub/Gitea/Jenkins), Makefile, `mkdocs.yml`, `.readthedocs.yaml`, and release artifacts must each match their governing PART and the actual project. Workflow hardening checks: least-privilege permissions, no unsafe `pull_request_target` build/test/publish path, third-party actions pinned to full SHA, no secrets/write tokens exposed to fork PRs, security workflow blocks on failures.
-
-### Step 4: AI Tool Configuration (Rule Files)
-
-Verify all `.claude/rules/*.md` files exist, cover the correct PARTs (see the mapping table above), follow the required format, and are newer than AI.md — regenerate if not.
-
-### Step 5: Documentation Sync
-
-README.md, Swagger/OpenAPI, GraphQL schema, docs/ (ReadTheDocs), IDEA.md, and CLI `--help` must all match actual code/project state.
-
-### Step 6: Check Against FINAL CHECKPOINT
-
-Read the FINAL CHECKPOINT section (PART 30) and verify ALL items.
-
-### Step 7: FIX Issues (Don't Document Them)
-
-Code doesn't match spec → fix the code. Missing file → create it correctly. Feature in IDEA.md not implemented → implement it. Feature implemented but not in IDEA.md → add to IDEA.md or remove code. Outdated docs/CI/Docker/Makefile → update them.
-
-### Step 8: Temporary Tracking in AUDIT.AI.md
-
-Use `AUDIT.AI.md` only for explicit audits that uncover more than 5 issues (never `TODO.AI.md` for audit findings):
-```markdown
-# Project Audit
-
-Started: {date}
-Spec version: {line count or hash}
-
-## Issues Found
-
-- [ ] {component}: {issue description}
-- [x] {component}: {issue description} - FIXED
-
-## Sync Required
-
-- [ ] README.md out of sync with features
-
-## Completed
-
-- {component}: {what was fixed}
-```
-
-Fix issues as found — don't just log. Tell the user what was found while fixing it. Delete `AUDIT.AI.md` when all issues resolved (not emptied — deleted). Never leave it with unchecked items.
-
-### Step 9: Report to User
-
-```
-Audit complete
-Code compliant with spec
-All files in sync
-Fixed: [list what was fixed]
-Project is now 100% compliant with AI.md
-```
-
-**NEVER output:** "Found X issues. Here's a list..." → FIX THEM instead.
-
-## Common Drift Patterns to Avoid
-
-| Drift Pattern | What You Think | What You Should Do |
-|---------------|----------------|-------------------|
-| Pattern improvement | "This pattern is better" | Use the pattern in spec |
-| Format change | "This format is cleaner" | Use the format in spec |
-| Memory reliance | "I remember it says..." | Re-read the actual spec |
-| Assumption | "Obviously they want..." | Check spec, ask if unclear |
-| Feature addition | "This would be helpful" | Only do what's requested |
-| Spec correction | "The spec is wrong here" | Ask before any deviation |
+Never include AI attribution in commits, code comments, docs, or generated content.
 
 ## Tool Access
 
-| Access | Description |
-|--------|-------------|
-| Full | All tools available |
-| **PROHIBITED** | `git commit`, `git push` (plain git) — denied by sandbox/permission rules. They bypass commit signing AND the unified commit+push wrapper |
-| Allowed | `git status`, `git diff`, `git log`, `git branch`, `git add` (read + staging) |
-| Allowed | `gitcommit <command>` — signs, commits, AND pushes in one step |
-| **Required** | Write `{project_dir}/.git/COMMIT_MESS` BEFORE running `gitcommit <command>`. Re-read it after writing to confirm accuracy |
-| **PROHIBITED (subagents)** | Writing `.git/COMMIT_MESS` or calling `gitcommit` — subagents complete edits and report back; the parent (main) instance reviews the diff and owns the commit |
+`git commit`/`git push` are denied; use the `gitcommit` wrapper only, `--dir {project_dir} all`. Subagents edit and report — only the coordinating session commits.
 
-**AI commits via the `gitcommit` wrapper script, not plain `git commit`.** Because gitcommit pushes automatically, the message file MUST be verified accurate before invocation — there is no local staging window to catch mistakes.
+## Remote Image / Screenshot Handling
 
-### Remote Image/Screenshot Handling
-
-| Step | Command |
-|------|---------|
-| Download | `curl -q -LSsf -o {tmp_dir}/{project_org}/{internal_name}/screenshot_XXXX.png {url}` |
-| View | Use the Read tool on the downloaded file |
-
-**Path format:** `{tmp_dir}/{project_org}/{internal_name}/screenshot_XXXX` where `XXXX` increments (0001, 0002, ...). Downloading first ensures the image is captured and re-examinable without re-fetching, and sidesteps remote auth/rate-limit issues.
-
-## Prohibited Actions (Reference Table)
-
-| Action | Reason |
-|--------|--------|
-| Modifying PARTS 0-28 | Implementation patterns are fixed - NEVER modify |
-| Plain `git commit` (any flag form) | Bypasses signing wrapper. Use `gitcommit <command>` instead |
-| Plain `git push` | gitcommit already pushes. Plain `git push` bypasses the wrapper entirely |
-| `gitcommit <command>` without first writing AND re-reading `.git/COMMIT_MESS` | Wrong file = wrong commit on the remote |
-| `gitcommit -m "..."` / `gitcommit --message "..."` | Defeats the point — the message belongs in `.git/COMMIT_MESS` |
-| Running `gitcommit <command>` mid-task with files in an inconsistent state | Every commit is pushed — half-finished work goes public |
-| Subagent writing `.git/COMMIT_MESS` or calling `gitcommit` | Only the parent instance owns the commit |
-| Bare `@name` in commit body | Creates a GitHub contributor notification/link — write names without `@` or wrap in backticks |
-| Deleting files without confirmation | Destructive action |
-| Changing NON-NEGOTIABLE sections | Specification violation |
-| Skipping validation | Security requirement |
-| Hardcoding secrets | Security vulnerability |
-| Using deprecated APIs | Maintainability issue |
-
-## ⚠️ CRITICAL: File Paths and Project Root
-
-- All paths are relative to the project root unless explicitly noted
-- Do not scatter top-level files unnecessarily
-- Runtime-generated files are not committed
-- AI must not move the project root or invent sibling repositories
-- **Never edit files outside the project root to work around a problem inside it** — no host system files (`/etc/*`, shell rc files, systemd units), no sibling/other repositories, no global tool configs. A failing build, missing dependency, or broken tool inside the project is fixed in the project's own code/config/Docker image, never by reaching outside it. The only exception is an external path the user explicitly names for that specific task
-
-## ⚠️ CRITICAL: AI.md is the Source of Truth
-
-- `AI.md` is read-only during routine work
-- `IDEA.md` is where project-specific values and product rules live
-- Loader files (`CLAUDE.md`, `.claude/CLAUDE.md`) stay short and point back to `AI.md`
-- If a loader file and `AI.md` disagree, `AI.md` wins
-- `SPEC.md` overrides `AI.md` for project-specific rules only; if `SPEC.md` and `AI.md` conflict, `SPEC.md` wins — that is its purpose. If `IDEA.md` conflicts with `AI.md`, `AI.md` wins — fix `IDEA.md`
-
-## ⚠️ CRITICAL: Keep Documentation in Sync
-
-Update these when their subject changes:
-- `IDEA.md` when features or variables change
-- `README.md` when install, usage, or packaging changes
-- `LICENSE.md` when dependencies or attribution changes
-- Swagger/OpenAPI and GraphQL schema when routes/types change
-- CI/CD docs or scripts when release mechanics change
-
-## ⚠️ CRITICAL: One Coherent Product — Application AND Server, One Binary
-
-This specification defines **one Rust project, one deliverable binary per target**, that is simultaneously:
-- a native application with shared core logic and up to three presentation layers — GUI (preferred when available), TUI (fallback for interactive terminals), CLI (fallback for non-interactive/plain execution); and
-- a **full server** — frontend (HTML/PWA web UI) AND backend (JSON API, database, scheduler, email, metrics, etc.) — reachable over the network by browsers, the PWA, API clients, and the dedicated CLI client.
-
-**Never call this project an "API server" or "API-only service."** It is always "the server," or "the application," meaning frontend and backend together. There is no server variant that lacks a web frontend, and no application variant that lacks server capability — see PART 2 for how the single binary embeds both.
-
-Single-process, single binary per invocation. The binary may run as a foreground GUI/TUI/CLI session on a workstation, or as the long-running server process (daemon/service) — mode selection is covered in PART 4 and is consistent with, not a duplicate of, this section.
-
-## ⚠️ CRITICAL: No Host Toolchain or Binary Execution
-
-The Rust toolchain and any compiled artifact from this project MUST NOT run on the host machine.
-
-- Never invoke `cargo`, `rustc`, `rustfmt`, `clippy`, `cargo test`, `cargo run`, `cargo doc`, `cargo build`, `cargo install`, or any project binary from `target/` directly on the host
-- Every build, test, lint, format-check, doc-gen, run, install, package, and manual debug session executes inside a project-provided Docker container (or Incus for full-OS/systemd integration testing)
-- The host's role is limited to editing source files, version control, and orchestrating Docker/Incus
-- CI and local commands documented in this spec are illustrative shapes; the **actual invocation** is always Docker-wrapped (see PART 6 → "Docker Rule")
-- If a contributor's environment cannot run Docker, they cannot build/test this project — that is intentional, not a bug
-
-This rule has no opt-out. There is no "just this once" exception for `cargo test` on the host.
-
-### Container-Only Development Matrix
-
-| Task | Container | Notes |
-|------|-----------|-------|
-| **Building** | Docker `casjaysdev/rust:latest` | ALWAYS — Rust compilation |
-| **Unit tests** | Docker `casjaysdev/rust:latest` | `cargo test` commands |
-| **Quick testing** | Docker `alpine:latest` | Fast, ephemeral |
-| **Full OS testing** | Incus `debian:latest` | PREFERRED — systemd, services |
-| **Debugging** | Incus `debian:latest` | PREFERRED — persistent, SSH-able |
-
-```bash
-# CORRECT - Use Makefile targets
-# Quick build to {tempdir}/{project_org}/{internal_name}-XXXXXX/
-make dev
-# Build with version info to binaries/
-make local
-# Full cross-platform build to binaries/
-make build
-# Run unit tests
-make test
-
-# CORRECT - Integration tests
-# Auto-detects incus/docker
-./tests/run_tests.sh
-# Full OS test with systemd (PREFERRED)
-./tests/incus.sh
-
-# WRONG - Never run cargo directly on the host machine
-cargo build --release -o binary/{project_name} ./src
-```
-
-**See PART 23: TESTING, QUALITY & DEBUGGING for full containerized build/test procedures.**
-
-## ⚠️ CRITICAL: X11 AND Wayland Are Both Required
-
-If this project's GUI surface is in scope, it MUST support **both** X11 and Wayland as first-class display backends.
-
-- Wayland-only GUIs are not acceptable; X11-only GUIs are not acceptable
-- The chosen GUI stack/toolkit must be one that natively supports both, or the app must integrate both backends
-- Display detection at runtime must consider `WAYLAND_DISPLAY` AND `DISPLAY` and pick the appropriate backend
-- GUI smoke testing inside Docker MUST be runnable against both an X11 socket and a Wayland socket forwarded from the host
-- IDEA.md may declare GUI out of scope, but it may NOT declare "X11 only" or "Wayland only"
-- Reconciling X11/Wayland with the static-binary rule: use display crates that avoid **link-time** C dependencies. For X11, the preferred option is `x11rb` (pure-Rust); `x11-dl` is also acceptable because it `dlopen`s `libX11` lazily at runtime. For Wayland, use `wayland-client`/`wayland-rs` with the `dlopen` feature, removing the link-time dependency on `libwayland-client.so`. In all cases the binary has no link-time C dependency for display I/O. The Rust GUI ecosystem (e.g. `winit`, and toolkits built on it) typically relies on `x11-dl` + `wayland-client+dlopen`; that path is compliant
-
-## ⚠️ CRITICAL: Rust-Only Project
-
-This project's source code is **exclusively Rust** — application, library, server, build automation, and test code alike.
-
-- No C, C++, Objective-C, Swift, Go, Python, JavaScript, TypeScript, or shell-script source files contribute to the produced binary
-- `build.rs`, `xtask/`, and any task automation are written in Rust — not Make, not Bash, not Python
-- Small `docker/rootfs/usr/local/bin/entrypoint.sh` and `docker/` shell helpers are tolerated because they orchestrate the container, not the application; they MUST NOT contain application or server logic
-- Third-party crates that internally vendor C code (e.g., compression, crypto, SQLite, GUI) are allowed only when (a) no pure-Rust equivalent is viable, (b) the C code is statically linked into the final binary, (c) it does NOT require a system C lib at runtime (no `*-sys`-style dynamic linkage to system-installed `.so`/`.dylib`/`.dll`), and (d) the dependency is documented in `IDEA.md` and `LICENSE.md`. `ring` is pre-granted this exception (small, audited, ubiquitous) — still requires LICENSE.md attribution but no per-project IDEA.md write-up. Larger vendored-C dependencies (e.g. `rusqlite` with `bundled`) remain a per-project IDEA.md exception
-- **Prefer pure-Rust crates whenever a viable one exists** — this is what makes the single-static-binary rule and cross-platform GUI/server (Windows / macOS / Linux / BSD) achievable in practice; every `*-sys` crate dragged in becomes a portability and build-system tax. See PART 6 → "Pure-Rust Library Stack" for the recommended crate-by-capability list
-- Never introduce a build that requires a system C/C++ toolchain on the user's machine — the project Docker image is the only required build environment
-
-## ⚠️ CRITICAL: Single Static Binary
-
-The deliverable for each supported target is **one statically linked binary** that runs without external runtime dependencies beyond the kernel and (where applicable) display server sockets — and that single binary contains the full server (frontend + backend) as well as the GUI/TUI/CLI application layers.
-
-**Required build outputs per target:**
-
-| Target | Linkage | Notes |
-|--------|---------|-------|
-| `x86_64-unknown-linux-musl` | fully static (musl libc) | Default Linux release target |
-| `aarch64-unknown-linux-musl` | fully static (musl libc) | Default ARM64 Linux release target |
-| `x86_64-unknown-freebsd` / `x86_64-unknown-netbsd` / `x86_64-unknown-openbsd` (and aarch64 equivalents) | native BSD libc, statically linked where the platform supports it | NOT musl — opt-in per IDEA.md |
-| `x86_64-pc-windows-gnu` | static CRT via `-C target-feature=+crt-static` | Single `.exe`; `casjaysdev/rust:latest` ships no MSVC toolchain — use `-gnu`/`-gnullvm`, never `-msvc` |
-| `aarch64-pc-windows-gnullvm` | static CRT via `-C target-feature=+crt-static` | Single `.exe`; use `-gnullvm`, not `-msvc` |
-| `x86_64-apple-darwin` / `aarch64-apple-darwin` | system frameworks only (Apple disallows static libSystem) | "Static" means: no third-party dynamic libraries; only Apple-provided frameworks |
-
-**Rules:**
-- No `glibc` runtime dependency on Linux release artifacts — musl by default; BSD artifacts use the platform's native libc, statically linked where allowed
-- No third-party `.so` / `.dylib` / `.dll` shipped alongside the binary; no `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH`/wrapper-script tricks to find runtime libs
-- `cargo build --release` inside the Docker image MUST produce a binary that passes a "no unexpected dynamic deps" check (`ldd`, `otool -L`, `dumpbin /dependents`) appropriate to the target
-- X11 and Wayland are runtime-discovered display sockets, not link-time dependencies
-- Plugin systems, `dlopen` of arbitrary user code, and runtime extension loading from disk are forbidden unless IDEA.md explicitly defines a hardened plugin contract
-- Server capability (database driver, web templating, HTTP stack) is compiled into the same binary as the GUI/TUI/CLI layers — there is no separate "server-only" build artifact
-
-## ⚠️ CRITICAL: Self-Contained Assets
-
-The single binary contains **everything the app and the server need to function**. The user is not required to install fonts, themes, icons, templates, schemas, HTML/CSS/JS frontend assets, or any other support file separately.
-
-- Embed assets at build time using `include_bytes!`, `include_str!`, `rust-embed`, or an equivalent compile-time embedding pattern
-- Fonts, icons, theme data, default config, JSON/YAML schemas, SQL migrations, web/PWA frontend assets, localization catalogs, default templates, and licenses-to-display all live inside the binary
-- The `assets/` directory in the repo is a **build-time source tree** for embedding — it is not a runtime install target
-- The app/server may **read** user-provided config and data from per-user/per-instance paths (PART 3 path table), and may **write** cache/state/database files there, but it must run with full default functionality when those paths are empty
-- Network/CDN fetches at first run to "download missing assets" are forbidden
-- A new install on an air-gapped machine MUST work end-to-end with only the binary present, EXCEPT for the narrow, explicitly-declared exception below
-
-**Exception — security intelligence data is never embedded.** GeoIP databases, IP/domain blocklists, CVE feeds, and similar security intelligence data (PART 18, PART 19) change too frequently to embed and are downloaded on first run, then kept current by the built-in scheduler (never cron). If a download fails, the server logs a warning and degrades gracefully (features depending on that data are disabled, core functionality is unaffected) rather than failing to start. This is the only category of runtime fetch permitted by this specification.
-
-## ⚠️ CRITICAL: Full Web Application Architecture — Never "API Server"
-
-**This is a full web application with both frontend AND backend, embedded in the one static binary described above.**
-
-Every server-side feature MUST work via:
-1. **Web browser** — HTML pages, forms, interactive UI
-2. **PWA (Progressive Web App)** — installable, offline-capable, native-like experience
-3. **API clients** — JSON for curl, wget, automation, scripts
-4. **Dedicated CLI client** — `{project_name}-cli` (PART 8 — required for all projects)
-
-| Client Type | Examples | Response Format |
-|-------------|----------|-----------------|
-| **Browser** | Chrome, Firefox, Safari | HTML (pretty UI) |
-| **PWA** | Installed web app (desktop/mobile) | HTML (same as browser) |
-| **API/Automation** | curl, wget, scripts, integrations | JSON |
-| **CLI tool** | `{project_name}-cli` | Text/JSON (configurable) |
-
-**Endpoint pattern (applies to the entire server):**
-
-| Web Route (HTML) | API Route (JSON) | Purpose |
-|------------------|------------------|---------|
-| `/` | `/api/{api_version}/` | Homepage / API root |
-| `/server/healthz` | `/api/{api_version}/server/healthz` | Health status (both exist independently) |
-| `/quotes` | `/api/{api_version}/quotes` | Project feature (example) |
-| `/server/docs/swagger` | `/api/{api_version}/server/swagger` (also `/api/swagger` alias) | Swagger UI / OpenAPI JSON spec |
-| `/server/docs/graphql` | `/api/{api_version}/server/graphql` (also `/api/graphql` alias) | GraphiQL UI / GraphQL POST endpoint |
-
-**Rule:** for every web page, there's a corresponding API endpoint; for every API endpoint, the data can be displayed in a web page. Project-specific features (IDEA.md) follow the same pattern.
-
-**Terminology discipline:** documentation, code comments, commit messages, and UI copy refer to this component as "the server" or "the application" — never "the API," "the API server," or "API-only." When distinguishing the two halves internally, use "backend" (API/JSON/data layer) and "frontend" (HTML/PWA/web UI layer) — both are mandatory, both ship in the one binary.
-
-## Licensing & Features
-
-| Rule | Description |
-|------|-------------|
-| **MIT License** | All project code is MIT licensed unless IDEA.md explicitly states an additional compatible license policy |
-| **3rd party attribution** | All third-party licenses are listed in `LICENSE.md` (PART 25 → "License Compliance") |
-| **GPL / AGPL / LGPL denied by default** | Static linking would relicense the distributed binary away from MIT. Allowed only via a documented IDEA.md exception |
-| **Free & open source** | No paid tiers, enterprise gating, or artificial feature segmentation |
-| **No premium features** | GUI, TUI, CLI, and web/API surfaces expose the same core product capabilities where applicable |
-| **No activation gates** | No license keys, phone-home unlocks, or paywalled code paths |
-
-**NEVER implement:** upgrade/paywall prompts for core functionality, hidden features enabled by payment tier, telemetry-based licensing enforcement, artificial limits used for monetization.
-
-## Working Roles
-
-- **Senior Rust Developer** — production Rust code, architecture, optimization
-- **UI/UX Designer** — professional interfaces, excellent UX (web, GUI, and TUI alike)
-- **Beta Tester** — finding bugs, edge cases
-- **User** — end-user perspective, intuitiveness
-
-## Self-Validation Loop
-
-**AI MUST verify its own work with real tools before reporting a task as done. Do not rely on "the code looks right."**
-
-**This rule applies to EVERY change type covered by this specification — shared core logic, GUI/TUI/CLI binaries, backend/API logic, frontend, database, single-static-binary build, asset embedding, Docker, CI/CD, configuration, security, observability, i18n, documentation — not only one category.** Whatever you touched, you verify. All execution goes through the project's containerised targets — never bare host `cargo`.
-
-| Change type | How to verify |
-|-------------|----------------|
-| Shared core / library logic | Run the project's test target inside the container; exercise the logic directly; compare output against expected |
-| Backend logic / API endpoints | Run `make test`; hit the endpoint with curl/test; compare response body, status, and headers against expected |
-| Behavior-preserving refactor | Diff outputs of old vs. new path on representative inputs (don't trust that the diff "looks right") |
-| CLI binary / command | Build with `make build`; run the binary in the container; exercise relevant flags including `--help`/`--version`; check stdout, stderr, and exit code |
-| TUI binary | Run in the container; verify rendering, keyboard input, and screen redraw on resize/exit |
-| GUI binary | Run in the container; verify the rendered window under BOTH X11 AND Wayland forwarding; confirm input events reach the app |
-| Frontend / web UI change | Start the dev server, open the page in a browser, exercise the feature; if a design was provided, visually compare and iterate |
-| Single static binary requirement | Confirm the artifact is a single self-contained file (containing both the app layers and the full server) and that it runs on a clean container with no extra runtime install |
-| Asset embedding | Confirm assets are loaded from the binary itself (not a host path); test on a container without the source tree mounted |
-| Performance change | Measure before AND after — don't assume parallelism, caching, or "cleaner"/"lighter" code is faster |
-| Bug fix | Reproduce the bug FIRST for a failing signal, then verify the fix makes it disappear; add a regression test where feasible |
-| Schema / migration | Run forward and rollback against a real DB copy; check row counts and constraints; verify the app boots cleanly against the new schema |
-| Configuration / settings | Start the binary with the new config; verify defaults; verify validation rejects bad input with a useful error |
-| Docker / container build | Build and verify each image variant as appropriate: `:devel` (debug binary) for logic changes, `:latest` (release binary) for release verification; smoke-test the binary inside it; for GUI, verify display forwarding still works |
-| CI/CD workflow | Run the workflow on a branch (or `act`/equivalent dry-run); verify each job's exit status, not just YAML validity |
-| Health / observability | Hit `/server/healthz`, `/server/readyz`, `/server/metrics`; verify scrape format and that new metrics actually appear |
-| Logging / error paths | Trigger the error path; verify the log line/structured event was emitted with expected fields |
-| i18n / translation | Switch each supported locale; verify text renders correctly and no placeholders leak |
-| Security-sensitive change (auth, crypto, input validation, plugin/dlopen contracts) | Test both the success path AND attempted bypass paths; never assume a guard works without exercising it |
-| Documentation / README / Swagger | Render markdown/OpenAPI locally; verify links, code samples, and example commands actually work |
-| Type / lint / build correctness | The project's containerised check, clippy, and build targets — green across all |
-
-**Iteration rules:**
-- A failed check is data, not failure — adjust and re-run until green
-- Never report "done" while any verification is still red
-- If a check reveals the change is wrong in a way that can't be patched, revert and re-plan; do not paper over a failing check
-- When verification is genuinely impossible in this environment (no display, no DB, no browser, no network): say so explicitly — list what was checked and what could not be, so the user knows where to look
-
-**Reference:** based on published guidance about AI coding agent self-validation (Eivind Kjosbakken, Towards Data Science, 2026) — when an AI agent is given verification tools (output diffing, browser/display, test runners) and allowed to iterate, one-shot success rate, run length, and task complexity all improve substantially.
-
-## Security-First Design
-
-**Every project follows security-first design. Security MUST NOT compromise usability.** Full detail lives in PART 11 (Security, Logging & Privacy); the non-negotiable posture is stated here.
-
-| Principle | Description |
-|-----------|-------------|
-| **Never Trust Input** | All input is validated before use — never executed directly |
-| **Defense in Depth** | Multiple layers of security, not single points of failure |
-| **Least Privilege** | Minimal permissions required for each operation |
-| **Fail Secure** | On error, deny access rather than grant it |
-| **Secure by Default** | Safe defaults, user opts-in to less secure options |
-| **Internet-Facing Baseline** | The server is assumed exposed to hostile public networks unless the user explicitly defines a private/internal deployment |
-| **Suggest, Don't Block** | Recommend security features (token rotation), never force them |
-| **Friction-Free Security** | Security should enhance, not impede, the user experience |
-| **Usability Through Safe Automation** | Reduce operator effort by automating secure behavior, not by weakening controls |
-
-**Secure-by-design rule for the internet-facing server:** usability work MUST make the secure path easier; it MUST NOT make the secure path weaker. AI MUST NOT reduce friction by disabling, loosening, or bypassing authn/authz, TLS/secure cookies, CSRF/CSP/CORS protections, rate limiting/lockouts/abuse controls, input validation/output sanitization/untrusted-file protections, or least-privilege runtime rules. Any intentionally weaker compatibility/convenience mode MUST be explicit (never default), documented in IDEA.md, and clearly labeled as a security tradeoff. Refactors and simplifications MUST preserve or strengthen the current security posture — "easier" never means "less secure."
-
-**Input validation core rule:** all input is validated, never executed directly — HTML-encode for HTML, SQL-parameterize for SQL, allowlist permitted values, `.trim()` on all text inputs (except passwords, which are rejected rather than trimmed if they start/end with whitespace), never pass user input directly to shell/SQL/eval. **Never use `SELECT *` in application code** — always name columns explicitly (acceptable only in ad-hoc shell exploration, never committed code). Full attack-prevention table, rate-limit defaults, and error-message-by-audience rules live in PART 11.
+For a remote image URL: `curl -q -LSsf` to download it locally first, then Read the local file — never attempt to Read a bare URL.
 
 ## Code Style Rules
 
@@ -1173,43 +735,116 @@ When the specification is unclear: 1) check if it's clarified elsewhere in the s
 
 ---
 
+---
+
+# MIGRATING EXISTING PROJECTS
+
+## Migration Principles
+
+Migrating an existing Rust project (application-only, or server-only) onto the HYBRID specification preserves the project's actual product identity and behavior; it does not silently rewrite scope. `IDEA.md` continues to declare what the project actually is — HYBRID only applies where `IDEA.md` says the project is genuinely both an app and a server.
+
+| Projects CANNOT change without asking | Projects CAN change freely |
+|---|---|
+| Product identity / feature scope | Internal package layout to match PART 3 |
+| Existing config key names in a released project | Adding new optional config keys |
+| Public CLI flag names already released | Internal helper function names |
+| License (without explicit user decision) | Build tooling to match PART 6 |
+
+Migration preserves: existing route paths, existing config semantics, existing CLI flag contracts, existing data on disk/DB (schema migrations only, never silent data loss).
+
+### Migration Process
+
+1. Diff the existing project's structure against PART 3.
+2. Identify gaps (missing PARTs' worth of behavior) vs. genuine intentional deviations recorded in `SPEC.md`.
+3. Propose a migration plan (what moves, what's added, what's flagged) — get user confirmation for anything touching public contracts.
+4. Apply mechanical restructuring in small, verifiable commits.
+5. Re-run the Self-Validation Loop for every touched surface.
+
+### Migration Conflicts
+
+If migration would require breaking a released public contract (flag, route, config key), stop and ask — this is a "when to STOP and ASK" case, not a judgment call.
+
+### Post-Migration Checklist
+
+- Directory layout matches PART 3.
+- Build matches PART 6 (container-only, correct targets).
+- `AI.md`/`IDEA.md`/`SPEC.md`/`TODO.AI.md` all present and current.
+- No dropped functionality without an explicit user decision recorded.
+
+## AI Migration Behavior Rules
+
+**Three Laws of Migration:** (1) Never break a released public contract without asking. (2) Never lose user data. (3) Never silently change product scope.
+
+**Migration decision flow:** does this file/behavior conflict with the HYBRID structure? → No: leave as-is → Yes: is it a public contract? → Yes: ask → No: migrate directly, verify, commit.
+
+| Common AI deviation | Correct behavior instead |
+|---|---|
+| Renaming a released flag "to match the spec" | Keep the flag; document the deviation in `SPEC.md` |
+| Deleting a route because it's "not in the specification" | Keep it if `IDEA.md` covers it; ask if unclear |
+| Rewriting config format wholesale | Migrate incrementally with a compatibility shim |
+
+**Verification protocol:** after migration, run the full existing test suite plus a manual smoke test of the top 3 user-facing flows before declaring the migration done.
+
+**When AI is unsure:** ask, using the standard Question Format, rather than guessing which side of a conflict wins.
+
+**Migration checklist:** CLI flags preserved · directory structure aligned · configuration compatible or shimmed · code patterns consistent with PART 3 · Docker build updated to PART 6.
+
+**Final migration verification:** rebuild in-container, run the full test suite in-container, smoke-test the binary in Incus in both app mode and server mode.
+
+## AI New-Project Implementation Rules
+
+**Three Laws of Implementation:** (1) Follow `IDEA.md` scope exactly — no more, no less. (2) Every PART this document marks as applicable to the project gets implemented, not skipped. (3) Nothing is "done" until it passes the Self-Validation Loop.
+
+### Mandatory Sections
+
+A HYBRID project implements every PART of this document that applies given `IDEA.md`'s declared scope (app-only surfaces may be skipped only if `IDEA.md` explicitly scopes the project as app-only — but then it is not a HYBRID project; a true HYBRID project implements both the application surfaces of PART 2/4/8 and the server surfaces of PART 10–21).
+
+### Implementation Discipline
+
+Work through PARTs in dependency order (see Task Dependency Ordering in global rules), not in whatever order feels interesting. "Jumping around" — half-implementing the frontend before the server's data layer exists — is a failure mode, not a valid working style. If stuck on a PART, re-read it fully, check `IDEA.md`, then ask; don't skip ahead and leave a gap.
+
+### What "Complete" Means
+
+Every declared feature in `IDEA.md` is implemented, tested (Self-Validation Loop), documented (README/help/man/completions in sync), and buildable/runnable entirely in-container.
+
+### New-Project Completion Checklist
+
+Structure (PART 3) · Core app + server features (PART 2, 4, 8, 9, 10, 12–21 as scoped) · Infrastructure (PART 6, 24) · Governance & community (PART 1, 25) · Supply chain & release (PART 7, 21, 24) · Security & operations (PART 11, 14) · Any project-specific features `IDEA.md` declares beyond this specification.
+
+---
+
 # PART 1: PROJECT FILES, GOVERNANCE & LICENSE
 
 ## Project Files
 
-| File | Purpose | Update When |
-|------|---------|-------------|
-| **AI.md** | Implementation spec (HOW) - SOURCE OF TRUTH, readonly | No — use SPEC.md for project-specific rule overrides |
-| **SPEC.md** | Project-specific rule overrides (optional, may be empty) | When a project rule must contradict this specification or global |
-| **IDEA.md** | Project plan (WHAT) — must follow AI.md | Features or variables change |
-| **TODO.AI.md** | Task tracking (AI-owned, required for 3+ tasks) | Tasks added/completed |
-| **TODO.md** | Task tracking (human-owned) | AI may mark done; never delete/empty |
-| **PLAN.AI.md** | Implementation plan (AI-owned) | Planning new work |
-| **PLAN.md** | Implementation plan (human-owned) | AI may mark done; never rewrite wholesale |
-| **README.md** | User-facing install/usage docs | Usage changes |
-| **LICENSE.md** | Project + dependency licenses | Dependency set changes |
-| **release.txt** | Canonical release version when present | Release version changes |
-| **site.txt** | Optional official site/homepage URL | Official site changes |
-| **deny.toml** | `cargo-deny` license / advisory / bans / sources policy | Policy or allow/deny set changes |
-| **about.toml** | `cargo-about` configuration (allowlist of accepted licenses) | Accepted-licenses set changes |
-| **about.hbs** | `cargo-about` Handlebars template controlling the generated `LICENSE.md` region | Output-format changes |
-| **Makefile** | Build, test, run targets for local development — convenience wrappers around Docker-wrapped commands. **Never called from CI workflow `run:` steps** | Local-dev targets change |
-| **.dockerignore** | Build-context exclusions; Rust-specific entries: `target/`. `docker/`, `src/`, `Cargo.toml`, `Cargo.lock`, `build.rs`, `release.txt` are NEVER excluded | Build-context surface changes |
-| **renovate.json** | Single Renovate config covering Cargo deps, GitHub Actions SHAs, and Docker digests across all providers. Dependabot forbidden | Update-policy changes |
-
-**Hierarchy:** `SPEC.md` > `AI.md` > global `CLAUDE.md`. `AI.md` is ALWAYS the source of truth for the specification baseline; `SPEC.md` overrides it for project-specific rules only; `IDEA.md` is the project PLAN and must be spec-compliant.
+| File | Owner | Purpose |
+|---|---|---|
+| `AI.md` | Specification (read-only in projects) | This specification |
+| `SPEC.md` | Human + AI | Project-specific rule overrides |
+| `IDEA.md` | Human + AI | Project-specific WHAT — scope, features, product identity |
+| `TODO.AI.md` | AI-owned | AI task tracking, cleared item-by-item on completion |
+| `TODO.md` | Human-owned | Human task tracking |
+| `PLAN.AI.md` | AI-owned | In-flight implementation plan, deleted once fully committed |
+| `PLAN.md` | Human-owned | Human implementation plan |
+| `README.md` | AI-maintained | Public-facing project documentation (PART 25) |
+| `LICENSE.md` | AI-maintained | MIT license text + embedded-dependency attribution (see below) |
+| `release.txt` | AI-maintained | Current release version stamp |
+| `site.txt` | AI-maintained | Official site / FQDN reference (PART 7) |
+| `deny.toml` | AI-maintained | `cargo-deny` license / advisory / bans / sources policy |
+| `about.toml` | AI-maintained | `cargo-about` configuration (accepted-licenses allowlist) |
+| `about.hbs` | AI-maintained | `cargo-about` template for the generated `LICENSE.md` attribution region |
 
 ## Mandatory Compliance Schedule
 
-| When | Action | Purpose |
-|------|--------|---------|
-| Session start | Read the PART(s) relevant to the first task | Understand the context needed |
-| Before each task | Read only the spec parts relevant to what you are about to implement — do not pre-load speculatively | Prevent token waste |
-| Every 3-5 changes | Stop and verify against spec | Catch drift early |
-| Before task completion | Full compliance check | Ensure correctness |
-| When uncertain about a spec requirement | Read that specific section — never guess, never rely on prior-session memory | Accuracy without waste |
+| Trigger | Action |
+|---|---|
+| New session start | Read `AI.md`, `IDEA.md`, `SPEC.md`, `TODO.AI.md`/`TODO.md` |
+| Any CLI/route/config change | Update README, help text, man page, completions in the same commit |
+| Any dependency added | Check license compatibility (see below), update attribution |
+| Any drift found | Fix immediately or log to `TODO.AI.md` — never leave undocumented |
+| Before every commit | Run the Self-Validation Loop (PART 0) for every changed surface |
 
-**Hook-enforced:** `spec-guard.sh` blocks Edit/Write on project files until AI.md/SPEC.md has been Read this session; the gate re-arms after every compaction.
+**Hook-enforced:** `spec-guard.sh` blocks Edit/Write on project files until `AI.md`/`SPEC.md` has been Read this session; the gate re-arms after every compaction.
 
 ## Before / During / After Work
 
@@ -1217,7 +852,7 @@ When the specification is unclear: 1) check if it's clarified elsewhere in the s
 
 **During:** read the relevant spec PART(s) before each implementation; follow spec exactly, no unrequested "improvements"; check yourself every 3-5 changes; update TODO.AI.md/TODO.md as tasks complete; test changes before moving on; keep changes focused (one feature/fix per task); if uncertain, stop, re-read, or ask.
 
-**After:** update IDEA.md if features changed; never modify AI.md; update TODO.AI.md with newly discovered tasks; verify against the FINAL CHECKPOINT (PART 30); update COMMIT_MESS only if files changed.
+**After:** update IDEA.md if features changed; never modify AI.md; update TODO.AI.md with newly discovered tasks; verify against the PART 30 checklists; update COMMIT_MESS only if files changed.
 
 ## TODO.AI.md Completion
 
@@ -1243,162 +878,121 @@ Implemented core application and server functionality.
 
 **This completion ritual applies ONLY to TODO.AI.md.** The human-owned `TODO.md` is never emptied or truncated by AI — AI may only mark individual items done in place.
 
+## Self-Validation Loop
+
+See PART 0 § Self-Validation Loop — the same table and rules apply to all project-file and governance changes; not repeated here to avoid duplication.
+
 ## Loader Files
 
-| Tool | Primary Loader | Alternate Loader | Personal Override |
-|------|----------------|------------------|------------------|
-| Claude Code | `CLAUDE.md` | `.claude/CLAUDE.md` | `CLAUDE.local.md` |
+| Tool | File |
+|---|---|
+| Claude Code (primary) | `CLAUDE.md` |
+| Claude Code (alternate) | `.claude/CLAUDE.md` |
+| Claude Code (personal override) | `CLAUDE.local.md` |
 
-**Loader rule:** loader files stay short. Long-form product content belongs in `IDEA.md`; long-form implementation policy belongs in `AI.md`.
+Loader files point at `AI.md` as the actual specification; they do not duplicate its content.
 
-## README.md
+## License & Attribution
 
-**README.md MUST always be kept updated. Update after ANY feature change, bug fix, or configuration change.**
+### Project License
 
-#### Section Order (MUST follow this order)
+MIT is required for `{project_name}` unless `IDEA.md` explicitly records a different choice. GPL/AGPL/LGPL are denied by default (see PART 0).
 
-1. **Title & Badges** — project name, build status, version, license, docs badges
-2. **About** — brief description of what the project does
-3. **Official Site** — link to official site (if `{official_site}` is defined)
-4. **Features** — key features list
-5. **Production** — production deployment instructions (Docker, binary, systemd)
-6. **Client** — client installation and usage
-7. **Configuration** — key configuration options
-8. **API** — API endpoints summary with full URLs if `{official_site}` is set
-9. **Other** — troubleshooting, FAQ, etc.
-10. **Development** — development setup (ALWAYS LAST — for contributors only)
-11. **Disclaimer** — clear, readable disclaimer
-12. **License** — license info
+### LICENSE.md Structure
 
-#### CI/CD Badge Detection
+Full MIT license text with `{year}` and `{project_org}` placeholders, followed by an "Embedded Licenses" subsection listing every third-party dependency whose license requires attribution.
 
-**Every badge MUST be a linked badge** — `[![alt](image_url)](link_url)` is the only valid form; a bare `![alt](image_url)` is never acceptable. Detect the hosting platform by checking for workflow files in order: `.github/workflows/*.yml` (GitHub) → `.gitea/workflows/*.yml` (Gitea/Forgejo) → `.gitlab-ci.yml` (GitLab) → `Jenkinsfile` (Jenkins), and use the matching badge template for CI, Release, License, and Docs badges.
+### Embedded License Attribution
 
-**License badge — use GitHub's license API endpoint** (`https://img.shields.io/github/license/{project_org}/{project_name}`) so GitHub can auto-detect "MIT License" from `LICENSE.md`, never a static `license-MIT-blue` badge. Requires the file be named `LICENSE`/`LICENSE.md`/`LICENSE.txt` at repo root with unmodified license text (except copyright year/name).
+| Dependency license | Attribution required? |
+|---|---|
+| MIT | Yes |
+| Apache-2.0 | Yes |
+| BSD (2/3-clause) | Yes |
+| ISC | Yes |
+| MPL | Yes |
+| Public Domain / Unlicense | Optional |
+| GPL / AGPL / LGPL | Avoid entirely (PART 0) |
 
-**Docs badge — only add when documentation is actually deployed** (ReadTheDocs, GitHub Pages, GitBook, or self-hosted); never use an "unknown" placeholder badge; omit entirely if docs are planned but not ready.
+Identify dependency licenses with `cargo tree` and `cargo-deny` (`cargo deny check licenses`, `cargo deny list`; `cargo-deny` is pre-installed in `casjaysdev/rust:latest` — run in-container, never installed inline). Use a compact attribution format (dependency name, license, one-line notice) when there are 10+ attributed dependencies; use full license text per dependency when there are fewer than 10. BSD-3-Clause dependencies with a non-endorsement clause must reproduce that clause verbatim.
 
-**ReadTheDocs URL formats** — pick one and keep `mkdocs.yml`'s `site_url` consistent with it: org-project (`{project_org}-{project_name}.readthedocs.io`, default), project-only (`{project_name}.readthedocs.io`, when the name is unique), or a custom domain.
+### Maintenance Requirements
 
-#### Disclaimer Section
+Update `LICENSE.md` attribution whenever a dependency is added, removed, or changes license. Automate verification with a CI workflow (SHA-pinned third-party actions per global rules) running a `scripts/verify-licenses.sh` check that fails the build on an unattributed or disallowed license.
 
-**Every README.md MUST include a Disclaimer section** (before or after License), readable and specific — no warranty, not professional advice, third-party services disclaimer, security disclaimer, production-use evaluation notice. Avoid one-line vague disclaimers, unreadable copy-paste legalese, or omitting it entirely.
+### README.md License Badge
 
-#### URL Standards (PROJECT-WIDE)
+Every `{project_name}` README carries a license badge reflecting the MIT license (see PART 25 for full README section ordering and badge rules).
 
-Two different URL formats depending on context:
+### Docker Annotations
 
-| Context | URL Format | Example |
-|---------|------------|---------|
-| **Documentation** (README, docs/, examples) | `{official_site}/path` | `GET https://api.example.com/server/healthz` |
-| **Embedded code** (Rust, JS, templates) | `{fqdn}/path` via `build_url()` | `build_url(req.headers(), "/server/healthz")` |
+OCI image annotation `org.opencontainers.image.licenses=MIT` set via `docker buildx --annotation` (see PART 24 for the full CI/release workflow this fits into).
 
-**Documentation URLs:** if `{official_site}` is defined, ALL documentation examples (README, docs/, API docs, Swagger, GraphQL, install/troubleshooting guides) MUST use the full URL, not relative paths or `localhost` — except Docker examples and the Development section, where `localhost` is fine. If `{official_site}` is not defined, use relative paths and a `YOUR_SERVER` placeholder in curl examples.
+### Rust Crate License Field
 
-**Embedded code URLs:** application code that builds a link for a client (API response, email, template, OAuth callback, webhook) NEVER hardcodes a bare path or a hardcoded `https://{fqdn}` — it always calls the request-aware `build_url()` (PART 8 → "build_url"), which reads reverse-proxy headers so the link is correct behind any proxy. JavaScript uses `window.location.origin`; HTML templates receive a precomputed URL variable from the handler. The only bare-path exception is internal router registration (`Router::new().route("/api/v1/items", ...)`).
+`Cargo.toml` MUST carry `license = "MIT"`. The license is additionally documented in `LICENSE.md`, the README badge, and the crate-level doc comment (`//! This software is licensed under the MIT License. See LICENSE.md for details.`).
 
-## Project License
+### Common Mistakes
 
-**All projects MUST use the MIT License.**
+Forgetting to update attribution after adding a dependency; using a GPL-licensed dependency without an explicit `IDEA.md` exception; omitting a required non-endorsement clause from a BSD-3-Clause attribution.
 
-| Requirement | Value |
-|-------------|-------|
-| License type | MIT License |
-| License file | `LICENSE.md` (REQUIRED in project root) |
-| Copyright holder | `{project_org}` or individual/organization name |
-| Year | Current year or year of first publication |
+### License Compatibility Matrix
 
-**LICENSE.md structure:** standard MIT license text with `Copyright (c) {year} {project_org}`, followed by an `## Embedded Licenses` section listing third-party dependency licenses.
-
-## Embedded License Attribution
-
-**All third-party dependencies MUST have their licenses attributed in LICENSE.md.**
-
-| License Type | Attribution Required |
-|--------------|---------------------|
-| MIT / Apache 2.0 / BSD (2/3-clause) / ISC / MPL 2.0 | ✓ YES |
-| Public Domain/Unlicense (CC0, WTFPL) | Optional (recommended) |
-| GPL/AGPL/LGPL | ⚠️ AVOID — copyleft licenses, do not use |
-
-**Identify dependencies:** `cargo tree`; `cargo install cargo-deny && cargo deny check licenses && cargo deny list > licenses.csv`.
-
-**Format:** compact table (RECOMMENDED for 10+ dependencies — Library / Version / License / Copyright, with a link to spdx.org for full text) or full per-library sections (for <10 dependencies or where the license requires visible text, e.g. BSD-3-Clause's non-endorsement clause, or an Apache 2.0 NOTICE file).
-
-| License | Full Text Required | Reason |
-|---------|-------------------|--------|
-| MIT, ISC, BSD-2-Clause | NO | Just preserve copyright notice |
-| BSD-3-Clause | YES (brief) | Non-endorsement clause must be visible |
-| Apache 2.0 | Only NOTICE file | Must include NOTICE if the library has one |
-| MPL 2.0 | Reference only | Can link to mozilla.org/MPL/2.0/ |
-
-**When to update LICENSE.md:** new dependency added → add its license; dependency removed → remove its license; dependency upgraded → verify the license hasn't changed and bump the version number; major dependency update → re-check license compatibility.
-
-**Automated license checking** — projects SHOULD run a CI job (`.github/workflows/licenses.yml`) and/or a `scripts/verify-licenses.sh` that fails the build on any GPL/AGPL/LGPL dependency via `cargo deny list | grep -iE 'GPL|AGPL|LGPL'` (`cargo-deny` is pre-installed in `casjaysdev/rust:latest` — never installed inline).
-
-## README.md License Badge (REQUIRED)
-
-```markdown
-[![License](https://img.shields.io/github/license/{project_org}/{project_name})](LICENSE.md)
-```
-
-## Docker Annotations (REQUIRED)
-
-**License metadata is applied as an OCI annotation at build time — no LABEL in the Dockerfile.** Pass `--annotation "org.opencontainers.image.licenses=MIT"` to `docker buildx build`. See PART 6 → "Docker" for the complete annotation requirements.
-
-## Rust Crate License Field
-
-Projects MUST document the license in: `LICENSE.md` (REQUIRED), `Cargo.toml` `license` field (REQUIRED), the README.md badge (REQUIRED), and crate documentation comments (RECOMMENDED):
-
-```rust
-//! # {project_name}
-//!
-//! {brief description}
-//!
-//! This software is licensed under the MIT License.
-//! See LICENSE.md for details.
-```
-
-## Common Mistakes (AVOID)
-
-| Mistake | Correct Approach |
-|---------|-------------------|
-| No LICENSE.md file | Always include LICENSE.md |
-| Missing embedded licenses | Include ALL dependency licenses |
-| Using GPL dependencies | Use MIT/Apache/BSD alternatives |
-| Outdated license attributions | Update when dependencies change |
-| Only listing library names | Include full attribution per the format rules above |
-| Mixing incompatible licenses | Verify compatibility before adding a dependency |
-| No automation | Use CI checks |
-
-## License Compatibility Matrix
-
-| Project License | Can Use Dependencies Licensed As |
-|----------------|----------------------------------|
-| **MIT** | MIT, Apache 2.0, BSD, ISC, Public Domain |
-| **MIT** | ❌ **CANNOT use:** GPL, AGPL, LGPL |
-
-**When in doubt:** choose MIT/Apache 2.0/BSD licensed alternatives.
+MIT projects may depend on: MIT, Apache-2.0, BSD, ISC, Public Domain. MIT projects may NOT depend on: GPL, AGPL, LGPL (without an explicit, documented `IDEA.md` exception).
 
 ---
 
 # PART 2: APPLICATION & SERVER MODEL
 
+This is the most important reconciliation in the HYBRID specification: the project is not "an app that happens to also serve HTTP," and it is not "a server that happens to also have a CLI." It is one Rust binary, one set of shared core logic, with two coexisting operational personas.
+
 ## Product Model
 
-A HYBRID project is **one statically linked Rust binary per supported target** that is, at the same time:
+`{project_name}` ships as a single statically linked Rust binary that is simultaneously:
 
-1. **A native application**, per the APPLICATION.md application model — a shared core application layer with up to three presentation layers (GUI, TUI, CLI), auto-selected at runtime; and
-2. **A full server**, per the API.md server model — frontend (HTML/PWA web UI) and backend (JSON API, database, scheduler, email, metrics, SSL/TLS, GeoIP, backup, etc.) together, never a backend-only "API server."
+1. **A native application** — GUI, TUI, and/or CLI presentation layers over the project's core logic, exactly as described by the application model (this section) and selected at runtime per PART 4's Runtime Mode Selection rules; and
+2. **A full server** — frontend (web UI) and backend (JSON API under `/api/{api_version}/...`) together, sharing the same config, auth, database, and business logic as the native application. Never call this persona "an API server" or "an API" in isolation — it is "the server," and it always includes both the web frontend and the API backend (PART 0 § Full Web Application Architecture).
 
-These are not two different build targets or two different binaries — they are two facets of the same binary, distinguished by how it is invoked and what mode it resolves to at startup (PART 4 has the full runtime-mode-selection rules; this section states the architectural model those rules operate on and does not repeat them).
-
-**Distribution model:** one statically linked binary per supported target. Everything needed at runtime — UI assets, fonts, icons, default config, schemas, templates, locales, and the entire web/PWA frontend — is embedded inside that binary (PART 0 → "Single Static Binary" and "Self-Contained Assets"). The only data ever fetched at runtime is the narrowly-scoped, explicitly-declared security intelligence data in PART 0's Self-Contained Assets exception (GeoIP, blocklists, CVE feeds — PART 18/19).
+Both personas may make outbound network calls to remote services they consume (as an application would); the server persona additionally *hosts* — it accepts inbound connections and serves both browsers and API clients.
 
 **The mental model is VS Code and code-server as ONE product** (or a native SSH client and its web twin): the server persona serves the application's own UI over the web — the same workspace reached through a browser, not a separate website bolted onto an app. A user who starts the native GUI, a TUI in a terminal, and the web UI is looking at one product three ways. Three core mechanisms make that real:
 
 1. **Instance registry** — every running instance registers on a per-user Unix socket registry (PART 4 → "Instance Registry & Per-User Sockets")
 2. **Instance switcher** — the web UI lists the authenticated system user's running instances and switches between them like a desktop window switcher (PART 15 → "Instance Switcher")
 3. **Per-system-user tokens** — web access is authenticated per OS user (PART 8 → "Per-System-User Tokens"); logging in with a user's token lands in that user's instances and context only
+
+## How the Two Personas Coexist
+
+They are the same binary and the same compiled `internal`/`src` package tree — not a client binary and a server binary shipped separately. Runtime mode selection (fully specified in PART 4) decides, per-invocation, which persona is active:
+
+- **No explicit server directive**, run interactively (a terminal or desktop session is attached) → the binary behaves as the native application: it auto-detects GUI vs. TUI vs. CLI per PART 4's detection rules and presents the corresponding UI surface.
+- **An explicit server directive** (a `serve` subcommand, a `--server` flag, or invocation from a service manager/systemd unit with no attached interactive session) → the binary starts the full server (frontend + backend) in the foreground and does not present a GUI/TUI/CLI session UI; it instead shows a status banner/log stream appropriate to a long-running service (see Binary-Specific Behavior below).
+
+PART 4 owns the authoritative detection priority, override rules (flag > config > env > auto-detect), and exact flag/subcommand names — this section only establishes that both personas exist in the same binary and are mutually exclusive per invocation (a single process is either the interactive app or the server, never both at once in the same process; a machine can of course run the server as a background service while a user separately runs the CLI/TUI/GUI app against it as a client).
+
+Independently of which persona is active, the binary also has a **production/development/debug mode** and an orthogonal **debug flag** — this is a second, unrelated axis (application runtime posture, not UI-vs-server selection):
+
+| Setting | Priority |
+|---|---|
+| Mode | `--mode` flag > `MODE` env > default `production` |
+| Debug | `--debug` flag > `DEBUG` env > `MODE=debug` (defaults debug on) > default `false` |
+
+Six operational states result: production, production+debug, development, development+debug, debug (debug flag on by default), and debug with `DEBUG=false` (debug mode, debug endpoints off). In every state, operator/token authentication (`server.token`) is NEVER bypassed by debug mode — debug only ever adds observability (`/debug/*` API routes, verbose logging), never removes a security control. Development mode alone (without `--debug`) still keeps debug endpoints DISABLED. This mode/debug axis applies to the server persona; it has no meaning for a plain interactive GUI/TUI/CLI session.
+
+### Debug Endpoints (`--debug` / `DEBUG=true` Only)
+
+Debug endpoints are ONLY available when the debug flag is set; otherwise they return 404. They only ever add observability — operator/token authentication (`server.token`) still applies exactly as it does everywhere else.
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/debug/vars` | GET | Runtime variables (JSON) |
+| `/debug/config` | GET | Current configuration (sanitized) |
+| `/debug/routes` | GET | All registered routes |
+| `/debug/cache` | GET | Cache statistics |
+| `/debug/db` | GET | Database statistics |
+| `/debug/scheduler` | GET | Scheduler task status |
+| `/debug/memory` | GET | Memory usage statistics |
+| `/debug/tasks` | GET | Async task statistics |
 
 ## Architectural Rule
 
@@ -1419,7 +1013,7 @@ src/
 │   ├── routes.rs
 │   ├── middleware.rs
 │   └── template/            # server-rendered HTML templates (frontend)
-├── client/                  # dedicated CLI client for talking to a running server (PART 8) — required for all projects
+├── client/                  # optional dedicated CLI client for talking to a running server (PART 8)
 ├── state/                   # app state and persistence adapters
 └── support/                 # logging, errors, utilities
 ```
@@ -1430,15 +1024,11 @@ src/
 - Core behavior MUST live in shared modules, not be duplicated across GUI/TUI/CLI or between frontend and backend
 - UI layers are adapters over the same business rules; the web frontend and the JSON backend are two views over the same server-side handlers, not separately maintained logic (PART 0 → "Full Web Application Architecture": every web route has a corresponding API route)
 - Optional `src/bin/*.rs` utilities are allowed only for real auxiliary tools, not as a substitute for clean architecture
-- `src/client/` (PART 8) is REQUIRED for every project — it is the dedicated way to operate a running server from the command line, distinct from the primary binary's own CLI surface
+- `src/client/` (PART 8) exists only when the project warrants a dedicated client build — a thin way to operate a running server from the command line, distinct from the primary binary's own CLI surface
 
 ## Binary Model
 
-| Binary | Status | Purpose |
-|--------|--------|---------|
-| `{project_name}` | REQUIRED | Primary binary — single statically linked artifact; runs as GUI/TUI/CLI application OR as the server (frontend + backend), per PART 4 mode selection |
-| `{project_name}-cli` (`src/client/`) | REQUIRED | Dedicated client for interacting with a running server's API (PART 8) |
-| `src/bin/*` helpers | DISCOURAGED | Permitted only when IDEA.md justifies a real auxiliary tool; each helper is itself a single static binary |
+Released binaries are named `{project_name}-{platform}-{arch}{.ext}` (e.g. `{project_name}-linux-amd64`, `{project_name}-windows-amd64.exe`, `{project_name}-darwin-arm64`) across all release targets in PART 0's target table. The in-tree/local build name is the bare `{project_name}`.
 
 **Binary naming rules:**
 
@@ -1475,305 +1065,30 @@ Distribution artifact names follow the schema:
 
 ## GUI/TUI/CLI Capability Rule
 
-- A project may implement one, two, or all three application surfaces
-- If GUI exists, it is the preferred interactive experience on capable local desktops
-- If TUI exists, it is the preferred interactive fallback for capable terminals
-- CLI is the universal fallback and the default for automation/non-interactive use
-- The server is not optional — every HYBRID project ships the full server (frontend + backend); IDEA.md declares which of the GUI/TUI/CLI *application* surfaces are in scope, but never declares the server itself out of scope
+A HYBRID project's application persona may implement one, two, or all three of GUI/TUI/CLI — `IDEA.md` declares which surfaces are in scope. Regardless of which application surfaces exist, the server persona (frontend + backend) is present whenever `IDEA.md` scopes the project as a HYBRID project — that is what distinguishes a HYBRID project from a plain APPLICATION-only project.
 
-## Operational States (Application Mode vs. Display Mode)
+## Binary Requirements Summary
 
-The single binary has two independent axes of "mode" — they are not the same concept and must not be conflated:
+| Requirement | Rule |
+|---|---|
+| Linkage | Statically linked per PART 0's target table (musl on Linux), no runtime dependencies |
+| Default behavior (no args, interactive session) | Runtime mode auto-detection selects GUI/TUI/CLI per PART 4 |
+| Default behavior (service/non-interactive invocation, or explicit `serve`) | Starts the embedded server; auto-creates `server.yml` and required directories on first run; prints a startup banner; PID file on by default; handles standard signals for graceful shutdown |
+| Windows double-click | Opens a console window showing server/app status as appropriate to the persona started |
+| Embedded assets | Templates, static web assets, fonts, icons, i18n locales, default config — embedded via `include_bytes!`/`include_str!`/`rust-embed` (PART 0) |
+| External runtime data | GeoIP/blocklist/CVE/Trivy databases — explicitly excluded from embedding, scheduler-downloaded when enabled (PART 0, PART 17, PART 18) |
+| Setup wizard | The CLI surface is the persona that carries an interactive first-run setup wizard (see PART 8); the server persona presents status only on its console, never an interactive prompt — though when server admin is enabled it additionally serves the one-time token-based web setup wizard over HTTP (PART 28) |
 
-| Axis | Governs | Values | Where selected |
-|------|---------|--------|-----------------|
-| **Display/runtime mode** | Which presentation the process uses: interactive desktop app (GUI/TUI/CLI) vs. long-running server daemon | `Gui`, `Tui`, `Cli`, `Headless`/server | PART 4 (Runtime Mode Selection) |
-| **Application mode** | How the process behaves internally: verbosity, caching, error detail, debug diagnostics | `production` / `development` / `debug`, with an independent debug flag | This section |
+## Binary-Specific Behavior
 
-### Mode and Debug Detection Priority
+| Persona | Interactive UI? | Behavior |
+|---|---|---|
+| Server (frontend + backend) | No | Foreground process with a status banner and structured logs; not interactive; the only way to configure it is `server.yml` and CLI flags/env (PART 5), never an in-process prompt |
+| CLI | Yes | Full interactive application, including the first-run setup wizard; falls back to a clear error (not a hang) when invoked in a headless context that requires interactivity it doesn't have |
+| TUI | Yes (when a suitable terminal is attached) | Full interactive application per PART 4's terminal-capability detection |
+| GUI | Yes (when a display is attached) | Full interactive application per PART 4's display detection |
 
-**Application mode:**
-1. `--mode` CLI flag (highest priority)
-2. `MODE` environment variable
-3. Default: `production`
-
-**Debug:**
-1. `--debug` CLI flag (highest priority)
-2. `DEBUG` environment variable (truthy values)
-3. `--mode debug` / `MODE=debug` (debug mode defaults debug on)
-4. Default: `false`
-
-**`debug` mode:** `--mode debug` / `MODE=debug` selects debug mode — explicit opt-in only, NEVER implied or auto-enabled. It defaults the debug flag to on; an explicit `--debug` flag or `DEBUG` env var still wins — `MODE=debug DEBUG=false` runs debug mode with the `/debug/*` endpoints off.
-
-### Six Operational States
-
-| State | Mode | Debug | Use Case |
-|-------|------|-------|----------|
-| **Production** | `production` | `false` | Live deployment (desktop app or server), no debugging |
-| **Production + Debug** | `production` | `true` | Live debugging (temporary) |
-| **Development** | `development` | `false` | Local development, sensible defaults |
-| **Development + Debug** | `development` | `true` | Full debugging, all features |
-| **Debug** | `debug` | `false` | Debug-mode diagnostics with `/debug/*` explicitly off (`MODE=debug DEBUG=false`) |
-| **Debug + Endpoints** | `debug` | `true` | Full diagnostics (the default when `MODE=debug` and `DEBUG` unset) |
-
-**Production mode** (default): `info`-level logging; debug endpoints disabled (`/debug/*` → 404); tokio-console disabled; generic error messages (no stack traces); graceful panic recovery (log + 500); template/static-file caching as configured (config-driven, not mode-driven); rate limiting enforced; all security headers enabled; sensitive data never shown; minimal request logging.
-
-**Development mode:** `debug`-level logging; debug endpoints still disabled (opt in with `--debug`); tokio-console still disabled (opt in with `--debug`); detailed errors (stack traces in logs); verbose panic recovery; template/static-file caching as configured (config-driven, not mode-driven); rate limiting relaxed/disabled; security headers relaxed (permissive CORS); sensitive data sanitized — output/log sanitization fully enforced; verbose request logging (headers, body preview).
-
-### Debug Mode (`MODE=debug`)
-
-**Explicit opt-in only — NEVER implied or auto-enabled. Selecting it defaults the debug flag to on (an explicit `--debug`/`DEBUG` still wins).**
-
-| Setting | Behavior |
-|---------|----------|
-| Logging | `debug` level, maximum verbosity |
-| Sanitization | Minimal — internals, dumps, and stack traces may be exposed |
-| Credentials | Keys, tokens, passwords, secrets ALWAYS redacted — no exceptions |
-| Security checks | Never disabled — authentication and authorization fully enforced |
-| Everything else | As Development Mode |
-
-### Debug Flag (`--debug` / `DEBUG=true`)
-
-**Enables ALL debug diagnostics regardless of mode. Debug mode affects verbosity and diagnostics ONLY — it NEVER disables authentication or security checks, in any mode, including production builds.**
-
-| Setting | Behavior |
-|---------|----------|
-| **Operator token (`server.token`) auth** | **NEVER bypassed** — all auth and security checks remain fully enforced |
-| Debug endpoints (`/debug/*`, `/debug/vars`) | Enabled |
-| Request/response logging | Full (headers, body, timing) |
-| Database query logging | Enabled (queries, timing, rows) |
-| Cache operation logging | Enabled (hits, misses, evictions) |
-| Memory profiling / async task monitoring | Enabled |
-
-**Console banner when debug enabled:** `🔒 Running in mode: production [debugging]` / `🔧 Running in mode: development [debugging]`.
-
-### Mode Shortcuts
-
-| Shortcut | Mode |
-|----------|------|
-| `--mode dev` / `--mode devel` / `--mode development` | development |
-| `--mode prod` / `--mode production` | production |
-| `--mode debug` | debug (defaults the debug flag to on) |
-
-### Debug Endpoints (`--debug` / `DEBUG=true` Only)
-
-Debug endpoints are ONLY available when the debug flag is set; otherwise they return 404.
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/debug/vars` | GET | Runtime variables (JSON) |
-| `/debug/config` | GET | Current configuration (sanitized) |
-| `/debug/routes` | GET | All registered routes |
-| `/debug/cache` | GET | Cache statistics |
-| `/debug/db` | GET | Database statistics |
-| `/debug/scheduler` | GET | Scheduler task status |
-| `/debug/memory` | GET | Memory usage statistics |
-| `/debug/tasks` | GET | Async task statistics |
-
-```rust
-// src/server/debug.rs
-// register_debug_routes registers debug endpoints (--debug/DEBUG=true only)
-pub fn register_debug_routes(router: Router<AppState>, config: &Config) -> Router<AppState> {
-    if !config.is_debug() {
-        // No debug routes unless --debug or DEBUG=true
-        return router;
-    }
-    router.nest("/debug", Router::new()
-        .route("/config", get(handle_debug_config))
-        .route("/routes", get(handle_debug_routes))
-        .route("/cache", get(handle_debug_cache))
-        .route("/db", get(handle_debug_db))
-        .route("/scheduler", get(handle_debug_scheduler))
-        .route("/memory", get(handle_debug_memory))
-        .route("/tasks", get(handle_debug_tasks))
-        .route("/vars", get(handle_debug_vars))
-    )
-}
-```
-
-Debug logging, debug middleware, and runtime metrics registration all gate on `config.is_debug()` the same way — every debug-only code path is a no-op when the flag is unset, so production builds never pay for or leak debug diagnostics.
-
-```yaml
-server:
-  # Application mode (does NOT enable debug features)
-  mode: development
-
-  # Debug-specific settings (only apply when the debug flag is
-  # enabled via --debug or DEBUG=true - mode does not gate these)
-  debug:
-    tokio_console: true
-    log_queries: true
-    log_cache: true
-    log_bodies: false
-    max_body_log_size: 10KB
-    runtime_endpoints: true
-```
-
-### Profiling (Commands)
-
-```bash
-# CPU profile (flamegraph)
-cargo install cargo-flamegraph
-cargo flamegraph --bin {internal_name}
-
-# Heap memory — use heaptrack or valgrind
-heaptrack ./{internal_name}
-
-# Async task monitoring — use tokio-console
-cargo install tokio-console
-TOKIO_CONSOLE_BIND=127.0.0.1:6669 ./{internal_name}
-tokio-console http://127.0.0.1:6669
-```
-
-### Reference: Application Mode State
-
-```rust
-// src/mode/mod.rs
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-
-// 0 = Production
-static CURRENT_MODE: AtomicU8 = AtomicU8::new(0);
-static DEBUG_ENABLED: AtomicBool = AtomicBool::new(false);
-
-const PRODUCTION: u8 = 0;
-const DEVELOPMENT: u8 = 1;
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum AppMode {
-    Production,
-    Development,
-}
-
-// set_app_mode sets the application mode
-pub fn set_app_mode(m: &str) {
-    match m.to_lowercase().as_str() {
-        "dev" | "devel" | "development" => CURRENT_MODE.store(DEVELOPMENT, Ordering::SeqCst),
-        // Alias: development mode + debug on (an explicit --debug/DEBUG env var still wins)
-        "debug" => {
-            CURRENT_MODE.store(DEVELOPMENT, Ordering::SeqCst);
-            set_debug_enabled(true);
-        }
-        _ => CURRENT_MODE.store(PRODUCTION, Ordering::SeqCst),
-    }
-}
-
-// set_debug_enabled enables or disables debug mode
-pub fn set_debug_enabled(enabled: bool) {
-    DEBUG_ENABLED.store(enabled, Ordering::SeqCst);
-}
-
-// is_app_mode_dev / is_app_mode_prod / is_debug_enabled — see PART 4 for the
-// companion DisplayMode (Gui/Tui/Cli/Headless) detection, a separate axis.
-
-// from_env sets mode and debug from environment variables
-pub fn from_env() {
-    if let Ok(m) = std::env::var("MODE") {
-        if !m.is_empty() {
-            set_app_mode(&m);
-        }
-    }
-    if crate::config::is_truthy(&std::env::var("DEBUG").unwrap_or_default()) {
-        set_debug_enabled(true);
-    }
-}
-```
-
-## Default Behavior (Server-Mode Binary)
-
-| Behavior | Description |
-|----------|--------------|
-| No arguments | Initialize (if needed) and start the server |
-| First run | Auto-create `server.yml` with defaults if absent, show banner with URLs and version |
-| First run | Auto-create required directories |
-| Double-click (Windows) | Console window opens, server runs in foreground with banner |
-| Signals | Proper handling (SIGTERM, SIGINT, SIGHUP) |
-| PID file | Enabled by default |
-
-**See PART 8 "First-Run / Double-Click Behavior" for the CLI client's setup wizard — the dedicated client is the only binary with a built-in setup wizard.**
-
-## Embedded vs. External Data
-
-**Embedded** (compiled into the binary — PART 0 → "Self-Contained Assets"): server templates (`src/server/template/`), static frontend files (`src/server/static/`), application data (`src/data/`).
-
-**External, never embedded** (downloaded on first run, kept current by the built-in scheduler — the sole exception to the self-contained-assets rule, PART 18/19 have full detail): GeoIP databases, IP/domain blocklists, CVE feeds, and similar security intelligence data. Reasons: this data changes daily/weekly, embedding would force a new binary release for every data update, and external fetch allows immediate security updates without redeployment. If a download fails, the server logs a warning and degrades gracefully rather than failing to start.
-
-## Binary-Specific Display Behavior
-
-| Binary | GUI | TUI | CLI | Headless |
-|--------|-----|-----|-----|----------|
-| **Primary binary in server mode** | Status window | Status banner | Commands | Default (daemon) |
-| **Primary binary in app mode** | Full app (if in scope) | Full app (if in scope) | Commands | N/A |
-| **`{project_name}-cli` (PART 8)** | ✅ Full app | ✅ Full app (default) | ✅ Commands | ❌ Error |
-
-The server surface is not interactive beyond status banners; the dedicated CLI client is the full TUI/GUI-capable app for operating a running server, including its setup wizard. See PART 4 for the shared `DisplayMode`/`DisplayEnv` detection logic (Gui/Tui/Cli/Headless) used by both the primary binary and the client, and PART 8 for the client's full mode implementation.
-
-## Common Rust Modules (Shared Across Binaries)
-
-```
-src/
-├── common/                          # Shared across all binaries
-│   ├── display/                     # Display/terminal detection (PART 4)
-│   ├── theme/                       # Unified theming (PART 15 → "Unified Color Palette")
-│   ├── terminal/                    # Terminal size, resize, symbols
-│   ├── banner/                      # Startup banner (responsive to terminal size)
-│   └── version/                     # Build info, version strings (PART 7)
-├── server/                          # The server: frontend + backend
-├── client/                          # Dedicated CLI client (PART 8)
-│   ├── cli/
-│   ├── tui/                         # ratatui
-│   └── gui/                         # native
-```
-
-Representative `Cargo.toml` dependency set for a HYBRID project (server + client + optional GUI/TUI):
-
-```toml
-[package]
-name = "{internal_name}"
-version = "0.1.0"
-edition = "2021"
-authors = ["{maintainer_name} <{maintainer_email}>"]
-description = "{project_name} - {brief description}"
-license = "MIT"
-repository = "{PLATFORM_REPO_URL}"
-
-[[bin]]
-name = "{internal_name}"
-path = "src/main.rs"
-
-[dependencies]
-anyhow = "1"
-axum = { version = "0.7", features = ["macros"] }
-clap = { version = "4", features = ["derive"] }
-config = "0.14"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-sha2 = "0.10"
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"] }
-tokio = { version = "1", features = ["full"] }
-tower = "0.4"
-tower-http = { version = "0.5", features = ["trace", "cors", "compression-gzip"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-uuid = { version = "1", features = ["v4", "v7", "serde"] }
-# Terminal/TUI (shared by the primary binary's TUI surface and the client)
-atty = "0.2"
-terminal_size = "0.3"
-ratatui = "0.26"
-crossterm = "0.27"
-
-[dev-dependencies]
-axum-test = "14"
-tokio = { version = "1", features = ["full"] }
-
-[profile.release]
-opt-level = "z"
-lto = true
-codegen-units = 1
-strip = true
-panic = "abort"
-```
-
-When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead. See PART 6 for the full pure-Rust library stack and cross-target build matrix.
+See PART 4 for the complete Runtime Mode Selection specification — detection priority, override mechanism, display/terminal capability detection, and the exact flag/subcommand conventions this section's persona-selection description depends on.
 
 ## Optional Server Features (Disabled by Default)
 
@@ -2676,11 +1991,20 @@ When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
 
 ---
 
-## OS-Specific Paths
+# CHECKPOINT 2: PROJECT STRUCTURE VERIFICATION
 
-#### Linux
+Before proceeding, confirm you understand:
+- [ ] Project directory structure — native-app UI (`src/ui/{gui,tui,cli}`) and server modules (`src/server`, `src/routes`, `src/db`, `src/web`) coexist under one `src/` tree
+- [ ] Variable syntax (`{}` = variable, no `{}` = literal)
+- [ ] All 4 OSes must be supported
+- [ ] Both AMD64 and ARM64 must be supported
+- [ ] Always use latest stable Rust
 
-#### Privileged (root/sudo)
+---
+
+## Linux
+
+### Privileged (root/sudo)
 
 | Type | Path |
 |------|------|
@@ -2698,7 +2022,7 @@ When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
 | SQLite DB | `/var/lib/{internal_org}/{internal_name}/db/` (server.db) |
 | Service | `/etc/systemd/system/{internal_name}.service` |
 
-#### User (non-privileged)
+### User (non-privileged)
 
 | Type | Path |
 |------|------|
@@ -2717,9 +2041,9 @@ When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
 
 ---
 
-### macOS
+## macOS
 
-#### Privileged (root/sudo)
+### Privileged (root/sudo)
 
 | Type | Path |
 |------|------|
@@ -2737,7 +2061,7 @@ When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
 | SQLite DB | `/Library/Application Support/{internal_org}/{internal_name}/db/` (server.db) |
 | Service | `/Library/LaunchDaemons/{plist_name}.plist` |
 
-#### User (non-privileged)
+### User (non-privileged)
 
 | Type | Path |
 |------|------|
@@ -2757,9 +2081,9 @@ When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
 
 ---
 
-### BSD (FreeBSD, OpenBSD, NetBSD)
+## BSD (FreeBSD, OpenBSD, NetBSD)
 
-#### Privileged (root/sudo/doas)
+### Privileged (root/sudo/doas)
 
 | Type | Path |
 |------|------|
@@ -2777,7 +2101,7 @@ When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
 | SQLite DB | `/var/db/{internal_org}/{internal_name}/db/` (server.db) |
 | Service | `/usr/local/etc/rc.d/{internal_name}` |
 
-#### User (non-privileged)
+### User (non-privileged)
 
 | Type | Path |
 |------|------|
@@ -2796,9 +2120,9 @@ When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
 
 ---
 
-### Windows
+## Windows
 
-#### Privileged (Administrator)
+### Privileged (Administrator)
 
 | Type | Path |
 |------|------|
@@ -2815,7 +2139,7 @@ When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
 | SQLite DB | `%ProgramData%\{internal_org}\{internal_name}\db\` (server.db) |
 | Service | Windows Service Manager |
 
-#### User (non-privileged)
+### User (non-privileged)
 
 | Type | Path |
 |------|------|
@@ -2833,7 +2157,7 @@ When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
 
 ---
 
-### Docker/Container
+## Docker/Container
 
 **⚠️ DOCKER-ONLY PATHS: `/data/**` and `/config/**` are ONLY used inside Docker containers. On native Linux/macOS/Windows/FreeBSD, use the platform-specific paths above.**
 
@@ -2862,14 +2186,9 @@ volumes:
 
 ---
 
-# CHECKPOINT 2: PROJECT STRUCTURE & PATH VERIFICATION
+# CHECKPOINT 3: PATH VERIFICATION
 
 Before proceeding, confirm you understand:
-- [ ] Project directory structure — native-app UI (`src/ui/{gui,tui,cli}`) and server modules (`src/server`, `src/routes`, `src/db`, `src/web`) coexist under one `src/` tree
-- [ ] Variable syntax (`{}` = variable, no `{}` = literal)
-- [ ] All 4 OSes must be supported
-- [ ] Both AMD64 and ARM64 must be supported
-- [ ] Always use latest stable Rust
 - [ ] Each OS has specific paths for privileged and non-privileged users
 - [ ] Config file is ALWAYS `server.yml` (not .yaml)
 - [ ] Docker uses simplified paths (/config, /data)
@@ -2881,20 +2200,33 @@ Before proceeding, confirm you understand:
 
 ## Selection Priority
 
-**Automatic runtime selection priority is:**
-1. **GUI**
-2. **TUI**
-3. **CLI**
+**This binary is both a native application and a server (see PART 2). At startup it picks exactly one runtime mode.**
 
-**Server mode is NEVER auto-selected.** The binary only enters server mode when explicitly forced — via an explicit CLI flag/subcommand (`--server`, `--serve`, `server`) or an explicit config file value. There is no environment-based smart-detect trigger for server mode: an unattended/headless environment falls through to CLI, not server, unless the server mode was explicitly requested.
+**Automatic runtime selection priority is:**
+1. **Server** (only when server-mode is explicitly requested — see Server below; never auto-selected over GUI/TUI/CLI)
+2. **GUI**
+3. **TUI**
+4. **CLI**
 
 **Override priority is:**
-1. explicit CLI flag / subcommand (`--ui gui|tui|cli`, `--server` / `--serve` / `server`, `gui`, `tui`, `cli`, etc.)
-2. config file value
+1. explicit CLI flag / subcommand (`--ui gui|tui|cli`, `gui`, `tui`, `cli`, `--server`/`--serve`, `server`, etc.)
+2. config file value (`mode:` in `server.yml` — see PART 5)
 3. environment override
-4. automatic detection using the GUI → TUI → CLI priority above (server is excluded from automatic detection)
+4. automatic detection using the priority above
 
 ## Smart Detect Rules
+
+### Server
+
+Choose Server when **any** are true:
+- explicit `--server` / `--serve` flag, or the `server` subcommand, is passed
+- the binary is invoked as its server-mode symlink/alias name (if the project defines one)
+- running under a service manager (systemd, launchd, Windows Service, OpenRC, SysVinit, runit, rc.d — see PART 4 → Service Support) — a service unit ALWAYS forces server mode, it never falls through to GUI/TUI/CLI auto-detection
+- `MODE=server` (or equivalent config value) is set
+
+**Server mode is never auto-selected by environment heuristics alone** — unlike GUI/TUI/CLI, which are inferred from the environment, server mode requires an explicit trigger (flag, subcommand, invocation alias, or service-manager launch). This prevents an interactive terminal session from accidentally binding ports and starting background listeners.
+
+Once server mode is selected, GUI/TUI/CLI detection is skipped entirely — the process runs the HTTP server (PART 8, 12, 13) and, unless `--headless`/`--no-console` is given, still logs startup/status to stdout/stderr following the Output Rules below.
 
 ### GUI
 
@@ -2946,15 +2278,6 @@ Choose CLI when:
 - automation or plain-text mode is requested
 
 CLI is the **required** fallback and the default for non-interactive work.
-
-### Server
-
-Server mode is a fourth, explicit-only mode — it runs the embedded frontend+backend (see PART 2) instead of a GUI/TUI/CLI session. It is entered only through:
-- `--server` / `--serve` CLI flag, or the `server` subcommand
-- an explicit `mode: server` (or equivalent) config file value
-- `--service --install` / `--service start` (service management always runs the binary in server mode)
-
-Server mode is **never** chosen by smart-detect, and it is **never** implied by the absence of a TTY, `SSH_*`/`MOSH_*` variables, `CI=true`, or any other environment signal — those signals only ever steer the GUI → TUI → CLI decision. An unattended CLI invocation with no display and no TTY still runs as CLI, not server, unless server mode was explicitly requested.
 
 ## Reference Detection Logic
 
@@ -3060,15 +2383,19 @@ Prefer platform-standard user directories:
 
 **Rule:** Both `{internal_name}` and `{internal_org}` anchor on-disk identifiers and stable OS-registered names (Bundle IDs, package IDs, dbus names, keychain entries, updater channels). A rename of `{project_name}` or `{project_org}` MUST NOT silently move user data or change those identifiers.
 
-**Full OS-specific privileged and user paths for server mode:** see PART 3 → "OS-Specific Paths".
+**Full OS-specific privileged and user paths for server mode:** see the PART 3 per-OS path tables (Linux, macOS, BSD, Windows, Docker/Container).
 
 ---
 
+### Server-Daemon Privilege Escalation & Service Registration
+
+The rules above (Core Rule, NEVER Do, Allowed Uses, Default Scope Rule, Path Rule) govern privilege escalation in general. The following applies specifically when the binary runs in **server mode** as a background daemon/service — installing a system user, binding privileged ports, and registering with the platform's service manager. This is exactly the kind of "service registration only if the project truly implements a background service" case the Allowed Uses rule permits — the server capability set makes it apply by default whenever server mode is installed system-wide.
+
 ## Overview
 
-Application user creation **REQUIRES** privilege escalation for server mode. If the user cannot escalate privileges, the server runs as the current user with user-level directories.
+Application user creation **REQUIRES** privilege escalation. If the user cannot escalate privileges, the application runs as the current user with user-level directories.
 
-**See PART 5 "Privileged Port Binding" for the complete escalation flow:**
+**IMPORTANT: See PART 5 "Privileged Port Binding (<1024)" → "Binary Implementation" (item 3, "Smart escalation flow") for the complete escalation flow:**
 - Binary first checks if already root/admin → skips escalation prompt entirely
 - Only prompts if user CAN actually escalate (is in sudoers/wheel/admin group)
 - Never prompts if user cannot escalate → shows informative error instead
@@ -3787,30 +3114,6 @@ PART 22 owns the service unit definitions; its units start the server persona as
 ---
 
 # PART 5: CONFIGURATION
-
-## Runtime Detection Rules
-
-All machine-dependent settings MUST be detected at runtime on the target machine, never copied from the developer machine — this applies equally to GUI/TUI/CLI modes and to server mode.
-
-| Setting | Detection Method | NEVER Do |
-|---------|------------------|----------|
-| OS / architecture | `std::env::consts`, target info | hardcode dev machine values |
-| Home/config/data dirs | platform APIs / env vars | hardcode absolute dev paths |
-| Locale | `LANG`, platform locale APIs | assume English-only unless documented |
-| Theme preference | OS theme APIs / config | assume dark/light universally |
-| Terminal capability | TTY + TERM + negotiated features | assume ANSI/alt-screen support |
-| Display stack | X11 (`DISPLAY`) **and** Wayland (`WAYLAND_DISPLAY`) detection — both backends supported, runtime-selected | assume GUI exists; ship X11-only or Wayland-only |
-| CPU / memory | runtime detection if needed | tune only for dev hardware |
-
-## Configuration Rules (Non-Server Modes)
-
-- Config files store user choices, not auto-detected machine facts
-- Defaults must be sensible for a fresh per-user install
-- Support config file + environment variable + CLI override layering
-- CLI override wins over env; env wins over config; config wins over defaults
-- Secrets must not be stored in world-readable files
-
-**In server mode, `server.yml` (below) is the sole source of truth for configuration; the same override order (CLI > env > config > defaults) applies to any flags server mode also accepts.**
 
 ## YAML Comment Style
 
@@ -5563,11 +4866,41 @@ web:
   cors: "*"
 ```
 
-## Logging & Log Rotation (Non-Server Modes)
+---
 
-GUI/TUI/CLI invocations write `app.log` and `error.log` to the platform log directory. Rotation is built in — no external logrotate needed. Server mode's request/access/audit logs use the same `rotate`/`keep` schema, documented in PART 11.
+## Runtime Detection, CLI Output & Non-Server-Mode Logging
 
-### Rotation Options
+**The sections above cover the server's configuration model (`server.yml`, env vars, database-backed state). The rules below apply universally — to server mode AND to the binary's GUI/TUI/CLI modes (see PART 4) — for machine-fact detection, config layering, logging, and terminal output.**
+
+### Runtime Detection Rules
+
+All machine-dependent settings MUST be detected at runtime on the target machine, never copied from the developer machine.
+
+| Setting | Detection Method | NEVER Do |
+|---------|------------------|----------|
+| OS / architecture | `std::env::consts`, target info | hardcode dev machine values |
+| Home/config/data dirs | platform APIs / env vars | hardcode absolute dev paths |
+| Locale | `LANG`, platform locale APIs | assume English-only unless documented |
+| Theme preference | OS theme APIs / config | assume dark/light universally |
+| Terminal capability | TTY + TERM + negotiated features | assume ANSI/alt-screen support |
+| Display stack | X11 (`DISPLAY`) and Wayland (`WAYLAND_DISPLAY`) detection — both backends supported, runtime-selected by GUI toolkit | assume GUI exists; ship X11-only or Wayland-only |
+| CPU / memory | runtime detection if needed | tune only for dev hardware |
+
+### Configuration Layering Rules
+
+- Config files store user choices, not auto-detected machine facts
+- Defaults must be sensible for a fresh per-user install (GUI/TUI/CLI modes) or a fresh server install (`server.yml` — see Configuration Storage above)
+- Support config file + environment variable + CLI override layering
+- CLI override wins over env; env wins over config; config wins over defaults
+- Secrets must not be stored in world-readable files
+
+**In server mode, `server.yml` (see Configuration Storage above) is the sole source of truth for configuration; the same override order (CLI > env > config > defaults) applies to any flags server mode also accepts.**
+
+### Logging & Log Rotation (Non-Server Modes)
+
+GUI/TUI/CLI modes write `app.log` and `error.log` to the platform log directory (see the PART 3 per-OS path tables). Rotation is built in — no external logrotate needed. **Server mode uses the same `rotate`/`keep` schema, writing `server.log` instead (see `logging:` under Configuration above) — the two share one rotation/retention implementation.**
+
+#### Rotation Options
 
 | Option | Description |
 |--------|-------------|
@@ -5580,7 +4913,7 @@ GUI/TUI/CLI invocations write `app.log` and `error.log` to the platform log dire
 | `NGB` | Rotate at N gigabytes (e.g., `1GB`) |
 | Combined | Time + size, whichever first (e.g., `weekly,50MB`) |
 
-### Retention Options
+#### Retention Options
 
 | Option | Description |
 |--------|-------------|
@@ -5591,7 +4924,7 @@ GUI/TUI/CLI invocations write `app.log` and `error.log` to the platform log dire
 | `Nm` | Keep logs for N months |
 | `forever` | Keep forever (no automatic deletion) |
 
-### Configuration
+#### Configuration
 
 ```yaml
 logging:
@@ -5620,7 +4953,7 @@ logging:
     compress: false
 ```
 
-### Defaults
+#### Defaults
 
 | Log Type | Rotation | Keep |
 |----------|----------|------|
@@ -5630,9 +4963,9 @@ logging:
 - `weekly,50MB` = rotate on weekly OR 50MB, whichever comes first
 - `keep: none` = do not retain old logs (default) — deleted immediately after rotation
 
-## Standard CLI Flags
+### Standard CLI Flags
 
-### Universal Flags (ALL Binaries, Every Mode)
+#### Universal Flags (ALL Binaries, Every Mode)
 
 | Flag | Short | Values | Description |
 |------|-------|--------|-------------|
@@ -5643,8 +4976,9 @@ logging:
 
 - `--color auto` and `--color=auto` (space and `=` forms) must both work — `clap` handles this natively; no extra parsing needed.
 - **No escalation** — `--help` and `--version` must never be gated behind privilege checks; never call `nix::unistd::geteuid()` (Unix) or an admin-token check (Windows) before help/version output.
+- These universal flags apply to every binary the project ships — GUI, TUI, CLI, server, and client (see PART 8) alike.
 
-## Output Rules
+### Output Rules
 
 - Respect `NO_COLOR`
 - Respect `TERM=dumb`
@@ -5653,7 +4987,7 @@ logging:
 - Help/version output must show the **actual invoked binary name**
 - **No escalation** — help at every level (main, subcommand, nested) must never call `sudo`, require root/admin, or check privilege state; exit immediately with the help text.
 
-## NO_COLOR Support
+### NO_COLOR Support
 
 When `NO_COLOR` is set and non-empty, disable ANSI color output. If the TUI depends on richer formatting, fall back to CLI/plain output instead of forcing a degraded pseudo-TUI.
 
@@ -5692,13 +5026,13 @@ Before proceeding, confirm you understand:
 | Linting | `clippy` is required |
 | Testing | `cargo test` is required |
 | Docs | `cargo doc --no-deps` is required for public APIs/libraries inside the app workspace |
-| Source language | Rust only (PART 0 → "Rust-Only Project") |
+| Source language | Rust only (PART 0 → "Rust-Only Application") |
 
 ## Pure-Rust Library Stack
 
 This is the recommended starting point for satisfying common application and server needs with crates that do **not** drag in `*-sys` C dependencies. Pure-Rust crates are what make a single static binary that works on Windows, macOS, Linux, and BSD achievable; every C-linked crate becomes a portability tax across that target matrix.
 
-**Rule:** when a capability below is needed, prefer the pure-Rust option. Only deviate when (a) the pure-Rust option is not viable for the project's actual requirements, AND (b) the deviation is documented per the Rust-Only Project rule (PART 0 → "Rust-Only Project"). Note: PART 0 pre-grants the vendored-C exception for `ring` only — it requires LICENSE.md attribution but no per-project IDEA.md write-up. All other deviations (e.g., `rusqlite + bundled`, `zstd` / `zstd-safe`) require both an IDEA.md exception and LICENSE.md attribution.
+**Rule:** when a capability below is needed, prefer the pure-Rust option. Only deviate when (a) the pure-Rust option is not viable for the project's actual requirements, AND (b) the deviation is documented per the Rust-Only Application rule (PART 0 → "Rust-Only Application"). Note: PART 0 pre-grants the vendored-C exception for `ring` only — it requires LICENSE.md attribution but no per-project IDEA.md write-up. All other deviations (e.g., `rusqlite + bundled`, `zstd` / `zstd-safe`) require both an IDEA.md exception and LICENSE.md attribution.
 
 | Capability | Preferred (pure Rust) | Avoid (drags in C) |
 |------------|-----------------------|--------------------|
@@ -5706,7 +5040,7 @@ This is the recommended starting point for satisfying common application and ser
 | HTTP client | `reqwest` with `rustls-tls` (no `default-features`), `ureq` with `rustls` | anything pulling `openssl-sys` |
 | HTTP/web server framework | `axum`, `actix-web` | frameworks that pull `openssl-sys` for TLS |
 | Crypto | `RustCrypto/*` (`sha2`, `aes-gcm`, `ed25519-dalek`, …); `ring` is acceptable (asm + small C, statically linked, widely audited) | system OpenSSL via `openssl-sys` |
-| Compression | `flate2` with `rust_backend` feature, `miniz_oxide`, `zune-inflate`; for zstd decode, `ruzstd` (pure Rust). For zstd encode there is no pure-Rust option today — `zstd` / `zstd-safe` (vendors C) requires an IDEA.md exception per PART 0 → "Rust-Only Project", same as `rusqlite + bundled` | `flate2` default backend with `libz-sys`, system zlib |
+| Compression | `flate2` with `rust_backend` feature, `miniz_oxide`, `zune-inflate`; for zstd decode, `ruzstd` (pure Rust). For zstd encode there is no pure-Rust option today — `zstd` / `zstd-safe` (vendors C) requires an IDEA.md exception per PART 0 → "Rust-Only Application", same as `rusqlite + bundled` | `flate2` default backend with `libz-sys`, system zlib |
 | Serialization | `serde` + `serde_json` / `toml` / `ron` / `postcard` / `bincode` | — |
 | Async runtime | `tokio` (pure Rust), `smol`, `async-std` | — |
 | CLI parsing | `clap` (no system deps), `argh`, `lexopt` | — |
@@ -5781,7 +5115,7 @@ Bare `cargo …` invocations on the host are forbidden by PART 0 → "No Host To
 
 ## Build Rules
 
-- **Pure Rust by default** — every dependency is pure Rust unless a specific exception is documented in `IDEA.md` and the C code is statically linked into the final binary (PART 0 → "Rust-Only Project")
+- **Pure Rust by default** — every dependency is pure Rust unless a specific exception is documented in `IDEA.md` and the C code is statically linked into the final binary (PART 0 → "Rust-Only Application")
 - Release builds use `cargo build --release` against a static target (e.g., `--target x86_64-unknown-linux-musl`) inside the Docker image
 - The final artifact MUST be a single statically linked binary per target (PART 0 → "Single Static Binary") — this applies equally when the binary is a server: the server binary embeds its own frontend assets, templates, and static files, it never ships a companion asset directory
 - Use `RUSTFLAGS="-C target-feature=+crt-static"` for Windows GNU targets (`x86_64-pc-windows-gnu`, `aarch64-pc-windows-gnullvm`) — the image has no MSVC toolchain, so `*-pc-windows-msvc` is not an option; use musl targets for Linux; for BSDs, use the platform's native target triple and statically link where the platform allows
@@ -5830,31 +5164,31 @@ See PART 3 for the full project layout (directory tree, module breakdown, and Do
 | Cargo package name (`[package].name`) | lowercase, hyphenated | `notes-app` |
 | Rust crate identifier (used in `use`, `extern crate`) | lowercase, underscored — Cargo auto-converts hyphens | `notes_app` |
 
-### Binary Naming Pattern
+## Binary Naming
 
 The project produces two possible binaries, both single static Rust binaries built from the same workspace:
 
 **Pattern: `{project_name}[-type]-{os}-{arch}[.exe]`**
 
 | Binary | Local Build | Distribution |
-|--------|------------|---------------|
-| **Server** (frontend + backend, single binary) | `{project_name}` | `{project_name}-{os}-{arch}` |
-| **Client** (companion thin CLI, when it exists) | `{project_name}-cli` | `{project_name}-cli-{os}-{arch}` |
+|--------|------------|--------------|
+| **HYBRID (server+GUI/TUI/CLI)** | `{project_name}` | `{project_name}-{os}-{arch}` |
+| **Client** (optional, `src/client/` present) | `{project_name}-cli` | `{project_name}-cli-{os}-{arch}` |
 
 ### Examples
 
 | Binary | Local | Linux AMD64 | Windows AMD64 |
 |--------|------|-------------|---------------|
-| Server | `jokes` | `jokes-linux-amd64` | `jokes-windows-amd64.exe` |
+| HYBRID | `jokes` | `jokes-linux-amd64` | `jokes-windows-amd64.exe` |
 | Client | `jokes-cli` | `jokes-cli-linux-amd64` | `jokes-cli-windows-amd64.exe` |
 
 ### Binary Output Directory Structure
 
-```text
+```
 binaries/
-├── {project_name}                      # Local server binary
+├── {project_name}                      # Local HYBRID binary (GUI/TUI/CLI + server)
 ├── {project_name}-cli                  # Local client binary (if src/client/ exists)
-├── {project_name}-linux-amd64          # Server distributions
+├── {project_name}-linux-amd64          # HYBRID distributions
 ├── {project_name}-linux-arm64
 ├── {project_name}-darwin-amd64
 ├── {project_name}-darwin-arm64
@@ -5862,10 +5196,12 @@ binaries/
 ├── {project_name}-windows-arm64.exe
 ├── {project_name}-freebsd-amd64
 ├── {project_name}-freebsd-arm64
-├── {project_name}-cli-linux-amd64      # Client distributions
+├── {project_name}-cli-linux-amd64      # Client distributions (if applicable)
 ├── {project_name}-cli-linux-arm64
 ├── ...
 ```
+
+### Local/Testing
 
 | Context | Path |
 |---------|------|
@@ -5873,7 +5209,7 @@ binaries/
 
 **If built with musl → strip binary before release. Final name has NO `-musl` suffix.**
 
-### Build Matrix
+## Build Matrix
 
 | OS | Architectures |
 |----|---------------|
@@ -5881,167 +5217,6 @@ binaries/
 | macOS (Darwin) | amd64, arm64 |
 | Windows | amd64, arm64 |
 | FreeBSD | amd64, arm64 |
-
-## Release Artifacts
-
-- Primary binary follows the naming schema `{project_name}-{platform}-{arch}{.ext}` defined above — single statically linked file, `-musl`/vendor/ABI tokens stripped
-- Each release MUST publish artifacts for at minimum: `{project_name}-linux-amd64`, `{project_name}-linux-arm64`, `{project_name}-windows-amd64.exe`, `{project_name}-windows-arm64.exe`, `{project_name}-darwin-amd64`, `{project_name}-darwin-arm64` (subset acceptable only when IDEA.md narrows platform scope); `{project_name}-freebsd-amd64` / `{project_name}-freebsd-arm64` are included when FreeBSD is in the build matrix
-- Client binaries (`{project_name}-cli-{os}-{arch}`) ship alongside server binaries for every platform when `src/client/` exists in the project
-- A static-linkage verification step is part of release: `ldd` / `otool -L` / `dumpbin /dependents` output is captured and checked against an allowlist (kernel vDSO, Apple system frameworks, Windows kernel32/user32 etc.) — anything outside the allowlist fails the release
-- No companion files (no `.so`, `.dylib`, `.dll`, no asset bundles, no font directories) ship next to the binary
-- Include `sha256.txt` and `sha512.txt` checksum manifests (standard `sha256sum`/`sha512sum` output format: `{hash}  {filename}` lines, one line per release asset); computed LAST, after `version.txt`/source-archive/SBOM are added to the binaries directory, over the full and identical file list (`FILES="$(ls)"` captured once, reused for both manifests) so the two manifests always cover the same asset set and never hash each other
-- Include release notes that describe actual changes
-- Include an SBOM (always — generated via `cargo-cyclonedx`). Include provenance/attestation via `actions/attest-build-provenance` when the release platform supports it; always set `provenance: false` on `docker/build-push-action` steps
-- If GUI packaging exists (MSI, DMG, AppImage, deb, rpm, etc.), the package wraps the same single static binary plus desktop integration metadata; package metadata lives in `packaging/`
-- Every release includes `version.txt` (version string only), `sha256.txt`, `sha512.txt`, and `{project_name}-{version}-source.tar.gz` (source archive, excludes `.git`, `.github`, `.gitea`, `binaries/`, `releases/`)
-
-### version.txt Content
-
-| Release Type | version.txt Content |
-|--------------|---------------------|
-| Stable | `1.2.3` (semver without `v` prefix) |
-| Beta | `20251205143022-beta` (timestamp-beta) |
-| Daily | `a1b2c3d` (short commit id) |
-
-### Release Types
-
-#### Stable Release
-
-| Property | Value |
-|----------|-------|
-| Trigger | Git tag push with semver pattern (`v*`, `*.*.*`) |
-| Version format | Semantic (`X.Y.Z`) — NUMBERS only |
-| Git tag | `v1.2.3`, `v0.2.0`, or `1.2.3` (numeric versions) |
-| Release name | `v{version}` (always with v: `v1.2.3`, `v0.2.0`) |
-| version.txt | `{version}` (without `v`: `1.2.3`, `0.2.0`) |
-| GitHub release | Yes, marked as latest |
-
-**Examples:** Git tag `v1.2.3` → Release `v1.2.3`, version.txt `1.2.3`. Git tag `0.2.0` → Release `v0.2.0`, version.txt `0.2.0`.
-
-#### Beta Release
-
-| Property | Value |
-|----------|-------|
-| Trigger | Push to `beta` branch |
-| Version format | `{YYYYMMDDHHMMSS}-beta` — TEXT, NO `v` prefix |
-| Release name | `{YYYYMMDDHHMMSS}-beta` (e.g., `20251205143022-beta`) |
-| version.txt | `{YYYYMMDDHHMMSS}-beta` |
-| GitHub release | Yes, marked as pre-release |
-
-#### Daily Build
-
-| Property | Value |
-|----------|-------|
-| Trigger | Daily schedule (3am UTC) + push to main/master |
-| Version format | short commit id (`git rev-parse --short=7 HEAD`), NO `v` prefix — NEVER a timestamp |
-| Git tag | always the literal rolling tag `daily` |
-| Release name | `Daily Build {version}` (e.g., `Daily Build a1b2c3d`) |
-| version.txt | `{version}` (e.g., `a1b2c3d`) |
-| GitHub release | Yes, **replaces previous daily** |
-| Max releases | **1** (always overwrites previous daily) |
-
-**Daily Build Rules:** only ONE daily release exists at any time; each daily build **deletes and replaces** the previous `daily` release; this prevents accumulation of thousands of releases. The daily channel is identified by the commit it was built from, not by build time — `release.txt` is never consulted for daily builds.
-
-### Version Tag `v` Prefix Rules
-
-**CRITICAL: Only add `v` prefix to NUMERIC semantic versions, NEVER to text versions.**
-
-**When creating git tags:**
-- Numeric versions: `git tag v0.2.0` or `git tag 0.2.0` (both become v0.2.0)
-- Text versions: `git tag dev` or `git tag beta` (stay as dev, beta — NO v)
-- NEVER create: `git tag vdev`, `git tag vbeta` (wrong!)
-
-**When extracting VERSION variable from tag:** git tag `v1.2.3` → VERSION=`1.2.3` (strip v for internal use); git tag `dev` → VERSION=`dev` (no v to strip); git tag `beta` → VERSION=`beta` (no v to strip).
-
-| Tag Input | Type | Add `v`? | Display As |
-|-----------|------|----------|------------|
-| `0.2.0` | Number (semver) | YES | `v0.2.0` |
-| `1.2.3` | Number (semver) | YES | `v1.2.3` |
-| `v1.2.0` | Number (has v) | NO | `v1.2.0` |
-| `1.2.3-rc1` | Number (semver+suffix) | YES | `v1.2.3-rc1` |
-| `dev` | Text | NO | `dev` |
-| `beta` | Text | NO | `beta` |
-| `daily` | Text | NO | `daily` |
-| `20251218060432` | Timestamp | NO | `20251218060432` |
-| `20251218060432-beta` | Timestamp+text | NO | `20251218060432-beta` |
-
-**Examples of WRONG:** `vdev`, `vbeta` (never add v to text), `v20251218` (never add v to timestamps), `vv0.3.0` (never double the v prefix).
-
-```bash
-# Shell function to format version tag (prevents vv prefix, only adds v to numbers)
-format_version_tag() {
-    local tag="$1"
-
-    # Step 1: If already starts with v, return as-is (prevents vv0.3.0)
-    if [[ "$tag" == v* ]]; then
-        echo "$tag"
-        return
-    fi
-
-    # Step 2: If it's a semantic version (starts with digit.digit.digit), add v
-    if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-        echo "v$tag"
-    else
-        echo "$tag"
-    fi
-}
-```
-
-### Version Tag Summary (Quick Reference)
-
-| Release Type | Git Tag | Has `v` Prefix? | Release Name | version.txt |
-|--------------|---------|-----------------|--------------|-------------|
-| **Stable** | `v1.2.3` or `1.2.3` | YES (numbers) | `v1.2.3` | `1.2.3` |
-| **Stable** | `v0.2.0` or `0.2.0` | YES (numbers) | `v0.2.0` | `0.2.0` |
-| **Beta** | (branch push) | NO (timestamp) | `20251205-beta` | `20251205-beta` |
-| **Daily** | (branch push) | NO (timestamp) | `daily` | `20251218` |
-| **Dev** | `dev` | NO (text) | `dev` | `dev` |
-
-**NEVER:** `vdev`, `vbeta`, `vdaily` (text versions never get v); `v20251218` (timestamps never get v); `vv1.2.3` (don't double the v).
-
-### Version Files
-
-| File | Purpose | When Updated |
-|------|---------|--------------|
-| `release.txt` | Source of truth for stable version | Manual |
-| `releases/version.txt` | Included in release archive | During release build |
-
-### Version Priority
-
-1. `VERSION` environment variable (if set)
-2. `release.txt` file (if exists)
-3. Create `release.txt` with `0.1.0` (first release)
-
-### Release Summary
-
-| Type | Method | Version Example | Max Releases |
-|------|--------|-----------------|--------------|
-| Stable | CI/CD (tag) or `make release` (local) | `1.2.3` | Unlimited |
-| Beta | CI/CD only | `20251205143022-beta` | Unlimited |
-| Daily | CI/CD only | `20251218060432` | **1** (rolling) |
-
-**Note:** `make release` is for manual local releases only. All automated releases use CI/CD (GitHub Actions, Gitea Actions, or GitLab CI depending on git provider).
-
-### NEVER Copy or Symlink Binaries
-
-**Binaries are NEVER copied or symlinked by manual/ad-hoc commands. They stay in `binaries/` until moved for release by the CI/CD pipeline or the `make release` target.**
-
-| Action | Example | Why Prohibited |
-|--------|---------|-----------------|
-| Symlink to PATH | `ln -s binaries/app /usr/local/bin/app` | Creates maintenance nightmare |
-| Copy to system dirs | `cp binaries/app /usr/local/bin/` | Stale binaries, version confusion |
-| Symlink for testing | `ln -s ../binaries/app test/app` | Use full path instead |
-| Copy between dirs | `cp binaries/app releases/app` | Use CI/CD release process |
-| Install locally | Any form of "installing" the binary | Run from `binaries/` directly |
-
-**The only exceptions** are the CI/CD release process and the `make release` target, where binaries are built fresh, stripped (debug symbols removed), copied into the release directory, and uploaded directly to the release (GitHub Releases, registry, etc.) — these are handled by CI/CD or the sanctioned `make release` target, not ad-hoc manual commands.
-
-### Directory Rules
-
-| Rule | Description |
-|------|-------------|
-| `binaries/` | Build output only — temporary, gitignored |
-| `releases/` | Release artifacts only — packaged for distribution |
 
 ## Makefile
 
@@ -6354,99 +5529,256 @@ make local
 make build
 ```
 
-## Embedded Build Info
+### Directory Rules
 
-Every binary MUST have these values embedded at build time:
+| Rule | Description |
+|------|-------------|
+| **binaries/** | Build output only — temporary, gitignored |
+| **releases/** | Release artifacts only — packaged for distribution |
+| **version.txt** | Every release includes `version.txt` with current version |
 
-| Variable | Example | Description |
-|----------|---------|-------------|
-| `Version` | `1.2.3` | Semantic version from `release.txt` |
-| `CommitID` | `a1b2c3d` | Git short commit hash |
-| `BUILD_EPOCH` | `1765112713` | Unix build timestamp (seconds, UTC) — the single captured time source; used by the updater's daily-channel check |
-| `BuildDate` | `2025-12-04T13:05:13Z` | Build timestamp (ISO 8601 / RFC 3339 UTC) — derived from `BUILD_EPOCH` by build systems (`date -u -d @$BUILD_EPOCH ...`) or in-app via `build_date()`; never embedded as its own `APP_*` value |
-| `OfficialSite` | `https://api.example.com` | Default server URL (empty if self-hosted) |
+### NEVER Copy or Symlink Binaries
 
-**Rust code requirement** (in `src/main.rs` or `src/version.rs`):
+**Binaries are NEVER copied or symlinked. They stay in `binaries/` until explicitly moved for release.**
 
-```rust
-// Build info - set via build.rs, which maps VERSION/COMMIT_ID/BUILD_EPOCH/OFFICIAL_SITE to APP_*
-pub const VERSION: &str = option_env!("APP_VERSION").unwrap_or("devel");
-pub const COMMIT_ID: &str = option_env!("APP_COMMIT_ID").unwrap_or("N/A");
-// Unix build timestamp (seconds, UTC) - used by the updater's daily-channel check
-pub const BUILD_EPOCH: &str = option_env!("APP_BUILD_EPOCH").unwrap_or("0");
-// Build date derived from BUILD_EPOCH (RFC 3339 UTC); "N/A" when unset
-pub fn build_date() -> String {
-    match BUILD_EPOCH.parse::<i64>() {
-        Ok(n) if n > 0 => chrono::DateTime::from_timestamp(n, 0)
-            .map(|t| t.format("%Y-%m-%dT%H:%M:%SZ").to_string())
-            .unwrap_or_else(|| "N/A".into()),
-        _ => "N/A".into(),
-    }
+| Action | Example | Why Prohibited |
+|--------|---------|----------------|
+| **Symlink to PATH** | `ln -s binaries/app /usr/local/bin/app` | Creates maintenance nightmare |
+| **Copy to system dirs** | `cp binaries/app /usr/local/bin/` | Stale binaries, version confusion |
+| **Symlink for testing** | `ln -s ../binaries/app test/app` | Use full path instead |
+| **Copy between dirs** | `cp binaries/app releases/app` | Use CI/CD release process |
+| **Install locally** | Any form of "installing" the binary | Run from `binaries/` directly |
+
+| Task | WRONG | CORRECT |
+|------|-------|---------|
+| **Run binary** | `ln -s binaries/app ~/bin/app && app` | `./binaries/app` or `binaries/app` |
+| **Test binary** | `cp binaries/app /tmp/ && /tmp/app` | `./binaries/app --test` |
+| **Release** | `cp binaries/* releases/` | CI/CD handles release artifacts |
+| **Deploy** | Copy binary to server | Use container or package manager |
+
+| Problem | Description |
+|---------|--------------|
+| **Stale binaries** | Symlinks/copies don't auto-update when you rebuild |
+| **Version confusion** | Which binary is running? The copy or the original? |
+| **Debug nightmare** | "I fixed it but it's still broken" = running old copy |
+| **Path pollution** | Binaries scattered across system |
+| **No cleanup** | Copies left behind, consuming space |
+
+**The only exception: release builds.** Release binaries are always built *fresh* — never copied from `binaries/` by hand — then stripped (debug symbols removed) and published directly (GitHub Releases, registry, etc.). This happens either through the CI/CD release pipeline or through the local `make release` target (see PART 6 → "`make release`"); both build from source rather than copying an existing artifact.
+
+## Release Artifacts
+
+- Primary binary follows the naming schema `{project_name}-{platform}-{arch}{.ext}` defined above — single statically linked file, `-musl`/vendor/ABI tokens stripped
+- Each release MUST publish artifacts for at minimum: `{project_name}-linux-amd64`, `{project_name}-linux-arm64`, `{project_name}-darwin-amd64`, `{project_name}-darwin-arm64`, `{project_name}-windows-amd64.exe`, `{project_name}-windows-arm64.exe`, `{project_name}-freebsd-amd64`, `{project_name}-freebsd-arm64` (subset acceptable only when IDEA.md narrows platform scope); CLI client artifacts (`{project_name}-cli-*`) are published for the same platform matrix when `src/client/` exists
+- A static-linkage verification step is part of release: `ldd` / `otool -L` / `dumpbin /dependents` output is captured and checked against an allowlist (kernel vDSO, Apple system frameworks, Windows kernel32/user32 etc.) — anything outside the allowlist fails the release
+- No companion files (no `.so`, `.dylib`, `.dll`, no asset bundles, no font directories) ship next to the binary
+- Include two aggregate checksum manifests covering every release asset — `sha256.txt` (SHA-256) and `sha512.txt` (SHA-512), standard `{hash}  {filename}` format — uploaded as release assets, never per-artifact sidecar files; computed LAST, after `version.txt`/source-archive/SBOM are added to the binaries directory, over the full and identical file list (`FILES="$(ls)"` captured once, reused for both manifests) so the two manifests always cover the same asset set and never hash each other
+- Include release notes that describe actual changes
+- Include an SBOM (always — generated via `cargo-cyclonedx`; see PART 24 for the invocation). Include provenance/attestation via `actions/attest-build-provenance` when the release platform supports it; always set `provenance: false` on `docker/build-push-action` steps
+- If GUI packaging exists (MSI, DMG, AppImage, deb, rpm, etc.), the package wraps the same single static binary plus desktop integration metadata; package metadata lives in `packaging/`
+
+### Server Binaries (Always)
+
+| File | Description |
+|------|-------------|
+| `{project_name}-linux-amd64` | Linux AMD64 binary |
+| `{project_name}-linux-arm64` | Linux ARM64 binary |
+| `{project_name}-darwin-amd64` | macOS AMD64 binary |
+| `{project_name}-darwin-arm64` | macOS ARM64 (Apple Silicon) binary |
+| `{project_name}-windows-amd64.exe` | Windows AMD64 binary |
+| `{project_name}-windows-arm64.exe` | Windows ARM64 binary |
+| `{project_name}-freebsd-amd64` | FreeBSD AMD64 binary |
+| `{project_name}-freebsd-arm64` | FreeBSD ARM64 binary |
+
+### Client Binaries (If Project Has a Companion Client)
+
+| File | Description |
+|------|-------------|
+| `{project_name}-cli-linux-amd64` | Linux AMD64 client binary |
+| `{project_name}-cli-linux-arm64` | Linux ARM64 client binary |
+| `{project_name}-cli-darwin-amd64` | macOS AMD64 client binary |
+| `{project_name}-cli-darwin-arm64` | macOS ARM64 (Apple Silicon) client binary |
+| `{project_name}-cli-windows-amd64.exe` | Windows AMD64 client binary |
+| `{project_name}-cli-windows-arm64.exe` | Windows ARM64 client binary |
+| `{project_name}-cli-freebsd-amd64` | FreeBSD AMD64 client binary |
+| `{project_name}-cli-freebsd-arm64` | FreeBSD ARM64 client binary |
+
+### Metadata Files (Always)
+
+| File | Description | Example Content |
+|------|-------------|-----------------|
+| `version.txt` | Version string only | `1.2.3`, `20251218060432-beta`, `20251218060432` |
+| `{project_name}-{version}-source.tar.gz` | Source code archive | Excludes `.git`, `.github`, `.gitea`, `binaries/`, `releases/` |
+
+### version.txt Content
+
+| Release Type | version.txt Content |
+|--------------|---------------------|
+| Stable | `1.2.3` (semver without `v` prefix) |
+| Beta | `20251205143022-beta` (timestamp-beta) |
+| Daily | `a1b2c3d` (short commit id) |
+
+## Release Types
+
+### Stable Release
+
+| Property | Value |
+|----------|-------|
+| Trigger | Git tag push with semver pattern (`v*`, `*.*.*`) |
+| Version format | Semantic (`X.Y.Z`) — NUMBERS only |
+| Git tag | `v1.2.3`, `v0.2.0`, or `1.2.3` (numeric versions) |
+| Release name | `v{version}` (always with v: `v1.2.3`, `v0.2.0`) |
+| version.txt | `{version}` (without `v`: `1.2.3`, `0.2.0`) |
+| sha256.txt | SHA-256 checksums of every uploaded binary (`{hash}  {filename}` lines) |
+| sha512.txt | SHA-512 checksums of every uploaded binary (`{hash}  {filename}` lines) |
+| GitHub release | Yes, marked as latest |
+
+**Examples:** Git tag `v1.2.3` → Release `v1.2.3`, version.txt `1.2.3`. Git tag `0.2.0` → Release `v0.2.0`, version.txt `0.2.0`.
+
+### Beta Release
+
+| Property | Value |
+|----------|-------|
+| Trigger | Push to `beta` branch |
+| Version format | `{YYYYMMDDHHMMSS}-beta` — TEXT, NO `v` prefix |
+| Release name | `{YYYYMMDDHHMMSS}-beta` (e.g., `20251205143022-beta`) |
+| version.txt | `{YYYYMMDDHHMMSS}-beta` |
+| sha256.txt | SHA-256 checksums of every uploaded binary (`{hash}  {filename}` lines) |
+| sha512.txt | SHA-512 checksums of every uploaded binary (`{hash}  {filename}` lines) |
+| GitHub release | Yes, marked as pre-release |
+
+### Daily Build
+
+| Property | Value |
+|----------|-------|
+| Trigger | Daily schedule (3am UTC) + push to main/master |
+| Git tag | `daily` (single rolling tag, NOT a timestamp) |
+| Version format | Short commit id (`git rev-parse --short=7 HEAD`) — NO `v` prefix |
+| Release name | `Daily Build {VERSION}` |
+| version.txt | Same as version format (e.g., `a1b2c3d`) |
+| sha256.txt | SHA-256 checksums of every uploaded binary (`{hash}  {filename}` lines) |
+| sha512.txt | SHA-512 checksums of every uploaded binary (`{hash}  {filename}` lines) |
+| GitHub release | Yes, **replaces previous daily** |
+| Max releases | **1** (always overwrites previous daily) |
+
+**Daily Build Rules:** Only ONE daily release exists at any time, identified by the rolling `daily` tag; each daily build **deletes and recreates** that `daily` release (`prerelease: true`), preventing accumulation of thousands of releases. Identity is the commit itself — `VERSION` is always the short commit id of the commit that triggered the build, never a stamped `release.txt` value or a timestamp.
+
+### Version Tag Summary (Quick Reference)
+
+| Release Type | Git Tag | Has `v` Prefix? | Release Name | version.txt |
+|--------------|---------|-----------------|--------------|-------------|
+| **Stable** | `v1.2.3` or `1.2.3` | ✓ YES (numbers) | `v1.2.3` | `1.2.3` |
+| **Stable** | `v0.2.0` or `0.2.0` | ✓ YES (numbers) | `v0.2.0` | `0.2.0` |
+| **Beta** | (branch push) | ✗ NO (timestamp) | `20251205-beta` | `20251205-beta` |
+| **Daily** | `daily` (rolling tag) | ✗ NO (commit id) | `Daily Build {VERSION}` | `a1b2c3d` |
+| **Dev** | `dev` | ✗ NO (text) | `dev` | `dev` |
+
+**NEVER:** `vdev`, `vbeta`, `vdaily` (text versions never get v) · `v20251218` (timestamps never get v) · `vv1.2.3` (don't double the v).
+
+### Version Tag `v` Prefix Rules
+
+**CRITICAL: Only add `v` prefix to NUMERIC semantic versions, NEVER to text versions.**
+
+**When creating git tags:**
+- Numeric versions: `git tag v0.2.0` or `git tag 0.2.0` (both become v0.2.0)
+- Text versions: `git tag dev` or `git tag beta` (stay as dev, beta — NO v)
+- NEVER create: `git tag vdev`, `git tag vbeta` (wrong)
+
+**When extracting VERSION variable from tag:**
+- Git tag `v1.2.3` → VERSION=`1.2.3` (strip v for internal use)
+- Git tag `dev` → VERSION=`dev` (no v to strip)
+- Git tag `beta` → VERSION=`beta` (no v to strip)
+
+| Tag Input | Type | Add `v`? | Display As | Why |
+|-----------|------|----------|------------|-----|
+| `0.2.0` | Number (semver) | YES | `v0.2.0` | Numeric version gets v |
+| `1.2.3` | Number (semver) | YES | `v1.2.3` | Numeric version gets v |
+| `v1.2.0` | Number (has v) | NO | `v1.2.0` | Already has v |
+| `1.2.3-rc1` | Number (semver+suffix) | YES | `v1.2.3-rc1` | Numeric version gets v |
+| `dev` | Text | NO | `dev` | Text version NO v |
+| `beta` | Text | NO | `beta` | Text version NO v |
+| `daily` | Text | NO | `daily` | Text version NO v |
+| `20251218060432` | Timestamp | NO | `20251218060432` | Not semver NO v |
+| `20251218060432-beta` | Timestamp+text | NO | `20251218060432-beta` | Not semver NO v |
+
+```bash
+# Shell function to format version tag (prevents vv prefix, only adds v to numbers)
+format_version_tag() {
+    local tag="$1"
+
+    # Step 1: If already starts with v, return as-is (prevents vv0.3.0)
+    if [[ "$tag" == v* ]]; then
+        echo "$tag"
+        return
+    fi
+
+    # Step 2: If it's a semantic version (starts with digit.digit.digit), add v
+    # Matches: 0.2.0, 1.2.3, 10.5.2-rc1
+    # Does NOT match: dev, beta, daily, 20251218
+    if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        echo "v$tag"
+    else
+        echo "$tag"
+    fi
 }
-pub const OFFICIAL_SITE: &str = option_env!("APP_OFFICIAL_SITE").unwrap_or("");
-// OFFICIAL_SITE empty = users must use --server flag
 ```
 
-**Required `build.rs`** (project root) — the Makefile's `RUST_DOCKER` wrapper and the Dockerfile's builder-stage `ARG`s expose `VERSION`, `COMMIT_ID`, `BUILD_EPOCH`, and `OFFICIAL_SITE` to `cargo build`; `build.rs` maps them to the `APP_*` variables `option_env!()` reads. `BUILD_DATE` is NOT mapped — the app derives it from `BUILD_EPOCH` via `build_date()`; `BUILD_DATE` only exists as a docker build-arg for OCI labels:
+### Version Files
 
-```rust
-// build.rs — map build-system env vars to the APP_* rustc-env vars read by option_env!()
-fn main() {
-    let mappings = [
-        ("VERSION", "APP_VERSION"),
-        ("COMMIT_ID", "APP_COMMIT_ID"),
-        ("BUILD_EPOCH", "APP_BUILD_EPOCH"),
-        ("OFFICIAL_SITE", "APP_OFFICIAL_SITE"),
-    ];
-    for (src, dst) in mappings {
-        println!("cargo:rerun-if-env-changed={src}");
-        if let Ok(val) = std::env::var(src) {
-            println!("cargo:rustc-env={dst}={val}");
-        }
-    }
-}
-```
+| File | Purpose | When Updated |
+|------|---------|--------------|
+| `release.txt` | Source of truth for stable version | Manual |
+| `releases/version.txt` | Included in release archive | During release build |
 
-**Build date format:** uses build system timezone or `TZ` env var.
+### Version Priority
 
-**OfficialSite usage:** if set, the client uses this as default `--server` value. If empty, users must provide `--server` flag or configure it in `cli.yml`.
+1. `VERSION` environment variable (if set)
+2. `release.txt` file (if exists)
+3. Create `release.txt` with `0.1.0` (first release)
 
-## Rust Dependency Caching
+### Release Summary
 
-All Docker builds use persistent Rust crate caching to avoid re-downloading dependencies:
+| Type | Method | Version Example | Max Releases |
+|------|--------|-----------------|---------------|
+| Stable | CI/CD (tag) or `make release` (local) | `1.2.3` | Unlimited |
+| Beta | CI/CD only | `20251205143022-beta` | Unlimited |
+| Daily | CI/CD only | `20251218060432` | **1** (rolling) |
 
-| Cache | Local Path (`?=` default) | Container Path |
-|-------|--------------------------|------------------|
-| Cargo (`CARGO_CACHE`) | `~/.cargo` | `/usr/local/share/cargo` |
-| Rustup (`RUSTUP_CACHE`) | `~/.rustup` | `/usr/local/share/rustup` |
-| sccache (`SCCACHE_CACHE`) | `~/.cache/sccache` | `/root/.cache/sccache` |
-| Cargo target (`CARGO_TARGET`) | `~/.cache/cargo-target/{project_name}` | `/app/target` |
-
-**Benefits:** first build downloads crates once; subsequent builds use cached crates; shared across all projects on the same machine; significantly faster builds after first run.
+**Note:** `make release` is for manual local releases only. All automated releases use CI/CD (GitHub Actions, Gitea Actions, or GitLab CI depending on git provider).
 
 ## Docker Rule
 
 Docker is **REQUIRED**. The project MUST ship a working Docker setup, and every toolchain command and every produced binary runs inside it (PART 0 → "No Host Toolchain or Binary Execution").
 
-### Required Docker Assets
+### Docker Directory Structure
 
-```text
+```
 docker/
-├── Dockerfile                              # production runtime image — two-stage (builder + minimal Alpine/Debian); tagged :latest
-├── Dockerfile.dev                          # devel image — same as release but binary runs in debug mode; tagged :devel   (project-specific)
-├── rootfs/                                 # build-time filesystem overlay copied into image at /   (project-specific)
-│   └── usr/local/bin/entrypoint.sh         # prepares cache/target dirs; user creation and privilege drop happen in the binary; called by tini → entrypoint.sh → app
-├── docker-compose.yml                      # production/human runtime — image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:latest
-├── docker-compose.dev.yml                  # human development — image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:devel
-├── docker-compose.test.yml                 # automated testing — :devel image, valkey cache w/ ephemeral tmpfs, named bridge net; AI prefers tests/ scripts over running this directly
-└── README.md                               # how to build the image, run tests, run GUI with display forwarding
+├── Dockerfile              # production runtime image — two-stage (builder + minimal Alpine); tagged :latest
+├── Dockerfile.dev          # devel image — same as release but binary runs in debug mode; tagged :devel (project-specific)
+├── docker-compose.yml      # production compose — HUMAN USE ONLY
+├── docker-compose.dev.yml  # development compose — HUMAN USE ONLY
+├── docker-compose.test.yml # test compose — AI/AUTOMATED TESTING ONLY
+├── README.md               # how to build the image, run tests, run GUI with display forwarding
+└── rootfs/                 # build-time filesystem overlay copied into image at /   (project-specific)
+    └── usr/local/bin/
+        └── entrypoint.sh   # container entrypoint (REQUIRED)
 ```
 
-All three compose files live under `docker/`. A top-level `docker-compose.yml` symlink or shim is allowed for ergonomics, but the source of truth lives under `docker/`. `docker-compose.yml` and `docker-compose.dev.yml` are human-only; AI's preferred interface for `docker-compose.test.yml` is the project's `tests/` scripts rather than a direct invocation.
+`docker-compose.yml` always lives under `docker/` — never at the repo root. See `dockerfile_conventions.md` → "Docker Compose" for the canonical layout: `docker-compose.yml` and `docker-compose.dev.yml` are human-only, and AI's preferred interface for `docker-compose.test.yml` is the project's `tests/` scripts rather than a direct invocation.
 
-**Build Context:** Docker build context is project root (`.`); Dockerfile specified with `-f docker/Dockerfile`; multi-stage build — Rust binary compiled entirely in the builder stage (no pre-built binaries needed); build-time overlay copied from `docker/rootfs/`.
+**Build Context:**
+- Docker build context is project root (`.`)
+- Dockerfile specified with `-f docker/Dockerfile`
+- Multi-stage build: Rust binary compiled in builder stage (no pre-built binaries needed)
+- Build-time overlay copied from `docker/rootfs/`
 
-**Rules:** NEVER place Dockerfile or docker-compose.yml in project root; ALWAYS use `docker/` for Dockerfiles/compose files and `docker/rootfs/` for build-time overlay files; ALWAYS use `entrypoint.sh` for container startup; ALWAYS use multi-stage build; `docker/rootfs/` mirrors the container filesystem.
+**Rules:**
+- NEVER place Dockerfile or docker-compose.yml in project root
+- ALWAYS use `docker/` for Dockerfiles/compose files and `docker/rootfs/` for build-time overlay files
+- ALWAYS use `entrypoint.sh` for container startup
+- ALWAYS use multi-stage build
+- `docker/rootfs/` mirrors the container filesystem
 
 ### Toolchain Image
 
@@ -6484,59 +5816,31 @@ All three compose files live under `docker/`. A top-level `docker-compose.yml` s
 
 CI workflows reference this image directly: `container: image: casjaysdev/rust:latest`. No `cargo install`, no `rustup` in CI, no `ensure-build-image` job, no `build-toolchain.yml`.
 
-### OCI Annotations (No LABEL Policy)
-
-All image metadata is applied as **OCI annotations at build time** — never as `LABEL` blocks in any Dockerfile, and never baked in ahead of time. Labels attach to per-platform image layers; multiarch manifest indexes do not inherit labels, so they appear missing on multiarch pulls. Annotations attach to the manifest index and are visible across all platforms.
-
-- No `LABEL` blocks in `docker/Dockerfile` or `docker/Dockerfile.dev`
-- GitHub Actions: use `docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9  # v6.1.0` with an `annotations:` input listing the required OCI keys
-- `docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0` MUST set `annotations: ${{ steps.meta.outputs.annotations }}`, `labels: ${{ steps.meta.outputs.labels }}` AND `provenance: false` to prevent a spurious `unknown/unknown` platform entry in the manifest list (use `actions/attest-build-provenance` for release binary attestation instead)
-
-Required annotation set: `org.opencontainers.image.{title,description,url,source,documentation,vendor,authors,vcs-type,version,revision,created,licenses,base.name,schema-version}`; plus `maintainer` and `com.github.containers.toolbox: false`.
-
-```yaml
-- uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9  # v6.1.0
-  id: meta
-  with:
-    images: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
-    annotations: |
-      org.opencontainers.image.description={project_name} description
-      org.opencontainers.image.title={project_name}
-      org.opencontainers.image.licenses=MIT
-
-- uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
-  with:
-    annotations: ${{ steps.meta.outputs.annotations }}
-    labels: ${{ steps.meta.outputs.labels }}
-    provenance: false
-    tags: ${{ steps.meta.outputs.tags }}
-```
-
-### Container Runtime Rules
-
-Every production image MUST satisfy:
-
-- **Startup chain `tini → entrypoint.sh → app`** — `ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]`. Never override `ENTRYPOINT` or `CMD` to bypass `tini` or the entrypoint shim. All startup customization goes in `docker/rootfs/usr/local/bin/entrypoint.sh`, which MUST end with `exec "$@"` (or `exec <binary> ... "$@"`) so the application replaces the shell as PID 1 and receives signals directly.
-- **`STOPSIGNAL SIGRTMIN+3`** (systemd-compatible clean shutdown; works well with Docker, Podman, Kubernetes; allows entrypoint.sh to coordinate shutdown of all services; avoids race conditions before forced termination)
-- **`HEALTHCHECK`** — every production image declares a `HEALTHCHECK` that exits non-zero when the binary is unhealthy. Image default: start 10m, interval 5m, timeout 15s (conservative fallback for plain `docker run`); compose files override with tighter timings (start 90s, interval 10s, timeout 5s) — the compose values are authoritative for deployments
-- **Privilege drop, not Dockerfile users** — containers start as root with NO `USER` directive and no user/group creation in the Dockerfile. The binary itself creates its dedicated user/group, creates its directories, sets permissions, then drops privileges once initialization completes (see "Privileged Port Binding (<1024)" for the run-mode and drop rules). `entrypoint.sh` may export UID/GID env vars so the binary can match host ownership of mounted volumes. Running permanently as root (never dropping) is the exception and MUST be justified in `IDEA.md`.
-
 ### Dockerfile Requirements
 
 | Requirement | Value |
 |-------------|-------|
 | Location | `docker/Dockerfile` |
-| Build type | **Multi-stage** (builder + runtime) |
+| **Build type** | **Multi-stage** (builder + runtime) |
 | Builder stage | `casjaysdev/rust:latest` |
 | Runtime stage | `alpine:latest` |
-| Meta labels | None in the Dockerfile — CI applies OCI labels/annotations at build time |
+| Meta labels | All OCI annotations (see below) — never Dockerfile `LABEL` blocks |
 | Required packages | git, curl, bash, tini, tor |
-| Tor handling | Installed but **binary controls** startup (see PART 27: TOR HIDDEN SERVICE) |
+| Tor handling | Installed but **binary controls** it (see PART 27) |
 | Binary location | `/usr/local/bin/{project_name}` |
 | Entrypoint script | `/usr/local/bin/entrypoint.sh` |
 | Init system | **tini** |
 | Internal port | **80** |
-| `ENV MODE` | **not set** — binary defaults to production; compose files set `MODE` explicitly (`production` / `development`) |
+| **ENV MODE** | **not set** — binary defaults to production; compose files set `MODE` explicitly (`production` / `development`) |
+
+### Container Runtime Rules
+
+Every production image MUST satisfy:
+
+- **Startup chain `tini → entrypoint.sh → app`** — `ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]`. Never override `ENTRYPOINT` or `CMD` to bypass `tini` or the entrypoint shim. All startup customization goes in `docker/rootfs/usr/local/bin/entrypoint.sh`, which MUST end with `exec "$@"` (or `exec <binary> ... "$@"`) so the application replaces the shell as PID 1 and receives signals directly — without `exec`, tini/Docker signals are delivered to bash, not the app, and graceful shutdown breaks.
+- **`STOPSIGNAL SIGRTMIN+3`** (systemd-compatible clean shutdown; works well with Docker, Podman, Kubernetes; allows entrypoint.sh to coordinate shutdown of all services; avoids race conditions before forced termination)
+- **`HEALTHCHECK`** — every production image declares a `HEALTHCHECK` that exits non-zero when the binary is unhealthy. Image default: start 10m, interval 5m, timeout 15s (conservative fallback for plain `docker run`); compose files override with tighter timings (start 90s, interval 10s, timeout 5s) — the compose values are authoritative for deployments
+- **Privilege drop, not Dockerfile users** — containers start as root with NO `USER` directive and no user/group creation in the Dockerfile. The binary itself creates its dedicated user/group, creates its directories, sets permissions, then drops privileges once initialization completes (see "Privileged Port Binding (<1024)" for the run-mode and drop rules). `entrypoint.sh` may export UID/GID env vars so the binary can match host ownership of mounted volumes. Running permanently as root (never dropping) is the exception and MUST be justified in `IDEA.md`.
 
 ### Dockerfile Example (Multi-Stage)
 
@@ -6638,7 +5942,13 @@ ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]
 
 **Location:** `docker/rootfs/usr/local/bin/entrypoint.sh`
 
-**Entrypoint is MINIMAL.** It only sets environment variables/flags, execs the server binary, starts the server binary, and handles signals for graceful shutdown. **Binary handles EVERYTHING else:** directories, permissions, user/group, Tor, etc.
+**Entrypoint is MINIMAL.** It only does:
+1. Set environment variables/flags
+2. Exec binary
+3. Start binary
+4. Handle signals for graceful shutdown
+
+**Binary handles EVERYTHING else:** directories, permissions, user/group, Tor, etc.
 
 ```bash
 #!/usr/bin/env bash
@@ -6675,6 +5985,15 @@ cleanup() {
 trap cleanup SIGTERM SIGINT SIGQUIT
 
 # =============================================================================
+# Start services (add supervisord, etc. here if needed)
+# =============================================================================
+# Example: Start supervisord for multi-service containers
+# if [ -f /etc/supervisord.conf ]; then
+#     /usr/bin/supervisord -c /etc/supervisord.conf &
+#     PIDS+=($!)
+# fi
+
+# =============================================================================
 # Start main application
 # =============================================================================
 log "Starting ${APP_NAME}..."
@@ -6687,9 +6006,19 @@ FLAGS="--address ${ADDRESS:-0.0.0.0} --port ${PORT:-80}"
 exec $APP_BIN $FLAGS "$@"
 ```
 
-**Entrypoint does NOT:** create directories, set permissions, create user/group, manage Tor, or perform any other runtime initialization — the server binary does all of that.
+| Feature | Description |
+|---------|--------------|
+| **Environment defaults** | Sets `TZ`, `CONFIG_DIR`, `DATA_DIR` |
+| **Flag building** | Constructs CLI flags from env vars (`ADDRESS`, `PORT`, `DEBUG`) |
+| **Signal handling** | Graceful shutdown on SIGTERM/SIGINT/SIGQUIT |
+| **Service startup** | Optional: pre-flight checks before binary exec |
+| **Binary exec** | Runs binary with `exec` (replaces shell) |
 
-**Environment Variables (Entrypoint):**
+**Entrypoint does NOT:** create directories, set permissions, create user/group, manage Tor (see PART 27), or perform any other runtime initialization — the binary does all of this.
+
+**Why `SIGRTMIN+3`:** matches systemd's own clean-shutdown signal, works well with Docker/Podman/Kubernetes, allows entrypoint.sh to coordinate graceful multi-process shutdown, and avoids race conditions by giving time for proper cleanup before forced termination.
+
+### Environment Variables (Entrypoint)
 
 | Variable | Default | Description |
 |----------|---------|--------------|
@@ -6697,9 +6026,9 @@ exec $APP_BIN $FLAGS "$@"
 | `MODE` | `development` | `production` (`prod`) strict · `development` (`dev`/`devel`) relaxed · `debug` explicit-only |
 | `DEBUG` | `false` | Enable ALL debug features (debug endpoints, detailed logging) |
 | `ADDRESS` | `0.0.0.0` | Listen address |
-| `PORT` | `80` | Listen port (update docker-compose `ports:` to match) |
+| `PORT` | `80` | Listen port (update docker-compose ports: to match) |
 
-**MODE vs DEBUG:** `MODE=production` (shortcut `prod` — the default) is strict: minimal logging, full output/log sanitization. `MODE=development` (shortcuts `dev` / `devel`) sits between production and debug: relaxed security, verbose logging, sanitization still fully enforced. `MODE=debug` is explicit opt-in only — NEVER implied or auto-enabled — with minimal sanitization (internals, dumps, stack traces may be exposed); credentials (keys, tokens, passwords, secrets) are ALWAYS redacted in every mode, no exceptions. `DEBUG=truthy` enables the debug endpoints (`/debug/*`) regardless of MODE; nothing else may auto-enable debug. Every mode uses the cache when one is configured — cache use is config-driven, not mode-driven. Boolean env vars accept all truthy/falsy values (`DEBUG=yes`, `DEBUG=enable`, `DEBUG=1`). Tor is auto-enabled if the `tor` binary is installed — no `ENABLE_TOR` flag needed; the Docker image always includes Tor.
+**MODE vs DEBUG:** `MODE=production` (shortcut `prod` — the default) is strict: minimal logging, full output/log sanitization. `MODE=development` (shortcuts `dev` / `devel`) sits between production and debug: relaxed security, verbose logging, sanitization still fully enforced. `MODE=debug` is explicit opt-in only — NEVER implied or auto-enabled — with minimal sanitization (internals, dumps, stack traces may be exposed); credentials (keys, tokens, passwords, secrets) are ALWAYS redacted in every mode, no exceptions. `DEBUG=truthy` enables the debug endpoints (`/debug/*`) regardless of MODE; nothing else may auto-enable debug. Every mode uses the cache when one is configured — cache use is config-driven, not mode-driven. Boolean env vars accept all truthy/falsy values (see Boolean Values table in PART 5). Tor is auto-enabled if the `tor` binary is installed — no `ENABLE_TOR` flag needed; the Docker image always includes Tor.
 
 ### Mandatory `docker run` Naming Convention
 
@@ -6788,11 +6117,58 @@ docker run --rm \
 - Sound/MIDI/input device forwarding is allowed only when IDEA.md justifies it
 - Audio (PulseAudio/PipeWire) forwarding follows the same scoped-socket pattern when needed
 
+### OCI Meta Labels / Annotations (Required)
+
+All images MUST carry these labels — applied as OCI annotations on the manifest index at build time, never as Dockerfile `LABEL` blocks (`LABEL` attaches only to the per-platform layer and is invisible on multiarch pulls; annotations attach to the index and are visible on every platform):
+
+| Label | Value |
+|-------|-------|
+| `maintainer` | `{maintainer_name} <{maintainer_email}>` — email part omitted when `maintainer_email` is unset (label becomes just `{maintainer_name}`) |
+| `org.opencontainers.image.vendor` | `{project_org}` |
+| `org.opencontainers.image.authors` | `{project_org}` |
+| `org.opencontainers.image.title` | `{project_name}` |
+| `org.opencontainers.image.base.name` | `{project_name}` |
+| `org.opencontainers.image.description` | `{project_name} - {brief description}` |
+| `org.opencontainers.image.licenses` | License (e.g., `MIT`) |
+| `org.opencontainers.image.created` | `${BUILD_DATE}` (ARG) |
+| `org.opencontainers.image.version` | `${VERSION}` (ARG) |
+| `org.opencontainers.image.schema-version` | `${VERSION}` (ARG) |
+| `org.opencontainers.image.revision` | `${COMMIT_ID}` (ARG) |
+| `org.opencontainers.image.url` | `{PLATFORM_REPO_URL}` |
+| `org.opencontainers.image.source` | `{PLATFORM_REPO_URL}` |
+| `org.opencontainers.image.documentation` | `{PLATFORM_REPO_URL}` |
+| `org.opencontainers.image.vcs-type` | `Git` |
+| `com.github.containers.toolbox` | `false` |
+
+No `LABEL` blocks anywhere in `docker/Dockerfile*`. All metadata is passed at build time via `--annotation` flags on `docker buildx build` (or via `docker/metadata-action` → `annotations:` output in GitHub Actions / Gitea / Forgejo):
+
+```yaml
+- uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9  # v6.1.0
+  id: meta
+  with:
+    images: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
+    annotations: |
+      org.opencontainers.image.description={project_name} description
+      org.opencontainers.image.title={project_name}
+      org.opencontainers.image.licenses=MIT
+
+- uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
+  with:
+    annotations: ${{ steps.meta.outputs.annotations }}
+    labels: ""
+    provenance: false
+    tags: ${{ steps.meta.outputs.tags }}
+```
+
+`provenance: false` is REQUIRED on `docker/build-push-action` — it prevents a spurious `unknown/unknown` platform entry in the manifest list (use `actions/attest-build-provenance` for release binary attestation instead).
+
+See `dockerfile_conventions.md` → "OCI Annotations" for the complete list of required annotation keys.
+
 ### Container Paths
 
-**Container directory structure - organized by component:**
+**Container directory structure — organized by component:**
 
-```text
+```
 /config/
 └── {project_name}/                    # App config directory
     ├── server.yml                    # Main config file
@@ -6833,19 +6209,6 @@ docker run --rm \
 | `/data/backups/{project_name}/` | Backup archives |
 | `/usr/local/bin/{project_name}` | Application binary |
 
-**Host Volume Mapping (docker-compose):** all compose files mount two volumes:
-
-```yaml
-volumes:
-  - ./volumes/config:/config:z
-  - ./volumes/data:/data:z
-```
-
-| Host Path | Container Path |
-|-----------|------------------|
-| `./volumes/config/` | `/config/` |
-| `./volumes/data/` | `/data/` |
-
 **Expected host directory structure (auto-created by binary on first run):**
 
 ```text
@@ -6861,9 +6224,41 @@ volumes:
     └── backups/
 ```
 
-**Key principles:** the binary owns Tor completely — Tor dirs are under `{project_name}/`, not separate; all SQLite databases live in `/data/db/sqlite/` (not scattered); the database name is ALWAYS `server.db` (globally consistent); external services (valkey) have their own `/data/db/{service}/` dirs; compose mounts entire `/config` and `/data`, not individual subdirectories.
+**Key principles:**
+- Binary owns Tor completely — Tor dirs are under `{project_name}/`, not separate
+- All SQLite databases in `/data/db/sqlite/` (not scattered)
+- Database name is ALWAYS `server.db` (globally consistent)
+- External services (valkey) have their own `/data/db/{service}/` dirs
+- Compose mounts entire `/config` and `/data` — not individual subdirectories
 
-### Docker Compose Requirements
+### Container Configuration
+
+| Setting | Value |
+|---------|-------|
+| Internal port | **80** (always) |
+| Config dir | `/config/{project_name}/` (binary's {config_dir}) |
+| Security dir | `/data/{project_name}/security/` |
+| Tor config dir | `/config/{project_name}/tor/` (binary owns Tor) |
+| Data dir | `/data/{project_name}/` (binary's {data_dir}) |
+| Tor data dir | `/data/{project_name}/tor/` (binary owns Tor) |
+| Database dir | `/data/db/{dbtype}/` (sqlite, valkey) |
+| Log dir | `/data/log/{project_name}/` |
+| Backup dir | `/data/backups/{project_name}/` |
+| Binary | `/usr/local/bin/{project_name}` |
+| HEALTHCHECK | `{binary} --status` |
+
+**Path Mapping (Container vs Local):**
+
+| Container Path | Local Path | Purpose |
+|----------------|-----------|---------|
+| `/config` | `./volumes/config` | Configuration root (organized by component) |
+| `/data` | `./volumes/data` | Data root (organized by component) |
+| `/config/{project_name}/` | `./volumes/config/{project_name}/` | Binary's config |
+| `/data/{project_name}/` | `./volumes/data/{project_name}/` | Binary's data |
+| `/data/db/` | `./volumes/data/db/` | Database data |
+| `/data/log/` | `./volumes/data/log/` | Log files |
+
+## Docker Compose Requirements
 
 **Locations:** `docker/docker-compose.yml` (production) · `docker/docker-compose.dev.yml` (human development only — AI must never run it) · `docker/docker-compose.test.yml` (automated testing — AI's preferred interface is the project's `tests/` scripts, not invoking this file directly; direct invocation is only a fallback when no `tests/` script exists yet)
 
@@ -6873,20 +6268,40 @@ volumes:
 | `image:` tag | `:latest` in `docker-compose.yml` (production) · `:devel` in `docker-compose.dev.yml` and `docker-compose.test.yml` |
 | `version:` | **NEVER include** |
 | `name:` | `{project_name}` (production) · `{project_name}-dev` (dev) · `{project_name}-test` (test) |
-| `container_name:` | `{project_name}-app` (prod main) · `{project_name}-dev` (dev main) · `{project_name}-test` (test main) · `{project_name}-cache` / `{project_name}-cache-test` (Valkey) |
+| `container_name:` | `{project_name}-app` (production and dev main) · `{project_name}-test` (test main) · `{project_name}-cache` / `{project_name}-cache-test` (Valkey) |
 | Main service name | `{project_name}` (matches project name in every variant) |
 | `pull_policy:` | `always` on every service |
 | `restart:` | `always` (production/dev) · `"no"` (test — services are ephemeral) |
-| `x-logging:` | Anchor for consistent logging; applied to every service via `logging: *default-logging` |
+| `x-logging:` | Anchor for consistent logging (see below); applied to every service via `logging: *default-logging` |
 | Network | Named to match the compose file's `name:` (`{project_name}`, `{project_name}-dev`, or `{project_name}-test`) — never a `-net` or other suffix; `external: false` |
-| Environment variables | **YAML map style** (`KEY: value`), never list style (`- KEY=value`) — inline `${VAR:-default}` fallbacks so the stack works with zero `.env` files |
-| `PORT` | Always `80` — the container's internal port never changes; only the published host-side port varies |
-| `environment: DEBUG/MODE` | **Never set in `docker-compose.yml`** (production) · `DEBUG: true` and `MODE: development` in `docker-compose.dev.yml` and `docker-compose.test.yml` |
+| Environment variables | **Hardcode with sane defaults** (NEVER use .env files); always YAML map style (`KEY: value`), never list style (`- KEY=value`) |
+| **environment: DEBUG/MODE** | `docker-compose.yml` sets **neither** `DEBUG` nor `MODE` (production defaults apply) · `docker-compose.dev.yml` and `docker-compose.test.yml` both set `DEBUG: true` and `MODE: development` |
 | Valkey cache service | Included in `docker-compose.yml` and `docker-compose.test.yml`; **never** in `docker-compose.dev.yml` |
 | `172.17.0.1:` bind | Used in `docker-compose.yml` and `docker-compose.test.yml`; **never** in `docker-compose.dev.yml`, which uses a plain `"{port}:80"` publish |
 | Layout order | `name:` → `x-logging` anchor → `services:` → environment map → `volumes:` → `ports:` → `healthcheck:` → `depends_on:` → `networks:` → top-level `networks:` block |
 
-**Production Compose (`docker/docker-compose.yml`):** server + Valkey for persistent session/rate-limit cache. No `DEBUG`/`MODE` vars — production always runs in strict production mode.
+### Logging Anchor
+
+**Every docker-compose.yml MUST include the x-logging anchor and every service MUST use it:**
+
+```yaml
+x-logging: &default-logging
+  options:
+    # Max 5MB per log file
+    max-size: "5m"
+    # Keep only 1 log file
+    max-file: "1"
+  # JSON format for parsing
+  driver: json-file
+
+services:
+  {project_name}:
+    logging: *default-logging
+```
+
+### Production Compose (`docker/docker-compose.yml`)
+
+**FOR HUMAN USE ONLY — AI assistants must NEVER use this file.** App + Valkey for persistent session/rate-limit cache. NO `DEBUG`/`MODE` env vars — the binary defaults to production behavior.
 
 ```yaml
 # nginx proxy address - http://172.17.0.1:{port}
@@ -6895,10 +6310,10 @@ volumes:
 name: {project_name}
 
 x-logging: &default-logging
-  driver: json-file
   options:
     max-size: "5m"
     max-file: "1"
+  driver: json-file
 
 services:
   {project_name}:
@@ -6909,12 +6324,21 @@ services:
     pull_policy: always
     logging: *default-logging
     environment:
+      # Production: strict security, minimal logging (cache use is config-driven via CACHE_URL)
+      # NO DEBUG/MODE - debug must be explicitly set via CLI if needed
       PORT: 80
-      TZ: ${TZ:-America/New_York}
+      TZ: America/New_York
       CACHE_URL: valkey://{project_name}-cache:6379
-      # For remote libsql/Turso: set DATABASE_DRIVER=libsql and DATABASE_URL
+      # DOMAIN (optional - auto-detects from reverse proxy headers)
+      # DOMAIN: myapp.com,www.myapp.com
+      # SMTP (optional - autodetects if not set)
+      # SMTP_HOST: smtp.example.com
+      # SMTP_PORT: 587
+      # SMTP_USERNAME: user
+      # SMTP_PASSWORD: pass
+      # For remote libsql/Turso: set DATABASE_DRIVER and DATABASE_URL
       # DATABASE_DRIVER: libsql
-      # DATABASE_URL: libsql://your-db.turso.io?authToken=${TURSO_AUTH_TOKEN}
+      # DATABASE_URL: libsql://your-db.turso.io?authToken={token}
     volumes:
       - ./volumes/config:/config:z
       - ./volumes/data:/data:z
@@ -6934,9 +6358,9 @@ services:
 
   {project_name}-cache:
     image: valkey/valkey:alpine
+    pull_policy: always
     container_name: {project_name}-cache
     restart: always
-    pull_policy: always
     logging: *default-logging
     volumes:
       - ./volumes/data/db/valkey:/data:z
@@ -6955,67 +6379,49 @@ networks:
     external: false
 ```
 
-**Docker Compose Field Reference:**
-
-| Field | Value | Description |
-|-------|-------|--------------|
-| `name:` | `{project_name}` / `{project_name}-dev` / `{project_name}-test` | Top-level compose project name, per variant |
-| `container_name:` | `{project_name}-app`, `{project_name}-db` | e.g., `jokes-app`, `jokes-db` |
-| Main service | `{project_name}` | Service name matches project name |
-| Database service | `{project_name}-db` | Database service name |
-| `hostname:` | `{project_name}` | Hardcoded container hostname |
-| `restart:` | `always` (prod/dev) · `"no"` (test) | Restart policy |
-| `pull_policy:` | `always` | Always pull latest image |
-| `logging:` | `*default-logging` | Use the logging anchor |
-| `networks:` | `{project_name}` (prod), `{project_name}-dev` (dev), `{project_name}-test` (test) | Isolated network per project/variant |
-
-**Logging Anchor:** every `docker-compose.yml` MUST include the `x-logging` anchor and every service MUST use it:
-
-```yaml
-x-logging: &default-logging
-  # JSON format for parsing
-  driver: json-file
-  options:
-    # Max 5MB per log file
-    max-size: "5m"
-    # Keep only 1 log file
-    max-file: "1"
+**Run:**
+```bash
+mkdir -p "${TMPDIR:-/tmp}/{project_org}"
+TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/{project_org}/{internal_name}-XXXXXX")
+mkdir -p "$TEMP_DIR/volumes/config" "$TEMP_DIR/volumes/data"
+cp docker/docker-compose.yml "$TEMP_DIR/"
+cd "$TEMP_DIR" && docker compose up -d
 ```
 
-```yaml
-services:
-  {project_name}:
-    logging: *default-logging
-```
+### Development Compose (`docker/docker-compose.dev.yml`)
 
-**Development Compose (`docker/docker-compose.dev.yml`) — HUMAN USE ONLY, AI must never run it.** Single-service, debug mode enabled, no Valkey (no cache service at all), no `172.17.0.1:` bind. Uses the `:devel` image.
+**FOR HUMAN USE ONLY — AI assistants must NEVER use this file.** Single-service, in-process memory cache, debug mode enabled. Uses the `:devel` image.
 
 ```yaml
+# nginx proxy address - http://172.17.0.1:{port}
+# {project_name} - development
+
 name: {project_name}-dev
 
 x-logging: &default-logging
-  driver: json-file
   options:
     max-size: "5m"
     max-file: "1"
+  driver: json-file
 
 services:
   {project_name}:
     image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:devel
-    container_name: {project_name}-dev
+    pull_policy: always
+    container_name: {project_name}-app
     hostname: {project_name}
     restart: always
-    pull_policy: always
     logging: *default-logging
     environment:
+      PORT: 80
       DEBUG: true
       MODE: development
-      PORT: 80
-      TZ: ${TZ:-America/New_York}
+      TZ: America/New_York
     volumes:
       - ./volumes/config:/config:z
       - ./volumes/data:/data:z
     ports:
+      # Development: accessible from all interfaces, no 172.17.0.1 bind
       - "64580:80"
     healthcheck:
       test: ["CMD", "/usr/local/bin/{project_name}", "--status"]
@@ -7032,37 +6438,45 @@ networks:
     external: false
 ```
 
-**Run (human, manual — AI must never do this):**
+**Run:**
 ```bash
-docker compose -f docker/docker-compose.dev.yml up -d
+mkdir -p "${TMPDIR:-/tmp}/{project_org}"
+TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/{project_org}/{internal_name}-XXXXXX")
+mkdir -p "$TEMP_DIR/volumes/config" "$TEMP_DIR/volumes/data"
+cp docker/docker-compose.dev.yml "$TEMP_DIR/docker-compose.yml"
+cd "$TEMP_DIR" && docker compose up -d
 ```
 
-**Docker Compose (Test) — `docker/docker-compose.test.yml` — FOR AI AND AUTOMATED TESTING.** AI's preferred interface is the project's `tests/` scripts; invoking this file directly is a fallback only. **Pulls the `:devel` image (`pull_policy: always`) — the current development build.** `DEBUG: true`, `MODE: development`, `172.17.0.1:` bind, Valkey cache included (ephemeral). **MUST be copied to a temp directory before use — NEVER run from the project directory.**
+### Test Compose (`docker/docker-compose.test.yml`)
+
+**FOR AUTOMATED TESTING.** AI's preferred interface is the project's `tests/` directory scripts (`tests/run_tests.sh`, `tests/docker.sh`) — NOT invoking this file directly. Direct invocation (copy to a temp dir, `./volumes` resolves there) is only a fallback when no `tests/` script exists yet. Debug enabled for test visibility. Includes an ephemeral Valkey cache service (`tmpfs`, no persistent volume). **MUST be copied to temp directory before direct use — NEVER run from project directory.**
 
 ```yaml
 name: {project_name}-test
 
 x-logging: &default-logging
-  driver: json-file
   options:
     max-size: "5m"
     max-file: "1"
+  driver: json-file
 
 services:
   {project_name}:
     image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:devel
     pull_policy: always
     container_name: {project_name}-test
-    hostname: {project_name}
     restart: "no"
     logging: *default-logging
     environment:
+      PORT: 80
       DEBUG: true
       MODE: development
-      PORT: 80
-      TZ: ${TZ:-America/New_York}
+      TZ: America/New_York
       CACHE_URL: valkey://{project_name}-cache-test:6379
     volumes:
+      # CRITICAL: ./volumes/ must resolve to $TEMP_DIR/volumes/, NOT project directory
+      # This file MUST be copied to a temp directory before running
+      # AI: NEVER run this from the project directory
       - ./volumes/config:/config:z
       - ./volumes/data:/data:z
     ports:
@@ -7081,11 +6495,11 @@ services:
 
   {project_name}-cache-test:
     image: valkey/valkey:alpine
+    pull_policy: always
     container_name: {project_name}-cache-test
     restart: "no"
     logging: *default-logging
     tmpfs:
-      # ephemeral — always clean state, no persistent volume
       - /data
     healthcheck:
       test: ["CMD-SHELL", "valkey-cli ping || exit 1"]
@@ -7102,7 +6516,7 @@ networks:
     external: false
 ```
 
-**AI/Automated Testing Workflow (fallback — prefer `tests/` scripts):**
+**AI/Automated Testing Workflow (REQUIRED — prefer `tests/` scripts; this is the fallback):**
 ```bash
 mkdir -p "${TMPDIR:-/tmp}/{project_org}"
 TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/{project_org}/{internal_name}-XXXXXX")
@@ -7113,16 +6527,17 @@ cd "$TEMP_DIR" && docker compose up --abort-on-container-exit
 rm -rf "$TEMP_DIR"
 ```
 
-**Compose Variants:**
+### Compose Variants
 
-| File | Image | Cache | `172.17.0.1:` bind | Who runs it |
-|------|-------|-------|---------------------|--------------|
-| `docker/docker-compose.yml` | `:latest` (registry) | Valkey (separate container) | Yes | Human — production deployment |
-| `docker/docker-compose.dev.yml` | `:devel` (registry) | None | No | Human only — AI never runs this |
-| `docker/docker-compose.test.yml` | Builds `docker/Dockerfile` locally | Valkey (ephemeral `tmpfs`) | Yes | AI/automated testing, preferably via `tests/` scripts |
+Three compose files ship in the `docker/` directory:
+
+| File | Image Tag | Cache | `172.17.0.1:` bind | Who runs it |
+|------|-----------|-------|---------------------|--------------|
+| `docker/docker-compose.yml` | `:latest` | Valkey, `{project_name}-cache` (persistent volume) | Yes | Human — production deployment |
+| `docker/docker-compose.dev.yml` | `:devel` | None | No | Human only — AI never runs this |
+| `docker/docker-compose.test.yml` | `:devel` | Valkey, `{project_name}-cache-test` (ephemeral `tmpfs`) | Yes | AI/automated testing, preferably via `tests/` scripts |
 
 **Build Commands:**
-
 ```bash
 # Standard image (context is project root)
 docker build -t {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:latest -f docker/Dockerfile .
@@ -7136,7 +6551,7 @@ docker build -t {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:deve
 | Service Type | Service Name | Container Name |
 |--------------|---------------|------------------|
 | Main app (production) | `{project_name}` | `{project_name}-app` |
-| Main app (dev) | `{project_name}` | `{project_name}-dev` |
+| Main app (dev) | `{project_name}` | `{project_name}-app` |
 | Main app (test) | `{project_name}` | `{project_name}-test` |
 | Database | `{project_name}-db` | `{project_name}-db` |
 | Cache (Valkey, production) | `{project_name}-cache` | `{project_name}-cache` |
@@ -7145,7 +6560,7 @@ docker build -t {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:deve
 
 ### Build-Time `docker/rootfs/` vs Runtime `./volumes/` (CRITICAL — Understand This)
 
-**There are TWO different filesystem concepts — do not confuse them:**
+**There are TWO different filesystem concepts here — do not confuse them:**
 
 | Context | Location | Purpose | In Repo? |
 |---------|----------|---------|----------|
@@ -7153,7 +6568,7 @@ docker build -t {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:deve
 | **Runtime** | `./volumes/` next to the compose file | Volume mounts (config, data) | NEVER |
 
 **Build-time `docker/rootfs/`** (in repo):
-```text
+```
 docker/
 ├── Dockerfile           # COPY docker/rootfs/ / ← copies into container image
 ├── docker-compose.yml
@@ -7163,7 +6578,7 @@ docker/
 ```
 
 **Runtime `./volumes/`** (never committed from repo-local runs):
-```text
+```
 # Production (operator's choice of location):
 /path/to/deployment/
 ├── docker-compose.yml   # copied from repo
@@ -7179,11 +6594,11 @@ $TEMP_DIR/
     └── data/
 ```
 
-**Why this works:** the `./volumes/` path in `docker run`/`docker-compose.yml` is relative to where the container command runs from, not where it lives in the repo. Dockerfile's `COPY docker/rootfs/ /` uses build context (`.` project root).
+**Why this works:** The `./volumes/` path in `docker run`/`docker-compose.yml` is relative to where the container command runs from, not where it lives in the repo. Dockerfile's `COPY docker/rootfs/ /` uses build context (`.` project root).
 
 ### Volume Paths (Local Side)
 
-**Every compose file uses only 2 volumes:**
+**Docker-compose.yml uses only 2 volumes:**
 
 | Volume Mount | Purpose |
 |--------------|---------|
@@ -7193,7 +6608,7 @@ $TEMP_DIR/
 **Container internal structure (organized by component):**
 
 | Container Path | Contents |
-|------------------|----------|
+|----------------|----------|
 | `/config/{project_name}/` | Binary's {config_dir} - server.yml, etc. |
 | `/config/{project_name}/ssl/` | TLS certs and keys |
 | `/config/{project_name}/tor/` | Tor config (torrc) - binary owns Tor |
@@ -7207,7 +6622,11 @@ $TEMP_DIR/
 | `/data/backups/{project_name}/` | Backup files |
 | `/data/{internal_name}/` | External service data (nginx, apache, etc.) |
 
-**Rules:** production volumes use `:z` suffix (SELinux shared label); AI test-run volumes (temp dir) omit `:z` (not needed in temp dir); `docker/rootfs/` is for container overlay (entrypoint.sh, service configs), NOT for runtime volumes; NEVER commit runtime `volumes/` from local runs.
+**Rules:**
+- Production volumes use `:z` suffix (SELinux shared label)
+- AI test-run volumes (temp dir) omit `:z` (not needed in temp dir)
+- `docker/rootfs/` is for container overlay (entrypoint.sh, service configs) — NOT for runtime volumes
+- NEVER commit runtime `volumes/` from local runs
 
 ### Running Docker Compose (AI / Automated Testing)
 
@@ -7252,48 +6671,26 @@ rm -rf "$TEMP_DIR"
 | Development (human) | `{randomport}:80` | `64580:80` |
 | Production / Test | `172.17.0.1:{randomport}:80` | `172.17.0.1:64580:80` |
 
-**Rules:** internal port is always `80` (`PORT: 80` in every compose file); external port is random unused port in `64xxx` range; production and test bind to Docker bridge IP (`172.17.0.1`) for security; development binds to all interfaces for easier human access; if changing internal port, update docker-compose port mapping to match.
+**Rules:**
+- Internal port is always `80` (`PORT: 80` in every compose file; override with `PORT` env var)
+- External port is random unused port in `64xxx` range
+- Production and test bind to Docker bridge IP (`172.17.0.1`) for security
+- Development binds to all interfaces for easier human access
+- If changing internal port, update docker-compose port mapping to match
 
 ### Environment Variables (Compose)
 
-**Stack must work with zero `.env` files. Use inline `${VAR:-default}` fallbacks.**
+**ALL environment variables MUST be hardcoded with sane defaults. NEVER require .env files.**
 
 | Rule | Description |
 |------|--------------|
+| **NEVER** | Use `${VAR}` or `${VAR:-default}` syntax requiring .env |
 | **NEVER** | Create `.env`, `.env.example`, `.env.sample` files |
-| **NEVER** | Use `${VAR}` without a fallback (stack breaks if var is unset) |
-| **NEVER** | Use list-style env vars (`- KEY=value`) — always YAML map style (`KEY: value`) |
-| **ALWAYS** | Use `${VAR:-default}` so the stack works without any `.env` |
-| **ALWAYS** | Operators may override via `.env` or shell env — the fallback just handles zero-config |
+| **ALWAYS** | Hardcode values directly in docker-compose.yml |
+| **ALWAYS** | Use sane, working defaults |
+| **ALWAYS** | YAML map style (`KEY: value`), never list style (`- KEY=value`) |
 
-**Why inline fallbacks?** works out of the box — no setup required; operators can still override any value via environment; no outdated `.env.example` files to maintain.
-
-### Container Configuration
-
-| Setting | Value |
-|---------|-------|
-| Internal port | **80** (always) |
-| Config dir | `/config/{project_name}/` (binary's {config_dir}) |
-| Security dir | `/data/{project_name}/security/` |
-| Tor config dir | `/config/{project_name}/tor/` (binary owns Tor) |
-| Data dir | `/data/{project_name}/` (binary's {data_dir}) |
-| Tor data dir | `/data/{project_name}/tor/` (binary owns Tor) |
-| Database dir | `/data/db/{dbtype}/` (sqlite, valkey) |
-| Log dir | `/data/log/{project_name}/` |
-| Backup dir | `/data/backups/{project_name}/` |
-| Binary | `/usr/local/bin/{project_name}` |
-| HEALTHCHECK | `{binary} --status` |
-
-**Path Mapping (Container vs Local):**
-
-| Container Path | Local Path | Purpose |
-|-------------------|------------|---------|
-| `/config` | `./volumes/config` | Configuration root (organized by component) |
-| `/data` | `./volumes/data` | Data root (organized by component) |
-| `/config/{project_name}/` | `./volumes/config/{project_name}/` | Binary's config |
-| `/data/{project_name}/` | `./volumes/data/{project_name}/` | Binary's data |
-| `/data/db/` | `./volumes/data/db/` | Database data |
-| `/data/log/` | `./volumes/data/log/` | Log files |
+**Why hardcoded defaults?** Works out of the box — no setup required; no confusion about required variables; no outdated `.env.example` files to maintain; users can override by editing docker-compose.yml directly.
 
 ### Tor in Container
 
@@ -7308,9 +6705,11 @@ rm -rf "$TEMP_DIR"
 | .onion address | Persists across container restarts via volume mount |
 | Binary owns Tor | Tor dirs under `{project_name}/`, not separate service |
 
+See PART 27 for the full Tor hidden-service specification.
+
 ### Container Detection
 
-**Container detection uses multiple methods:**
+**Container detection uses multiple methods (see PART 4 for full runtime-mode detection logic):**
 - File checks: `/.dockerenv`, `/run/.containerenv`, `/dev/lxc`
 - Environment: `container`, `KUBERNETES_SERVICE_HOST`
 - Init systems: `tini`, `dumb-init`, `s6-svscan`, `runsv`, `runsvdir`, `catatonit`
@@ -7320,7 +6719,7 @@ rm -rf "$TEMP_DIR"
 |--------------------|----------|
 | Defaults | Use container-appropriate defaults |
 | Logging | Log to stdout/stderr (captured by container runtime) |
-| Tor | Server binary manages the Tor process internally |
+| Tor | Application manages Tor process internally |
 
 ### Image Tags
 
@@ -7348,10 +6747,28 @@ rm -rf "$TEMP_DIR"
 | Development | Local Docker daemon only |
 
 **Tag Rules:**
-1. Release builds MUST push to `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}`
-2. Development builds MUST use local-only tags (no registry prefix)
-3. NEVER push `:dev` or `:test` tags to production registry
+1. **Release builds** MUST push to `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}`
+2. **Development builds** MUST use local-only tags (no registry prefix)
+3. **NEVER push `:dev` or `:test` tags to production registry**
 4. All release images built for `linux/amd64` AND `linux/arm64`
+
+### CI/CD Workflow Pattern
+
+All Rust CI jobs run inside `casjaysdev/rust:latest`. Never `apk add` or `cargo install` in a workflow `run:` step — every tool is already in the image. No `ensure-build-image` pre-flight, no `build-toolchain.yml`.
+
+Canonical job pattern for `ci.yml` / `release.yml`:
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: casjaysdev/rust:latest
+      options: "--user 0:0"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - run: cargo build --release --locked
+```
 
 ### Forbidden
 
@@ -7448,6 +6865,76 @@ pub fn build_date() -> String {
 }
 ```
 
+## Embedded Build Info
+
+Every binary MUST have these values embedded at build time:
+
+| Variable | Example | Description |
+|----------|---------|-------------|
+| `Version` | `1.2.3` | Semantic version from `release.txt` |
+| `CommitID` | `a1b2c3d` | Git short commit hash |
+| `BUILD_EPOCH` | `1765112713` | Unix build timestamp (seconds, UTC) — the single captured time source; used by the updater's daily-channel check |
+| `BuildDate` | `2025-12-04T13:05:13Z` | Build timestamp (ISO 8601 / RFC 3339 UTC) — derived from `BUILD_EPOCH` by build systems (`date -u -d @$BUILD_EPOCH ...`) or in-app via `build_date()`; never embedded as its own `APP_*` value |
+| `OfficialSite` | `https://api.example.com` | Default server URL (empty if self-hosted) |
+
+**Rust code requirement** (in `src/main.rs` or `src/version.rs`):
+
+```rust
+// Build info - set via build.rs, which maps VERSION/COMMIT_ID/BUILD_EPOCH/OFFICIAL_SITE to APP_*
+pub const VERSION: &str = option_env!("APP_VERSION").unwrap_or("devel");
+pub const COMMIT_ID: &str = option_env!("APP_COMMIT_ID").unwrap_or("N/A");
+// Unix build timestamp (seconds, UTC) - used by the updater's daily-channel check
+pub const BUILD_EPOCH: &str = option_env!("APP_BUILD_EPOCH").unwrap_or("0");
+// Build date derived from BUILD_EPOCH (RFC 3339 UTC); "N/A" when unset
+pub fn build_date() -> String {
+    match BUILD_EPOCH.parse::<i64>() {
+        Ok(n) if n > 0 => chrono::DateTime::from_timestamp(n, 0)
+            .map(|t| t.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+            .unwrap_or_else(|| "N/A".into()),
+        _ => "N/A".into(),
+    }
+}
+pub const OFFICIAL_SITE: &str = option_env!("APP_OFFICIAL_SITE").unwrap_or("");
+// OFFICIAL_SITE empty = users must use --server flag
+```
+
+**Required `build.rs`** (project root) — the Makefile's `RUST_DOCKER` wrapper and the Dockerfile's builder-stage `ARG`s expose `VERSION`, `COMMIT_ID`, `BUILD_EPOCH`, and `OFFICIAL_SITE` to `cargo build`; `build.rs` maps them to the `APP_*` variables `option_env!()` reads. `BUILD_DATE` is NOT mapped — the app derives it from `BUILD_EPOCH` via `build_date()`; `BUILD_DATE` only exists as a docker build-arg for OCI labels:
+
+```rust
+// build.rs — map build-system env vars to the APP_* rustc-env vars read by option_env!()
+fn main() {
+    let mappings = [
+        ("VERSION", "APP_VERSION"),
+        ("COMMIT_ID", "APP_COMMIT_ID"),
+        ("BUILD_EPOCH", "APP_BUILD_EPOCH"),
+        ("OFFICIAL_SITE", "APP_OFFICIAL_SITE"),
+    ];
+    for (src, dst) in mappings {
+        println!("cargo:rerun-if-env-changed={src}");
+        if let Ok(val) = std::env::var(src) {
+            println!("cargo:rustc-env={dst}={val}");
+        }
+    }
+}
+```
+
+**Build date format:** uses build system timezone or `TZ` env var.
+
+**OfficialSite usage:** if set, the client uses this as default `--server` value. If empty, users must provide `--server` flag or configure it in `cli.yml`.
+
+## Rust Dependency Caching
+
+All Docker builds use persistent Rust crate caching to avoid re-downloading dependencies:
+
+| Cache | Local Path (`?=` default) | Container Path |
+|-------|--------------------------|------------------|
+| Cargo (`CARGO_CACHE`) | `~/.cargo` | `/usr/local/share/cargo` |
+| Rustup (`RUSTUP_CACHE`) | `~/.rustup` | `/usr/local/share/rustup` |
+| sccache (`SCCACHE_CACHE`) | `~/.cache/sccache` | `/root/.cache/sccache` |
+| Cargo target (`CARGO_TARGET`) | `~/.cache/cargo-target/{project_name}` | `/app/target` |
+
+**Benefits:** first build downloads crates once; subsequent builds use cached crates; shared across all projects on the same machine; significantly faster builds after first run.
+
 ---
 
 # PART 8: SERVER BINARY CLI & CLIENT
@@ -7503,291 +6990,6 @@ Default config: /etc/apimgr/jokes/  # Hardcoded project name
 ```
 
 **For client flags, see PART 8, "Client" subsection.**
-
-## Display & Terminal Environment Detection
-
-**ALL binaries (server, CLI) MUST detect the display environment and adapt output accordingly.** These symbols (`detect_display_env`, `DisplayEnv`, `DisplayMode`, `SizeMode`, `TerminalSize`, `get_terminal_size`) live in `src/common/display/` and `src/common/terminal/` and are shared across every binary and surface.
-
-### Display Mode Hierarchy
-
-| Mode | When Used | Requirements |
-|------|-----------|--------------|
-| **GUI** | Native display available, CLI binary only | X11, Wayland, Windows, macOS |
-| **TUI** | Terminal available, interactive | TTY, SSH, mosh, screen, tmux |
-| **CLI** | Command provided or piped output | Any environment |
-| **Headless** | No display, no TTY | Daemon, service, cron |
-
-### Platform Detection
-
-| Platform | Display Check | Notes |
-|----------|---------------|-------|
-| **Linux/BSD** | `WAYLAND_DISPLAY` or `DISPLAY` | Wayland preferred over X11 |
-| **macOS** | Always (unless SSH) | Native Cocoa display |
-| **Windows** | Always (unless service) | Native Win32 display |
-| **SSH/Mosh** | `SSH_CLIENT`, `SSH_TTY`, `MOSH` | No GUI, TUI or CLI only |
-
-### Module Layout
-
-```
-src/
-├── common/
-│   ├── display/                     # Display/terminal detection
-│   │   ├── detect.rs                # Core detection logic (detect_display_env)
-│   │   ├── detect_unix.rs           # Linux/BSD/macOS detection
-│   │   ├── detect_windows.rs        # Windows detection
-│   │   └── mode.rs                  # DisplayMode type and helpers
-│   └── terminal/                    # Terminal utilities
-│       ├── size.rs                  # Terminal size and breakpoints (get_terminal_size)
-│       ├── resize.rs                # SIGWINCH handling
-│       └── symbols.rs               # Unicode/ASCII symbols
-```
-
-### Display Environment Detection
-
-```rust
-// src/common/display/detect.rs
-use std::env;
-
-/// DisplayMode - UI display mode (NOT app mode)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum DisplayMode {
-    /// No display, no TTY
-    Headless,
-    /// Command-line only (piped or command provided)
-    Cli,
-    /// Terminal UI (interactive terminal)
-    Tui,
-    /// Native graphical UI
-    Gui,
-}
-
-/// DisplayEnv - detected display environment
-#[derive(Debug, Clone)]
-pub struct DisplayEnv {
-    pub mode: DisplayMode,
-    /// X11, Wayland, Windows, macOS display
-    pub has_display: bool,
-    /// "x11", "wayland", "windows", "macos", "none"
-    pub display_type: String,
-    /// stdout is a TTY
-    pub is_terminal: bool,
-    /// Running over SSH
-    pub is_ssh: bool,
-    /// Running over mosh
-    pub is_mosh: bool,
-    /// Running in screen/tmux
-    pub is_screen: bool,
-    /// TERM value
-    pub terminal_type: String,
-    /// Terminal columns (0 if no terminal)
-    pub cols: u16,
-    /// Terminal rows (0 if no terminal)
-    pub rows: u16,
-}
-
-/// auto-detect display environment
-pub fn detect_display_env() -> DisplayEnv {
-    let is_terminal = atty::is(atty::Stream::Stdout);
-    let (cols, rows) = if is_terminal {
-        terminal_size::terminal_size()
-            .map(|(w, h)| (w.0, h.0))
-            .unwrap_or((0, 0))
-    } else {
-        (0, 0)
-    };
-    let terminal_type = env::var("TERM").unwrap_or_default();
-
-    // Remote session detection
-    let is_ssh = env::var("SSH_CLIENT").is_ok() || env::var("SSH_TTY").is_ok();
-    let is_mosh = env::var("MOSH").is_ok() || terminal_type.contains("mosh");
-    let is_screen = env::var("STY").is_ok() || env::var("TMUX").is_ok();
-
-    let (has_display, display_type) = detect_platform_display(is_ssh);
-
-    let mut env = DisplayEnv {
-        mode: DisplayMode::Headless,
-        has_display,
-        display_type,
-        is_terminal,
-        is_ssh,
-        is_mosh,
-        is_screen,
-        terminal_type,
-        cols,
-        rows,
-    };
-    env.mode = env.auto_detect_display_mode();
-    env
-}
-
-impl DisplayEnv {
-    /// determine display mode from environment
-    fn auto_detect_display_mode(&self) -> DisplayMode {
-        if !self.is_terminal && !self.has_display {
-            return DisplayMode::Headless;
-        }
-        // TERM=dumb: force CLI mode (no TUI, no ANSI escapes)
-        if self.terminal_type == "dumb" {
-            return DisplayMode::Cli;
-        }
-        if self.has_display && !self.is_ssh && !self.is_mosh {
-            return DisplayMode::Gui;
-        }
-        if self.is_terminal {
-            return DisplayMode::Tui;
-        }
-        DisplayMode::Cli
-    }
-
-    /// check if running in dumb terminal (no ANSI support)
-    pub fn is_dumb_terminal(&self) -> bool {
-        self.terminal_type == "dumb"
-    }
-
-    pub fn is_gui(&self) -> bool      { self.mode == DisplayMode::Gui }
-    pub fn is_tui(&self) -> bool      { self.mode == DisplayMode::Tui }
-    pub fn is_cli(&self) -> bool      { self.mode == DisplayMode::Cli }
-    pub fn is_headless(&self) -> bool { self.mode == DisplayMode::Headless }
-}
-```
-
-### Platform-Specific Display Detection
-
-```rust
-// src/common/display/detect_unix.rs
-#[cfg(not(target_os = "windows"))]
-pub fn detect_platform_display(is_ssh: bool) -> (bool, String) {
-    use std::env;
-    use std::process::Command;
-
-    // Check for Wayland first (preferred on Linux)
-    if env::var("WAYLAND_DISPLAY").is_ok() {
-        return (true, "wayland".to_string());
-    }
-
-    // Check for X11
-    if env::var("DISPLAY").is_ok() {
-        return (true, "x11".to_string());
-    }
-
-    // macOS: check if we have access to WindowServer
-    #[cfg(target_os = "macos")]
-    {
-        // On macOS, display is always available unless:
-        // - Running over SSH
-        // - Running as a LaunchDaemon (no GUI session)
-        if !is_ssh && env::var("__CFBundleIdentifier").is_ok() {
-            return (true, "macos".to_string());
-        }
-        // Check if WindowServer is accessible
-        if let Ok(output) = Command::new("launchctl").arg("managername").output() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            if stdout.contains("Aqua") {
-                return (true, "macos".to_string());
-            }
-        }
-    }
-
-    let _ = is_ssh;
-    (false, "none".to_string())
-}
-```
-
-```rust
-// src/common/display/detect_windows.rs
-#[cfg(target_os = "windows")]
-pub fn detect_platform_display(_is_ssh: bool) -> (bool, String) {
-    use std::env;
-
-    // Windows always has a display unless running as a service.
-    // Check if we're in session 0 (service session) via windows-sys.
-    let session_id = get_current_session_id();
-    if session_id == 0 {
-        // Running as a service (session 0) - no interactive desktop
-        return (false, "none".to_string());
-    }
-
-    // Check for remote desktop session
-    let session_name = env::var("SESSIONNAME").unwrap_or_default();
-    if session_name.starts_with("RDP-Tcp") {
-        return (true, "windows-rdp".to_string());
-    }
-
-    // Normal Windows session with display
-    if console_window_exists() {
-        (true, "windows".to_string())
-    } else {
-        (false, "none".to_string())
-    }
-}
-```
-
-### Terminal Size Detection
-
-```rust
-// src/common/terminal/size.rs
-use terminal_size::{terminal_size, Height, Width};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum SizeMode {
-    /// <40 cols or <10 rows
-    Micro,
-    /// 40-59 cols or 10-15 rows
-    Minimal,
-    /// 60-79 cols or 16-23 rows
-    Compact,
-    /// 80-119 cols and 24-39 rows
-    Standard,
-    /// 120-199 cols and 40-59 rows
-    Wide,
-    /// 200-399 cols and 60-79 rows
-    Ultrawide,
-    /// 400+ cols and 80+ rows
-    Massive,
-}
-
-#[derive(Debug, Clone)]
-pub struct TerminalSize {
-    pub cols: u16,
-    pub rows: u16,
-    pub mode: SizeMode,
-}
-
-pub fn get_terminal_size() -> TerminalSize {
-    let (cols, rows) = terminal_size()
-        .map(|(Width(w), Height(h))| (w, h))
-        .unwrap_or((80, 24));
-    let cols = if cols == 0 { 80 } else { cols };
-    let rows = if rows == 0 { 24 } else { rows };
-
-    TerminalSize {
-        cols,
-        rows,
-        mode: calculate_mode(cols, rows),
-    }
-}
-
-fn calculate_mode(cols: u16, rows: u16) -> SizeMode {
-    match (cols, rows) {
-        (c, r) if c < 40 || r < 10 => SizeMode::Micro,
-        (c, r) if c < 60 || r < 16 => SizeMode::Minimal,
-        (c, r) if c < 80 || r < 24 => SizeMode::Compact,
-        (c, r) if c < 120 || r < 40 => SizeMode::Standard,
-        (c, r) if c < 200 || r < 60 => SizeMode::Wide,
-        (c, r) if c < 400 || r < 80 => SizeMode::Ultrawide,
-        _ => SizeMode::Massive,
-    }
-}
-
-impl SizeMode {
-    pub fn show_ascii_art(self) -> bool { self >= SizeMode::Standard }
-    pub fn show_borders(self) -> bool   { self >= SizeMode::Compact }
-    pub fn show_sidebar(self) -> bool   { self >= SizeMode::Wide }
-    pub fn show_icons(self) -> bool     { self >= SizeMode::Minimal }
-}
-```
-
-**For `TERM=dumb` handling and disabling ANSI escapes, see PART 5 "NO_COLOR Support".**
 
 ## Flag Parsing (Server Binary)
 
@@ -10764,13 +9966,13 @@ pub async fn request_id_middleware(mut req: Request, next: Next) -> Response {
 
 ## Client
 
-The server binary and the client are separate concerns. The server binary (`{project_name}`) can act as its own client for local administration (e.g. `{project_name} --status`, `{project_name} --shell completions`), but a dedicated, thin client binary (`{project_name}-cli`) is what end users and scripts install to talk to a server over the network. Build a separate `{project_name}-cli` crate/binary whenever the project has remote users, scriptable automation, or a TUI/GUI surface distinct from server administration — which is the default for every project. Only skip the separate client binary when the server has no meaningful remote API surface for end users (rare); in that case, the server's own `--status`/admin flags cover the same-binary case. The following subsections port the full client specification.
+In HYBRID projects the server binary is a self-contained deployable that can also act as its own client — one build talking to a remote instance of itself over the network using its own API, with no separate binary required. Some projects instead benefit from a thin, separate client mode or a dedicated client build (a distinct CLI/TUI binary) when the operational split between "runs the server" and "talks to a server" is large enough to warrant it. Choose whichever fits the project's actual usage pattern; the guidance below applies either way.
 
 ### Overview
 
-**client is REQUIRED for all projects.**
+**Every project MUST provide client access to the server — either the server binary acting as its own client or a dedicated client build (see the intro above); the dedicated `src/client/` build itself is OPTIONAL.**
 
-Every server MUST have a companion client. The client provides terminal-based access to all server functionality and is essential for:
+The client provides terminal-based access to all server functionality and is essential for:
 - Scripting and automation
 - Headless/SSH environments
 - CI/CD pipelines
@@ -11066,6 +10268,286 @@ fn detect_mode(args: &[String]) -> &'static str {
     "tui"
 }
 ```
+
+### Display Module (`src/common/display`)
+
+**ALL binaries (server, CLI) MUST detect the display environment and adapt output accordingly.** Defined here in PART 8; referenced throughout this document. These symbols (`detect_display_env`, `DisplayEnv`, `DisplayMode`, `SizeMode`, `TerminalSize`, `get_terminal_size`) live in `src/common/display/` and `src/common/terminal/` and are shared across every binary and surface. `src/common/display/detect.rs` holds the core detection logic, with platform-specific `detect_platform_display()` implementations split across `#[cfg]`-gated files.
+
+#### Display Mode Hierarchy
+
+| Mode | When Used | Requirements |
+|------|-----------|--------------|
+| **GUI** | Native display available, CLI binary only | X11, Wayland, Windows, macOS |
+| **TUI** | Terminal available, interactive | TTY, SSH, mosh, screen, tmux |
+| **CLI** | Command provided or piped output | Any environment |
+| **Headless** | No display, no TTY | Daemon, service, cron |
+
+#### Platform Detection
+
+| Platform | Display Check | Notes |
+|----------|---------------|-------|
+| **Linux/BSD** | `WAYLAND_DISPLAY` or `DISPLAY` | Wayland preferred over X11 |
+| **macOS** | Always (unless SSH) | Native Cocoa display |
+| **Windows** | Always (unless service) | Native Win32 display |
+| **SSH/Mosh** | `SSH_CLIENT`, `SSH_TTY`, `MOSH` | No GUI, TUI or CLI only |
+
+#### Module Layout
+
+```text
+src/
+├── common/
+│   ├── display/                     # Display/terminal detection
+│   │   ├── detect.rs                # Core detection logic (detect_display_env)
+│   │   ├── detect_unix.rs           # Linux/BSD/macOS detection (cfg-gated)
+│   │   └── detect_windows.rs        # Windows detection (cfg-gated)
+│   └── terminal/                    # Terminal utilities
+│       └── size.rs                  # Terminal size and breakpoints (get_terminal_size)
+```
+
+```rust
+// src/common/display/detect.rs
+use std::env;
+
+/// DisplayMode - UI display mode (NOT app mode)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DisplayMode {
+    /// No display, no TTY
+    Headless,
+    /// Command-line only (piped or command provided)
+    Cli,
+    /// Terminal UI (interactive terminal)
+    Tui,
+    /// Native graphical UI
+    Gui,
+}
+
+/// DisplayEnv - detected display environment
+#[derive(Debug, Clone)]
+pub struct DisplayEnv {
+    pub mode: DisplayMode,
+    /// X11, Wayland, Windows, macOS display
+    pub has_display: bool,
+    /// "x11", "wayland", "windows", "macos", "none"
+    pub display_type: String,
+    /// stdout is a TTY
+    pub is_terminal: bool,
+    /// Running over SSH
+    pub is_ssh: bool,
+    /// Running over mosh
+    pub is_mosh: bool,
+    /// Running in screen/tmux
+    pub is_screen: bool,
+    /// TERM value
+    pub terminal_type: String,
+    /// Terminal columns (0 if no terminal)
+    pub cols: u16,
+    /// Terminal rows (0 if no terminal)
+    pub rows: u16,
+}
+
+/// auto-detect display environment
+pub fn detect_display_env() -> DisplayEnv {
+    let is_terminal = atty::is(atty::Stream::Stdout);
+    let (cols, rows) = if is_terminal {
+        terminal_size::terminal_size()
+            .map(|(w, h)| (w.0, h.0))
+            .unwrap_or((0, 0))
+    } else {
+        (0, 0)
+    };
+    let terminal_type = env::var("TERM").unwrap_or_default();
+
+    // Remote session detection
+    let is_ssh = env::var("SSH_CLIENT").is_ok() || env::var("SSH_TTY").is_ok();
+    let is_mosh = env::var("MOSH").is_ok() || terminal_type.contains("mosh");
+    let is_screen = env::var("STY").is_ok() || env::var("TMUX").is_ok();
+
+    let (has_display, display_type) = detect_platform_display(is_ssh);
+
+    let mut env = DisplayEnv {
+        mode: DisplayMode::Headless,
+        has_display,
+        display_type,
+        is_terminal,
+        is_ssh,
+        is_mosh,
+        is_screen,
+        terminal_type,
+        cols,
+        rows,
+    };
+    env.mode = env.auto_detect_display_mode();
+    env
+}
+
+impl DisplayEnv {
+    /// determine display mode from environment
+    fn auto_detect_display_mode(&self) -> DisplayMode {
+        if !self.is_terminal && !self.has_display {
+            return DisplayMode::Headless;
+        }
+        // TERM=dumb: force CLI mode (no TUI, no ANSI escapes)
+        if self.terminal_type == "dumb" {
+            return DisplayMode::Cli;
+        }
+        if self.has_display && !self.is_ssh && !self.is_mosh {
+            return DisplayMode::Gui;
+        }
+        if self.is_terminal {
+            return DisplayMode::Tui;
+        }
+        DisplayMode::Cli
+    }
+
+    /// check if running in dumb terminal (no ANSI support)
+    pub fn is_dumb_terminal(&self) -> bool {
+        self.terminal_type == "dumb"
+    }
+
+    pub fn is_gui(&self) -> bool      { self.mode == DisplayMode::Gui }
+    pub fn is_tui(&self) -> bool      { self.mode == DisplayMode::Tui }
+    pub fn is_cli(&self) -> bool      { self.mode == DisplayMode::Cli }
+    pub fn is_headless(&self) -> bool { self.mode == DisplayMode::Headless }
+}
+```
+
+```rust
+// src/common/display/detect_unix.rs
+#[cfg(not(target_os = "windows"))]
+pub fn detect_platform_display(is_ssh: bool) -> (bool, String) {
+    use std::env;
+    use std::process::Command;
+
+    // Check for Wayland first (preferred on Linux)
+    if env::var("WAYLAND_DISPLAY").is_ok() {
+        return (true, "wayland".to_string());
+    }
+
+    // Check for X11
+    if env::var("DISPLAY").is_ok() {
+        return (true, "x11".to_string());
+    }
+
+    // macOS: check if we have access to WindowServer
+    #[cfg(target_os = "macos")]
+    {
+        // On macOS, display is always available unless:
+        // - Running over SSH
+        // - Running as a LaunchDaemon (no GUI session)
+        if !is_ssh && env::var("__CFBundleIdentifier").is_ok() {
+            return (true, "macos".to_string());
+        }
+        // Check if WindowServer is accessible
+        if let Ok(output) = Command::new("launchctl").arg("managername").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if stdout.contains("Aqua") {
+                return (true, "macos".to_string());
+            }
+        }
+    }
+
+    let _ = is_ssh;
+    (false, "none".to_string())
+}
+```
+
+```rust
+// src/common/display/detect_windows.rs
+#[cfg(target_os = "windows")]
+pub fn detect_platform_display(_is_ssh: bool) -> (bool, String) {
+    use std::env;
+
+    // Windows always has a display unless running as a service.
+    // Check if we're in session 0 (service session) via windows-sys.
+    let session_id = get_current_session_id();
+    if session_id == 0 {
+        // Running as a service (session 0) - no interactive desktop
+        return (false, "none".to_string());
+    }
+
+    // Check for remote desktop session
+    let session_name = env::var("SESSIONNAME").unwrap_or_default();
+    if session_name.starts_with("RDP-Tcp") {
+        return (true, "windows-rdp".to_string());
+    }
+
+    // Normal Windows session with display
+    if console_window_exists() {
+        (true, "windows".to_string())
+    } else {
+        (false, "none".to_string())
+    }
+}
+```
+
+### Terminal Module (`src/common/terminal`)
+
+**Defined here in PART 8; referenced throughout this document. `src/common/terminal/size.rs` provides `SizeMode`, `TerminalSize`, and `get_terminal_size()`.**
+
+```rust
+// src/common/terminal/size.rs
+use terminal_size::{terminal_size, Height, Width};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SizeMode {
+    /// <40 cols or <10 rows
+    Micro,
+    /// 40-59 cols or 10-15 rows
+    Minimal,
+    /// 60-79 cols or 16-23 rows
+    Compact,
+    /// 80-119 cols and 24-39 rows
+    Standard,
+    /// 120-199 cols and 40-59 rows
+    Wide,
+    /// 200-399 cols and 60-79 rows
+    Ultrawide,
+    /// 400+ cols and 80+ rows
+    Massive,
+}
+
+#[derive(Debug, Clone)]
+pub struct TerminalSize {
+    pub cols: u16,
+    pub rows: u16,
+    pub mode: SizeMode,
+}
+
+pub fn get_terminal_size() -> TerminalSize {
+    let (cols, rows) = terminal_size()
+        .map(|(Width(w), Height(h))| (w, h))
+        .unwrap_or((80, 24));
+    let cols = if cols == 0 { 80 } else { cols };
+    let rows = if rows == 0 { 24 } else { rows };
+
+    TerminalSize {
+        cols,
+        rows,
+        mode: calculate_mode(cols, rows),
+    }
+}
+
+fn calculate_mode(cols: u16, rows: u16) -> SizeMode {
+    match (cols, rows) {
+        (c, r) if c < 40 || r < 10 => SizeMode::Micro,
+        (c, r) if c < 60 || r < 16 => SizeMode::Minimal,
+        (c, r) if c < 80 || r < 24 => SizeMode::Compact,
+        (c, r) if c < 120 || r < 40 => SizeMode::Standard,
+        (c, r) if c < 200 || r < 60 => SizeMode::Wide,
+        (c, r) if c < 400 || r < 80 => SizeMode::Ultrawide,
+        _ => SizeMode::Massive,
+    }
+}
+
+impl SizeMode {
+    pub fn show_ascii_art(self) -> bool { self >= SizeMode::Standard }
+    pub fn show_borders(self) -> bool   { self >= SizeMode::Compact }
+    pub fn show_sidebar(self) -> bool   { self >= SizeMode::Wide }
+    pub fn show_icons(self) -> bool     { self >= SizeMode::Minimal }
+}
+```
+
+**For `TERM=dumb` handling and disabling ANSI escapes, see PART 5 "NO_COLOR Support".**
 
 ### Display Environment Detection (CLI-Specific)
 
@@ -14865,17 +14347,6 @@ fn is_serialization_error(err: &anyhow::Error) -> bool {
 
 # PART 11: SECURITY, LOGGING & PRIVACY
 
-## Security-First Design
-
-- Least privilege by default
-- Per-user storage by default
-- Explicit consent for networked, destructive, or privileged operations
-- Validate all untrusted input
-- Prefer safe Rust and audited crates
-- Use `rustls` for TLS. On macOS and Windows, the platform-native TLS APIs (`security-framework` on Apple, Schannel via `windows`/`windows-sys` on Windows) are also acceptable since they reach the OS through Apple frameworks / Windows system DLLs that are already in the allowed runtime set. On Linux/BSD, do **not** fall back to GnuTLS or system OpenSSL — they would require a `*-sys` exception per PART 0, and `rustls` covers the use case
-- Use `secrecy` for in-memory secret handling
-- For OS-level secret storage, use pure-Rust crates that speak the platform protocol directly: `secret-service` (Linux/BSD freedesktop Secret Service over D-Bus), the `security-framework` Rust binding to Apple frameworks (counts as an Apple-frameworks dependency, not third-party C), and the `windows` / `windows-sys` crates for Windows DPAPI / Credential Manager. Do **not** link to `libsecret` / `libgnome-keyring` / `kwallet` directly — those would be `*-sys` C deps and would need an IDEA.md exception per PART 0 → "Rust-Only Project"
-
 ## Public Endpoint Safety Principle (Security First)
 
 **This is the hard rule that governs every public (no-auth) surface in the application — APIs, frontend pages, reports endpoints, RSS feeds, sitemaps, anything. If it can be loaded by anyone in the world, it MUST be safe for anyone in the world to see.**
@@ -15090,6 +14561,56 @@ When `DEBUG=true` is active and an error occurs, the canonical error body (PART 
 
 **Interpretation rule:** "easy to use" means the safe deployment is the default deployment. AI must reduce operator burden by making secure configuration automatic and understandable, not by removing protections.
 
+## General Security Practices
+
+**Foundational development-practice rules that apply across the whole codebase, in addition to the runtime/server-facing rules above.**
+
+### Security-First Design
+
+- Least privilege by default
+- Per-user storage by default
+- Explicit consent for networked, destructive, or privileged operations
+- Validate all untrusted input
+- Prefer safe Rust and audited crates
+- Use `rustls` for TLS. On macOS and Windows, the platform-native TLS APIs (`security-framework` on Apple, Schannel via `windows`/`windows-sys` on Windows) are also acceptable since they reach the OS through Apple frameworks / Windows system DLLs that are already in the allowed runtime set. On Linux/BSD, do **not** fall back to GnuTLS or system OpenSSL — they would require a `*-sys` exception per PART 0, and `rustls` covers the use case
+- Use `secrecy` for in-memory secret handling
+- For OS-level secret storage, use pure-Rust crates that speak the platform protocol directly: `secret-service` (Linux/BSD freedesktop Secret Service over D-Bus), the `security-framework` Rust binding to Apple frameworks (counts as an Apple-frameworks dependency, not third-party C), and the `windows` / `windows-sys` crates for Windows DPAPI / Credential Manager. Do **not** link to `libsecret` / `libgnome-keyring` / `kwallet` directly — those would be `*-sys` C deps and would need an IDEA.md exception per PART 0 → "Rust-Only Application"
+
+### Secrets and Sensitive Data
+
+**Redaction and log-safety for tokens/secrets are covered in full by the Output Sanitization Pipeline and Audit Log Rules above — the additional rules below are not duplicated there:**
+
+- Config files containing secrets must use restrictive permissions
+- Export/import features must clearly label sensitive content
+
+### Update / Download Safety
+
+If the application downloads updates or remote content:
+
+- require explicit user intent or documented auto-update policy
+- verify integrity/signatures where supported
+- never run downloaded code implicitly
+- document trust assumptions in IDEA.md
+
+Plugin downloads are an additional case and apply only when IDEA.md defines a hardened plugin contract per PART 0 → "Single Static Binary"; the four rules above apply to them as well.
+
+See PART 21 → UPDATE COMMAND for the update mechanism itself.
+
+### Dependency Governance
+
+- Keep dependencies minimal
+- Remove unused crates promptly
+- **Renovate is the only supported dependency-update tool** — covers Cargo deps, GitHub Actions SHAs, and Docker image digests from a single `renovate.json` at the repo root. Works on GitHub, GitLab, Gitea, Forgejo, and Bitbucket.
+- **Dependabot is forbidden** — GitHub-only, duplicates Renovate's work on GitHub, and cannot serve the other four providers. Never enable both.
+- Public repos MUST ship `renovate.json` so Cargo / Actions / Docker updates land as PRs automatically; Renovate uses `pinDigests: true` to keep all `uses:` lines pinned to immutable SHAs
+- Renovate only updates the SHA; the **runtime-still-supported** verification (e.g., node24 vs deprecated runtimes) remains a manual check on every SHA bump (PART 24 → "Third-party Action Pinning")
+- Security advisories are blockers until triaged
+- Run `cargo audit` (and `cargo deny check advisories`) as part of CI to catch known vulnerabilities
+
+### Telemetry Rule
+
+No hidden telemetry. Any analytics, crash reporting, or update pings must be documented and controllable.
+
 ## Cryptographic Keys
 
 **The application maintains a small set of project-level cryptographic secrets. They are persisted in `server.db` (or where noted), included in every backup, and never logged.**
@@ -15138,15 +14659,6 @@ The root secret all other derived material hangs off. Without it, in-flight HMAC
 - NEVER logged. The Output Sanitization Pipeline (PART 11 → above) treats any field whose name contains `secret`, `key`, `password`, `token` as redacted at the log layer too.
 - Always included in backups (PART 20 → "Backup Contents").
 - Restored verbatim from a backup. Restoring partially (e.g., DB without these secrets) is rejected by the restore flow — the manifest verifies all secrets are present.
-
-## Secrets and Sensitive Data
-
-**Applies to every secret in the application, not only the project-level keys above — this generalizes the "NEVER logged" rule to all code paths, not just the audit log (see "Audit Log Rules" below for the audit-log-specific field list).**
-
-- Never log raw secrets
-- Redact tokens, passwords, API keys, auth headers, and personal data from logs and diagnostics
-- Config files containing secrets must use restrictive permissions
-- Export/import features must clearly label sensitive content
 
 ## Security Headers
 
@@ -16429,24 +15941,42 @@ server:
 - Show only first 8 characters: `token_abc12345...`
 - Or use separate ID field that doesn't expose token value
 
-## Audit Log Access
+## Audit Log
 
-**There is no admin web UI (PART 11) — the audit log is read on the server, not through web routes.**
+| Element | Type | Description |
+|---------|------|-------------|
+| Log viewer | Table | Paginated audit log entries |
+| Filters | Dropdowns | Filter by category, severity, date range |
+| Search | Text input | Search by actor, IP, event type |
+| Export | Button | Download filtered results as JSON/CSV |
+| Retention | Display | Show current retention policy |
+| Stats | Cards | Event counts by category/severity |
 
-| Access Method | Description |
-|---------------|-------------|
-| Log files | JSONL files under `{log_dir}` — one JSON object per line |
-| `jq` / `grep` | Filter by category, severity, actor, IP, event type, or date range directly on the files |
-| Export | Files are already JSON; convert to CSV with `jq -r` if needed |
-| Retention | Governed by the `keep` setting in Audit Log Configuration above |
+**Export follows the "Import/Export UI Convention" section** — a plain link/GET response with `Content-Disposition: attachment`, never a JS Blob/download-attribute trick.
 
-**Filtering examples (operator, on the server):**
-- By category: `jq 'select(.category == "security")' audit.log`
-- By severity: `jq 'select(.severity == "error")' audit.log`
-- By actor or IP: `jq 'select(.actor == "admin" or .ip == "203.0.113.7")' audit.log`
-- By result: `jq 'select(.result == "failure")' audit.log`
+**Log Viewer Columns:**
+| Column | Description |
+|--------|-------------|
+| Time | Timestamp (local timezone) |
+| Event | Event type with icon |
+| Actor | Who performed action |
+| Target | What was affected |
+| IP | Source IP address |
+| Result | Success/failure badge |
+| Details | Expandable row |
 
-**Masking note:** entries are written with the masking rules above already applied, so exports and copies never expose raw tokens or emails.
+**Filters:**
+- Category: All, Authentication, Configuration, Security, etc.
+- Severity: All, Info, Warn, Error, Critical
+- Result: All, Success, Failure
+- Date range: Today, Last 7 days, Last 30 days, Custom
+- Actor: Text search
+- IP: Text search
+
+**Export Options:**
+- Format: JSON (default), CSV
+- Range: Current view, All matching filters, Full log
+- Note: Export respects same masking rules as display
 
 ## Audit Log Integrity
 
@@ -16946,31 +16476,6 @@ pub fn is_allowlisted<B>(req: &Request<B>) -> bool {
 | `security.ip_unblocked` | IP was unblocked | IP, reason |
 | `security.ip_allowlisted` | IP/CIDR added to allowlist | CIDR, description |
 | `security.ip_allowlist_removed` | IP/CIDR removed from allowlist | CIDR |
-
-## Update / Download Safety
-
-If the app downloads updates or remote content:
-
-- require explicit user intent or documented auto-update policy
-- verify integrity/signatures where supported
-- never run downloaded code implicitly
-- document trust assumptions in IDEA.md
-
-Plugin downloads are an additional case and apply only when IDEA.md defines a hardened plugin contract per PART 0 → "Single Static Binary"; the four rules above apply to them as well.
-
-## Dependency Governance
-
-- Keep dependencies minimal
-- Remove unused crates promptly
-- **Renovate is the only supported dependency-update tool** — covers Cargo deps, GitHub Actions SHAs, and Docker image digests from a single `renovate.json` at the repo root. Works on GitHub, GitLab, Gitea, Forgejo, and Bitbucket.
-- **Dependabot is forbidden** — GitHub-only, duplicates Renovate's work on GitHub, and cannot serve the other four providers. Never enable both.
-- Public repos MUST ship `renovate.json` so Cargo / Actions / Docker updates land as PRs automatically; Renovate uses `pinDigests: true` to keep all `uses:` lines pinned to immutable SHAs
-- Renovate only updates the SHA; the **runtime-still-supported** verification (e.g., node24 vs deprecated runtimes) remains a manual check on every SHA bump (PART 24 → "Third-party Action Pinning")
-- Security advisories are blockers until triaged
-
-## Telemetry Rule
-
-No hidden telemetry. Any analytics, crash reporting, or update pings must be documented and controllable.
 
 ---
 
@@ -23098,7 +22603,7 @@ html.theme-light {
 
 ### Functions
 
-Before writing a new function, search for an existing one with the same or similar behavior — in the same package, in `helpers.go`/`helpers.rs`, in existing handlers/validators/middleware — and call or extend it instead of re-implementing the logic. Two near-identical functions that differ only in a hardcoded value are a sign the existing function should take that value as a parameter instead of being copy-pasted.
+Before writing a new function, search for an existing one with the same or similar behavior — in the same module, in `helpers.rs`, in existing handlers/validators/middleware — and call or extend it instead of re-implementing the logic. Two near-identical functions that differ only in a hardcoded value are a sign the existing function should take that value as a parameter instead of being copy-pasted.
 
 ### Variables & Constants
 
@@ -24292,6 +23797,107 @@ function isInstalledPWA() {
 | iOS Safari (no prompt event) | Yes (manual instructions) |
 | Desktop browser | Yes (if supported) |
 
+### Push Notifications (PWA)
+
+**Push notifications work even when app is closed (like native apps).**
+
+**(Only when the notification system (PART 16) enables web push. Push subscriptions belong to the signed-in system user (`sys_` token login). Skip this entire subsection when web push is not configured.)**
+
+| Component | Purpose |
+|-----------|---------|
+| **Service Worker** | Receives push events, shows notifications |
+| **Push API** | Subscribe to push service |
+| **Notifications API** | Display system notifications |
+| **VAPID Keys** | Server authentication for push |
+
+**User must grant permission** - prompt on first relevant action, not page load.
+
+```javascript
+// Request permission and subscribe
+async function subscribeToPush() {
+  // Check support
+  if (!('PushManager' in window)) {
+    console.log('Push not supported');
+    return null;
+  }
+
+  // Request permission
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') {
+    console.log('Notification permission denied');
+    return null;
+  }
+
+  // Subscribe
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+  });
+
+  // Send subscription to server
+  await fetch('/api/push/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(subscription)
+  });
+
+  return subscription;
+}
+
+// Helper: Convert VAPID key
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+}
+```
+
+**Service Worker - handle push:**
+```javascript
+// sw.js
+self.addEventListener('push', event => {
+  const data = event.data?.json() || {};
+  const options = {
+    body: data.body || 'New notification',
+    icon: '/static/icons/icon-192.png',
+    badge: '/static/icons/badge-72.png',
+    vibrate: [100, 50, 100],
+    data: { url: data.url || '/' },
+    actions: data.actions || []
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || '{app_name}', options)
+  );
+});
+
+// Handle notification click
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+
+  const url = event.notification.data?.url || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then(windowClients => {
+      // Focus existing window if open
+      for (const client of windowClients) {
+        if (client.url === url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Open new window
+      return clients.openWindow(url);
+    })
+  );
+});
+```
+
+**Admin Panel Settings (`/server/{admin_path}/config/notifications` — only when the server admin panel is enabled, PART 28):**
+- Enable/disable push notifications
+- VAPID key generation
+- Test push functionality
+
 ### Background Sync
 
 **Queue actions when offline, automatically sync when back online:**
@@ -24545,7 +24151,7 @@ document.cookie = "lang=fr; path=/; max-age=31536000; SameSite=Lax";
 - Never store PII in cookies or localStorage
 - Always fall back to a safe default when a cookie is missing or invalid
 
-**Cross-device preference sync (export/import — stateless, no PART 34 required):**
+**Cross-device preference sync (export/import — stateless, no account system required):**
 
 Preferences aren't tied to identity — any two guests who set the same `theme`/`lang` produce the same code/URL, because the code/URL *is* the preference values, not a lookup key. This lets a preference be carried to a new browser/device without an account and without the server ever storing anything.
 
@@ -24555,7 +24161,7 @@ Preferences aren't tied to identity — any two guests who set the same `theme`/
   - **Full URL** — `https://{host}/server/preferences/import?theme=dark&lang=fr`: a plain query string, human-readable, and stable across schema changes (a link made before a new preference key existed just omits it on import).
   - **Short code** — `base64url(theme=dark&lang=fr)`: the query string alone, for manual retyping on a device without copy/paste; the import form strips a leading `https://.../server/preferences/import?` if pasted with it.
 - **Import** (`GET /server/preferences/import?theme=dark&lang=fr`, API-mirrored at `GET /api/{api_version}/server/preferences/import`, or a paste-a-code field feeding the same route): validates each parameter against its normal enum/BCP-47 allowlist — reject or drop anything unknown or malformed, an imported value is still untrusted input — sets the matching cookies, then `303 See Other` to `/` (or the referring page) so the code never lingers in the visible URL or browser history.
-- No account, no DB row, no PART 34 dependency — decode → validate → set cookie → redirect happens in the one request; nothing is written or looked up server-side.
+- No account, no DB row, no account-system dependency — decode → validate → set cookie → redirect happens in the one request; nothing is written or looked up server-side.
 
 ### Offline Behavior
 
@@ -26311,7 +25917,9 @@ pub struct StaticAssets;
 - Reusable components (DRY principle)
 - Auto-escaping for security (XSS prevention)
 
-### CSS Rules
+### No Inline Styles
+
+Full CSS rules (custom properties, theming, layout): see "CSS Rules" earlier in this PART.
 
 | Bad | Good |
 |-----|------|
@@ -26326,9 +25934,9 @@ pub struct StaticAssets;
 
 | NEVER Use | ALWAYS Use Instead |
 |-----------|---------------------|
-| `alert()` | Custom modal with CSS classes |
-| `confirm()` | Custom confirmation modal |
-| `prompt()` | Custom input modal or inline form |
+| `alert()` | Native `<dialog>` styled with CSS classes |
+| `confirm()` | Native `<dialog>` confirmation with `<form method="dialog">` buttons |
+| `prompt()` | Native `<dialog>` with an input, or inline form |
 | Plain text inputs for options | Dropdowns (`<select>`) |
 | Plain text for yes/no | Checkboxes or toggle switches |
 | Plain text for multiple options | Radio buttons or dropdown |
@@ -26895,7 +26503,7 @@ When the admin panel is enabled (PART 28) these are also editable at `/server/{a
 
 | Source | Format | Example |
 |--------|--------|---------|
-| Local file | File path | Set `branding.logo_path` in config to an absolute file path (or upload via the admin panel — PART 28) |
+| Local file | File path | Set `server.branding.logo` in config to an absolute file path (or upload via the admin panel — PART 28) |
 | Remote URL | URL input | `https://example.com/logo.png` |
 | Embedded default | - | Built-in fallback |
 
@@ -27488,7 +27096,7 @@ When the operator sets `custom_html` in `server.yml`, the server logs at startup
 ```html
 <footer class="footer">
   <!-- Onion address (only shown if Tor is enabled, running, and an onion address is published) -->
-  {% if tor_enabled && tor_running && !tor_address.is_empty() %}
+  {% if tor_enabled && tor_running && !onion_address.is_empty() %}
   <p class="footer-onion">
     <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
     <code class="onion-address">{onion_address}</code>
@@ -27805,6 +27413,7 @@ function loadTracking() {
 
 **CCPA "Do Not Sell"** (only rendered when `server.privacy.data.sold = true`) is a plain POST form to `/consent/ccpa` — no JavaScript required. The server sets the `ccpa_opt_out` cookie (1 year), declines non-essential categories in `cookieConsent`, blocks third-party data sharing, and honors the GPC (Global Privacy Control) signal server-side. Nothing is stored in localStorage — the server must be able to read the opt-out on every request.
 
+```css
 <style>
 /* Cookie Consent Banner - matches reference design.
    No hidden state needed: the server only renders the banner when there is
@@ -28539,15 +28148,15 @@ curl -H "Accept: application/xml" https://jokes.example.com/api/v1/joke</code></
 
 **Tor Access section (only shown if Tor is enabled, running, and an onion address is published):**
 ```html
-{% if tor_enabled && tor_running && !tor_address.is_empty() %}
+{% if tor_enabled && tor_running && !onion_address.is_empty() %}
 <section id="tor-access" class="tor-access">
   <h3>Tor Access</h3>
   <p>This application is available as a Tor hidden service for enhanced privacy.</p>
 
   <h4>Onion Address</h4>
   <div class="code-block">
-    <code class="code-content">{{ tor_address }}</code>
-    <button type="button" class="copy-btn" data-copy="{{ tor_address }}" aria-label="Copy to clipboard">
+    <code class="code-content">{{ onion_address }}</code>
+    <button type="button" class="copy-btn" data-copy="{{ onion_address }}" aria-label="Copy to clipboard">
       <span class="copy-icon">📋</span>
       <span class="copy-text" aria-live="polite">Copy</span>
     </button>
@@ -29905,14 +29514,16 @@ it in a compliance-sensitive form.
 
 ## Access Control
 
-**`/server/metrics` is INTERNAL ONLY — internal/operational endpoints, never advertised, never in FeaturesInfo. Token auth is mandatory; the network controls below are additional defense in depth, never a substitute.**
+**`/server/metrics` and its aliases are INTERNAL ONLY. See TERMINOLOGY > Monitoring Endpoints for the /server/healthz vs /server/metrics distinction.**
 
 | Deployment | Access Method | Recommendation |
 |------------|---------------|----------------|
-| **Single server** | Firewall rules | Block external access to the `/server/metrics` port/path |
-| **Behind reverse proxy** | Proxy config | Do NOT proxy `/server/metrics` (or its aliases) to public |
+| **Single server** | Firewall rules | Block external access to `/server/metrics` and `/metrics` port/path |
+| **Behind reverse proxy** | Proxy config | Do NOT proxy `/server/metrics` or `/metrics` to public |
 | **Kubernetes** | NetworkPolicy | Restrict to monitoring namespace |
 | **Cloud** | Security groups | Allow only from Prometheus IP |
+
+### Authentication
 
 **Every metrics route requires a bearer token. There is no unauthenticated default.**
 
@@ -29937,11 +29548,11 @@ scrape_configs:
   - job_name: '{project_name}'
     static_configs:
       - targets: ['app.internal:8080']
-    # Root alias (default); use /server/metrics if root.enabled is false
+    # Root alias (default) - or use /server/metrics
     metrics_path: /metrics
     authorization:
-      # The prometheus service token from server.metrics.auth.tokens
-      credentials: 'your-prometheus-token-here'
+      # The prometheus service token from server.metrics.auth.tokens.prometheus
+      credentials: 'your-prometheus-service-token-here'
 ```
 
 ## Configuration
@@ -30177,22 +29788,6 @@ server:
 |--------|---------|
 | `scheduler_task_duration_seconds` | 0.1, 0.5, 1, 5, 10, 30, 60, 300, 600 |
 
-### Rate Limiting Metrics (if rate limiting enabled)
-
-| Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `ratelimit_requests_total` | Counter | `limit`, `status` | Total rate-limited requests |
-| `ratelimit_blocked_total` | Counter | `limit` | Requests blocked by rate limiter |
-
-**Rate limiting label values:**
-
-| Label | Values | Notes |
-|-------|--------|-------|
-| `limit` | `global`, `per_ip`, `per_user`, `per_endpoint` | Rate limit type |
-| `status` | `allowed`, `limited` | Request outcome |
-
-**Cardinality note:** Never use `ip` as a metric label — unbounded cardinality is a memory-DoS vector. Log per-IP details to structured logs instead; metrics answer "how many?" while logs answer "which IPs?"
-
 ### System Metrics (if `include_system: true`)
 
 | Metric | Type | Labels | Description |
@@ -30221,6 +29816,22 @@ server:
 | `tor_running` | Gauge | - | 1 if Tor process is running, 0 otherwise |
 | `tor_circuit_established` | Gauge | - | 1 if circuit established, 0 otherwise |
 | `tor_requests_total` | Counter | - | Total requests via Tor hidden service |
+
+### Rate Limiting Metrics (if rate limiting enabled)
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `ratelimit_requests_total` | Counter | `limit`, `status` | Total rate-limited requests |
+| `ratelimit_blocked_total` | Counter | `limit` | Requests blocked by rate limiter |
+
+**Rate limiting label values:**
+
+| Label | Values | Notes |
+|-------|--------|-------|
+| `limit` | `global`, `per_ip`, `per_user`, `per_endpoint` | Rate limit type |
+| `status` | `allowed`, `limited` | Request outcome |
+
+**Cardinality note:** Never use `ip` as a metric label — unbounded cardinality is a memory-DoS vector. Log per-IP details to structured logs instead; metrics answer "how many?" while logs answer "which IPs?"
 
 ## Metrics Output Example
 
@@ -32901,7 +32512,7 @@ rm -rf "${TMPDIR:-/tmp}/${PROJECT_ORG}/"
 
 **⚠️ NEVER RUN BINARIES DIRECTLY ON THE LOCAL MACHINE. ALWAYS USE CONTAINERS. ⚠️**
 
-**See also: "Container-Only Development" in Critical Rules section.**
+**See also: PART 0 → "No Host Toolchain or Binary Execution".**
 
 **ALL builds, tests, and binary execution MUST use containers. The local machine is for orchestration only.**
 
@@ -34736,7 +34347,7 @@ Build failed → this is a bug, not a note for later; diagnose the root cause an
 
 ## Suggested CI Steps
 
-All Rust CI jobs run inside `casjaysdev/rust:latest`. Never `cargo install` or `rustup` in a workflow `run:` step — every tool is already in the image. No `ensure-build-image` pre-flight, no `build-toolchain.yml`.
+CI runs every Rust step inside `casjaysdev/rust:latest`. CI MUST NOT install a Rust toolchain on the runner and call `cargo` directly — and MUST NOT run quality-gate commands inside the runtime image (`docker/Dockerfile`), which contains only the final binary. Never `cargo install` or `rustup` in a workflow `run:` step — every tool is already in the image. No `ensure-build-image` pre-flight, no `build-toolchain.yml`.
 
 Canonical job pattern for `ci.yml` / `release.yml`:
 
@@ -38505,7 +38116,7 @@ Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI fai
 - Prefer command snippets that actually match the Rust project layout
 - If GUI/TUI/CLI differ in behavior, document the differences explicitly
 
-## ReadTheDocs Documentation
+## ReadTheDocs Project Setup
 
 ### Overview
 
@@ -38515,7 +38126,7 @@ Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI fai
 
 Documentation uses MkDocs Material theme with dark/light/auto switching.
 
-**See PART 15 → "Web Frontend" (theme rules subsection) for project-wide theme rules (colors, accessibility, switching behavior).**
+**See PART 15 → "Themes (NON-NEGOTIABLE - PROJECT-WIDE)" for project-wide theme rules (colors, accessibility, switching behavior).**
 
 | Attribute | Value |
 |-----------|-------|
@@ -40572,7 +40183,7 @@ server:
 
 ### Screen Reader Announcements
 
-**Announce dynamic changes without moving focus.** The live region is a static element in the base Tera template (like the toast container) — screen readers only announce changes to live regions that already exist in the DOM, and a static element needs no JS to be created. JS only swaps its text:
+**Announce dynamic changes without moving focus.** The live region is a static element in the base Askama template (like the toast container) — screen readers only announce changes to live regions that already exist in the DOM, and a static element needs no JS to be created. JS only swaps its text:
 
 ```html
 <div id="sr-announcer" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
@@ -42865,7 +42476,7 @@ pub fn register_admin_routes(cfg: &Config) -> axum::Router<Arc<AppState>> {
 
 ## The Server Admin Account
 
-**There is exactly ONE server admin account: the main server admin. It is an ADMINISTRATIVE identity for managing the application, not an application user.**
+**There is exactly ONE server admin account — the main server admin. It is an ADMINISTRATIVE ACCOUNT for managing the application. It is NOT an application user account: application user accounts do not exist; identity is the operating system (PART 8), and system users authenticate with their per-system-user `sys_` tokens.**
 
 ### Server Admin vs System Users
 
@@ -42874,12 +42485,13 @@ pub fn register_admin_routes(cfg: &Config) -> axum::Router<Arc<AppState>> {
 | **Purpose** | Manage server and configuration | API access as an operating-system user |
 | **Scope** | Server-wide administration | Own `sys_` token and data only |
 | **Identity** | Main server admin (maps to `server.token`) | Operating-system account (`system_users` table) |
+| **Storage** | `admins` table (profile, preferences, MFA) — the admin token itself lives in `server.yml` (PART 11), never in the database | `system_users` table (PART 8) |
 | **Required** | **YES — whenever this PART is enabled** | Core (PART 8) |
-| **Login** | `/server/auth/login` → `/server/{admin_path}/*` | No web login — `sys_` token API auth only |
+| **Login** | `/server/auth/login` → `/server/{admin_path}/*` (admin token) | No web login — `sys_` token API auth only |
 | **Access** | Admin panel (`/server/{admin_path}/*`) | API routes per PART 8 |
 | **Created by** | Setup wizard (first run) | Operating system (`useradd` etc.); token minted per PART 8 |
 
-**Important:** The Server Admin and system users are completely separate identity types. The Server Admin is NOT a "privileged user" - it is a different kind of identity entirely, backed by `server.token`.
+**Important:** The Server Admin and system users are completely separate identity types. The Server Admin is NOT a "privileged user" — it is a different kind of identity entirely, backed by `server.token`: it manages the server; it does not own application data.
 
 ### Server Admin Behavior
 
@@ -42888,7 +42500,7 @@ pub fn register_admin_routes(cfg: &Config) -> axum::Router<Arc<AppState>> {
 | `/server/{admin_path}/*` | Full access |
 | `/server/auth/login` | Login page |
 | `/server/auth/logout` | Logout |
-| Public routes (`/`, `/server/*`, etc.) | Guest view (no user-specific content) |
+| Public routes (`/`, `/server/*`, etc.) | Guest view (no admin-specific content) |
 
 **The admin token (`server.token`) lives in `server.yml` ONLY (PART 11), never in the database or config-managed secrets stores.**
 
@@ -43051,9 +42663,16 @@ On first run, a one-time setup token is generated and displayed in console. Admi
 
 **No exceptions.**
 
+### Admin Recovery
+
+| Scenario | Recovery Method |
+|----------|-----------------|
+| Lost admin token | Read or rotate `server.token` in `server.yml` on the host (PART 11), or run `--maintenance setup` |
+| Lost 2FA | Use recovery keys, or run `--maintenance setup` on the host to reset MFA |
+
 ### Server Admin Account Security Details
 
-**The Server Admin has the following account security features.**
+**The server admin account has a full set of account security features.**
 
 #### Passkeys/WebAuthn
 
@@ -43218,13 +42837,6 @@ On first run, a one-time setup token is generated and displayed in console. Admi
 | Own API token (regenerate) | Shown masked; regenerate at will |
 | Own 2FA status | TOTP/passkey enrollment |
 | Own session history | Active admin sessions |
-
-### Admin Recovery
-
-| Scenario | Recovery Method |
-|----------|-----------------|
-| Lost admin token | Read/rotate `server.token` in `server.yml` (shell access required) |
-| Lost 2FA + recovery keys | Run `--maintenance setup` to reset MFA enrollment |
 
 ### Login Page (`/server/{admin_path}`)
 
@@ -44205,12 +43817,14 @@ The admin panel MUST include a scheduler section with:
 
 ### Admin - System Users (`/api/{api_version}/server/{admin_path}/config/system-users/`)
 
-**Read-only view of the `system_users` table (PART 8). Accounts are managed by the operating system — this API never creates, modifies, or deletes system users.**
+**Read-only view of the `system_users` table (PART 8). System user accounts are managed by the operating system, and their per-system-user `sys_` tokens by the PART 8 token lifecycle — the admin panel never creates, edits, or deletes them.**
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/{api_version}/server/{admin_path}/config/system-users` | GET | List system users (username, uid, token status, last_used_at, rotated_at) |
-| `/api/{api_version}/server/{admin_path}/config/system-users/{username}` | GET | Get one system user's row (same read-only fields) |
+| `/api/{api_version}/server/{admin_path}/config/system-users/{username}` | GET | Get one system user's token status details |
+
+**No write endpoints exist under `/config/system-users` — the view is strictly read-only.**
 
 ### Admin - Profile (`/api/{api_version}/server/{admin_path}/{admin_username}/profile/`)
 
@@ -44342,11 +43956,11 @@ The admin panel MUST include a scheduler section with:
 
 # PART 29: CLIENT (companion to PART 8)
 
-**The client is REQUIRED for every project and is fully specified in PART 8 → "Client".** This PART is not optional; it adds ONLY the client-side companions to the per-system-user token system (PART 8 → "Per-System-User Tokens") that PART 8 does not restate — API token authentication, config-file permissions for tokens, token revocation handling, CLI auto-update, and flag-to-config save rules. These apply to any client build/mode.
+**Client access is REQUIRED for every project and is fully specified in PART 8 → "Client" (the dedicated client build itself is optional there).** This PART is not optional; it adds ONLY the client-side companions to the per-system-user token system (PART 8 → "Per-System-User Tokens") that PART 8 does not restate — API token authentication, config-file permissions for tokens, token revocation handling, CLI auto-update, and flag-to-config save rules. These apply to any client build/mode.
 
 ## Client
 
-The client itself is fully specified in **PART 8 → "Client"** and is NOT restated here. PART 8 covers: overview (client is REQUIRED for all projects), binary naming rules, CLI open API access, CLI config file permissions, CLI auto-update (including flag-to-config save rules), modes and automatic mode detection, display environment detection, CLI/TUI/GUI theming, responsive layout, professional UI/UX standards, configuration (`cli.yml`), standard flags, commands, authentication, HTTP client identity, URL encoding, output formats, project-specific commands, build integration, TUI requirements, error handling and exit codes, `--version` extended output, and whether the project warrants a dedicated client build.
+The client itself is fully specified in **PART 8 → "Client"** and is NOT restated here. PART 8 covers: overview (client access is REQUIRED for all projects; a dedicated client build is optional), binary naming rules, CLI open API access, CLI config file permissions, CLI auto-update (including flag-to-config save rules), modes and automatic mode detection, display environment detection, CLI/TUI/GUI theming, responsive layout, professional UI/UX standards, configuration (`cli.yml`), standard flags, commands, authentication, HTTP client identity, URL encoding, output formats, project-specific commands, build integration, TUI requirements, error handling and exit codes, `--version` extended output, and whether the project warrants a dedicated client build.
 
 The client subsections below add ONLY what PART 8 does not cover.
 
@@ -44479,7 +44093,7 @@ See **PART 8 → "Flag-to-Config Save Rules"** — flags only update `cli.yml` w
 - [ ] `.dockerignore` exists at project root with Rust-specific entries (`target/`, plus the standard exclusions from `dockerfile_conventions.md` → ".dockerignore")
 - [ ] `docker/Dockerfile.build` does not exist — Rust projects always use `casjaysdev/rust:latest` directly; no custom toolchain image is ever needed
 - [ ] `ci.yml` and `release.yml` use `container: image: casjaysdev/rust:latest` — no `ensure-build-image` pre-flight, no `build-toolchain.yml`
-- [ ] If IDEA.md documents a `*-sys` exception requiring system dev libs at build time, only the minimum set needed by that crate is added to the image — by default the image carries no GUI-stack C dev libs (PART 0 → "Rust-Only Project")
+- [ ] If IDEA.md documents a `*-sys` exception requiring system dev libs at build time, only the minimum set needed by that crate is added to the image — by default the image carries no GUI-stack C dev libs (PART 0 → "Rust-Only Application")
 - [ ] `rust-toolchain.toml` pins the toolchain; `.cargo/config.toml` pins static-link rustflags
 - [ ] `Cargo.toml` release profile uses `opt-level = "z"`, `lto = true`, `codegen-units = 1`, `strip = true`, `panic = "abort"`
 - [ ] Repo has `assets/` (build-time source) and a Rust embedding module (`include_bytes!` / `rust-embed`) wiring it into the binary
@@ -44651,11 +44265,11 @@ maintainer_email: {maintainer@example.com — or empty; used only if set}
 
 **Surfaces (declare which apply — see PART 2 → "Application & Server Model"):**
 - GUI: {yes / no — and on which platforms; if yes, both X11 and Wayland are mandatory on Linux/BSD, see PART 0}
+- TUI: {yes / no}
+- CLI: {yes / no}
 - Web frontend: {yes / no}
 - REST API: {yes / no}
 - GraphQL API: {yes / no}
-- CLI client: {yes / no — client is required for all server-mode projects}
-- TUI (interactive client): {yes / no}
 
 **Optional server features (both disabled by default — see PART 2 → "Optional Server Features (Disabled by Default)"; declare only when the server surface is in scope):**
 - Server admin (admin user + admin routes): {yes / no}
@@ -44705,9 +44319,11 @@ maintainer_email: {maintainer@example.com — or empty; used only if set}
 
 ## IDEA.md Examples
 
-The following six examples are carried forward from the two source templates this HYBRID spec unifies. The first three emphasize the application/client-surface side (GUI/TUI/CLI-flavored projects); the last three emphasize the server/API side (web + REST/GraphQL-flavored projects). A real HYBRID project's IDEA.md typically lands somewhere between these, declaring whichever surfaces (web frontend, REST, GraphQL, CLI, TUI) it actually ships.
+The six examples below are carried forward from the two source templates this HYBRID spec unifies: three application-flavored examples (GUI/TUI/CLI, no server surface) and three server-flavored examples (web frontend + API, no GUI/TUI). All six use the same unified template above — an example simply leaves the fields that don't apply to it out, or marks them "no" / "none". A real HYBRID project's IDEA.md typically lands somewhere between these, declaring whichever surfaces (web frontend, REST, GraphQL, CLI, TUI) it actually ships.
 
-**Example 1: Notes (client-focused, fully offline)**
+### Application-Flavored Examples
+
+**Example 1: Notes (GUI + CLI, fully offline)**
 
 ```markdown
 ## Project description
@@ -44734,11 +44350,12 @@ maintainer_email: jane@example.com
 - Power users scripting note creation / search via shell
 
 **Surfaces:**
+- GUI: yes (Linux X11 + Wayland, macOS, Windows)
+- TUI: no
+- CLI: yes (`notes new`, `notes search`, `notes ls`)
 - Web frontend: no
 - REST API: no
 - GraphQL API: no
-- CLI client: yes (`notes new`, `notes search`, `notes ls`)
-- TUI: no
 
 **Features:**
 - **Note management**: create, edit, archive, delete with markdown support
@@ -44769,7 +44386,7 @@ maintainer_email: jane@example.com
 - Cache: `~/.cache/casjay/notes/`
 
 **License exceptions:**
-- `rusqlite` with `bundled` feature for the local notes database. Pure-Rust alternative (`limbo`) is not yet stable for production; statically vendored SQLite C is acceptable per PART 0 → "Rust-Only Project" exception path. Distribution license remains MIT.
+- `rusqlite` with `bundled` feature for the local notes database. Pure-Rust alternative (`limbo`) is not yet stable for production; statically vendored SQLite C is acceptable per PART 0 → "Rust-Only Application" exception path. Distribution license remains MIT.
 ```
 
 **Example 2: Feeds (TUI + CLI, consumes a remote API)**
@@ -44800,11 +44417,12 @@ maintainer_email: jane@example.com
 - Anyone wanting offline-friendly RSS reading without a hosted service
 
 **Surfaces:**
+- GUI: no
+- TUI: yes (primary)
+- CLI: yes (`feeds add`, `feeds sync`, `feeds export`)
 - Web frontend: no
 - REST API: no
 - GraphQL API: no
-- CLI client: yes (`feeds add`, `feeds sync`, `feeds export`)
-- TUI: yes (primary)
 
 **Features:**
 - **Subscription**: add / remove / rename feeds; OPML import / export
@@ -44866,11 +44484,12 @@ maintainer_email: jane@example.com
 - Developers managing dotfiles across multiple machines
 
 **Surfaces:**
+- GUI: no
+- TUI: no
+- CLI: yes (`dotctl link`, `dotctl unlink`, `dotctl status`, `dotctl diff`)
 - Web frontend: no
 - REST API: no
 - GraphQL API: no
-- CLI client: yes (`dotctl link`, `dotctl unlink`, `dotctl status`, `dotctl diff`)
-- TUI: no
 
 **Features:**
 - **Link / unlink**: create or remove symlinks from a dotfiles repo into the user's home
@@ -44901,6 +44520,8 @@ maintainer_email: jane@example.com
 **License exceptions:** none
 ```
 
+### Server-Flavored Examples
+
 **Example 4: Jokes Server**
 
 ```markdown
@@ -44929,11 +44550,12 @@ maintainer_email: jane@example.com
 - Websites wanting random developer jokes
 
 **Surfaces:**
+- GUI: no
+- TUI: no
+- CLI: yes (thin `jokes-cli` client for the server's API — see PART 8; `jokes-cli get`, `jokes-cli search`)
 - Web frontend: yes
 - REST API: yes
 - GraphQL API: yes
-- CLI client: yes (`jokes-cli get`, `jokes-cli search`)
-- TUI: no
 
 **Features:**
 - **Joke delivery**: random joke selection with rating-based weighting
@@ -44998,11 +44620,12 @@ maintainer_email: jane@example.com
 - Businesses wanting branded short links
 
 **Surfaces:**
+- GUI: no
+- TUI: no
+- CLI: yes (thin `linkshort-cli` client for the server's API — see PART 8; `linkshort-cli create`, `linkshort-cli stats`)
 - Web frontend: yes
 - REST API: yes
 - GraphQL API: no
-- CLI client: yes (`linkshort-cli create`, `linkshort-cli stats`)
-- TUI: no
 
 **Features:**
 - **URL shortening**: generate 6-char short codes or custom slugs
@@ -45068,11 +44691,12 @@ maintainer_email: jane@example.com
 - Home automation systems
 
 **Surfaces:**
+- GUI: no
+- TUI: no
+- CLI: yes (thin `weather-cli` client for the server's API — see PART 8; `weather-cli current`, `weather-cli forecast`)
 - Web frontend: yes
 - REST API: yes
 - GraphQL API: yes
-- CLI client: yes (`weather-cli current`, `weather-cli forecast`)
-- TUI: no
 
 **Features:**
 - **Current conditions**: temperature, humidity, wind, conditions by location

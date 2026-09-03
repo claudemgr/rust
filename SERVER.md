@@ -1196,8 +1196,7 @@ Quick reference: Accept `yes/no`, `true/false`, `1/0`, `on/off`, `enable/disable
 | `PLAN.AI.md` | Optional | Project plan — AI creates/updates. If it exists, this is THE plan |
 | `TODO.md` | Optional | Task list — human edits/owns. AI reads, interprets, executes, and marks items done in place. Never delete, empty, or restructure |
 | `TODO.AI.md` | Optional | Task list — AI creates/updates (3+ tasks only) |
-
-**Why two variants of PLAN/TODO exist:** humans and AI write tasks at different levels of detail. A human might write `[ ] fix bugs`; AI would write a structured task with reproduction steps, acceptance criteria, and file paths. The split lets each party use their natural style. **AI's job with human files:** read terse items, figure out what they mean (investigate, propose, ask if genuinely unclear — don't refuse for being short), do the work, then check the box. AI must NOT "improve" the wording into AI-style verbose form. The completion rituals (`TODO.AI.md` ✅ items removed individually when done, `PLAN.AI.md` "Fully Implemented" rewrite) apply only to the AI-owned variants.
+| `CLAUDE.local.md` | Optional | Personal Claude Code notes — gitignored |
 | `README.md` | ✓ | Public documentation |
 | `LICENSE.md` | ✓ | License file |
 | `Makefile` | ✓ | Build targets |
@@ -1212,6 +1211,11 @@ Quick reference: Accept `yes/no`, `true/false`, `1/0`, `on/off`, `enable/disable
 | `Jenkinsfile` | ✓ | Jenkins pipeline — required on every project per `cicd_conventions.md` |
 | `mkdocs.yml` | ✓ | MkDocs configuration |
 | `.readthedocs.yaml` | ✓ | ReadTheDocs configuration |
+| `.editorconfig` | Optional | Editor configuration |
+
+**Why two variants of PLAN/TODO exist:** humans and AI write tasks at different levels of detail. A human might write `[ ] fix bugs`; AI would write a structured task with reproduction steps, acceptance criteria, and file paths. The split lets each party use their natural style. **AI's job with human files:** read terse items, figure out what they mean (investigate, propose, ask if genuinely unclear — don't refuse for being short), do the work, then check the box. AI must NOT "improve" the wording into AI-style verbose form. The completion rituals (`TODO.AI.md` ✅ items removed individually when done, `PLAN.AI.md` "Fully Implemented" rewrite) apply only to the AI-owned variants.
+
+**RULE: If a root file doesn't appear in this list, it MUST NOT exist - ask before creating.**
 
 ### AI-Specific Files and Directories
 
@@ -1978,47 +1982,20 @@ Instructions for how this agent should behave...
 | `deps/` | | Optional, committed, project-specific support files not part of build/release output (e.g. scripts or Dockerfiles for building a dependency) — never a cache or temp/output dir | No |
 | `.github/` | If GitHub / public repo | GitHub Actions, community files, templates | No |
 | `.gitea/` | If Gitea | Gitea Actions, templates | No |
-| `.claude/` | Auto | Claude Code config — team config (rules/agents/hooks/settings.json) committed; personal overrides, cache, lock files gitignored | Partial |
-| `.cursor/` | Auto | Cursor AI config — `rules/`, `mcp.json` committed; personal settings gitignored | Partial |
+| `.claude/` | Auto | Claude Code config — team config (rules, agents, hooks, `settings.json`) committed; personal/runtime files gitignored | Partial (see AI-Specific Files table) |
+| `.cursor/` | Auto | Cursor AI config — `rules/`, `mcp.json` committed; personal settings gitignored | Partial (see AI-Specific Files table) |
 | `.aider/` | Auto | Aider AI config (regenerated) | **Yes** |
 | `.ai/` | Auto | Generic AI config (regenerated) | **Yes** |
-| `.windsurf/` | Auto | Windsurf AI config — `rules/` committed; personal settings gitignored | Partial |
+| `.windsurf/` | Auto | Windsurf AI config — `rules/` committed; personal settings gitignored | Partial (see AI-Specific Files table) |
 | `binaries/` | Auto | Build output | **Yes** |
 | `releases/` | Auto | Release artifacts | **Yes** |
 | `volumes/` | Auto | Runtime volume data (if created locally) | **Yes** |
 
 **RULE: If a directory doesn't appear in this list, it MUST NOT exist - ask before creating.**
 
-### Allowed Root Files (Exhaustive List)
+### Allowed Root Files
 
-| File | Required | Purpose | Gitignored |
-|------|:--------:|---------|:----------:|
-| `AI.md` | ✓ | Project specification (source of truth) | No |
-| `IDEA.md` | ✓ | Project plan and features | No |
-| `CLAUDE.md` | ✓ | Claude Code project memory (primary location) | No |
-| `CLAUDE.local.md` | - | Personal Claude Code preferences | **Yes** |
-| `SPEC.md` | - | Project-specific rule overrides — SPEC.md > AI.md > global CLAUDE.md; created only when a rule must differ from template | No |
-| `PLAN.md` | - | Project plan — human edits/owns | No |
-| `PLAN.AI.md` | - | Project plan — AI creates/updates | No |
-| `TODO.md` | - | Task list — human edits/owns | No |
-| `TODO.AI.md` | - | Task list — AI creates/updates (3+ tasks only) | No |
-| `README.md` | ✓ | Project documentation | No |
-| `LICENSE.md` | ✓ | MIT license + embedded third-party licenses | No |
-| `Cargo.toml` | ✓ | Rust workspace/package definition | No |
-| `Cargo.lock` | ✓ | Rust dependency lockfile | No |
-| `rust-toolchain.toml` | ✓ | Pinned toolchain (`channel = "stable"`) | No |
-| `Makefile` | ✓ | Local development only | No |
-| `Jenkinsfile` | ✓ | Jenkins pipeline — required on every project per `cicd_conventions.md` | No |
-| `mkdocs.yml` | ✓ | MkDocs configuration | No |
-| `.readthedocs.yaml` | ✓ | ReadTheDocs configuration | No |
-| `.gitignore` | ✓ | Git ignore patterns | No |
-| `.dockerignore` | ✓ | Docker ignore patterns | No |
-| `.gitattributes` | - | Git attributes | No |
-| `.editorconfig` | - | Editor configuration | No |
-| `release.txt` | ✓ | Version source of truth | No |
-| `site.txt` | - | Official site URL (optional, never guess) | No |
-
-**RULE: If a root file doesn't appear in this list, it MUST NOT exist - ask before creating.**
+See the single authoritative table earlier in this file (search: `### Allowed Root Files (Exhaustive List)`). If a root file doesn't appear in that list, it MUST NOT exist - ask before creating.
 
 ### GitHub-Specific Files (`.github/` directory)
 
@@ -3393,8 +3370,11 @@ Spec version: {line count or hash}
 | Action | Reason |
 |--------|--------|
 | **Modifying PARTS 0-36** | **Implementation patterns are fixed - NEVER modify** |
-| Plain `git commit` (any flag form) | Bypasses signing wrapper |
-| Plain `git push` | Bypasses the commit wrapper entirely |
+| Plain `git commit` (any flag form) | Bypasses signing wrapper. Use `gitcommit <command>` instead |
+| Plain `git push` | gitcommit already pushes. Plain `git push` bypasses the wrapper entirely |
+| `gitcommit <command>` without first writing AND re-reading `.git/COMMIT_MESS` | The script reads the message from the file and pushes immediately. Wrong file = wrong commit on the remote |
+| `gitcommit -m "..."` / `gitcommit --message "..."` | Defeats the point. The message belongs in `.git/COMMIT_MESS` so it can be verified before committing |
+| Running `gitcommit <command>` mid-task with files in an inconsistent state | Every commit is pushed — half-finished work goes public. Finish the unit of work first |
 | Subagent writing `.git/COMMIT_MESS` | Commit message must be written by the parent instance after reviewing the actual diff |
 | Subagent calling `gitcommit` | Only the parent (main) instance runs gitcommit — subagents complete edits and report back |
 | Bare `@name` in commit body | Any `@username` in a commit message creates a GitHub contributor notification/link — never use bare `@` unless intentionally crediting a real contributor; write names without `@` or wrap in backticks |
@@ -17176,6 +17156,7 @@ server:
 | `ldap.user_created` | Auto-provisioned user via LDAP | User ID, provider name |
 | `ldap.admin_granted` | Admin access via group mapping | User ID, group DN |
 | `ldap.admin_revoked` | Admin access removed (group change) | User ID |
+| `ldap.session_revoked` | Local sessions revoked because the provider was deleted/disabled | Provider name, session count, changed by |
 | `ldap.bind_locked` | Per-identity bind-failure lockout triggered (password-spray defense) | Identity (masked), provider name, IP, failure count |
 
 ### SAML Events
@@ -17190,7 +17171,6 @@ server:
 | `saml.slo_initiated` | Single Logout started (SP-initiated LogoutRequest sent, or IdP-initiated LogoutRequest received) | User ID, provider name, initiator (`sp` or `idp`) |
 | `saml.slo_completed` | Single Logout completed (local session ended and LogoutResponse exchanged) | User ID, provider name |
 | `saml.session_revoked` | Local sessions revoked because the provider was deleted/disabled | Provider name, session count, changed by |
-| `saml.sp_cert_rotated` | SP signing/encryption keypair rotated (auto-gen expiry or admin action) | Provider name, new cert fingerprint, expiry |
 
 ### Configuration Events
 
@@ -17211,6 +17191,7 @@ server:
 | `config.saml_provider_added` | SAML provider configured | Provider name, added by |
 | `config.saml_provider_updated` | SAML provider changed | Provider name, changed by |
 | `config.saml_provider_removed` | SAML provider removed | Provider name, removed by |
+| `config.saml_sp_cert_regenerated` | SP signing/encryption keypair regenerated or replaced (auto-gen expiry or admin action) | Provider name, new cert fingerprint, expiry, changed by |
 | `config.admin_groups_updated` | Admin group mapping changed | Old groups, new groups, changed by |
 
 ### Security Events
@@ -19895,9 +19876,9 @@ pub struct ConsentState {
     pub timestamp: i64,
 }
 
-// Stored in the `cookieConsent` COOKIE as JSON (1 year, SameSite=Lax) so the
+// Stored in the `cookie_consent` COOKIE as JSON (1 year, SameSite=Lax) so the
 // server can read it - consent_middleware parses it via get_consent_from_jar():
-// cookieConsent = {"essential":true,"preferences":true,"analytics":false,"timestamp":1704067200}
+// cookie_consent = {"essential":true,"preferences":true,"analytics":false,"timestamp":1704067200}
 ```
 
 ### Granular Consent UI (Manage Preferences)
@@ -20759,7 +20740,7 @@ pub struct StatsInfo {
 }
 ```
 
-### Security Rules (all health responses)
+#### Security Rules (all health responses)
 
 These rules apply to the health payload in every format and on every health route (`/server/healthz`, `/healthz` alias, `/api/{api_version}/server/healthz`, `/api/healthz`).
 
@@ -26820,7 +26801,8 @@ if (new URLSearchParams(window.location.search).get('source') === 'pwa') {
 | Badging API | Yes | No |
 | Web Share Target | Yes | No |
 
-**iOS-specific meta tags:**```html
+**iOS-specific meta tags:**
+```html
 <head>
   <!-- Standard manifest -->
   <link rel="manifest" href="/manifest.json">
@@ -28371,7 +28353,9 @@ pub struct StaticAssets;
 - Reusable components (DRY principle)
 - Auto-escaping for security (XSS prevention)
 
-### CSS Rules
+### No Inline Styles
+
+Full CSS rules (custom properties, theming, layout): see "CSS Rules" earlier in this PART.
 
 | Bad | Good |
 |-----|------|
@@ -28386,9 +28370,9 @@ pub struct StaticAssets;
 
 | NEVER Use | ALWAYS Use Instead |
 |-----------|---------------------|
-| `alert()` | Custom modal with CSS classes |
-| `confirm()` | Custom confirmation modal |
-| `prompt()` | Custom input modal or inline form |
+| `alert()` | Native `<dialog>` styled with CSS classes |
+| `confirm()` | Native `<dialog>` confirmation with `<form method="dialog">` buttons |
+| `prompt()` | Native `<dialog>` with an input, or inline form |
 | Plain text inputs for options | Dropdowns (`<select>`) |
 | Plain text for yes/no | Checkboxes or toggle switches |
 | Plain text for multiple options | Radio buttons or dropdown |
@@ -29548,7 +29532,7 @@ When admin edits `custom_html`, show:
 ```html
 <footer class="footer">
   <!-- Onion address (only shown if Tor is enabled, running, and an onion address is published) -->
-  {% if tor_enabled && tor_running && !tor_address.is_empty() %}
+  {% if tor_enabled && tor_running && !onion_address.is_empty() %}
   <p class="footer-onion">
     <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
     <code class="onion-address">{onion_address}</code>
@@ -29754,16 +29738,18 @@ When admin edits `custom_html`, show:
 | **Buttons (mobile)** | Centered below message, side-by-side |
 | **Decline button** | Text/outline style, no background |
 | **"I Agree" button** | Filled white background, purple text |
-| **Persistence** | Choice stored in the `cookieConsent` cookie (server-readable) — server skips rendering the banner on later requests |
+| **Persistence** | Choice stored in the `cookie_consent` cookie (server-readable) — server skips rendering the banner on later requests |
 | **Z-index** | Above all content, below modals |
 
 ### Banner Behavior
 
+**The server decides whether to render the banner: no `cookie_consent` cookie → render it; cookie present → skip it entirely.** Accept/Decline/Save are standard `<form method="post">` submits handled server-side (set the cookie, redirect back) - the banner works fully without JavaScript. External JS is a no-reload enhancement only.
+
 | Action | Result |
 |--------|--------|
-| **I Agree** | POST to `/consent` — server sets `cookieConsent` cookie (all categories true), redirects back, enables all cookies + tracking |
-| **Decline** | POST to `/consent` — server sets `cookieConsent` cookie (essential only), redirects back, session cookies only |
-| **Already set** | Server does NOT render the banner when a valid `cookieConsent` cookie exists (`consent_middleware` parses it) |
+| **I Agree** | POST to `/server/consent` — server sets `cookie_consent` cookie (all categories true), redirects back, enables all cookies + tracking |
+| **Decline** | POST to `/server/consent` — server sets `cookie_consent` cookie (essential only), redirects back, session cookies only |
+| **Already set** | Server does NOT render the banner when a valid `cookie_consent` cookie exists (`consent_middleware` parses it) |
 | **First visit** | No consent cookie — server renders the banner visible; it works without JavaScript |
 
 ### Implementation
@@ -29788,7 +29774,7 @@ let message = cfg.privacy.get_consent_message();
 ```
 
 ```html
-<!-- Cookie Consent Banner - SERVER-RENDERED only when no valid cookieConsent
+<!-- Cookie Consent Banner - SERVER-RENDERED only when no valid cookie_consent
      cookie exists (consent_middleware parses it; get_consent_from_jar()).
      The banner is fully functional without JavaScript: Accept/Decline are
      plain POST forms. No hidden-by-default + JS-reveal pattern. -->
@@ -29800,11 +29786,11 @@ let message = cfg.privacy.get_consent_message();
       {message} - <a href="{policy_url}" class="policy-link">{policy_text}</a>
     </span>
     <div class="cookie-buttons">
-      <form method="post" action="/consent">
+      <form method="post" action="/server/consent">
         <input type="hidden" name="choice" value="decline">
         <button type="submit" class="btn-decline">{decline_text}</button>
       </form>
-      <form method="post" action="/consent">
+      <form method="post" action="/server/consent">
         <input type="hidden" name="choice" value="accept">
         <button type="submit" class="btn-accept">{accept_text}</button>
       </form>
@@ -29814,16 +29800,16 @@ let message = cfg.privacy.get_consent_message();
 {% endif %}
 ```
 
-**Server handler (`POST /consent`) — the no-JS baseline:**
+**Server handler (`POST /server/consent`) — the no-JS baseline:**
 
 ```rust
-// POST /consent sets the cookieConsent cookie (JSON value, 1 year, SameSite=Lax)
+// POST /server/consent sets the cookie_consent cookie (JSON value, 1 year, SameSite=Lax)
 // and redirects back to the referring page (303 See Other).
 // choice=accept  -> {"essential":true,"preferences":true,"analytics":true,"timestamp":...}
 // choice=decline -> {"essential":true,"preferences":false,"analytics":false,"timestamp":...}
-// choice=custom  -> per-category values from the preferences form checkboxes
-// GET /consent renders the granular preferences page (server-rendered form) -
-// the no-JS target for every "Manage Preferences" link.
+// choice=save    -> per-category values from the Manage Preferences form checkboxes
+// The no-JS fallback for "Manage Preferences" is the /server/privacy page,
+// which renders the same granular form inline at #cookie-preferences.
 ```
 
 **JavaScript enhancement (static/js/app.js — external file, NO inline handlers):**
@@ -29844,9 +29830,11 @@ document.addEventListener('submit', async (e) => {
 });
 
 // Enhancement: open the native <dialog id="cookie-preferences-modal"> in place
-// instead of navigating to the server-rendered /consent page
+// (focus trap, Esc, backdrop built in) instead of jumping to the inline form
+// on /server/privacy; its Save button is a normal POST to /server/consent
+// with choice=save.
 document.addEventListener('click', (e) => {
-  const link = e.target.closest('[data-consent-preferences]');
+  const link = e.target.closest('[data-action="cookie-preferences"]');
   const dialog = document.getElementById('cookie-preferences-modal');
   if (link && dialog?.showModal) {
     e.preventDefault();
@@ -29861,9 +29849,13 @@ function loadTracking() {
 }
 ```
 
-**CCPA "Do Not Sell"** (only rendered when `server.privacy.data.sold = true`) is a plain POST form to `/consent/ccpa` — no JavaScript required. The server sets the `ccpa_opt_out` cookie (1 year), declines non-essential categories in `cookieConsent`, blocks third-party data sharing, and honors the GPC (Global Privacy Control) signal server-side. Nothing is stored in localStorage — the server must be able to read the opt-out on every request.
+**CCPA "Do Not Sell" (only when `server.privacy.data.sold = true`):**
 
-<style>
+The opt-out is a POST form on the privacy page to `/server/ccpa`; the server sets the `ccpa_opt_out=true` cookie (1 year, and downgrades `cookie_consent` to essential-only), honors the GPC (Global Privacy Control) signal server-side, and reads it on every request - see `privacy_page()` in PART 12. No localStorage, no JS required; external JS may enhance the form for no-reload feedback.
+
+**Banner CSS (`static/css/components.css` - never inline):**
+
+```css
 /* Cookie Consent Banner - matches reference design.
    No hidden state needed: the server only renders the banner when there is
    no valid consent cookie, and the JS enhancement removes the element. */
@@ -29951,16 +29943,15 @@ function loadTracking() {
     padding: 0.5rem 1.25rem;
   }
 }
-</style>
 ```
 
 ### Consent Logic (Granular)
 
-**Consent stored as JSON in the `cookieConsent` cookie (server-readable):** `{"essential":true,"preferences":true,"analytics":false,"timestamp":1704067200}`
+**Consent stored as JSON in the `cookie_consent` cookie:** `{"essential":true,"preferences":true,"analytics":false,"timestamp":1704067200}`
 
 | Condition | Show Banner | Essential | Preferences | Analytics |
 |-----------|-------------|-----------|-------------|-----------|
-| No `cookieConsent` cookie (first visit) | **Yes** | Yes (always) | Wait | Wait |
+| No `cookie_consent` cookie (first visit) | **Yes** | Yes (always) | Wait | Wait |
 | Accept All clicked | No | Yes | **Yes** | **Yes** (if `server.tracking` configured) |
 | Decline clicked | No | Yes | No | No |
 | Custom preferences saved | No | Yes | User choice | User choice |
@@ -29984,7 +29975,7 @@ function loadTracking() {
 | **Analytics/Tracking** | **NEVER loaded** | No tracking scripts injected, no data sent to analytics providers |
 | **Preference cookies** | **NOT set** | Theme defaults to system/dark, language defaults to browser/en |
 | **Essential cookies** | **Still work** | Session, CSRF, auth tokens required for app to function |
-| **localStorage** | **Not used** | The decline is remembered in the `cookieConsent` cookie (essential category) so the server can skip the banner |
+| **localStorage** | **Nothing** | Consent choice lives in the `cookie_consent` cookie (essential) - localStorage is never used for consent |
 | **Third-party scripts** | **NOT loaded** | No Google Analytics, Matomo, etc. |
 | **Embedded content** | **Placeholder shown** | YouTube, social embeds show "Content blocked" placeholder |
 
@@ -29992,7 +29983,7 @@ function loadTracking() {
 ```
 ✓ Session cookie (required for login/auth)
 ✓ CSRF token cookie (required for form security)
-✓ Remember decline choice (`cookieConsent` cookie — essential, stores the refusal)
+✓ Remember decline choice (`cookie_consent` cookie - itself essential)
 ✓ Basic functionality (browse, view content)
 ```
 
@@ -30041,12 +30032,12 @@ pub fn tracking_script(headers: &HeaderMap, cfg: &Config) -> askama::MarkupDispl
 {% endif %}
 
 <!-- Show placeholder for blocked embeds -->
-<!-- The link targets the server-rendered /consent page (works without JS);
-     app.js upgrades it to open the preferences <dialog> in place -->
+<!-- The link targets the inline preferences form on /server/privacy (works
+     without JS); app.js upgrades it to open the preferences <dialog> in place -->
 {% if !preferences_allowed %}
   <div class="embed-blocked">
     <p>External content blocked due to cookie preferences.</p>
-    <a href="/consent" class="btn" data-consent-preferences>Manage Preferences</a>
+    <a href="/server/privacy#cookie-preferences" data-action="cookie-preferences">Manage Preferences</a>
   </div>
 {% else %}
   <!-- Actual embed -->
@@ -30217,10 +30208,15 @@ pub fn tracking_script(headers: &HeaderMap, cfg: &Config) -> askama::MarkupDispl
     <p>We do not use analytics tracking on this site.</p>
     {% endif %}
 
-    <div class="manage-cookies">
-      <!-- No-JS baseline: navigates to the server-rendered /consent page;
-           app.js upgrades it to open the preferences <dialog> in place -->
-      <a href="/consent" class="btn" data-consent-preferences>Manage Cookie Preferences</a>
+    <!-- Granular preferences rendered inline - plain POST form, works without JS -->
+    <div class="manage-cookies" id="cookie-preferences">
+      <form method="post" action="/server/consent">
+        <input type="hidden" name="choice" value="save">
+        <label><input type="checkbox" checked disabled> Essential cookies (always on)</label>
+        <label><input type="checkbox" name="preferences" {% if consent.preferences %}checked{% endif %}> Preference cookies</label>
+        <label><input type="checkbox" name="analytics" {% if consent.analytics %}checked{% endif %}> Analytics cookies</label>
+        <button type="submit">Save Cookie Preferences</button>
+      </form>
     </div>
   </section>
 
@@ -30313,7 +30309,7 @@ pub fn tracking_script(headers: &HeaderMap, cfg: &Config) -> askama::MarkupDispl
       <li><strong>Deletion:</strong> Delete your account and all associated data permanently.</li>
       {% endif %}
       <li><strong>Correction:</strong> Update or correct your personal information anytime.</li>
-      <li><strong>Cookie Control:</strong> <a href="/consent" data-consent-preferences>Manage your cookie preferences</a></li>
+      <li><strong>Cookie Control:</strong> <a href="/server/privacy#cookie-preferences">Manage your cookie preferences</a></li>
     </ul>
   </section>
 
@@ -30339,13 +30335,13 @@ pub fn tracking_script(headers: &HeaderMap, cfg: &Config) -> askama::MarkupDispl
         <span class="status-icon">✓</span>
         <span>You have opted out of data sales.</span>
       </div>
-      <form method="post" action="/consent/ccpa">
-        <input type="hidden" name="opt_out" value="false">
+      <form method="post" action="/server/ccpa">
+        <input type="hidden" name="choice" value="opt-in">
         <button type="submit" class="btn-secondary">Opt Back In</button>
       </form>
       {% else %}
-      <form method="post" action="/consent/ccpa">
-        <input type="hidden" name="opt_out" value="true">
+      <form method="post" action="/server/ccpa">
+        <input type="hidden" name="choice" value="opt-out">
         <button type="submit" class="btn-primary btn-ccpa-opt-out">Do Not Sell My Personal Information</button>
       </form>
       {% endif %}
@@ -30591,15 +30587,15 @@ curl -H "Accept: application/xml" https://jokes.example.com/api/v1/joke</code></
 
 **Tor Access section (only shown if Tor is enabled, running, and an onion address is published):**
 ```html
-{% if tor_enabled && tor_running && !tor_address.is_empty() %}
+{% if tor_enabled && tor_running && !onion_address.is_empty() %}
 <section id="tor-access" class="tor-access">
   <h3>Tor Access</h3>
   <p>This application is available as a Tor hidden service for enhanced privacy.</p>
 
   <h4>Onion Address</h4>
   <div class="code-block">
-    <code class="code-content">{{ tor_address }}</code>
-    <button type="button" class="copy-btn" data-copy="{{ tor_address }}" aria-label="Copy to clipboard">
+    <code class="code-content">{{ onion_address }}</code>
+    <button type="button" class="copy-btn" data-copy="{{ onion_address }}" aria-label="Copy to clipboard">
       <span class="copy-icon">📋</span>
       <span class="copy-text" aria-live="polite">Copy</span>
     </button>
@@ -32792,12 +32788,13 @@ The admin panel MUST include a scheduler section with:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/{api_version}/server/{admin_path}/config/admins` | GET | Admin overview: total count + own account only (Admin Privacy — other admin details are never returned) |
-| `/api/{api_version}/server/{admin_path}/config/admins/{id}` | GET | Get admin details (self only; other admin IDs return 404) |
-| `/api/{api_version}/server/{admin_path}/config/admins/{id}` | DELETE | Delete admin (non-primary; caller must already know the ID) |
-| `/api/{api_version}/server/{admin_path}/config/admins/{id}/disable` | POST | Disable admin |
-| `/api/{api_version}/server/{admin_path}/config/admins/{id}/enable` | POST | Enable admin |
+| `/api/{api_version}/server/{admin_path}/config/admins/count` | GET | Total admin count (number only — no listing; see Server Admin Privacy) |
+| `/api/{api_version}/server/{admin_path}/config/admins/{username}` | DELETE | Delete admin by username (must know it; non-primary only) |
+| `/api/{api_version}/server/{admin_path}/config/admins/{username}/disable` | POST | Disable admin by username (must know it) |
+| `/api/{api_version}/server/{admin_path}/config/admins/{username}/enable` | POST | Enable admin by username (must know it) |
 | `/api/{api_version}/server/{admin_path}/config/admins/invite` | POST | Generate admin invite link |
+
+**No list or per-admin GET endpoints exist — Server Admin Privacy forbids enumerating or viewing other admin accounts.**
 
 ### Admin - Profile (`/api/{api_version}/server/{admin_path}/{admin_username}/profile/`)
 
@@ -35072,7 +35069,9 @@ Task activity is logged to log files only — the scheduler NEVER prints to the 
 │  [View Full History]  [Download Backup]  [Restore...]                      │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
-```**Task List Columns:**
+```
+
+**Task List Columns:**
 
 | Column | Description |
 |--------|-------------|
@@ -35339,6 +35338,14 @@ it in a compliance-sensitive form.
 - All alias routes invoke the SAME handler — never redirect (redirects break scrapers), same rule as the healthz root alias.
 - The correct product spelling is **Grafana** — endpoint and config key are `grafana`.
 
+## Service Semantics
+
+| Service | Content-Type | Body |
+|---------|--------------|------|
+| `prometheus` | `text/plain; version=0.0.4` | Full Prometheus text exposition — all required + project metrics |
+| `grafana` | `application/json` | A complete, importable Grafana dashboard definition (schema-current JSON) with panels covering every metric category this specification requires (HTTP, database, cache, scheduler, system, business); datasource left as a template variable so it imports against any Prometheus datasource |
+| `loki` | `application/json` | Recent structured log entries in Loki push-API stream format: `{"streams":[{"stream":{labels},"values":[["<ns-timestamp>","<line>"],...]}]}` — bounded by `loki.max_entries`/`loki.max_age`, same sanitization as log files (credentials ALWAYS redacted) |
+
 ## Access Control
 
 **`/server/metrics` is INTERNAL ONLY. See TERMINOLOGY > Monitoring Endpoints for /server/healthz vs /server/metrics distinction.**
@@ -35350,7 +35357,7 @@ it in a compliance-sensitive form.
 | **Kubernetes** | NetworkPolicy | Restrict to monitoring namespace |
 | **Cloud** | Security groups | Allow only from Prometheus IP |
 
-### Authentication
+## Authentication
 
 **Every metrics route requires a bearer token. There is no unauthenticated default.**
 
@@ -35373,10 +35380,10 @@ Authorization: Bearer <token>
 ```yaml
 scrape_configs:
   - job_name: '{project_name}'
+    # Root alias (default); use /server/metrics if root.enabled is false
+    metrics_path: /metrics
     static_configs:
       - targets: ['app.internal:8080']
-    # Root alias (server.metrics.root.enabled: true) - or use /server/metrics
-    metrics_path: /metrics
     authorization:
       # The prometheus service token from server.metrics.auth.tokens
       credentials: 'your-prometheus-token-here'
@@ -35422,14 +35429,6 @@ server:
     # Histogram buckets for request size (bytes)
     size_buckets: [100, 1000, 10000, 100000, 1000000, 10000000]
 ```
-
-## Service Semantics
-
-| Service | Content-Type | Body |
-|---------|--------------|------|
-| `prometheus` | `text/plain; version=0.0.4` | Full Prometheus text exposition — all required + project metrics |
-| `grafana` | `application/json` | A complete, importable Grafana dashboard definition (schema-current JSON) with panels covering every metric category this specification requires (HTTP, database, cache, scheduler, system, business); datasource left as a template variable so it imports against any Prometheus datasource |
-| `loki` | `application/json` | Recent structured log entries in Loki push-API stream format: `{"streams":[{"stream":{labels},"values":[["<ns-timestamp>","<line>"],...]}]}` — bounded by `loki.max_entries`/`loki.max_age`, same sanitization as log files (credentials ALWAYS redacted) |
 
 ## Metrics Categories
 
@@ -36896,14 +36895,14 @@ Content-Type: application/json
 **Warning Shown if Encryption Not Enabled:**
 
 ```
-+----------------------------------------------------------------------+
-|  WARNING  BACKUP ENCRYPTION NOT CONFIGURED                           |
-|                                                                      |
-|  Your backups are NOT encrypted. If someone gains access to your     |
-|  backup files, they can read all data including admin credentials.   |
-|                                                                      |
-|  [Set Encryption Password]  [Remind Me Later]  [Don't Show Again]   |
-+----------------------------------------------------------------------+
+┌─────────────────────────────────────────────────────────────────────┐
+│  ⚠️  BACKUP ENCRYPTION NOT CONFIGURED                               │
+│                                                                      │
+│  Your backups are NOT encrypted. If someone gains access to your    │
+│  backup files, they can read all data including admin credentials.  │
+│                                                                      │
+│  [Set Encryption Password]  [Remind Me Later]  [Don't Show Again]   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 Shown on:
@@ -36920,7 +36919,7 @@ Shown on:
 | `keep_weekly` | 0 | ≥0 | Weekly backups (Sunday) - 0 = disabled |
 | `keep_monthly` | 0 | ≥0 | Monthly backups (1st) - 0 = disabled |
 | `keep_yearly` | 0 | ≥0 | Yearly backups (Jan 1st) - 0 = disabled |
-| `max_total_size` | `"10%"` | `N%`, `NG`, `0` | Max total size of all backup files; `0` = disabled; overrides count limits |
+| `max_total_size` | `"10%"` | % or bytes | Hard size cap (e.g. `"10%"`, `"50G"`); `0` = disabled; overrides count limits |
 
 **Falsey Values (all disabled):** `0`, `false`, `no`, `none`, `disable`, `disabled`, `off`
 
@@ -36938,19 +36937,9 @@ server:
       keep_monthly: 0
       # 0-10: January 1st (0 = disabled)
       keep_yearly: 0
-      # Percent of backup volume (e.g., 10%) or absolute (e.g., 50G); 0 = disabled
+      # Hard size cap: percent of backup volume or absolute size; 0 = disabled
       max_total_size: "10%"
 ```
-
-Retention and disk-pressure cleanup scan the backup directory resolved and cached at startup step 7 — the same directory backups are written to. Never re-resolve the path at cleanup time.
-
-The retention algorithm matches EVERY file the app creates in the backup dir:
-- `{project_name}_backup_YYYY-MM-DD.tar.gz[.enc]` — daily full backup
-- `{project_name}_backup_YYYY-MM-DD_HHMMSS.tar.gz[.enc]` — manual/timestamped backup
-- `{project_name}-daily.tar.gz[.enc]` — daily incremental
-- `{project_name}-hourly.tar.gz[.enc]` — hourly incremental
-
-Timestamped manual backups (`{project_name}_backup_YYYY-MM-DD_HHMMSS`) count toward `max_backups` alongside daily fulls, sorted by date, oldest deleted first. Any file matching the `{project_name}_backup_*` or `{project_name}-*.tar.gz*` prefix that is not otherwise classified is treated as a daily backup for retention purposes — nothing in the backup dir matching the app's naming is ever exempt from pruning.
 
 **Default: 2 files total** (yesterday's full + today's incremental)
 
@@ -36961,17 +36950,18 @@ Timestamped manual backups (`{project_name}_backup_YYYY-MM-DD_HHMMSS`) count tow
 **Backup Creation Flow (backup_daily task at 02:00):**
 
 ```
-0. Run full retention sweep on the backup dir (resolved and cached at startup step 7)
-1. Check free space: if free space < 2x the most recent backup size, or disk usage > disk_threshold,
-   log backup.skipped_disk_full (level=error) and abort — do NOT create the backup
-2. Create full backup: {project_name}_backup_YYYY-MM-DD.tar.gz[.enc]
-3. Verify full backup (all checks must pass)
-4. Create daily incremental: {project_name}-daily.tar.gz[.enc]
-5. Verify daily incremental (all checks must pass)
-6. If ALL verifications pass:
+1. Run retention sweep on backup dir (resolved and cached at startup step 7)
+2. Check free space: if free < 2× size of most recent backup, OR disk usage
+   > disk_threshold (default 90%), log backup.skipped_disk_full (level=error)
+   and abort — do NOT create the backup
+3. Create full backup: {project_name}_backup_YYYY-MM-DD.tar.gz[.enc]
+4. Verify full backup (all checks must pass)
+5. Create daily incremental: {project_name}-daily.tar.gz[.enc]
+6. Verify daily incremental (all checks must pass)
+7. If ALL verifications pass:
    - Apply retention policy (delete old backups per retention settings)
    - If total backup size exceeds max_total_size: delete oldest first until under the cap
-7. If ANY verification fails:
+8. If ANY verification fails:
    - Delete failed backup file
    - Keep existing valid backups
    - Alert admin
@@ -37027,11 +37017,14 @@ Every backup is verified **immediately after creation** - backups must be 100% w
 
 | Event | Description | Logged Data |
 |-------|-------------|-------------|
-| `backup.created` | Backup created and verified | Filename, size, encrypted, verification status |
+| `backup.created` | Backup created and verified | Filename, size, encrypted, verification status, created by |
+| `backup.restored` | Backup restored | Filename, restored by |
+| `backup.deleted` | Backup deleted | Filename, deleted by |
+| `backup.failed` | Backup failed | Error message |
 | `backup.retention_cleanup` | Old backups deleted | Deleted files, reason, remaining count |
-| `backup.skipped_disk_full` | Backup skipped due to insufficient disk space | Free space, disk usage %, threshold |
 | `backup.verification_failed` | Backup verification failed | Filename, check that failed |
 | `backup.daily_updated` | Daily incremental updated | Filename, changes since last |
+| `backup.skipped_disk_full` | Backup skipped — insufficient free space or disk above threshold | Free space, disk usage %, threshold |
 
 ### Backup Files Created (Single Task at 02:00)
 
@@ -37073,16 +37066,16 @@ WARN: keep_monthly: 24 exceeds recommended 12 (2 years of monthly backups)
 
 **WebUI Confirmation for High Values:**
 ```
-+----------------------------------------------------------+
-|  WARNING  Confirm Backup Retention                       |
-+----------------------------------------------------------+
-|  max_backups: 30 will retain 30 days of daily backups.  |
-|  Recommended: 7 or less.                                |
-|                                                         |
-|  Estimated storage: ~15 gigabytes (based on backups)    |
-|                                                         |
-|              [Cancel]  [Save Anyway]                    |
-+----------------------------------------------------------+
+┌─────────────────────────────────────────────────────────┐
+│  ⚠️ Confirm Backup Retention                            │
+├─────────────────────────────────────────────────────────┤
+│  max_backups: 30 will retain 30 days of daily backups.  │
+│  Recommended: 7 or less.                                │
+│                                                         │
+│  Estimated storage: ~15 gigabytes (based on backups)    │
+│                                                         │
+│              [Cancel]  [Save Anyway]                    │
+└─────────────────────────────────────────────────────────┘
 ```
 
 **Retention Priority Order:**
@@ -37096,8 +37089,8 @@ WARN: keep_monthly: 24 exceeds recommended 12 (2 years of monthly backups)
 **Example: Default settings (max=1, weekly=0, monthly=0, yearly=0)**
 ```
 Backups on disk:
-  myapp_backup_2025-01-15.tar.gz.enc    <- Yesterday (full)
-  myapp-daily.tar.gz.enc                 <- Today (incremental)
+  myapp_backup_2025-01-15.tar.gz.enc    ← Yesterday (full)
+  myapp-daily.tar.gz.enc                 ← Today (incremental)
 
 Total: 2 files
 ```
@@ -37112,10 +37105,10 @@ retention:
 ```
 ```
 Backups on disk (January 15, 2025):
-  myapp_backup_2025-01-15.tar.gz.enc    <- Yesterday (daily)
-  myapp_backup_2025-01-12.tar.gz.enc    <- Last Sunday (weekly)
-  myapp_backup_2025-01-01.tar.gz.enc    <- 1st of Jan 2025 (yearly - outranks monthly, counted once)
-  myapp-daily.tar.gz.enc                 <- Incremental
+  myapp_backup_2025-01-15.tar.gz.enc    ← Yesterday (daily)
+  myapp_backup_2025-01-12.tar.gz.enc    ← Last Sunday (weekly)
+  myapp_backup_2025-01-01.tar.gz.enc    ← 1st of Jan 2025 (monthly + yearly)
+  myapp-daily.tar.gz.enc                 ← Incremental
 
 Total: 4 files
 ```
@@ -37130,34 +37123,51 @@ retention:
 ```
 ```
 Backups on disk (January 15, 2026):
-  myapp_backup_2026-01-15.tar.gz.enc    <- Yesterday (daily)
-  myapp_backup_2026-01-12.tar.gz.enc    <- Last Sunday (weekly)
-  myapp_backup_2026-01-01.tar.gz.enc    <- 1st of Jan 2026 (monthly + yearly)
-  myapp_backup_2025-12-01.tar.gz.enc    <- 1st of Dec 2025 (monthly, kept until Feb)
-  myapp_backup_2025-01-01.tar.gz.enc    <- 1st of Jan 2025 (yearly)
-  myapp-daily.tar.gz.enc                 <- Incremental
+  myapp_backup_2026-01-15.tar.gz.enc    ← Yesterday (daily)
+  myapp_backup_2026-01-12.tar.gz.enc    ← Last Sunday (weekly)
+  myapp_backup_2026-01-01.tar.gz.enc    ← 1st of Jan 2026 (monthly + yearly)
+  myapp_backup_2025-12-01.tar.gz.enc    ← 1st of Dec 2025 (monthly, kept until Feb)
+  myapp_backup_2025-01-01.tar.gz.enc    ← 1st of Jan 2025 (yearly)
+  myapp-daily.tar.gz.enc                 ← Incremental
 
 Total: 6 files (1 daily + 1 weekly + 2 monthly + 1 yearly + incremental)
 ```
 
-**Backup Cleanup Logic (runs after successful backup and at startup):**
+**Backup Cleanup Logic (runs at startup and after every backup):**
 
-Operates on the backup directory resolved and cached at startup step 7 — never re-resolves the path.
-Matches all files the app creates: `{project_name}_backup_*` (daily full and manual/timestamped) and
-`{project_name}-*.tar.gz*` (incremental). Timestamped manual backups count toward `max_backups`.
+Retention and disk-pressure cleanup scan the backup directory resolved and
+cached at startup step 7 — the same directory backups are written to.
+Never re-resolve the path at cleanup time.
+
+The algorithm matches EVERY backup file the app creates:
+- `{project_name}_backup_YYYY-MM-DD.tar.gz[.enc]` — daily full
+- `{project_name}_backup_YYYY-MM-DD_HHMMSS.tar.gz[.enc]` — manual/timestamped
+- `{project_name}-daily.tar.gz[.enc]` — daily incremental
+- `{project_name}-hourly.tar.gz[.enc]` — hourly incremental
+
+Timestamped manual backups count toward `max_backups` alongside daily fulls
+(sorted by date, oldest deleted first). Any file matching the
+`{project_name}_backup_*` or `{project_name}-*.tar.gz*` prefix that is not
+otherwise classified is treated as a daily backup for retention purposes —
+nothing in the backup dir matching the app's naming is ever exempt from pruning.
 
 ```
-1. Scan the cached backup dir for all matching files (see pattern list above)
+1. Collect all backup files in the cached backup dir matching the app's
+   naming patterns above; sort by date (oldest first)
 2. Mark all backups from January 1st as "yearly" (keep up to keep_yearly)
 3. Mark all backups from 1st of month as "monthly" (keep up to keep_monthly)
 4. Mark all backups from Sunday as "weekly" (keep up to keep_weekly)
-5. Mark remaining {project_name}_backup_* files as "daily" (keep up to max_backups, oldest deleted first)
+5. Mark remaining backups (daily full + manual/timestamped) as "daily"
+   (keep up to max_backups, oldest deleted first)
 6. Delete unmarked backups, oldest first
-7. If total backup size exceeds max_total_size: delete oldest first until under the cap (overrides all other limits)
-8. Daily incremental is always replaced (only 1 exists)
+7. Daily incremental ({project_name}-daily.tar.gz[.enc]) is always replaced
+   (only 1 exists); hourly incremental likewise
+8. If max_total_size > 0: after all count-based pruning, if total size of
+   all backup files still exceeds the cap, delete oldest files first until
+   total is under the cap (size cap overrides all count limits)
 
 Note: A single backup can satisfy multiple retention types (e.g., Jan 1st 2025
-on a Sunday counts as daily + weekly + monthly + yearly - uses highest priority)
+on a Sunday counts as daily + weekly + monthly + yearly — uses highest priority)
 ```
 
 **Daily incremental is NOT counted** in retention - it's always exactly 1 file that gets replaced.
@@ -37177,17 +37187,17 @@ on a Sunday counts as daily + weekly + monthly + yearly - uses highest priority)
 
 **Cluster Backup Verification:**
 ```
-+------------------------------------------------------------------+
-|  CLUSTER BACKUP STATUS                                           |
-+------------------------------------------------------------------+
-|  Node              Last Backup      Status    Backups  Daily    |
-|  ----------------------------------------------------------------|
-|  node1.example.com 2025-01-15 02:05 Valid     4/4      yes      |
-|  node2.example.com 2025-01-15 02:10 Valid     4/4      yes      |
-|  node3.example.com 2025-01-15 02:15 Valid     4/4      yes      |
-|                                                                  |
-|  [Backup All Now]  [Verify All]  [Download from Node...]        |
-+------------------------------------------------------------------+
+┌─────────────────────────────────────────────────────────────────┐
+│  CLUSTER BACKUP STATUS                                          │
+├─────────────────────────────────────────────────────────────────┤
+│  Node              Last Backup      Status    Backups  Daily   │
+│  ─────────────────────────────────────────────────────────────  │
+│  node1.example.com 2025-01-15 02:05 ✓ Valid   4/4      ✓       │
+│  node2.example.com 2025-01-15 02:10 ✓ Valid   4/4      ✓       │
+│  node3.example.com 2025-01-15 02:15 ✓ Valid   4/4      ✓       │
+│                                                                 │
+│  [Backup All Now]  [Verify All]  [Download from Node...]       │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 **Cluster Backup Alerts:**
@@ -43574,7 +43584,7 @@ jobs:
           tag_name: ${{ needs.version.outputs.tag }}
           files: binaries/*
           prerelease: true
-
+```
 
 ## Daily Workflow (Gitea/Forgejo Actions)
 
@@ -44930,7 +44940,9 @@ Create in GitLab Project → Build → Pipeline schedules:
 | Target Branch | `main` or `master` |
 | Activated | Yes |
 
-**Second schedule (Devel Image):**
+## GitLab Scheduled Pipelines (for Devel Builds)
+
+Create a second pipeline schedule so `docker:build-devel` also runs daily, independent of pushes:
 
 | Field | Value |
 |-------|-------|
@@ -44985,6 +44997,7 @@ Jenkins provides equivalent functionality to GitHub Actions, Gitea Actions, and 
 | Main/master | `when { anyOf { branch 'main'; branch 'master' } }` | `daily.yml` |
 | Scheduled | `triggers { cron('0 3 * * *') }` | `daily.yml` schedule |
 | All branches | Default (no `when`) | `docker.yml` |
+| Devel image | `triggers { cron('0 4 * * *') }` + `when { not { buildingTag() } }` | `docker.yml` `build-devel` job |
 
 ## Jenkinsfile
 
@@ -51850,10 +51863,11 @@ async fn read_onion_hostname(hs_dir: &Path) -> Result<String, AppError> {
 
 ### Tor Configuration Optimizations
 
-**Hidden Service → Tor Backend Port Mapping:**
-- **Declared in torrc** via `HiddenServiceDir` + `HiddenServicePort` - NOT the `ADD_ONION` control command
-- Hidden service forwards `.onion:{virtual_port}` → `127.0.0.1:{tor_backend_port}` (dedicated PROXY-protocol Tor backend listener)
-- Tor connects to a dedicated loopback listener the app binds for Tor - separate from the clearnet listener
+**Hidden Service → Backend Port Mapping:**
+- **Uses torrc `HiddenServiceDir` + `HiddenServicePort` (v3)** - not ADD_ONION
+- Hidden service forwards `.onion:{virtual_port}` → `127.0.0.1:{tor_backend_port}` (dedicated PROXY-protocol listener)
+- Port mapping declared in torrc: `HiddenServicePort {virtual_port} 127.0.0.1:{tor_backend_port}`
+- Tor connects to a dedicated loopback listener wrapped with the `proxy-protocol` crate - separate from the clearnet port
 
 ```rust
 /// Generates torrc content from `TorConfig` settings, including the v3 hidden
@@ -51922,17 +51936,8 @@ pub fn get_tor_config(cfg: &TorConfig, data_dir: &Path, tor_backend_port: u16, v
 # NEVER uses default port 9051 - uses runtime localhost port on all OSes
 {control_config}
 
-# Hidden service (v3) - forwards .onion:{virtual_port} → dedicated PROXY-protocol backend listener
-HiddenServiceDir {hs_dir}
-HiddenServicePort {virtual_port} 127.0.0.1:{tor_backend_port}
-HiddenServiceVersion 3
-# Export per-rendezvous-circuit ID via HAProxy PROXY protocol (opaque token, not an IP)
-HiddenServiceExportCircuitID haproxy
-
 # Security Hardening
 SafeLogging {safe_logging}
-# Guard-discovery-attack defense (vanguards-lite) - built into Tor >= 0.4.7; keep enabled, never disable
-VanguardsLiteEnabled 1
 
 # Circuit limits
 MaxCircuitDirtiness 600
@@ -51948,7 +51953,10 @@ ExitPolicy reject *:*
 ORPort 0
 DirPort 0
 
-# Hidden service optimizations (HS declared above via HiddenServiceDir)
+# Guard-discovery-attack defense (vanguards-lite) - built into Tor >= 0.4.7; keep enabled, never disable
+VanguardsLiteEnabled 1
+
+# Hidden service optimizations
 HiddenServiceSingleHopMode 0
 
 # Faster startup
@@ -51957,6 +51965,15 @@ FetchDirInfoExtraEarly 1
 
 # Reduce memory usage
 DisableDebuggerAttachment 1
+
+# ============================================================
+# Hidden Service (v3) - Tor generates and persists the key + hostname here
+# ============================================================
+HiddenServiceDir {hs_dir}
+HiddenServiceVersion 3
+HiddenServicePort {virtual_port} 127.0.0.1:{tor_backend_port}
+# Export per-rendezvous-circuit ID via HAProxy PROXY protocol (opaque token, not an IP)
+HiddenServiceExportCircuitID haproxy
 "#,
         socks_config = socks_config,
         control_config = control_config,
@@ -51990,19 +52007,19 @@ DisableDebuggerAttachment 1
 - `ControlPort 127.0.0.1:auto` → Tor picks available high port on localhost
 - `ControlPortWriteToFile {data_dir}/tor/control_port` → Tor writes the chosen control address; server reads this file before connecting
 
-**Hidden Service Settings (declared in torrc):**
+**Hidden Service Settings (via torrc `HiddenServiceDir`, not ADD_ONION):**
 
 The hidden service is declared in the generated torrc; Tor creates and persists everything under `HiddenServiceDir`:
 
-| Setting | How Applied | Description |
-|---------|-------------|-------------|
+| Setting | torrc directive | Description |
+|---------|-----------------|-------------|
 | Version 3 | `HiddenServiceVersion 3` | v3 onion (56 chars, ed25519) |
-| Target port | `HiddenServicePort {virtual_port} 127.0.0.1:{port}` | Forwards to the dedicated Tor backend listener |
+| Target port | `HiddenServicePort {virtual_port} 127.0.0.1:{tor_backend_port}` | Forwards to dedicated PROXY-protocol listener |
 | Virtual port | First value of `HiddenServicePort` (e.g., `80`) | `.onion` port users connect to |
+| Circuit ID export | `HiddenServiceExportCircuitID haproxy` | Per-rendezvous-circuit ID via PROXY protocol (opaque token, not an IP) |
+| Guard defense | `VanguardsLiteEnabled 1` | Guard-discovery-attack defense (built into Tor; keep enabled) |
 | Key persistence | `{data_dir}/tor/site/hs_ed25519_secret_key` | Tor creates/loads key for persistent address |
 | Hostname | `{data_dir}/tor/site/hostname` | Tor writes the .onion address; server reads it |
-| Circuit-ID export | `HiddenServiceExportCircuitID haproxy` | Per-rendezvous-circuit ID via PROXY protocol (opaque token, not an IP) |
-| Guard-discovery defense | `VanguardsLiteEnabled 1` | vanguards-lite (built into Tor); never disabled |
 
 ### Circuit-ID Export & PROXY-Protocol Backend Listener
 
@@ -52010,7 +52027,7 @@ The hidden service is declared in the generated torrc; Tor creates and persists 
 
 Because the PROXY header is sent on every connection, the `HiddenServicePort` target MUST be a **dedicated loopback listener** the app binds specifically for Tor (`127.0.0.1:{tor_backend_port}`), **separate from the public clearnet listener** — clearnet connections carry no PROXY header and would fail to parse against a listener that requires one. The app:
 
-- binds the dedicated Tor backend listener and parses the PROXY-protocol header on its accept path (Rust: the `proxy-protocol` or `ppp` crate),
+- binds the dedicated Tor backend listener and parses the PROXY-protocol header on its accept path (Rust: the `proxy-protocol` crate),
 - reads the circuit ID from that header and uses it as the `tor:{circuit_id}` key for logs, audit trails, admin UI, and rate limiting,
 - points `HiddenServicePort {virtual_port} 127.0.0.1:{tor_backend_port}` at this listener (not the clearnet HTTP port).
 
@@ -59964,39 +59981,25 @@ server:
             admin: ["admins", "administrators", "app-admins", "app-administrators", "platform-admins"]
             moderator: ["moderators", "support", "support-staff", "helpdesk", "reviewers"]
             user: ["users", "user", "members", "member", "employees", "staff", "developers", "engineering"]
-          # PKCE (RFC 7636). auto = use S256 when the discovery document advertises
-          # it, fall back to plain only if the provider requires it. Public clients
-          # MUST use PKCE; confidential clients SHOULD.
-          # Values: auto | s256 | disabled
-          pkce: auto
-          # CSRF/replay protections for the authorization-code flow. Both are ON and
-          # non-optional in practice; exposed here only so operators can see them.
-          # Opaque state param bound to the browser session
-          require_state: true
-          # Nonce claim validated against the ID token
-          require_nonce: true
-          # Allowed clock skew (seconds) when validating iat/exp/nbf on the ID token.
-          max_clock_skew: 60
-          # Discovery document (.well-known/openid-configuration) + JWKS caching.
-          discovery:
-            # Refresh cadence for the cached discovery doc and JWKS. Signing-key
-            # rollover is picked up on refresh or on first unknown `kid`.
-            refresh_interval: 12h
-            # Serve from the last good cache if the provider is unreachable on refresh.
-            cache_on_failure: true
-          # Refresh-token handling (only when the provider issues one and offline_access
-          # is granted). Used to keep long-lived sessions without re-prompting.
-          token_refresh:
-            enabled: true
-            # Refresh this long before access-token expiry.
-            leeway: 60s
-          # RP-initiated logout (OIDC front-channel). When the provider publishes an
-          # end_session_endpoint, local logout also redirects there to end the IdP
-          # session. See § OIDC Session Termination below.
+          # PKCE is REQUIRED for the Authorization Code flow (S256 challenge)
+          pkce: true
+          # CSRF/replay protection — state and nonce are REQUIRED per request
+          use_state: true
+          use_nonce: true
+          # Discovery document (.well-known/openid-configuration) cache lifetime
+          discovery_cache_ttl: 1h
+          # Allowed clock skew when validating id_token iat/exp/nbf
+          clock_skew: 2m
+          # Refresh-token cadence for long-lived sessions (0 = do not refresh)
+          token_refresh_interval: 15m
+          # RP-initiated logout: also end the IdP session on local logout when
+          # the provider advertises end_session_endpoint in discovery
           rp_initiated_logout: true
-          # Back-channel logout (OIDC Back-Channel Logout 1.0). When enabled the app
-          # exposes a logout token receiver and revokes the matching local session.
+          # Back-channel logout receiver (OIDC Back-Channel Logout 1.0).
+          # Omitted by default; enable only if the IdP is configured to call it
           backchannel_logout: false
+          # Invalidate all active sessions for this provider when it is removed
+          revoke_sessions_on_delete: true
 
     ldap:
       enabled: false
@@ -60047,43 +60050,32 @@ server:
               - "cn=staff,ou=groups,dc=example,dc=com"
               - "cn=developers,ou=groups,dc=example,dc=com"
               - "cn=engineering,ou=groups,dc=example,dc=com"
-          # Transport security. Plaintext ld:// with no TLS is REJECTED unless
-          # allow_insecure is explicitly set (dev only). Prefer ldaps:// or
-          # StartTLS on the standard 389 port.
-          tls:
-            # required | starttls | ldaps | disabled
-            mode: starttls
-            # Verify the directory server certificate against the system/CA bundle.
-            verify_cert: true
-            # Optional custom CA bundle path for private PKI.
-            ca_file: ""
-            # Escape hatch for lab/dev only; never in production.
-            allow_insecure: false
-          # Connection pooling + failover. `server` may be a single URL or a list;
-          # the pool round-robins and fails over on connection error.
-          servers:
-            - "ldaps://ldap1.example.com:636"
-            - "ldaps://ldap2.example.com:636"
+          # Transport security: ldaps | starttls | none
+          # Plaintext ldap:// with tls_mode none is BLOCKED unless the host
+          # resolves to localhost/127.0.0.1 for local testing
+          tls_mode: starttls
+          # Verify the directory server certificate (never disable in prod)
+          tls_verify: true
+          # Connection, bind, and search timeouts
+          connect_timeout: 5s
+          request_timeout: 10s
+          # Connection pool for the service (bind) account
           pool:
-            max_connections: 8
-            # Idle connections are health-checked before reuse.
-            idle_timeout: 60s
-          # Chase referrals returned by the directory (AD often returns these).
+            max_conns: 10
+            max_idle: 5
+            # Reconnect and retry the next server on connection failure
+            reconnect: true
+          # Optional failover directory servers (tried in order)
+          failover_servers:
+            - "ldap://ldap2.example.com:389"
+          # Chase LDAP referrals returned by the directory
           follow_referrals: false
-          # Paged search (RFC 2696) for large directories / group enumeration.
+          # Paged search for large group/member result sets (RFC 2696)
           page_size: 500
-          # Per-operation timeouts.
-          timeouts:
-            connect: 5s
-            bind: 5s
-            search: 10s
-          # Bind-failure throttling to blunt password spraying. Counts failed
-          # end-user binds per identity; independent of local-account lockout.
-          bind_lockout:
-            enabled: true
-            max_failures: 5
-            window: 15m
-            backoff: 30s
+          # Resolve nested group membership (AD LDAP_MATCHING_RULE_IN_CHAIN)
+          nested_groups: false
+          # Bind-failure backoff/lockout window for the service account
+          bind_failure_backoff: 30s
 
     # SAML 2.0 Service Provider. Requires a SAML-enabled build (Cargo `saml`
     # feature → the `saml` crate, danielkov/saml; see PART 3 § SAML crate
@@ -60092,77 +60084,63 @@ server:
     # MUST fail fast at startup with a clear message rather than silently ignore it.
     saml:
       enabled: false
-      # Service Provider signing/encryption keypair. Default is zero-config:
-      # the server auto-generates a self-signed keypair on first enable, persists
-      # it (encrypted at rest, same store as 2FA secrets), and publishes the public
-      # cert in SP metadata. Admins may instead supply their own PEM cert/key.
-      sp_certificate:
-        # auto (self-signed, generated + persisted) | provided
-        mode: auto
-        # Used only when mode: provided.
-        cert_file: ""
-        key_file: ""
-        # For mode: auto — validity of the generated self-signed cert; the server
-        # rotates before expiry and re-publishes metadata.
-        self_signed_days: 3650
       providers:
         - name: okta
           display_name: "Login with Okta"
-          # IdP metadata: supply a URL (fetched + cached) OR an inline/xml file.
-          # entity_id, SSO/SLO endpoints, and signing certs are read from it.
+          # IdP metadata: fetch by URL (preferred) OR paste inline XML
           idp_metadata_url: "https://example.okta.com/app/abc123/sso/saml/metadata"
-          idp_metadata_file: ""
-          # How often to refetch idp_metadata_url (cert rollover pickup).
-          metadata_refresh_interval: 12h
-          # This SP's entity ID. Default derives from the public base URL:
-          # {public_url}/server/auth/saml/{provider}/metadata
-          sp_entity_id: ""
-          # NameID format requested in the AuthnRequest.
-          name_id_format: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
-          # Require the IdP to sign assertions/responses (STRONGLY recommended).
+          # idp_metadata_xml: |
+          #   <EntityDescriptor ...>...</EntityDescriptor>
+          # SP identity advertised to the IdP (defaults to FQDN-derived value)
+          sp_entity_id: "https://app.example.com/server/auth/saml/okta/metadata"
+          # Assertion Consumer Service URL (where the IdP POSTs the assertion)
+          acs_url: "https://app.example.com/server/auth/saml/okta/acs"
+          # Require the IdP to sign assertions/responses (STRONGLY recommended)
           want_assertions_signed: true
-          # Request encrypted assertions (IdP must support; needs SP enc key).
-          want_assertions_encrypted: false
-          # Sign our AuthnRequest / LogoutRequest with the SP key.
+          # Sign our AuthnRequest / LogoutRequest with the SP key
           sign_requests: true
-          # Clock skew tolerance (seconds) for assertion NotBefore/NotOnOrAfter.
-          max_clock_skew: 60
-          # Auto-create regular user on first login (ONLY if multi-user is enabled).
+          # Allowed clock skew when validating assertion NotBefore/NotOnOrAfter
+          clock_skew: 2m
+          # Auto-create regular user on first login (ONLY if multi-user enabled)
           auto_register: true
-          # Map SAML assertion attributes to user fields. Values are attribute
-          # Names (or FriendlyNames) as issued by the IdP.
-          attributes:
-            # uid
+          # Map SAML assertion attributes to user fields
+          attribute_mapping:
             username: "urn:oid:0.9.2342.19200300.100.1.1"
-            # mail
             email: "urn:oid:0.9.2342.19200300.100.1.3"
-            # displayName
             name: "urn:oid:2.16.840.1.113730.3.1.241"
-            # Attribute whose values carry group/role membership.
-            groups: "http://schemas.xmlsoap.org/claims/Group"
+            # Attribute carrying group memberships
+            groups: "groups"
           username_resolution:
             # prompt_on_first_login | prompt_if_conflict | reject_if_conflict
             mode: prompt_on_first_login
             allow_custom_on_first_login: true
-          # Assertion attribute values that grant the Server Admin role.
+          # Map SAML group assertions to Server Admin role
           admin_groups:
             - "admins"
             - "administrators"
             - "server-admins"
             - "app-administrators"
             - "platform-admins"
-          # Map assertion attribute values to user roles (if multi-user enabled).
+          # Map SAML group assertions to user roles (if multi-user enabled)
           role_mapping:
-            admin: ["admins", "administrators", "app-admins", "platform-admins"]
-            moderator: ["moderators", "support", "support-staff", "helpdesk"]
-            user: ["users", "members", "employees", "staff", "developers"]
-          # Single Logout. Supports both SP-initiated (user logs out locally →
-          # LogoutRequest to IdP) and IdP-initiated (IdP POSTs a LogoutRequest to
-          # our SLO endpoint). Requires signed LogoutRequests when enabled.
-          slo:
-            enabled: true
-            # redirect | post — binding used for SP-initiated LogoutRequest.
-            binding: redirect
+            admin: ["admins", "administrators", "app-admins", "app-administrators", "platform-admins"]
+            moderator: ["moderators", "support", "support-staff", "helpdesk", "reviewers"]
+            user: ["users", "user", "members", "member", "employees", "staff", "developers", "engineering"]
+          # Requested NameID format returned in the assertion Subject
+          nameid_format: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
+          # SP signing/encryption keypair. Leave sp_cert_path/sp_key_path empty
+          # to auto-generate a self-signed keypair on provider creation
+          # (zero-config default); set both to supply your own certificate
+          auto_generate_cert: true
+          sp_cert_path: ""
+          sp_key_path: ""
+          # For auto_generate_cert: true — validity of the generated self-signed
+          # cert; the server rotates before expiry and re-publishes metadata.
+          # Ignored when auto_generate_cert: false (operator owns rotation).
+          cert_expiry_days: 3650
+          # Single Logout (SLO) — SP-initiated and IdP-initiated
+          slo_enabled: true
+          idp_slo_url: "https://example.okta.com/app/abc123/slo/saml"
           # Accept unsolicited (IdP-initiated) login for this provider.
           # Off by default: unsolicited assertions have no InResponseTo to
           # match against a stored AuthnRequest, which weakens CSRF
@@ -60176,6 +60154,10 @@ server:
 - regular users: created/synced via `auto_register`, `claims_mapping`, and `role_mapping`
 - server admins: granted by `admin_groups`
 
+**OIDC logout behavior:**
+- **RP-initiated logout:** when `rp_initiated_logout: true` and the provider publishes an `end_session_endpoint` in discovery, local logout ends the local session AND redirects to the IdP end-session endpoint (with `id_token_hint` + `post_logout_redirect_uri`) so the IdP session is also ended. If the provider lacks the endpoint, only the local session is ended and this is noted in the `oidc.logout` audit event.
+- **Back-channel logout:** off by default (`backchannel_logout: false`) — it requires a persisted session index keyed by `sid`/`sub` and a publicly reachable receiver endpoint, which conflicts with "first-run works with zero config." When `backchannel_logout: true`, the server exposes a logout-token receiver; a validated OIDC Back-Channel Logout token (correct `iss`/`aud`, `events` claim, and `sid`/`sub`) revokes the matching local session server-side even if the browser never returns.
+
 ### External Identity Provider Requirements
 
 - External identity support for Server Admins MUST include OIDC, LDAP, and SAML 2.0 (SAML is feature-gated at build time; see PART 3)
@@ -60185,7 +60167,7 @@ server:
 - If `server.users.enabled: false`, those same providers remain valid for Server Admin auth only
 - Provider identity is part of the stored source value: `oidc:{provider}`, `ldap:{provider}`, or `saml:{provider}`
 
-**Why regular-user OIDC/LDAP/SAML support matters:** organizations that already run OIDC, LDAP, or SAML expect the app to plug into their existing identity infrastructure instead of forcing a second local account system. When multi-user mode is enabled, the project MUST support regular-user OIDC/LDAP/SAML login so the app fits into the operator's existing SSO/directory environment.
+**Why regular-user OIDC/LDAP/SAML support matters:** organizations that already run OIDC, LDAP, or SAML expect the app to plug into their existing identity infrastructure instead of forcing a second local account system. When multi-user mode is enabled, the project MUST support regular-user external login so the app fits into the operator's existing SSO/directory environment.
 
 **Common OIDC providers to support cleanly:**
 
@@ -60205,57 +60187,71 @@ server:
 - Providers without a trustworthy username claim MUST derive an initial candidate username from email localpart or another documented stable field, then run normal collision checks
 - If a provider does not expose email, the project MUST document whether email is optional, separately collected, or that provider is unsupported
 
+**OIDC session lifecycle & logout rules:**
+- The Authorization Code flow MUST use PKCE (`S256`); the plain challenge method is NOT acceptable
+- Every authorization request MUST carry a `state` value (CSRF protection) and a `nonce` (id_token replay protection); both MUST be validated on callback
+- The discovery document (`.well-known/openid-configuration`) MUST be cached and refreshed on `discovery_cache_ttl` (default `1h`); JWKS keys are refreshed on the same schedule and on a signature-key miss
+- id_token validation MUST allow a small clock skew (`clock_skew`, default `2m`) on `iat`/`exp`/`nbf`
+- When a refresh token is issued, long-lived sessions SHOULD refresh on `token_refresh_interval` (default `15m`); a failed refresh ends the local session
+- **Local logout vs IdP logout:** with `rp_initiated_logout: true` (default) and a provider that advertises `end_session_endpoint`, local logout MUST also redirect to the IdP end-session endpoint so the IdP session is terminated; if the endpoint is absent or `rp_initiated_logout: false`, only the local session is ended and this MUST be documented to the operator
+- Back-channel logout (OIDC Back-Channel Logout 1.0) is OPTIONAL and OFF by default; when enabled the SP MUST expose a logout receiver and terminate the matching local session on a valid logout token
+- When an OIDC provider is deleted, `revoke_sessions_on_delete: true` (default) MUST invalidate all active sessions whose `source` is `oidc:{provider}`; external-only accounts can no longer authenticate, while local-fallback accounts fall back to password (the same rule applies to SAML provider deletion)
+
 ### SAML Provider Expectations & Common Providers
 
-**SAML support applies to BOTH regular users and Server Admins**, mirroring OIDC/LDAP. The difference from OIDC/LDAP is the transport (browser POST of a signed XML assertion to the ACS endpoint) and that group/role membership arrives as **assertion attribute values**, not a groups claim or `memberOf`. Role mapping is otherwise identical:
-- regular users: created/synced via `auto_register`, `attributes`, and `role_mapping`
-- server admins: granted by `admin_groups` (matched against the mapped groups attribute's values)
+**SAML 2.0 support applies to BOTH regular users and Server Admins.** The difference is role mapping:
+- regular users: created/synced via `auto_register`, `attribute_mapping`, and `role_mapping`
+- server admins: granted by `admin_groups` (matched against the mapped groups assertion)
+
+**SAML acts as a Service Provider (SP) only.** The IdP asserts identity; the app consumes assertions. It is never an Identity Provider.
 
 **Common SAML IdPs to support cleanly:**
 
-| Provider | Typical Username Attribute | Typical Email Attribute | Typical Groups / Roles Source | Notes |
-|----------|---------------------------|-------------------------|-------------------------------|-------|
-| **Okta** | `NameID` (persistent) or custom `uid` | `email` / `mail` | Custom `groups` attribute (must be added to the app's SAML settings in Okta) | Okta does not emit groups unless the app is configured to; document this |
-| **Azure AD / Entra ID** | `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name` or UPN | `.../emailaddress` | `http://schemas.microsoft.com/ws/2008/06/identity/claims/groups` (GUIDs, not names) | Groups arrive as object GUIDs by default; map GUIDs or enable group-name emission |
-| **OneLogin** | `NameID` or `User.Username` | `User.email` | `memberOf` / roles parameter | Roles configured per-app in OneLogin |
-| **ADFS** | `windowsaccountname` or UPN | `emailaddress` | `Group` / `Role` claim rules | Requires explicit claim rules on the relying party trust |
-| **Shibboleth** | `urn:oid:0.9.2342.19200300.100.1.1` (uid) | `urn:oid:0.9.2342.19200300.100.1.3` (mail) | `urn:oid:1.3.6.1.4.1.5923.1.5.1.1` (isMemberOf) | Uses OID attribute names; map explicitly |
-| **Keycloak (SAML)** | `NameID` or configured user attribute | `email` | `Role` / `Group` attribute mapper | Same realm as OIDC but a distinct SAML client |
-
-**SAML NameID format guidance:**
-
-| NameID Format | When to use |
-|---------------|-------------|
-| `...:persistent` | Preferred stable identifier; opaque, per-SP, does not change on email/name change |
-| `...:emailAddress` | When the IdP guarantees a stable email and no persistent ID is available |
-| `...:transient` | NOT usable as an identity key (changes every login); only acceptable with a stable attribute mapped to `username`/`external_id` |
-| `...:unspecified` | Treat as opaque; document the actual value the IdP sends |
+| Provider | Metadata URL Convention | Typical NameID | Typical Groups Attribute | Notes |
+|----------|-------------------------|----------------|--------------------------|-------|
+| **Okta** | `https://{org}.okta.com/app/{app_id}/sso/saml/metadata` | `emailAddress` or `persistent` | `groups` (must be added as an app attribute statement) | Groups are opt-in per app; document the filter |
+| **Azure AD / Entra ID** | `https://login.microsoftonline.com/{tenant}/federationmetadata/2007-06/federationmetadata.xml?appid={app_id}` | `persistent` (`http://schemas.microsoft.com/identity/claims/objectidentifier`) | `http://schemas.microsoft.com/ws/2008/06/identity/claims/groups` | Emits group object IDs by default, not names |
+| **OneLogin** | `https://{org}.onelogin.com/saml/metadata/{app_id}` | `emailAddress` | `groups` or `memberOf` | Role/group parameter configured per app connector |
+| **ADFS** | `https://{host}/FederationMetadata/2007-06/FederationMetadata.xml` | `persistent` or `upn` | `http://schemas.xmlsoap.org/claims/Group` | Claim rules must be authored on the ADFS side |
+| **Shibboleth** | `https://{host}/idp/shibboleth` | `persistent` (`eduPersonTargetedID`) | `eduPersonEntitlement` / `isMemberOf` | Attribute release policy must include groups |
+| **Keycloak (SAML)** | `https://{host}/realms/{realm}/protocol/saml/descriptor` | `persistent` | `groups` (Group list mapper) | SAML client mappers must be configured |
 
 **SAML provider rules:**
-- The `external_id` for a SAML account is the assertion `NameID` (or a stable mapped attribute when NameID is transient); it MUST NOT be a mutable email/displayName
-- `want_assertions_signed: true` is the secure default; the server MUST reject unsigned assertions and validate the XML-DSig signature against the IdP metadata signing cert
-- The server MUST validate `Destination`, `Audience` (SP entity ID), `InResponseTo` (against a stored AuthnRequest ID), and the `NotBefore`/`NotOnOrAfter` window (within `max_clock_skew`), and MUST reject replayed assertion IDs
-- Group/role membership comes from the attribute named by `attributes.groups`; if the IdP emits opaque GUIDs (Azure AD), the operator MUST map GUIDs or enable name emission at the IdP
+- The project MUST NOT assume every IdP emits attributes under the same names; `attribute_mapping` is REQUIRED whenever the IdP does not cleanly expose username/email/name/groups
+- The SP MUST publish metadata at `/server/auth/saml/{provider}/metadata` (public/enabled by default) so IdP admins can configure the relying party without manual field entry
+- Assertions MUST be signature-validated against the IdP signing certificate from metadata; unsigned or mis-signed assertions MUST be rejected
+- The SP MUST enforce assertion conditions: `NotBefore`/`NotOnOrAfter` (with a small clock skew, `clock_skew`), `Destination` matching the ACS URL, `AudienceRestriction` matching `sp_entity_id`, and `Recipient` matching `acs_url`
+- The SP MUST reject replayed assertions by tracking the assertion `ID`/`InResponseTo` for the assertion validity window
+- **IdP-initiated login:** the IdP POSTs an unsolicited `Response` to the ACS with no stored `InResponseTo`. This is accepted ONLY when the provider is explicitly configured to allow it (`allow_idp_initiated: true`; unsolicited assertions weaken CSRF guarantees), and is rejected by default. Signature, audience, and replay checks are unchanged.
+- If the IdP does not emit a groups attribute, group-based admin mapping is unavailable for that provider and this MUST be documented, exactly as for OIDC/LDAP
+- With a `persistent` NameID format, the NameID becomes the stable `external_id`; with a transient format the SP MUST fall back to a documented stable attribute for `external_id`; the `external_id` MUST NOT be a mutable email or display name
 - If the IdP does not emit email, the same optional/collected/unsupported documentation rule as OIDC applies
+- SP signing/encryption keys MUST be auto-generated (self-signed) on provider creation when `auto_generate_cert: true` (zero-config default), or supplied by the admin via `sp_cert_path`/`sp_key_path`; the private key MUST be stored encrypted and included in backups. See "SAML SP Certificate Management" below for rotation.
+
+### SAML SP Certificate Management
+
+- **Default (zero-config):** on first enable of a provider, the server generates a self-signed SP signing/encryption keypair (`auto_generate_cert: true`), persists the private key encrypted at rest (same store as 2FA secrets), and publishes the public cert in SP metadata. The server rotates before `cert_expiry_days` expiry and re-publishes metadata.
+- **Admin-supplied:** `auto_generate_cert: false` uses operator PEM `sp_cert_path`/`sp_key_path` (e.g. a cert already trusted by the IdP). Rotation is the operator's responsibility.
+- Because most IdPs pin the SP cert from uploaded metadata, rotating the SP cert requires re-handing metadata (or the new cert) to the IdP; the admin UI surfaces the current cert fingerprint + expiry.
 
 ### Starter Group Mapping Presets
 
-**The setup UI SHOULD offer starter presets for OIDC, LDAP, and SAML group mapping so a typical enterprise/provider setup works with minimal manual editing.** For SAML, the "Typical OIDC Group Names" column applies directly — the values are matched against the assertion attribute named by `attributes.groups` exactly as OIDC group-claim values are.
+**The setup UI SHOULD offer starter presets for OIDC, LDAP, and SAML group mapping so a typical enterprise/provider setup works with minimal manual editing.**
 
 **Security rule:** these are starter presets, not an excuse to auto-grant broad admin access blindly. Operators MUST still be able to review and trim the mapped groups before saving.
 
-| Mapping Type | Typical OIDC Group Names | Typical LDAP Group DNs / Names |
-|--------------|--------------------------|--------------------------------|
-| **Server Admin** | `admins`, `administrators`, `server-admins`, `app-administrators`, `platform-admins`, `infra-admins`, `ops-admins` | `cn=admins,...`, `cn=administrators,...`, `cn=server-admins,...`, `cn=app-administrators,...`, `cn=platform-admins,...`, `cn=infra-admins,...` |
-| **App Admin Role** | `admins`, `administrators`, `app-admins`, `app-administrators`, `platform-admins` | `cn=admins,...`, `cn=administrators,...`, `cn=app-admins,...`, `cn=app-administrators,...` |
-| **Moderator Role** | `moderators`, `support`, `support-staff`, `helpdesk`, `reviewers` | `cn=moderators,...`, `cn=support,...`, `cn=support-staff,...`, `cn=helpdesk,...`, `cn=reviewers,...` |
-| **User Role** | `users`, `user`, `members`, `member`, `employees`, `staff`, `developers`, `engineering` | `cn=users,...`, `cn=members,...`, `cn=employees,...`, `cn=staff,...`, `cn=developers,...`, `cn=engineering,...` |
+| Mapping Type | Typical OIDC Group Names | Typical LDAP Group DNs / Names | Typical SAML Group Values |
+|--------------|--------------------------|--------------------------------|---------------------------|
+| **Server Admin** | `admins`, `administrators`, `server-admins`, `app-administrators`, `platform-admins`, `infra-admins`, `ops-admins` | `cn=admins,...`, `cn=administrators,...`, `cn=server-admins,...`, `cn=app-administrators,...`, `cn=platform-admins,...`, `cn=infra-admins,...` | `admins`, `administrators`, `server-admins`, `app-administrators`, `platform-admins` |
+| **App Admin Role** | `admins`, `administrators`, `app-admins`, `app-administrators`, `platform-admins` | `cn=admins,...`, `cn=administrators,...`, `cn=app-admins,...`, `cn=app-administrators,...` | `admins`, `administrators`, `app-admins`, `app-administrators`, `platform-admins` |
+| **Moderator Role** | `moderators`, `support`, `support-staff`, `helpdesk`, `reviewers` | `cn=moderators,...`, `cn=support,...`, `cn=support-staff,...`, `cn=helpdesk,...`, `cn=reviewers,...` | `moderators`, `support`, `support-staff`, `helpdesk`, `reviewers` |
+| **User Role** | `users`, `user`, `members`, `member`, `employees`, `staff`, `developers`, `engineering` | `cn=users,...`, `cn=members,...`, `cn=employees,...`, `cn=staff,...`, `cn=developers,...`, `cn=engineering,...` | `users`, `members`, `employees`, `staff`, `developers`, `engineering` |
 
 **Preset rules:**
 - For OIDC, these names are matched exactly against the configured group/role claim
-- For SAML, these names are matched exactly against the values of the assertion attribute named by `attributes.groups`
 - For LDAP, these should be emitted as full DN examples in config, but the setup UI may allow shorthand entry and expand to the configured group base DN
-- Providers that emit roles instead of groups MUST allow the operator to point `claims_mapping.groups` at that roles claim
+- For SAML, these names are matched exactly against the mapped groups assertion value; IdPs that emit group object IDs (for example Azure AD/Entra ID) require the operator to enter those IDs instead of names
+- Providers that emit roles instead of groups MUST allow the operator to point the groups mapping (`claims_mapping.groups` for OIDC, `attribute_mapping.groups` for SAML) at that roles claim/attribute
 - The starter preset is a convenience baseline; custom mappings remain fully supported and canonical
 
 ### Common LDAP Mapping Presets
@@ -60272,12 +60268,51 @@ server:
 **LDAP rules:**
 - The project MUST support overriding every LDAP attribute/filter mapping
 - `admin_groups` MUST use the exact identifier format returned by the configured directory lookup
-- If nested groups are needed (common in AD), the project MUST document whether it resolves nested membership or only direct membership
+- If nested groups are needed (common in AD), the project MUST document whether it resolves nested membership or only direct membership (`nested_groups`)
 - If the LDAP directory does not expose `memberOf`, the project MUST support a documented alternate membership lookup or explicitly state that the provider is unsupported
+
+**LDAP transport, reliability & operations rules:**
+- Transport security is enforced by `tls_mode`: `ldaps` (implicit TLS) or `starttls` (upgrade on 389) is REQUIRED; plaintext `none` is BLOCKED unless the host resolves to `localhost`/`127.0.0.1` for local testing
+- `tls_verify: true` is the default; certificate verification MUST NOT be disabled in production
+- The bind (service) account SHOULD use a connection pool (`pool.max_conns`/`max_idle`); on a broken connection the client MUST reconnect and, if `failover_servers` are configured, try the next server in order
+- Group/member lookups that can exceed the server size limit MUST use paged search (RFC 2696, `page_size`, default `500`)
+- LDAP referrals are NOT chased by default (`follow_referrals: false`); enabling referral chasing MUST reuse the same TLS and bind policy for the referred server
+- Search and bind operations MUST honor `connect_timeout`/`request_timeout`; a timeout is treated as provider-unavailable and falls back to cached local credentials (admins) or fails the login (users)
+- Repeated service-account bind failures MUST back off for `bind_failure_backoff` to avoid tripping directory-side lockout; service-account credential rotation is supported by editing the provider and MUST NOT require a restart
+- Failed end-user binds MUST be throttled per identity (bounded failures per window, with backoff) to blunt password spraying; this throttling is independent of local-account lockout and of the service-account `bind_failure_backoff`
+- The `test` route MUST perform a live bind + sample user/group lookup and report TLS mode, bind result, and resolved group sample without persisting a session
+
+### Common SAML Attribute Presets
+
+**SAML MUST support custom attribute mappings, but the template should define the usual defaults clearly.**
+
+| IdP | Typical NameID Format | Username Attribute | Email Attribute | Display Name Attribute | Groups Attribute |
+|-----|-----------------------|--------------------|-----------------|------------------------|------------------|
+| **Okta** | `persistent` or `emailAddress` | `urn:oid:0.9.2342.19200300.100.1.1` (`uid`) | `urn:oid:0.9.2342.19200300.100.1.3` (`mail`) | `displayName` | `groups` |
+| **Azure AD / Entra ID** | `persistent` | `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name` | `.../emailaddress` | `.../givenname` + `.../surname` | `http://schemas.microsoft.com/ws/2008/06/identity/claims/groups` |
+| **OneLogin** | `emailAddress` | `User.Username` | `User.email` | `User.FirstName` + `User.LastName` | `memberOf` / `groups` |
+| **ADFS** | `persistent` or `upn` | `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn` | `.../emailaddress` | `.../name` | `http://schemas.xmlsoap.org/claims/Group` |
+| **Shibboleth** | `persistent` (`eduPersonTargetedID`) | `urn:oid:0.9.2342.19200300.100.1.1` (`uid`) | `urn:oid:0.9.2342.19200300.100.1.3` (`mail`) | `urn:oid:2.16.840.1.113730.3.1.241` (`displayName`) | `urn:oid:1.3.6.1.4.1.5923.1.5.1.1` (`isMemberOf`) |
+| **Keycloak (SAML)** | `persistent` | `urn:oid:0.9.2342.19200300.100.1.1` (`uid`) | `urn:oid:0.9.2342.19200300.100.1.3` (`mail`) | `urn:oid:2.16.840.1.113730.3.1.241` | `groups` |
+
+**NameID format presets (`nameid_format`):**
+
+| Format | URN | External ID Stability |
+|--------|-----|-----------------------|
+| **Persistent** (default) | `urn:oasis:names:tc:SAML:2.0:nameid-format:persistent` | Stable per SP; use directly as `external_id` |
+| **Email address** | `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress` | Stable but mutable; prefer a persistent attribute for `external_id` |
+| **Transient** | `urn:oasis:names:tc:SAML:2.0:nameid-format:transient` | NOT stable; MUST map `external_id` to a documented persistent attribute |
+| **Unspecified** | `urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified` | IdP-dependent; document the resolved value |
+
+**SAML preset rules:**
+- Attribute names vary widely between IdPs; `attribute_mapping` MUST allow overriding every field, and the setup UI SHOULD prefill from the selected IdP preset
+- Group values are matched exactly against `admin_groups`/`role_mapping`; IdPs that emit group object IDs (Azure AD/Entra ID) require the operator to enter IDs, not names
+- When the NameID is not persistent, the operator MUST point `external_id` at a documented stable attribute or the provider MUST be treated as unsupported
+- The preset is a convenience baseline; custom mappings remain fully supported and canonical
 
 ### OIDC/LDAP/SAML Username Resolution for Regular Users
 
-**Regular-user OIDC/LDAP/SAML login MUST support a first-login username confirmation step for every new external account, not only conflict cases.** For SAML the "username claim" is the assertion attribute mapped by `attributes.username` (falling back to `NameID`); everything else in this section is identical.
+**Regular-user OIDC/LDAP/SAML login MUST support a first-login username confirmation step for every new external account, not only conflict cases.** SAML reuses this exact flow: the mapped username attribute is the initial candidate, and the persistent NameID (or the documented stable attribute when NameID is transient) becomes `external_id`.
 
 | Scenario | Required Behavior |
 |----------|-------------------|
@@ -60302,7 +60337,7 @@ server:
 
 ### OIDC/LDAP/SAML Username Resolution for Server Admins
 
-**OIDC/LDAP/SAML-backed Server Admins MUST support the same first-login username confirmation step for every new external admin account, not only conflict cases.**
+**OIDC/LDAP/SAML-backed Server Admins MUST support the same first-login username confirmation step for every new external admin account, not only conflict cases.** For SAML, the mapped username attribute is the initial candidate and the persistent NameID (or documented stable attribute) becomes `external_id`.
 
 | Scenario | Required Behavior |
 |----------|-------------------|
@@ -60333,7 +60368,7 @@ server:
 | `username` | Final local username (claim-derived or user-chosen on first login) |
 | `password` | Local Argon2id hash. Use a real fallback password hash when local fallback login is supported; otherwise store an unusable random secret so password login stays disabled for that external-only account |
 | `source` | `local`, `oidc:{provider}`, `ldap:{provider}`, `saml:{provider}` |
-| `external_id` | Stable provider subject / LDAP unique ID / SAML NameID (or mapped stable attribute) |
+| `external_id` | Stable provider subject / LDAP unique ID / SAML persistent NameID (or mapped stable attribute when NameID is transient) |
 | `groups` | Cached external groups/roles from last successful login (OIDC/LDAP groups or SAML group-attribute values) |
 | `last_sync` | Last successful OIDC/LDAP/SAML sync timestamp |
 
@@ -60347,12 +60382,12 @@ server:
 |----------|---------------|-------------|
 | **OIDC** | `admin_groups` list | Group names from the `groups` claim |
 | **LDAP** | `admin_groups` list | Full DN of groups (e.g., `cn=admins,ou=groups,dc=example,dc=com`) |
-| **SAML** | `admin_groups` list | Values of the assertion attribute mapped by `attributes.groups` (e.g., `admins`; Azure AD emits group object GUIDs) |
+| **SAML** | `admin_groups` list | Group values from the mapped groups assertion (names, or object IDs for IdPs like Azure AD/Entra ID) |
 
 **How Group Mapping Works:**
 
 1. User authenticates via OIDC/LDAP/SAML
-2. Server retrieves user's group memberships (OIDC/LDAP) or admin-attribute values (SAML) from the identity provider
+2. Server retrieves user's group memberships (OIDC/LDAP) or group-attribute values (SAML) from the identity provider
 3. If user belongs to ANY group/value in `admin_groups` → grant Server Admin access
 4. Admin access persists for session duration
 5. On next login, group membership is re-evaluated
@@ -60376,7 +60411,7 @@ server:
 | `/server/{admin_path}/config/security/auth/ldap/{provider}` | Edit, test, enable/disable, or remove one LDAP provider |
 | `/server/{admin_path}/config/security/auth/saml` | List/manage SAML providers |
 | `/server/{admin_path}/config/security/auth/saml/new` | Add SAML provider (auto-generates a self-signed SP keypair unless certs supplied) |
-| `/server/{admin_path}/config/security/auth/saml/{provider}` | Edit, test, enable/disable, download SP metadata, manage SP certs, or remove one SAML provider |
+| `/server/{admin_path}/config/security/auth/saml/{provider}` | Edit, test, enable/disable, download SP metadata, regenerate or upload SP certs, or remove one SAML provider |
 
 | Element | Type | Description |
 |---------|------|-------------|
@@ -60388,6 +60423,7 @@ server:
 | Role Mapping | Table | Per-provider mapping from external groups to application roles |
 | Test Connection | Button | Test one selected OIDC/LDAP/SAML provider (SAML: fetch/parse IdP metadata, validate SP cert, dry-run AuthnRequest) |
 | Test Group Mapping | Button | Test one selected provider's groups and resulting role |
+| SP Certificate | Panel | View/download SP cert, regenerate self-signed keypair, or upload admin-supplied cert (SAML only) |
 | Download SP Metadata | Button | SAML only: download this provider's SP metadata XML for handoff to the IdP |
 
 **Sane Defaults:**
@@ -60412,24 +60448,18 @@ server:
 1. Server builds a SAML `AuthnRequest`, signs it with the SP key when `sign_requests: true`, and stores the request ID + a CSRF `RelayState` bound to the browser session.
 2. Browser is sent to the IdP SSO endpoint (Redirect binding for the request; the IdP replies via POST binding to the ACS).
 3. IdP authenticates the user and POSTs a signed (optionally encrypted) `Response` to `/server/auth/saml/{provider}/acs`.
-4. Server validates, in order: XML-DSig signature against the IdP metadata signing cert; `Destination` equals the ACS URL; `Audience` equals the SP entity ID; `InResponseTo` matches the stored request ID; the `NotBefore`/`NotOnOrAfter` window within `max_clock_skew`; and that the assertion ID has not been seen before (replay cache).
-5. On success, attributes are mapped per `attributes`; `admin_groups`/`role_mapping` are applied; and the first-login username confirmation flow runs for new accounts (identical to OIDC/LDAP).
+4. Server validates, in order: XML-DSig signature against the IdP metadata signing cert; `Destination` equals the ACS URL; `Audience` equals the SP entity ID; `InResponseTo` matches the stored request ID; the `NotBefore`/`NotOnOrAfter` window within `clock_skew`; and that the assertion ID has not been seen before (replay cache).
+5. On success, attributes are mapped per `attribute_mapping`; `admin_groups`/`role_mapping` are applied; and the first-login username confirmation flow runs for new accounts (identical to OIDC/LDAP).
 
-**IdP-initiated login:** the IdP POSTs an unsolicited `Response` to the ACS with no stored `InResponseTo`. This is accepted ONLY when the provider is explicitly configured to allow it (unsolicited assertions weaken CSRF guarantees); otherwise it is rejected. Signature, audience, and replay checks are unchanged.
+**IdP-initiated login:** the IdP POSTs an unsolicited `Response` to the ACS with no stored `InResponseTo`. This is accepted ONLY when the provider is explicitly configured to allow it (`allow_idp_initiated: true`; unsolicited assertions weaken CSRF guarantees); otherwise it is rejected. Signature, audience, and replay checks are unchanged.
 
 **Assertion validation is non-negotiable:** an unsigned assertion, a signature that does not chain to the IdP metadata cert, a wrong `Audience`/`Destination`, or a replayed assertion MUST all be rejected with an audit event (`saml.login_failed`).
 
 ### SAML Single Logout (SLO)
 
-- **SP-initiated:** local logout builds a signed `LogoutRequest`, ends the local session, and redirects the browser to the IdP SLO endpoint (`slo.binding`). The IdP returns a `LogoutResponse` to `/server/auth/saml/{provider}/slo/callback`.
+- **SP-initiated:** with `slo_enabled: true`, local logout builds a signed `LogoutRequest`, ends the local session, and redirects the browser to the IdP SLO endpoint (`idp_slo_url`, Redirect binding). The IdP returns a `LogoutResponse` to `/server/auth/saml/{provider}/slo/callback`.
 - **IdP-initiated:** the IdP POSTs a signed `LogoutRequest` to `/server/auth/saml/{provider}/slo`; the server validates the signature, terminates the matching local session(s) by `NameID`/session index, and returns a signed `LogoutResponse`.
 - SLO requires signed logout messages; unsigned `LogoutRequest`/`LogoutResponse` are rejected.
-
-### SAML SP Certificate Management
-
-- **Default (zero-config):** on first enable of a provider, the server generates a self-signed SP signing/encryption keypair (`sp_certificate.mode: auto`), persists the private key encrypted at rest (same store as 2FA secrets), and publishes the public cert in SP metadata. The server rotates before `self_signed_days` expiry and re-publishes metadata.
-- **Admin-supplied:** `sp_certificate.mode: provided` uses operator PEM `cert_file`/`key_file` (e.g. a cert already trusted by the IdP). Rotation is the operator's responsibility.
-- Because most IdPs pin the SP cert from uploaded metadata, rotating the SP cert requires re-handing metadata (or the new cert) to the IdP; the admin UI surfaces the current cert fingerprint + expiry.
 
 ### API-mode SAML Flow
 
@@ -60439,21 +60469,6 @@ SAML is a browser protocol; API clients cannot complete it headlessly. The API f
 2. The client opens `redirect_url` in the system browser. The user authenticates at the IdP; the IdP POSTs the assertion to the normal browser ACS endpoint, which completes login and marks the `poll_token` satisfied.
 3. The client polls `POST /api/{api_version}/server/auth/saml/{provider}/poll` with the `poll_token`: `202` while pending, `200` + session/bearer token once the ACS step completed, `410` once the token expires.
 4. If the account is new, the poll response signals that the first-login username confirmation step is required before a token is issued.
-
-### OIDC Session Termination (Part B)
-
-- **RP-initiated logout:** when `rp_initiated_logout: true` and the provider publishes an `end_session_endpoint` in discovery, local logout ends the local session AND redirects to the IdP end-session endpoint (with `id_token_hint` + `post_logout_redirect_uri`) so the IdP session is also ended. If the provider lacks the endpoint, only the local session is ended and this is noted in the `oidc.logout` audit event.
-- **Back-channel logout:** when `backchannel_logout: true`, the server exposes a logout-token receiver; a validated OIDC Back-Channel Logout token (correct `iss`/`aud`, `events` claim, and `sid`/`sub`) revokes the matching local session server-side even if the browser never returns.
-- **Provider deletion / disable:** removing or disabling an OIDC provider MUST revoke all active local sessions whose `source` is `oidc:{provider}` (same rule stated for SAML provider deletion). External-only accounts can no longer authenticate; local-fallback accounts fall back to password.
-
-### LDAP Connection & Security Hardening (Part B)
-
-- **Transport:** plaintext `ldap://` with no TLS is rejected unless `tls.allow_insecure: true` (dev only). Production uses `ldaps://` or StartTLS (`tls.mode: starttls`) with `verify_cert: true`.
-- **Pooling & failover:** `servers` may list multiple URLs; the pool round-robins and fails over on connection error, health-checking idle connections before reuse (`pool.idle_timeout`).
-- **Referrals & paging:** `follow_referrals` controls chasing directory referrals (common with AD); `page_size` enables RFC 2696 paged search for large group/user result sets.
-- **Timeouts:** `connect`/`bind`/`search` are individually bounded so a slow directory cannot hang request threads.
-- **Bind-failure throttling:** `bind_lockout` counts failed end-user binds per identity within a window and applies backoff to blunt password spraying; this is independent of local-account lockout.
-- **Service-account rotation:** `bind_password` is a secret in `users.db`/secret store, never in the config file in plaintext; rotating it is a hot config update with a test-connection gate before it takes effect.
 
 ## Configuration
 
@@ -61794,12 +61809,13 @@ User registration invite codes (multi-user apps only).
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/{api_version}/server/{admin_path}/config/admins` | GET | Admin overview: total count + own account only (Admin Privacy — other admin details are never returned) |
-| `/api/{api_version}/server/{admin_path}/config/admins/{id}` | GET | Get admin details (self only; other admin IDs return 404) |
-| `/api/{api_version}/server/{admin_path}/config/admins/{id}` | DELETE | Delete admin (non-primary; caller must already know the ID) |
-| `/api/{api_version}/server/{admin_path}/config/admins/{id}/disable` | POST | Disable admin |
-| `/api/{api_version}/server/{admin_path}/config/admins/{id}/enable` | POST | Enable admin |
+| `/api/{api_version}/server/{admin_path}/config/admins/count` | GET | Total admin count (number only — no listing; see Server Admin Privacy) |
+| `/api/{api_version}/server/{admin_path}/config/admins/{username}` | DELETE | Delete admin by username (must know it; non-primary only) |
+| `/api/{api_version}/server/{admin_path}/config/admins/{username}/disable` | POST | Disable admin by username (must know it) |
+| `/api/{api_version}/server/{admin_path}/config/admins/{username}/enable` | POST | Enable admin by username (must know it) |
 | `/api/{api_version}/server/{admin_path}/config/admins/invite` | POST | Generate admin invite link |
+
+**No list or per-admin GET endpoints exist — Server Admin Privacy forbids enumerating or viewing other admin accounts.**
 
 ### Admin - Moderation Users (`/api/{api_version}/server/{admin_path}/config/moderation/users/`)
 
@@ -62916,7 +62932,7 @@ When using remote database, the same tables are created but with appropriate typ
 **Notes:**
 - Multiple admin rows supported — one row per Server Admin
 - First admin created via setup wizard on first run
-- Additional admins via invite (`/server/{admin_path}/config/admins/invite`) or OIDC/LDAP/SAML `admin_groups` provisioning
+- Additional admins via invite (`/server/{admin_path}/config/admins/invite`) or OIDC/LDAP/SAML `admin_groups` provisioning (PART 34)
 - Setup token displayed in console ONCE, used to access `/server/{admin_path}/config/setup`
 - Admin password and API token created during setup wizard (user must copy)
 - Admin API tokens live in the unified `tokens` table (`owner_type = 'admin'`), not in this table
@@ -62925,17 +62941,21 @@ When using remote database, the same tables are created but with appropriate typ
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID | Primary key |
-| `username` | String | Unique (case-insensitive), required; 2-39 chars, alphanumeric + hyphen |
+| `id` | Integer | Primary key |
+| `username` | String | Unique (case-insensitive), 2-39 chars, alphanumeric + hyphen, no leading/trailing hyphen |
 | `email` | String | Unique, required |
 | `password_hash` | String | Argon2id hash (PHC format) |
 | `display_name` | String | Optional |
 | `avatar_url` | String | Optional |
 | `bio` | Text | Optional |
-| `location` | String | Optional |
-| `website` | String | Optional |
+| `location` | String | Optional location (free text) |
+| `website` | String | Optional personal website URL |
 | `visibility` | String | Profile visibility: `public` (default), `private` |
 | `role` | String | User role |
+| `source` | String | `local`, `oidc:{provider}`, `ldap:{provider}`, `saml:{provider}` |
+| `external_id` | String | Stable provider subject / LDAP unique ID / SAML NameID or mapped stable attribute (external accounts) |
+| `groups` | JSON | Cached external groups/roles from last successful login (OIDC/LDAP groups or SAML group-attribute values) |
+| `last_sync` | Timestamp | Last successful OIDC/LDAP/SAML sync |
 | `email_verified` | Boolean | Email verified status |
 | `approved` | Boolean | Admin approved (if required) |
 | `disabled` | Boolean | Account disabled |
@@ -62943,10 +62963,6 @@ When using remote database, the same tables are created but with appropriate typ
 | `totp_enabled` | Boolean | 2FA enabled |
 | `timezone` | String | User timezone |
 | `language` | String | User language |
-| `source` | String | `local`, `oidc:{provider}`, `ldap:{provider}`, `saml:{provider}` |
-| `external_id` | String | Stable provider subject / LDAP unique ID / SAML NameID or mapped stable attribute (external accounts) |
-| `groups` | JSON | Cached external groups/roles from last successful login (OIDC/LDAP groups or SAML group-attribute values) |
-| `last_sync` | Timestamp | Last successful OIDC/LDAP/SAML sync |
 | `created_at` | Timestamp | Account creation |
 | `updated_at` | Timestamp | Last update |
 | `last_login_at` | Timestamp | Last login |
@@ -62957,9 +62973,9 @@ When using remote database, the same tables are created but with appropriate typ
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID | Primary key |
+| `id` | Integer | Primary key |
 | `owner_type` | String | `admin`, `user`, or `org` |
-| `owner_id` | UUID | Foreign key to admins/users/orgs |
+| `owner_id` | Integer | Foreign key to admins/users/orgs |
 | `name` | String | User-defined label |
 | `token_hash` | String | SHA-256 hash of API token |
 | `token_prefix` | String | First 8 chars (for identification) |
@@ -62972,8 +62988,8 @@ When using remote database, the same tables are created but with appropriate typ
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID | Primary key |
-| `user_id` | UUID | Foreign key to users |
+| `id` | Integer | Primary key |
+| `user_id` | Integer | Foreign key to users |
 | `token_hash` | String | SHA-256 hash of session token |
 | `ip_address` | String | Client IP |
 | `user_agent` | String | Browser/client info |
@@ -62985,13 +63001,13 @@ When using remote database, the same tables are created but with appropriate typ
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `id` | UUID | Primary key |
+| `id` | Integer | Primary key |
 | `code` | String | Unique invite code |
 | `role` | String | Role for invited users |
 | `max_uses` | Integer | Maximum uses (0 = unlimited) |
 | `use_count` | Integer | Current use count |
 | `expires_at` | Timestamp | Expiration |
-| `created_by` | UUID | Admin who created |
+| `created_by` | Integer | Admin who created |
 | `created_at` | Timestamp | Creation time |
 
 ## Public User Profiles & Vanity URLs (OPTIONAL)

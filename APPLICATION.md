@@ -2,7 +2,7 @@
 
 **Name**: {project_name}
 
-**About this file:** `AI.md` is the complete, authoritative specification for this project.
+**About this file:** `AI.md` is the complete, authoritative specification for this project. Throughout this document, all references to `AI.md` refer to this file.
 
 **Note:** `{PROJECT_NAME}` and `{project_name}` in this file are reference tokens, not setup-time text replacements. Their values are resolved from `IDEA.md ## Project variables` while `AI.md` remains read-only.
 
@@ -22,7 +22,7 @@ IDEA.md is the project PLAN. AI.md (this file) is the SOURCE OF TRUTH.
 
 | File | Role | Update When |
 |------|------|-------------|
-| **AI.md** | SOURCE OF TRUTH - implementation rules (readonly) | No — use SPEC.md for project-specific rule overrides |
+| **AI.md** | SOURCE OF TRUTH - implementation rules (read-only) | No — use SPEC.md for project-specific rule overrides |
 | **SPEC.md** | Project-specific rule overrides — created only when a rule must contradict this specification or global. May be empty. SPEC.md wins over AI.md. | When a project rule must differ from this specification or global |
 | **IDEA.md** | PROJECT PLAN - must follow AI.md | Features change, project variables change |
 
@@ -110,7 +110,7 @@ security assumptions, and any exceptions.)
 - Every item in this specification MUST be followed exactly unless explicitly marked optional
 - This is not a suggestion document
 - There are no silent exceptions
-- If the spec says X, do X - not “improved X”
+- If the spec says X, do X - not "improved X"
 - If something seems wrong, follow it and flag it; do not silently rewrite intent
 
 ## Attribution
@@ -187,7 +187,7 @@ This project's source code is **exclusively Rust**.
 
 - All application code, library code, build automation, and test code in this repository is written in Rust
 - No C, C++, Objective-C, Swift, Go, Python, JavaScript, TypeScript, or shell-script source files contribute to the produced binary
-- `build.rs`, `xtask/`, and any task automation are written in Rust — not Make, not Bash, not Python
+- `Makefile` and `scripts/` are used for build automation — they orchestrate Docker invocations but MUST NOT contain application logic; Rust-side build logic lives in `build.rs` and the optional `xtask/` crate
 - Small `docker/rootfs/usr/local/bin/entrypoint.sh` and `docker/` shell helpers are tolerated because they orchestrate the container, not the application; they MUST NOT contain application logic
 - Third-party crates that internally vendor C code (e.g., compression, crypto, SQLite, GUI) are allowed only when (a) no pure-Rust equivalent is viable, (b) the C code is statically linked into the final binary, (c) it does NOT require a system C lib at runtime (no `*-sys`-style dynamic linkage to system-installed `.so`/`.dylib`/`.dll`), and (d) the dependency is documented in `IDEA.md` and `LICENSE.md`. The Pure-Rust Library Stack in PART 5 pre-grants this exception for `ring` only — small, audited, ubiquitous, and effectively unavoidable for crypto performance — which still requires LICENSE.md attribution but does not need a per-project IDEA.md write-up. Larger vendored-C dependencies like `rusqlite` with `bundled` remain a per-project IDEA.md exception.
 - **Prefer pure-Rust crates whenever a viable one exists.** Pure-Rust crates are what make the single-static-binary rule and cross-platform GUI (Windows / macOS / Linux / BSD) achievable in practice — every `*-sys` crate dragged in becomes a portability and build-system tax. See PART 5 → "Pure-Rust Library Stack" for the recommended crate-by-capability list.
@@ -223,7 +223,7 @@ The single binary contains **everything the app needs to function**. The user is
 - Embed assets at build time using `include_bytes!`, `include_str!`, `rust-embed`, or an equivalent compile-time embedding pattern
 - Fonts, icons, theme data, default config, JSON/YAML schemas, SQL migrations, web assets (if any), localization catalogs, default templates, and licenses-to-display all live inside the binary
 - The `assets/` directory in the repo is a **build-time source tree** for embedding — it is not a runtime install target
-- The app may **read** user-provided config and data from per-user paths (PART 4 path table), and may **write** cache/state there, but it must run with full default functionality when those paths are empty
+- The app may **read** user-provided config and data from per-user paths (PART 4 → "Path Rule"), and may **write** cache/state there, but it must run with full default functionality when those paths are empty
 - Network/CDN fetches at first run to "download missing assets" are forbidden
 - A new install on an air-gapped machine MUST work end-to-end with only the binary present
 
@@ -252,7 +252,7 @@ The single binary contains **everything the app needs to function**. The user is
 
 | File | Purpose | Update When |
 |------|---------|-------------|
-| **AI.md** | Implementation spec (HOW) - SOURCE OF TRUTH, readonly | No — use SPEC.md for project-specific rule overrides |
+| **AI.md** | Implementation spec (HOW) - SOURCE OF TRUTH, read-only | No — use SPEC.md for project-specific rule overrides |
 | **SPEC.md** | Project-specific rule overrides (optional, may be empty) | When a project rule must contradict this specification or global |
 | **IDEA.md** | Project plan (WHAT) | Features or variables change |
 | **TODO.AI.md** | Task tracking (AI-owned) | Tasks added/completed |
@@ -388,7 +388,7 @@ src/
 └── support/                # logging, errors, utilities
 ```
 
-(See PART 5 → "Project Layout" for the full repository tree, including `docker/`, `assets/`, `packaging/`, `xtask/`, etc.)
+(See PART 5 → "Project Layout" for the full repository tree, including `docker/`, `assets/`, `packaging/`, `Makefile`, `scripts/`, `xtask/`, etc.)
 
 **Rules:**
 - Core behavior MUST live in shared modules, not be duplicated across GUI/TUI/CLI
@@ -683,7 +683,7 @@ This list is not exhaustive; treat it as the starting point. When introducing a 
 
 ## Cargo Commands
 
-**All cargo invocations execute inside the project Docker container — never on the host.** The table below shows the *logical* command; the **actual** invocation is wrapped (e.g., `docker compose run --rm dev <cmd>` or `docker run --rm --name "{project_name}-XXXX" -v "$PWD":/work -w /work <image> <cmd>`). See "Docker Rule" below.
+**All cargo invocations execute inside the project Docker container — never on the host.** The table below shows the *logical* command; the **actual** invocation is wrapped via the `CARGO_DOCKER` macro (see "Build Metadata" in PART 6 for the full macro definition). See "Docker Rule" below.
 
 | Logical Command | Purpose |
 |-----------------|---------|
@@ -697,20 +697,23 @@ This list is not exhaustive; treat it as the starting point. When introducing a 
 | `cargo run -- [args]` | Execution (in container; with X11/Wayland forwarding if GUI) |
 | `cargo install --path .` | In-container install for packaging/CLI testing |
 
-**Examples of the actual wrapped form:**
+**Examples of the actual wrapped form (using the `CARGO_DOCKER` macro from the Makefile):**
 
 ```bash
 # Format check
-docker compose run --rm dev cargo fmt --all --check
+$(CARGO_DOCKER) cargo fmt --all --check
 
 # Lint
-docker compose run --rm dev cargo clippy --workspace --all-targets --all-features -- -D warnings
+$(CARGO_DOCKER) cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 # Tests
-docker compose run --rm dev cargo test --workspace --all-features
+$(CARGO_DOCKER) cargo test --workspace --all-features
 
-# Release build (artifacts land in a mounted target/ inside the container)
-docker compose run --rm dev cargo build --release
+# Release build (artifacts land in binaries/ via the mounted workspace)
+$(CARGO_DOCKER) \
+  sh -c "cargo build --release --target x86_64-unknown-linux-musl && \
+    cp target/x86_64-unknown-linux-musl/release/{project_name} \
+      binaries/{project_name}-linux-amd64"
 
 # Run with display forwarding via the `gui` compose service, which mounts
 # the X11 / Wayland sockets and exports DISPLAY / WAYLAND_DISPLAY (see
@@ -756,6 +759,23 @@ rustflags = ["-C", "target-feature=+crt-static"]
 rustflags = ["-C", "target-feature=+crt-static"]
 ```
 
+## Build Metadata
+
+Build metadata (version, commit ID, build epoch, official site) is embedded at compile time by `build.rs`, which maps the `COMMIT_ID` and `BUILD_EPOCH` build-environment variables (plus `release.txt` / `site.txt`) to the `APP_*` constants `option_env!()` reads. The build date is never embedded — `build_date()` derives it from the embedded epoch at runtime (see PART 6 → "Build Metadata" for the full `build.rs` pattern and runtime constants).
+
+**Full release build command (logical form — run inside the Docker container, not on the host):**
+```bash
+# BUILD_EPOCH is the single captured time source - captured once per build
+BUILD_EPOCH="$(date -u +%s)"
+
+COMMIT_ID="$(git rev-parse --short=7 HEAD)" \
+BUILD_EPOCH="${BUILD_EPOCH}" \
+cargo build --release --target x86_64-unknown-linux-musl
+
+cp target/x86_64-unknown-linux-musl/release/{project_name} \
+  binaries/{project_name}-linux-amd64
+```
+
 ## Project Layout
 
 ```text
@@ -785,6 +805,7 @@ deps/                   # OPTIONAL: committed, project-specific support files
                          # Dockerfiles for building a dependency) — never a
                          # cache or temp/output dir
 docker/                 # REQUIRED: Dockerfile, docker-compose.yml, rootfs/usr/local/bin/entrypoint.sh, README.md
+Makefile                # build targets: build, release, docker, test, dev, clean
 packaging/              # installer/manifests/bundle metadata
 scripts/                # optional helper scripts that wrap Docker invocations (host-side wrappers); MUST NOT contain application logic
 xtask/                  # Rust-based build/release automation crate (executed inside Docker)
@@ -827,17 +848,17 @@ Place Docker assets under `docker/`:
 
 ```text
 docker/
-├── Dockerfile                              # production runtime image — two-stage (builder + minimal Alpine/Debian); tagged :latest
-├── Dockerfile.dev                          # devel image — same as release but binary runs in debug mode; tagged :devel   (project-specific)
-├── rootfs/                                 # build-time filesystem overlay copied into image at /   (project-specific)
-│   └── usr/local/bin/entrypoint.sh         # prepares cache/target dirs; user creation and privilege drop happen in the binary; called by tini → entrypoint.sh → app
-├── docker-compose.yml                      # production/human runtime — image: ghcr.io/{org}/{name}:latest
-├── docker-compose.dev.yml                  # human development — image: ghcr.io/{org}/{name}:devel
-├── docker-compose.test.yml                 # automated testing — builds from Dockerfile, valkey cache w/ ephemeral tmpfs, named bridge net; AI prefers tests/ scripts over running this directly
-└── README.md                               # how to build the image, run tests, run GUI with display forwarding
+├── Dockerfile              # production runtime image — two-stage (builder + minimal Alpine); tagged :latest
+├── Dockerfile.dev          # devel image — same as release but binary runs in debug mode; tagged :devel   (project-specific)
+├── rootfs/                 # build-time filesystem overlay copied into image at /   (project-specific)
+│   └── usr/local/bin/entrypoint.sh   # prepares cache dirs; user creation and privilege drop happen in the binary; called by tini → entrypoint.sh → app
+├── docker-compose.yml      # production compose — HUMAN USE ONLY
+├── docker-compose.dev.yml  # development compose — runs `:devel` image in debug mode; HUMAN USE ONLY
+├── docker-compose.test.yml # automated test compose — AI prefers the tests/ scripts over running this directly
+└── README.md               # how to build the image, run tests, run GUI with display forwarding
 ```
 
-All three compose files live under `docker/` (per `dockerfile_conventions.md` → "Docker Compose / File locations"). A top-level `docker-compose.yml` symlink or shim is allowed for ergonomics, but the source of truth lives under `docker/`. `docker-compose.yml` and `docker-compose.dev.yml` are human-only; AI's preferred interface for `docker-compose.test.yml` is the project's `tests/` scripts rather than a direct invocation.
+`docker-compose.yml` always lives under `docker/` — never at the repo root. See `dockerfile_conventions.md` → "Docker Compose" for the canonical layout: `docker-compose.yml` and `docker-compose.dev.yml` are human-only, and AI's preferred interface for `docker-compose.test.yml` is the project's `tests/` scripts rather than a direct invocation.
 
 ### Toolchain Image
 
@@ -953,6 +974,31 @@ By default `casjaysdev/rust:latest` carries no GUI-stack C dev libraries at link
 - **OpenGL / EGL / Vulkan**: when in scope, use Rust loaders that resolve symbols at runtime (e.g., `libloading`, or `glow` / `ash` configured for runtime loading) so the binary stays portable across hosts with different GPU stacks.
 - After every release build, the static-linkage check (`ldd`, `otool -L`, `dumpbin /dependents`) MUST confirm there is no link-time dependency on `libX11` / `libwayland-client` / `libGL` / `libEGL` / `libVulkan`. With `x11rb`, `libX11` will not appear in the runtime `dlopen` set either; with `x11-dl` it will appear only when an X11 session is actually used.
 
+### CI/CD Workflow Pattern
+
+All Rust CI jobs run inside `casjaysdev/rust:latest`. Never `apk add`, `cargo install`, or `rustup` in a workflow `run:` step — every tool is already in the image. No `ensure-build-image` pre-flight, no `build-toolchain.yml`.
+
+Canonical job pattern for `ci.yml` / `release.yml`:
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: casjaysdev/rust:latest
+      options: "--user 0:0"
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - name: Capture build epoch
+        run: |
+          # Captured ONCE per job - every other time value derives from this
+          BUILD_EPOCH=$(date -u +%s)
+          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITHUB_ENV
+      - run: cargo build --release
+        env:
+          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
+```
+
 ### X11 and Wayland Forwarding (Mandatory for GUI/Display Testing)
 
 GUI and display-aware test runs use the `gui` compose service (or equivalent `docker run` flags). Both X11 and Wayland forwarding MUST be supported; the spec does not pick one — the container detects what the host provides and forwards accordingly.
@@ -984,8 +1030,6 @@ docker run --rm \
   --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
   -e WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
   -e XDG_RUNTIME_DIR=/tmp/xdg \
-  -e QT_QPA_PLATFORM=wayland \
-  -e GDK_BACKEND=wayland \
   -v "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY":"/tmp/xdg/$WAYLAND_DISPLAY" \
   --device /dev/dri \
   -v "$PWD":/work -w /work \
@@ -1055,13 +1099,98 @@ Embed at build time when practical:
 BUILD_EPOCH="$(date -u +%s)"
 ```
 
-Makefile form (the derived `BUILD_DATE` line sits immediately after the capture):
+**Makefile pattern for build metadata and the Docker build macro** (the derived `BUILD_DATE` line sits immediately after the capture):
 
 ```makefile
-# Captured ONCE per build; every other time value derives from this
+PROJECTNAME := {project_name}
+PROJECTORG  := {project_org}
+BINDIR      := binaries
+RELDIR      := releases
+TARGET      ?= x86_64-unknown-linux-musl
+
+VERSION     ?= $(shell cat release.txt 2>/dev/null || echo "devel")
+COMMIT_ID   := $(shell git rev-parse --short=7 HEAD 2>/dev/null || echo "N/A")
+# BUILD_EPOCH is the single captured time source - captured once per build
 BUILD_EPOCH := $(shell date -u +%s)
-# ISO 8601 UTC, derived from BUILD_EPOCH (docker build-arg / OCI label use only)
-BUILD_DATE := $(shell date -u -d @$(BUILD_EPOCH) +"%Y-%m-%dT%H:%M:%SZ")
+# Derived from BUILD_EPOCH - used only for the Docker OCI created annotation; never passed to cargo
+BUILD_DATE  := $(shell date -u -d @$(BUILD_EPOCH) +"%Y-%m-%dT%H:%M:%SZ")
+
+CARGO_CACHE ?= $(HOME)/.cargo/registry
+CARGO_GIT   ?= $(HOME)/.cargo/git
+
+DOCKER_MEM  ?= 4g
+DOCKER_CPUS ?= 2
+
+# COMMIT_ID and BUILD_EPOCH are exported into the build environment so build.rs embeds them
+CARGO_DOCKER := docker run --rm \
+	--name $(PROJECTNAME)-$$(tr -dc 'a-z0-9' </dev/urandom | head -c8) \
+	--memory=$(DOCKER_MEM) --cpus=$(DOCKER_CPUS) \
+	-v $(PWD):/app \
+	-v $(CARGO_CACHE):/usr/local/cargo/registry \
+	-v $(CARGO_GIT):/usr/local/cargo/git \
+	-w /app \
+	-e COMMIT_ID=$(COMMIT_ID) \
+	-e BUILD_EPOCH=$(BUILD_EPOCH) \
+	casjaysdev/rust:latest
+
+TARGETS          ?= x86_64-unknown-linux-musl aarch64-unknown-linux-musl x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm x86_64-apple-darwin aarch64-apple-darwin
+DOCKER_PLATFORMS ?= linux/amd64,linux/arm64
+REGISTRY         ?= ghcr.io/$(PROJECTORG)/$(PROJECTNAME)
+
+.PHONY: build release docker test dev clean
+
+build:
+	@mkdir -p $(BINDIR)
+	$(CARGO_DOCKER) cargo build --release --target $(TARGET)
+	@cp target/$(TARGET)/release/$(PROJECTNAME) $(BINDIR)/$(PROJECTNAME)
+
+test:
+	@$(CARGO_DOCKER) sh -c " \
+		mkdir -p \"\$${TMPDIR:-/tmp}/$(PROJECTORG)\" && \
+		COVDIR=\$$(mktemp -d \"\$${TMPDIR:-/tmp}/$(PROJECTORG)/$(PROJECTNAME)-XXXXXX\") && \
+		cargo tarpaulin --workspace --all-features --out Xml \
+			--output-dir \$$COVDIR --fail-under 60 && \
+		echo \"Tests complete - Coverage >= 60% required ✓\""
+
+release:
+	@mkdir -p $(BINDIR) $(RELDIR)
+	@for target in $(TARGETS); do \
+		echo "Building $$target..."; \
+		$(CARGO_DOCKER) cargo build --release --target $$target || exit 1; \
+		case $$target in \
+			x86_64-unknown-linux-musl)  OUT=$(PROJECTNAME)-linux-amd64 ;; \
+			aarch64-unknown-linux-musl) OUT=$(PROJECTNAME)-linux-arm64 ;; \
+			x86_64-pc-windows-gnu)      OUT=$(PROJECTNAME)-windows-amd64.exe ;; \
+			aarch64-pc-windows-gnullvm) OUT=$(PROJECTNAME)-windows-arm64.exe ;; \
+			x86_64-apple-darwin)        OUT=$(PROJECTNAME)-darwin-amd64 ;; \
+			aarch64-apple-darwin)       OUT=$(PROJECTNAME)-darwin-arm64 ;; \
+		esac; \
+		BIN=$(PROJECTNAME); case $$target in *windows*) BIN=$(PROJECTNAME).exe ;; esac; \
+		cp target/$$target/release/$$BIN $(BINDIR)/$$OUT; \
+	done
+	@cp $(BINDIR)/$(PROJECTNAME)-* $(RELDIR)/
+	@echo "$(VERSION)" > $(RELDIR)/version.txt
+	@cd $(RELDIR) && FILES="$$(ls)" && sha256sum $$FILES > sha256.txt && sha512sum $$FILES > sha512.txt
+
+docker:
+	docker buildx build \
+		--platform $(DOCKER_PLATFORMS) \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT_ID=$(COMMIT_ID) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		--build-arg BUILD_EPOCH=$(BUILD_EPOCH) \
+		-t $(REGISTRY):$(VERSION) -t $(REGISTRY):latest \
+		-f docker/Dockerfile .
+
+dev: build
+	docker run --rm -it \
+		--name $(PROJECTNAME)-dev-$$(tr -dc 'a-z0-9' </dev/urandom | head -c8) \
+		-v $(PWD):/app -w /app \
+		casjaysdev/rust:latest \
+		$(BINDIR)/$(PROJECTNAME)
+
+clean:
+	rm -rf $(BINDIR) $(RELDIR)
 ```
 
 `BUILD_DATE` is never independently captured — it exists only where a Docker build needs the `org.opencontainers.image.created` label (`--build-arg BUILD_DATE=`), derived as `BUILD_DATE="$(date -u -d "@${BUILD_EPOCH}" +%Y-%m-%dT%H:%M:%SZ)"`. The app itself never receives `BUILD_DATE`; it derives the date from the embedded epoch via `build_date()` below.
@@ -1234,7 +1363,7 @@ logging:
 
 ## Human-Readable Values (User-Facing Output)
 
-**Every value shown on a user-facing surface — GUI windows and panels, TUI screens, and CLI pretty (default, non-machine) output — MUST be human-readable. Raw machine values belong to machine-readable output (`--json`, `--plain`) and logs only.**
+**Every value shown on a user-facing surface — GUI windows and dialogs, TUI screens, and pretty CLI output — MUST be human-readable. Raw machine values belong to machine-readable output (`--json`, `--plain`) and log files only.**
 
 | Kind | Rule | Examples |
 |------|------|----------|
@@ -1408,18 +1537,20 @@ All gates execute inside the project Docker container (PART 5 → "Docker Rule")
 
 | Gate | Logical Command | Wrapped Form (example) |
 |------|-----------------|------------------------|
-| Formatting | `cargo fmt --all --check` | `docker compose run --rm dev cargo fmt --all --check` |
-| Linting | `cargo clippy --workspace --all-targets --all-features -- -D warnings` | `docker compose run --rm dev cargo clippy …` |
-| Tests | `cargo test --workspace --all-features` | `docker compose run --rm dev cargo test …` |
-| Docs | `cargo doc --workspace --no-deps` | `docker compose run --rm dev cargo doc …` |
-| Licenses + advisories + bans + sources | `cargo deny check licenses advisories bans sources` | `docker compose run --rm dev cargo deny check …` |
+| Formatting | `cargo fmt --all --check` | `$(CARGO_DOCKER) cargo fmt --all --check` |
+| Linting | `cargo clippy --workspace --all-targets --all-features -- -D warnings` | `$(CARGO_DOCKER) cargo clippy …` |
+| Tests | `cargo test --workspace --all-features` | `$(CARGO_DOCKER) cargo test …` |
+| Docs | `cargo doc --workspace --no-deps` | `$(CARGO_DOCKER) cargo doc …` |
+| Vulnerability scan | `cargo audit` | `$(CARGO_DOCKER) cargo audit` |
+| Licenses + advisories + bans + sources | `cargo deny check licenses advisories bans sources` | `$(CARGO_DOCKER) cargo deny check …` |
 | Attribution drift | `cargo about generate about.hbs` (output diffed against the GENERATED region of `LICENSE.md`) | see PART 10 → "Suggested CI Steps" |
+| Coverage | `cargo tarpaulin --workspace --all-features --fail-under …` | see "Coverage Gate" below |
 | GUI smoke (X11) | `cargo run -- --ui gui` against an X11 socket | see PART 5 → "X11 and Wayland Forwarding" |
 | GUI smoke (Wayland) | `cargo run -- --ui gui` against a Wayland socket | see PART 5 → "X11 and Wayland Forwarding" |
 
 ## Coverage Gate
 
-`ci.yml` MUST enforce a minimum test coverage threshold. The threshold is declared in `IDEA.md ## Business logic` (free-form prose — e.g., "minimum test coverage: 75%"). If `IDEA.md` does not specify a value, the **default is 60%**.
+`ci.yml` MUST enforce a minimum test coverage threshold. The threshold is declared in `IDEA.md ## Business logic` (free-form prose — e.g., "minimum test coverage: 75%"). If `IDEA.md` does not specify a value, the **default is 60%**. The `test:` Makefile target already enforces a hardcoded 60% floor (PART 6 → "Build Metadata"); when `IDEA.md` declares a different threshold, update that hardcoded value to match — the Makefile check and the CI gate below must never disagree.
 
 - Use `cargo tarpaulin` (preferred for Linux musl) or `cargo llvm-cov` (works on more targets) — both pre-installed in `casjaysdev/rust:latest`
 - CI MUST fail when coverage drops below the threshold; a passing build with uncovered code is a silent regression
@@ -1455,14 +1586,13 @@ docker run --rm \
 
 **Plural** — all directories use plural names (`handlers/`, `models/`, `routes/`, `utils/`). Rust module directories follow the same rule — `src/handlers/mod.rs` not `src/handler/mod.rs`. Tooling dirs are also plural (`scripts/`, `tests/`, `completions/`).
 
----
-
 ## Performance Rules
 
 - Optimize based on measured behavior, not guesses
 - Scale caches/worker counts from runtime capabilities when relevant
 - Keep minimal-system defaults sensible
 - Avoid unnecessary allocations and duplicate state copies in hot paths
+- Never spawn unbounded tasks/threads — always cap with a semaphore, worker pool, or cancellation
 
 ---
 
@@ -1506,6 +1636,7 @@ Plugin downloads are an additional case and apply only when IDEA.md defines a ha
 - Public repos MUST ship `renovate.json` so Cargo / Actions / Docker updates land as PRs automatically; Renovate uses `pinDigests: true` to keep all `uses:` lines pinned to immutable SHAs
 - Renovate only updates the SHA; the **runtime-still-supported** verification (e.g., node24 vs deprecated runtimes) remains a manual check on every SHA bump (PART 10 → "Third-party Action Pinning")
 - Security advisories are blockers until triaged
+- Run `cargo audit` as part of CI to catch known vulnerabilities
 
 ## Telemetry Rule
 
@@ -1519,7 +1650,7 @@ No hidden telemetry. Any analytics, crash reporting, or update pings must be doc
 
 | Rule | Description |
 |------|-------------|
-| Explicit commands | CI must run explicit Cargo commands, not hide core release logic behind undocumented wrappers |
+| Explicit commands | CI must run explicit `cargo` / `make` commands, not hide core release logic behind undocumented wrappers |
 | Least privilege | CI tokens/permissions default to read-only |
 | Pinned actions | Third-party actions pinned to full commit SHAs; verify runtime and maintenance status on every SHA update |
 | No unsafe fork secrets | Fork PRs do not receive secrets or publish permissions |
@@ -1775,36 +1906,9 @@ Build failed → this is a bug, not a note for later; diagnose the root cause an
 
 ## Suggested CI Steps
 
-All Rust CI jobs run inside `casjaysdev/rust:latest`. Never `cargo install` or `rustup` in a workflow `run:` step — every tool is already in the image. No `ensure-build-image` pre-flight, no `build-toolchain.yml`.
+CI runs every Rust step inside `casjaysdev/rust:latest`. CI MUST NOT install a Rust toolchain on the runner and call `cargo` directly — and MUST NOT run quality-gate commands inside the runtime image (`docker/Dockerfile`), which contains only the final binary. Use `casjaysdev/rust:latest` for all build, test, lint, and doc steps.
 
-Canonical job pattern for `ci.yml` / `release.yml`:
-
-```yaml
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    container:
-      image: casjaysdev/rust:latest
-      options: "--user 0:0"
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - name: Capture build epoch
-        run: |
-          # Captured ONCE per job - every other time value derives from this
-          BUILD_EPOCH=$(date -u +%s)
-          echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITHUB_ENV
-      - run: cargo build --release
-        env:
-          BUILD_EPOCH: ${{ env.BUILD_EPOCH }}
-```
-
-The same capture-once pattern applies on every provider:
-
-- **Gitea / Forgejo**: identical to GitHub Actions (`$GITHUB_ENV` is supported by the act runner)
-- **GitLab CI**: capture at the top of the job's `script:` — `export BUILD_EPOCH="$(date -u +%s)"` — before any build command; all later commands in the job reuse it
-- **Jenkins**: capture once per pipeline in `environment {}` — `BUILD_EPOCH = sh(script: 'date -u +%s', returnStdout: true).trim()` — and reference `${env.BUILD_EPOCH}` in every stage
-
-Where a job builds a Docker image, derive `BUILD_DATE` from the captured epoch for the OCI `image.created` label only — e.g. `echo "BUILD_DATE=$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_ENV` — and pass `--build-arg BUILD_EPOCH=` plus `--build-arg BUILD_DATE=`. The cargo build consumes `BUILD_EPOCH`, never `BUILD_DATE`.
+**Single time source (all providers — GitHub Actions, Gitea/Forgejo, GitLab CI, Jenkins):** every CI job that builds binaries or images captures `BUILD_EPOCH="$(date -u +%s)"` exactly once (GitHub / Gitea / Forgejo: `echo "BUILD_EPOCH=${BUILD_EPOCH}" >> "$GITHUB_ENV"`; GitLab CI and Jenkins: a shell/environment variable set at the top of the stage). Every `cargo build` step exports `BUILD_EPOCH` in its environment so `build.rs` embeds it, every image build passes `--build-arg BUILD_EPOCH="${BUILD_EPOCH}"`, and `BUILD_DATE` is only ever derived from it — `BUILD_DATE="$(date -u -d "@${BUILD_EPOCH}" +%Y-%m-%dT%H:%M:%SZ)"` — where an OCI `org.opencontainers.image.created` annotation needs it. `BUILD_DATE` is never independently captured and never consumed by the cargo build.
 
 ### Required Concurrency and Retention Headers
 
@@ -2221,7 +2325,6 @@ Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI fai
 - [ ] `docker/Dockerfile` (always, when project ships a container), `docker/Dockerfile.dev` (project-specific — when a debug-mode image is shipped), `docker/docker-compose.yml`, `docker/docker-compose.dev.yml`, `docker/docker-compose.test.yml`, and `docker/rootfs/usr/local/bin/entrypoint.sh` exist as needed; `Dockerfile` is the runtime image
 - [ ] `.dockerignore` exists at project root with Rust-specific entries (`target/`, plus the standard exclusions from `dockerfile_conventions.md` → ".dockerignore")
 - [ ] `docker/Dockerfile.build` does not exist — Rust projects always use `casjaysdev/rust:latest` directly; no custom toolchain image is ever needed
-- [ ] `ci.yml` and `release.yml` use `container: image: casjaysdev/rust:latest` — no `ensure-build-image` pre-flight, no `build-toolchain.yml`
 - [ ] If IDEA.md documents a `*-sys` exception requiring system dev libs at build time, only the minimum set needed by that crate is added to the image — by default the image carries no GUI-stack C dev libs (PART 0 → "Rust-Only Application")
 - [ ] X11 forwarding sample command is documented and works against a real Xorg/XWayland session
 - [ ] Wayland forwarding sample command is documented and works against a real Wayland compositor
@@ -2229,6 +2332,7 @@ Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI fai
 - [ ] `Cargo.toml` release profile uses `opt-level = "z"`, `lto = true`, `codegen-units = 1`, `strip = true`, `panic = "abort"`
 - [ ] Repo has `assets/` (build-time source) and a Rust embedding module (`include_bytes!` / `rust-embed`) wiring it into the binary
 - [ ] No source files in any language other than Rust contribute to the binary (small Docker shell helpers excepted)
+- [ ] `Makefile` exists with at minimum `build`, `test`, `dev`, `clean` targets
 - [ ] `deny.toml` exists at project root with the spec's default allowlist / denylist (PART 11 → "License Compliance")
 - [ ] `about.toml` and `about.hbs` exist at project root and `cargo-about` produces the third-party attribution section
 - [ ] `cargo-deny`, `cargo-about`, and `cargo-cyclonedx` are pre-installed in the Docker image
@@ -2237,6 +2341,7 @@ Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI fai
 
 ## Implementation Checklist
 
+- [ ] `ci.yml` and `release.yml` use `container: image: casjaysdev/rust:latest` — no `ensure-build-image` pre-flight, no `build-toolchain.yml`
 - [ ] Core logic is shared across GUI/TUI/CLI
 - [ ] Runtime mode auto-detect follows GUI → TUI → CLI priority
 - [ ] GUI is not auto-selected in SSH/MOSH/remote-shell contexts
@@ -2310,7 +2415,7 @@ itself reports a clean result. Invoke the `rust-lint` agent before running
 - requested behavior contradicts documented product scope in IDEA.md
 - a proposed dependency would force a non-Rust source file into the build, dynamic linking into the release binary, or a runtime asset alongside the binary
 - a feature request implies shipping multiple files, an installer-only flow, or a first-run download
-- only one of X11 / Wayland can be supported by the chosen GUI stack
+- a proposed GUI toolkit only supports X11 or only supports Wayland — not both
 - a proposed dependency is GPL / AGPL / LGPL / SSPL / BUSL / source-available — flag the license-relicensing implication before adding (PART 11 → "License Compliance")
 
 ## Success Criteria
@@ -2326,7 +2431,7 @@ A compliant Rust project following this specification:
 - builds, tests, and runs only inside the project's Docker image — never on the host
 - auto-selects GUI, then TUI, then CLI using environment-aware detection
 - uses optional explicit privilege escalation only when requested
-- uses Cargo/Rust tooling consistently across development, testing, docs, and CI/CD
+- uses Rust/Cargo tooling (via `make` targets and Docker) consistently across development, testing, and CI/CD
 
 ---
 

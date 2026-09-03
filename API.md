@@ -1346,7 +1346,7 @@ For complete details, see AI.md PART 0, 1
 **Example Rules File Content (frontend-rules.md):**
 
 ```markdown
-# Frontend Rules (PART 16, 17)
+# Frontend Rules (PART 16)
 
 ⚠️ **These rules are NON-NEGOTIABLE. Violations are bugs.** ⚠️
 
@@ -2248,60 +2248,60 @@ server:
 
 ## How to Read This Large File
 
-**rust/API.md is ~1.7MB and ~45,000 lines. You CANNOT read it all at once. Follow these procedures.**
+**AI.md is ~1.8MB and ~49,000 lines. You CANNOT read it all at once. Follow these procedures.**
 
 ### File Size Reality
 
 | Constraint | Value |
 |------------|-------|
-| File size | ~1.7MB |
-| Line count | ~45,000 lines |
+| File size | ~1.8MB |
+| Line count | ~49,000 lines |
 | Read limit | ~500 lines per read |
-| Full reads needed | ~90 reads (impractical) |
+| Full reads needed | ~97 reads (impractical) |
 
 **Use the PART index to find relevant sections, then read each section COMPLETELY.**
 
 ### PART Index (Quick Reference)
 
-**Use `grep -n "^# PART" rust/API.md` to get exact current line numbers.**
+**Use `grep -n "^# PART" AI.md` to get exact current line numbers.**
 
 | PART | Line | Topic | When to Read |
 |------|------|-------|--------------|
-| 0 | ~2368 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
-| 1 | ~4181 | Critical Rules | **ALWAYS READ FIRST** |
-| 2 | ~5445 | License & Attribution | License requirements |
-| 3 | ~5779 | Project Structure | Setting up new project, **CI/CD badge detection** |
-| 4 | ~6703 | OS-Specific Paths | Path handling |
-| 5 | ~6899 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
-| 6 | ~8666 | Application Modes | Mode handling, debug endpoints |
-| 7 | ~9182 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~9853 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags**, **Resource Owner Tokens** |
-| 9 | ~12838 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~13340 | Database | Database work |
-| 11 | ~13755 | Security & Logging | Security features, **Context Detection** |
-| 12 | ~15787 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~17242 | Health & Versioning | Health endpoints |
-| 14 | ~17954 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~19698 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~20661 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~23974 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~24551 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~24979 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~25100 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~26438 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~26938 | Update Command | Update feature |
-| 23 | ~27466 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~28088 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~28413 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~29243 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~30215 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~33484 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~35322 | ReadTheDocs Documentation | Documentation |
-| 30 | ~36116 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~37511 | Overlay Networks (Tor & I2P) | Tor (required) + I2P eepsite (opt-in) |
-| 32 | ~39663 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~42819 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | ~43056 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 0 | ~2396 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
+| 1 | ~4211 | Critical Rules | **ALWAYS READ FIRST** |
+| 2 | ~5475 | License & Attribution | License requirements |
+| 3 | ~5810 | Project Structure | Setting up new project, **CI/CD badge detection** |
+| 4 | ~6734 | OS-Specific Paths | Path handling |
+| 5 | ~6930 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
+| 6 | ~8697 | Application Modes | Mode handling, debug endpoints |
+| 7 | ~9213 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
+| 8 | ~9897 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags**, **Resource Owner Tokens** |
+| 9 | ~12904 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~13406 | Database | Database work |
+| 11 | ~13821 | Security & Logging | Security features, **Context Detection** |
+| 12 | ~15887 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~17342 | Health & Versioning | Health endpoints |
+| 14 | ~18064 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~19834 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~20786 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~27627 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~28206 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~28634 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~28787 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~30125 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~30625 | Update Command | Update feature |
+| 23 | ~31153 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~31775 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~32100 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~32930 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~33902 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~37159 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~38997 | ReadTheDocs Documentation | Documentation |
+| 30 | ~39791 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~41185 | Overlay Networks (Tor & I2P) | Tor (required) + I2P eepsite (opt-in) |
+| 32 | ~43381 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~46537 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~46774 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File
 
@@ -2314,9 +2314,9 @@ server:
 Use `grep` to find the PART you need:
 ```bash
 # List all PARTs with line numbers
-grep -n "^# PART" rust/API.md
+grep -n "^# PART" AI.md
 # Find specific content
-grep -n "keyword" rust/API.md
+grep -n "keyword" AI.md
 ```
 
 **Step 3: Read the specific PART completely**
@@ -2359,16 +2359,16 @@ Example: If you're partway through PART 5 and it says "See PART 10", read PART 1
 
 ```bash
 # Find specific topics
-grep -n "rate limit" rust/API.md
-grep -n "CSRF" rust/API.md
-grep -n "server.yml" rust/API.md
+grep -n "rate limit" AI.md
+grep -n "CSRF" AI.md
+grep -n "server.yml" AI.md
 
 # Find code examples
-grep -n "```rust" rust/API.md
-grep -n "```yaml" rust/API.md
+grep -n "```rust" AI.md
+grep -n "```yaml" AI.md
 
 # Find tables
-grep -n "^|" rust/API.md | head -50
+grep -n "^|" AI.md | head -50
 ```
 
 ### Common Mistakes When Reading This File
@@ -7925,11 +7925,11 @@ sudo {project_name} --service --install
 | Step | Running As | Actions |
 |------|-----------|---------|
 | 1 | **root** | Service manager starts binary |
-| 2 | **root** | Create system user `{project_name}` (if needed) |
+| 2 | **root** | Create system user `{internal_name}` (if needed) |
 | 3 | **root** | Create directories, set ownership |
 | 4 | **root** | Bind configured ports (any port works) |
 | 5 | **root** | Spawn managed children (e.g. Tor) with setuid/setgid service-user credentials |
-| 6 | **root→user** | **DROP PRIVILEGES** to `{project_name}` user |
+| 6 | **root→user** | **DROP PRIVILEGES** to `{internal_name}` user |
 | 7 | **user** | Initialize config, database, etc. |
 | 8 | **user** | Start serving requests |
 
@@ -8186,7 +8186,7 @@ ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]
 | `--maintenance secret rotate <name>` | 🔐 Auth | Requires `server.token` OR root | N/A |
 | (normal start) | ❌ No | Adapts paths to current user | N/A |
 
-**Key insight:** After service install, the `{project_name}` user owns all data directories. However, sensitive operations require AUTHORIZATION, not just file access.
+**Key insight:** After service install, the `{internal_name}` user owns all data directories. However, sensitive operations require AUTHORIZATION, not just file access.
 
 #### Sensitive Operations (🔐 Auth Required)
 
@@ -8410,7 +8410,7 @@ Binary checks:
 | Read/write data | `/var/lib/{internal_org}/{internal_name}/` |
 | Read/write cache | `/var/cache/{internal_org}/{internal_name}/` |
 | Read/write logs | `/var/log/{internal_org}/{internal_name}/` |
-| Read/write backups | `/var/lib/Backups/{internal_org}/{internal_name}/` or `/mnt/Backups/...` |
+| Read/write backups | `/mnt/Backups/{internal_org}/{internal_name}/` (if writable, else `{data_dir}/backup/`) |
 | Use bound sockets | Inherited from root before privilege drop |
 | Bind ports >1024 | New sockets after privilege drop |
 | Run scheduled tasks | Backup, cleanup, SSL renewal, etc. |
@@ -10512,12 +10512,12 @@ PHASE 5: Server startup (actual server start)
    ├─ {data_dir}    (/var/lib/... or ~/.local/share/...)
    ├─ {cache_dir}   (/var/cache/... or ~/.cache/...)
    ├─ {log_dir}     (/var/log/... or ~/.local/log/...)
-   ├─ {backup_dir}  (see PART 5 get_backup_dir - /mnt/Backups/... if writable, else {data_dir}/backup/ in system mode)
+   ├─ {backup_dir}  (see PART 8 get_backup_dir - /mnt/Backups/... if writable, else {data_dir}/backup/ in system mode)
    └─ Never resolve ~/$HOME again after step 8h — the service account's HOME is {data_dir}
 
 8. IF RUNNING AS ROOT - setup system resources BEFORE dropping privileges:
    a. Check/create system user:
-      ├─ User {project_name} exists → use it
+      ├─ User {internal_name} exists → use it
       └─ User missing → create {internal_name}:{internal_name} (see PART 23)
    b. Create ALL directories (while still root):
       ├─ {config_dir}/ and subdirs (ssl/, tor/)
@@ -19818,7 +19818,7 @@ Need additional compatible endpoints?"
 
 ---
 
-# CHECKPOINT 6: FRONTEND & API VERIFICATION
+# CHECKPOINT 5: FRONTEND & API VERIFICATION
 
 Before proceeding, confirm you understand:
 - [ ] Frontend is required for ALL projects
@@ -20785,24 +20785,42 @@ Startup (for configured FQDN)
 ---
 # PART 16: WEB FRONTEND
 
----
-
 ## Requirements
 
-| Requirement | Details |
-|---|---|
-| Template engine | Tera (`tera` crate) |
-| Router | `axum` + `tower` + `tower-http` |
-| Static files | `tower-http::services::ServeDir` |
-| JSON | `serde_json` |
-| Logging | `tracing` + `tracing-subscriber` |
-| HTTP client | `reqwest` |
-| HTML sanitizer | `ammonia` |
-| Embed | `rust-embed` |
+**ALL PROJECTS MUST HAVE A PROFESSIONAL, WELL-DESIGNED, FULLY FUNCTIONAL FRONTEND.**
 
----
+| Requirement | Description |
+|-------------|-------------|
+| **Fully Functional** | ALL features work in browser - not just API |
+| **Professional UI/UX** | Clean, modern, polished design |
+| **Mobile Support** | Full responsive design with touch-friendly targets |
+| **HTML5** | Full web standards compliance |
+| **Accessibility** | WCAG 2.1 AA compliant, screen reader friendly |
+| **UX** | Readable, navigable, intuitive, user-friendly, self-explanatory |
+| **PWA Support** | Progressive Web App - installable, offline-capable |
+| **CORS** | `Access-Control-Allow-Origin: *` for API endpoints |
 
-## Frontend Route Structure
+## Frontend Consumes Backend
+
+**API is the source of truth. Frontend fully integrates with relevant API endpoints.**
+
+| Rule | Description |
+|------|-------------|
+| **API first** | Backend API works standalone, frontend consumes it |
+| **User features in browser** | All user-facing API features accessible via frontend |
+| **Same validation** | Frontend validates same rules as backend |
+| **Real-time feedback** | Frontend shows success/error from backend responses |
+
+**User-facing features work in browser. System-only endpoints are API-only (see PART 14).**
+
+### Frontend Route Structure
+
+| API Route | Frontend Route | Page Type |
+|-----------|----------------|-----------|
+| `GET /api/{api_version}/{resource}` | `GET /{resource}` | Resource list page |
+| `POST /api/{api_version}/{resource}` | `POST /{resource}` | Create resource form |
+| `GET /api/{api_version}/{resource}/{id}` | `GET /{resource}/{id}` | Resource detail page |
+| `GET /api/{api_version}/server/about` | `GET /server/about` | About page |
 
 Routes are registered with `axum::Router`. All frontend routes are public — there is no admin web UI, no dashboard, and no settings pages (no auth, no user accounts). Auth is bearer-token only (operator token or resource owner token) and applies to `/api/` routes, never to HTML pages.
 
@@ -20819,11 +20837,53 @@ router.route("/server/help", get(help_handler))
 router.route("/server/terms", get(terms_handler))
 ```
 
----
+### Vanity URLs (OPTIONAL - project-specific)
 
-## Vanity URLs / Slug Routes
+**For apps with public resource profiles, support short vanity URLs at root level.**
 
-Project-specific catch-all (lowest priority — registered last). Only implement if the project needs slug/short-code routes.
+This is OPTIONAL and only applies to apps where public short paths are a core feature (link shorteners, public profile pages, etc.).
+
+| Vanity URL | Maps To | API Equivalent | Example Apps |
+|------------|---------|----------------|--------------|
+| `/{slug}` | `/{resource}/{slug}` | `/api/{api_version}/{resource}/{slug}` | Link shorteners, public profiles |
+| `/{slug}/{sub}` | `/{resource}/{slug}/{sub}` | `/api/{api_version}/{resource}/{slug}/{sub}` | Nested public resources |
+
+**Route Priority (NON-NEGOTIABLE when implemented):**
+
+```
+1. /api/{api_version}/*   → API routes (highest priority)
+2. /server/healthz        → Health check
+3. /static/*              → Static assets
+4. /server/*              → Server pages (docs, about, status)
+5. /{reserved}            → Reserved names (see below)
+6. /*                     → Project-specific routes (lowest priority)
+```
+
+**Reserved Names (MUST block from registration):**
+
+```rust
+let reserved_names: Vec<&str> = vec![
+    // System routes
+    "api", "server", "static", "assets", "healthz", "metrics",
+    "webhook", "webhooks",
+
+    // Common paths
+    "search", "explore", "discover", "trending",
+    "help", "support", "docs", "documentation",
+    "about", "contact", "terms", "privacy", "legal", "security",
+
+    // Technical
+    "graphql", "swagger", "rest", "rpc", "ws", "websocket",
+    "cdn", "media", "uploads", "files", "images",
+    ".well-known", "robots.txt", "sitemap.xml", "favicon.ico",
+
+    // Project-specific (add yours in IDEA.md)
+];
+```
+
+**Resolution Logic:**
+
+Project-specific slug/short-code routes are registered last (lowest priority). The router resolves any `/{id}` style route after all explicit routes are matched.
 
 ```rust
 // Project-specific catch-all (lowest priority - registered last)
@@ -20832,46 +20892,49 @@ router.route("/:slug", get(slug_handler))
 router.route("/:slug/:sub", get(slug_handler))
 ```
 
----
+**Examples by App Type:**
 
-## Reserved Names
+| App Type | `/{slug}` Shows | Sub-routes |
+|----------|-----------------|------------|
+| **Pastebin clone** | Paste by ID | - |
+| **URL shortener** | Redirect to target | - |
+| **Joke app** | Joke by ID | - |
 
-Names that must never be used as user-supplied slugs:
+**Implementation Notes:**
 
-```rust
-let reserved_names: Vec<&str> = vec![
-    "api", "server", "static", "assets", "healthz", "metrics",
-    "webhook", "webhooks",
-    "search", "explore", "discover", "trending",
-    "help", "support", "docs", "documentation",
-    "about", "contact", "terms", "privacy", "legal", "security",
-    "graphql", "swagger", "rest", "rpc", "ws", "websocket",
-    "cdn", "media", "uploads", "files", "images",
-    ".well-known", "robots.txt", "sitemap.xml", "favicon.ico",
-    // Project-specific (add yours in IDEA.md)
-];
-```
+1. **Slug validation**: Define in `IDEA.md` for each project (format depends on resource type)
+2. **Reserved names**: Always check `is_reserved(slug)` before lookup
+3. **Case handling**: Normalize to lowercase; redirect if case differs
+4. **Trailing slash**: See "URL Normalization Middleware" below
+5. **404 handling**: Unknown slugs show a "not found" page, not a generic 404
 
----
+### URL Normalization Middleware
 
-## URL Normalization Middleware
-
-Strips trailing slashes and redirects to canonical URL (301). Does not strip trailing slash when the path segment contains a dot (file extension).
+**ALL routes MUST normalize URLs before processing. Apply this middleware FIRST in the chain.**
 
 ```rust
+// url_normalize_middleware normalizes URLs for consistent routing
+// - Removes trailing slashes (except for root "/")
+// - Redirects to canonical URL with 301 if normalization changed path
 async fn url_normalize_middleware(
     uri: axum::http::Uri,
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
     let path = uri.path();
+
+    // Root path "/" stays as-is
     if path == "/" {
         return next.run(request).await;
     }
+
+    // Remove trailing slash (canonical form: no trailing slash)
     if path.ends_with('/') {
+        // Exception: explicit file requests (e.g., /dir/index.html)
         let last_slash = path.rfind('/').unwrap_or(0);
         if !path[last_slash..].contains('.') {
             let canonical = path.trim_end_matches('/');
+            // Preserve query string
             let location = if let Some(query) = uri.query() {
                 format!("{}?{}", canonical, query)
             } else {
@@ -20880,56 +20943,143 @@ async fn url_normalize_middleware(
             return axum::response::Redirect::permanent(&location).into_response();
         }
     }
+
     next.run(request).await
 }
 ```
 
-Middleware execution order (outer → inner):
+**Normalization Rules:**
 
-1. `url_normalize_middleware` — canonical URL enforcement
-2. `request_id_middleware` — attach `X-Request-ID`
-3. `real_ip_middleware` — resolve client IP behind proxies
-4. `rate_limit_middleware` — per-IP throttle
-5. `csrf_middleware` — verify CSRF token on mutating browser form requests (see "CSRF Protection")
-6. Handler
+| Input | Output | Action |
+|-------|--------|--------|
+| `/items/` | `/items` | 301 redirect |
+| `/server/about/` | `/server/about` | 301 redirect |
+| `/api/{api_version}/items/` | `/api/{api_version}/items` | 301 redirect |
+| `/items` | `/items` | No redirect (canonical) |
+| `/` | `/` | No redirect (root exception) |
+| `/static/css/style.css` | `/static/css/style.css` | No redirect (file) |
+| `/dir/index.html` | `/dir/index.html` | No redirect (file) |
 
----
+**Why No Trailing Slash:**
+- SEO: Search engines treat `/page` and `/page/` as different URLs (duplicate content)
+- Consistency: One canonical URL per resource
+- Simplicity: Route matching is simpler without optional trailing slashes
 
-## detectClientType
+**Middleware Execution Order (see PART 5 for the full `setup_middleware`):**
 
-Determines whether the client expects HTML, plain text, or JSON based on request headers.
+```rust
+// Execution order (request flows top to bottom):
+// 1.  url_normalize_middleware    - normalize URLs (trailing slash, etc.)
+// 2.  request_id_middleware       - attach request ID (must run before Logging so logs include it)
+// 3.  path_security_middleware    - validate paths, block traversal
+// 4.  security_headers_middleware - add security headers
+// 5.  allowlist_middleware        - set allowlisted flag (bypasses blocklist/ratelimit/geoip, NOT auth)
+// 6.  blocklist_middleware        - IP/domain blocklist check
+// 7.  rate_limit_middleware       - rate limiting
+// 8.  geoip_middleware            - country blocking
+// 9.  auth_middleware             - authentication
+// 10. logging_middleware          - log requests (carries request_id)
+```
+
+### No JavaScript-Disabled Broken State
+
+**Frontend MUST work without JavaScript for core functionality:**
+
+| Feature | Without JS | With JS |
+|---------|------------|---------|
+| **Navigation** | Works (links) | Works (maybe enhanced) |
+| **Forms** | Work (submit) | Enhanced validation |
+| **Content** | Visible | Maybe enhanced |
+| **CRUD** | Works via forms | AJAX enhanced |
+
+**JavaScript enhances, it does not enable.**
+
+## Smart Content Detection
+
+**Frontend routes (`/**`) MUST automatically detect request type and respond appropriately.**
+
+### Detection Logic (MUST Support Full CRUD)
+
+**ALL frontend routes with CRUD operations MUST work in BOTH modes:**
 
 ```rust
 fn detect_client_type(headers: &axum::http::HeaderMap) -> &'static str {
+    // 1. Check Accept header first (explicit preference)
     let accept = headers.get("accept").and_then(|v| v.to_str().ok()).unwrap_or("");
+
     if accept.contains("text/html") { return "html"; }
     if accept.contains("text/plain") { return "text"; }
+    // Rare for frontend, but support it
     if accept.contains("application/json") { return "json"; }
+
+    // 2. Check User-Agent for browser detection
     let ua = headers.get("user-agent").and_then(|v| v.to_str().ok()).unwrap_or("");
+
+    // Browser User-Agents (common patterns)
     let browsers = ["Mozilla/", "Chrome/", "Safari/", "Edge/", "Firefox/", "Opera/", "MSIE", "Trident/"];
     for browser in &browsers {
         if ua.contains(browser) { return "html"; }
     }
+
+    // 3. CLI tools (curl, wget, httpie, etc.)
     let cli_tools = ["curl/", "Wget/", "HTTPie/", "python-requests/", "reqwest/", "node-fetch/"];
     for tool in &cli_tools {
         if ua.contains(tool) { return "text"; }
     }
+
+    // 4. Empty or unknown User-Agent
+    // Default to text for programmatic access
     if ua.is_empty() { return "text"; }
+
+    // 5. Default: HTML (safest fallback)
     "html"
 }
 ```
 
----
+### Response by Client Type
 
-## CRUD Operations
+**Frontend routes MUST respond differently based on client:**
 
-**No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works.
+| Route | Browser | curl/CLI | Accept: text/plain | Accept: text/html | Accept: application/json |
+|-------|---------|----------|-------------------|-------------------|--------------------------|
+| `/` | HTML page | Text | Text | HTML | JSON |
+| `/items` | HTML list | Text list | Text list | HTML list | JSON array |
+| `/items/123` | HTML detail | Text (name) | Text | HTML detail | JSON object |
+| `/jokes/random` | HTML joke page | Just the joke | Just the joke | HTML page | JSON object |
 
-All CRUD handlers follow this pattern:
+### CRUD Operations MUST Work in All Modes
 
-**Create**
+**ALL CRUD operations must be accessible via:**
+
+1. **HTML Forms** (browser users):
+   ```html
+   <form action="/items" method="POST">...</form>
+   <form action="/items/123" method="POST">
+     <input type="hidden" name="_method" value="PUT">
+   </form>
+   ```
+
+2. **API Endpoints** (programmatic):
+   ```bash
+   curl -q -LSsf -X POST /api/{api_version}/items -d '{"name":"test"}'
+   curl -q -LSsf -X PATCH /api/{api_version}/items/123 -d '{"name":"updated"}'
+   curl -q -LSsf -X DELETE /api/{api_version}/items/123
+   ```
+
+3. **Frontend Direct** (CLI/scripting):
+   ```bash
+   # Form-encoded
+   curl -q -LSsf -X POST /items -d 'name=test'
+   # Returns text (auto-detected)
+   curl -q -LSsf /items/123
+   ```
+
+**Rule:** CRUD must work for browsers (HTML forms), APIs (JSON), and CLI (text/form-encoded).
+
+**Handler pattern (server-rendered form → POST → redirect; build and verify this path FIRST, with JavaScript disabled — JS may only enhance what already works):**
 
 ```rust
+// Create
 async fn create_handler(
     State(state): State<AppState>,
     Form(form): Form<CreateForm>,
@@ -20938,11 +21088,8 @@ async fn create_handler(
     // call service layer
     // return redirect or error page
 }
-```
 
-**Read (list)**
-
-```rust
+// Read (list)
 async fn list_handler(
     State(state): State<AppState>,
     Query(params): Query<ListParams>,
@@ -20950,11 +21097,8 @@ async fn list_handler(
     // query db
     // render template
 }
-```
 
-**Update**
-
-```rust
+// Update
 async fn update_handler(
     State(state): State<AppState>,
     Path(id): Path<u64>,
@@ -20964,11 +21108,8 @@ async fn update_handler(
     // update record
     // return redirect or error page
 }
-```
 
-**Delete**
-
-```rust
+// Delete
 async fn delete_handler(
     State(state): State<AppState>,
     Path(id): Path<u64>,
@@ -20979,11 +21120,75 @@ async fn delete_handler(
 }
 ```
 
----
+### Frontend Testing Best Practice
 
-## Mobile-First Design
+**For automated testing, use text responses (much simpler than HTML parsing):**
 
-All UI is designed mobile-first. Breakpoints:
+```bash
+# Easy: Test text output (no HTML parsing needed)
+# Auto-detects CLI, returns text
+curl -q -LSsf /items/123
+# Explicitly request text
+curl -q -LSsf -H "Accept: text/plain" /items/123
+
+# Hard: Testing HTML requires parsing
+# Fragile
+curl -q -LSsf -H "Accept: text/html" /items/123 | grep "<title>"
+```
+
+**Recommended testing approach:**
+- ✓ Use Accept: text/plain for frontend route testing
+- ✓ Or rely on CLI auto-detection (curl returns text automatically)
+- ✓ Verify text output contains expected data
+- ✗ Avoid parsing HTML in test scripts (complex and fragile)
+
+**Test scripts should:**
+```bash
+# Test frontend returns text for CLI
+RESULT=$(curl -q -LSsf http://localhost:80/items/123)
+if echo "$RESULT" | grep -q "testitem"; then
+    echo "✓ Frontend returns item data"
+else
+    echo "✗ FAILED: Item data not returned"
+fi
+
+# Test frontend returns HTML for browser (optional, just check Content-Type)
+CONTENT_TYPE=$(curl -q -LSsfI -H "Accept: text/html" http://localhost:80/items/123 | grep -i "content-type")
+if echo "$CONTENT_TYPE" | grep -q "text/html"; then
+    echo "✓ Frontend serves HTML to browsers"
+fi
+```
+
+## Mobile-First Responsive Design
+
+**ALL frontend CSS MUST be mobile-first: base styles for mobile, media queries for larger screens.**
+
+### Core Principle
+
+```css
+/* CORRECT: Mobile-first */
+.element {
+  /* Base styles = mobile */
+  padding: 0.75rem;
+  font-size: 1rem;
+}
+@media (min-width: 768px) {
+  .element {
+    /* Enhanced for tablet+ */
+    padding: 1.5rem;
+  }
+}
+
+/* WRONG: Desktop-first (do NOT do this) */
+.element {
+  padding: 1.5rem;
+}
+@media (max-width: 767px) {
+  .element { padding: 0.75rem; }
+}
+```
+
+### Breakpoints
 
 | Breakpoint | Target | CSS |
 |------------|--------|-----|
@@ -20992,15 +21197,145 @@ All UI is designed mobile-first. Breakpoints:
 | `min-width: 1024px` | Desktops and up | `@media (min-width: 1024px)` |
 | `min-width: 1280px` | Large desktops (optional) | `@media (min-width: 1280px)` |
 
+### Container
+
 ```css
-/* Mobile-first: base styles target mobile, media queries add larger */
+/* Mobile-first container */
 .container {
   width: 100%;
-  padding-inline: var(--space-4);
-  margin-inline: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  margin: 0 auto;
 }
-@media (min-width: 768px)  { .container { width: 90%; max-width: 1400px; padding-inline: var(--space-6); } }
-@media (min-width: 1024px) { .container { padding-inline: var(--space-8); } }
+
+@media (min-width: 768px) {
+  .container {
+    width: 90%;
+    padding-left: 0;
+    padding-right: 0;
+    max-width: 1400px;
+  }
+}
+```
+
+### Responsive Behavior by Element
+
+| Element | Mobile (base) | Tablet+ (768px) | Desktop+ (1024px) |
+|---------|---------------|-----------------|-------------------|
+| **Container** | 100% width, 1rem padding | 90% width, centered | max-width: 1400px |
+| **Public Nav** | Hamburger menu | Horizontal links | Horizontal links |
+| **Tables** | Horizontal scroll | Full table | Full table |
+| **Modals** | Full-width (100% - 1rem) | Centered, max-width 600px | Same |
+| **Forms** | Single column, full-width | Multi-column where appropriate | Same |
+| **Grid layouts** | 1 column | 2 columns | 3-4 columns |
+| **Touch Targets** | Minimum 44x44px | Standard sizing | Standard sizing |
+| **Font Size** | Base 16px minimum | Base 16px | Base 16px |
+
+### Long Strings (IPv6, Tor, Tokens, Hashes)
+
+**Long unbreakable strings WILL break mobile layouts if not handled properly.**
+
+| String Type | Example Length | Example |
+|-------------|----------------|---------|
+| IPv6 address | 39 chars | `2001:0db8:85a3:0000:0000:8a2e:0370:7334` |
+| Tor v3 .onion | 62 chars | `duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion` |
+| I2P .b32.i2p | 60 chars | `ukeu3k5oycgaauneqgtnvselmt4yemvoilkln7jpvamvfx7dnkdq.b32.i2p` |
+| API token | 32-64 chars | `tok_EXAMPLE1234567890abcdefghij...` |
+| SHA-256 hash | 64 chars | `e3b0c44298fc1c149afbf4c8996fb924...` |
+| UUID | 36 chars | `550e8400-e29b-41d4-a716-446655440000` |
+| Base64 data | Variable | Long encoded strings |
+
+**Two treatments — pick by whether a copy button sits next to the value.**
+
+**No adjacent copy control → wrap in place** (table cells, list rows, plain inline text — the reader has no other way to see the full value):
+
+```css
+/* Apply to elements containing: IPs, hashes, tokens, codes with no copy button nearby */
+.long-string,
+.ip-address,
+.api-token,
+.hash,
+.uuid,
+.monospace-data {
+  /* Break long strings to prevent overflow */
+  word-break: break-all;
+  overflow-wrap: break-word;
+
+  /* Ensure monospace for readability */
+  font-family: monospace;
+
+  /* Optional: smaller font on mobile */
+  font-size: 0.875rem;
+}
+```
+
+**Adjacent copy button → single-line scroll-box, never wrap** (the copy button is the intended way to get the value, so hiding overflow behind a scroll costs nothing and keeps the pill from inflating to multiple lines):
+
+```css
+.onion-address,
+.i2p-address,
+.copy-value {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  font-family: monospace;
+  font-size: 0.875rem;
+}
+
+/* Alternative: horizontal scroll for code blocks */
+.code-block {
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+```
+
+Apply `.copy-value` to any other long-string element (setup token, API token, session ID) rendered next to a copy-to-clipboard button.
+
+**Where to apply:**
+
+| Context | CSS Class | Behavior |
+|---------|-----------|----------|
+| Inline display, no copy button (tables, lists) | `.long-string` | Word-break to wrap |
+| Onion / I2P address (always has a copy button) | `.onion-address` / `.i2p-address` | Single-line scroll, never wrap |
+| Any other value with an adjacent copy button | `.copy-value` | Single-line scroll, never wrap |
+| Code blocks | `.code-block` | Horizontal scroll |
+| Copy-friendly fields with no copy button | `.monospace-data` | Word-break + select all |
+
+**NEVER let long strings overflow their container or break mobile layouts.**
+
+### Footer (Mobile-First)
+
+```css
+/* Footer always at bottom - mobile-first */
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1;
+}
+
+footer {
+  text-align: center;
+  padding: 1rem;
+  font-size: 0.875rem;
+}
+
+/* Tight row spacing - rows are consecutive <p> elements, never <br /> spacers */
+footer p {
+  margin: 0.25rem 0;
+}
+
+@media (min-width: 768px) {
+  footer {
+    padding: 1.5rem;
+  }
+}
 ```
 
 ---
@@ -21574,83 +21909,6 @@ document.addEventListener('click', function(e) {
 
 ---
 
-### Long Strings (IPv6, Tor, Tokens, Hashes)
-
-**Long unbreakable strings WILL break mobile layouts if not handled properly.**
-
-| String Type | Example Length | Example |
-|-------------|----------------|---------|
-| IPv6 address | 39 chars | `2001:0db8:85a3:0000:0000:8a2e:0370:7334` |
-| Tor v3 .onion | 62 chars | `duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion` |
-| I2P .b32.i2p | 60 chars | `ukeu3k5oycgaauneqgtnvselmt4yemvoilkln7jpvamvfx7dnkdq.b32.i2p` |
-| API token | 32-64 chars | `tok_EXAMPLE1234567890abcdefghij...` |
-| SHA-256 hash | 64 chars | `e3b0c44298fc1c149afbf4c8996fb924...` |
-| UUID | 36 chars | `550e8400-e29b-41d4-a716-446655440000` |
-| Base64 data | Variable | Long encoded strings |
-
-**Two treatments — pick by whether a copy button sits next to the value.**
-
-**No adjacent copy control → wrap in place** (table cells, list rows, plain inline text — the reader has no other way to see the full value):
-
-```css
-/* Apply to elements containing: IPs, hashes, tokens, codes with no copy button nearby */
-.long-string,
-.ip-address,
-.api-token,
-.hash,
-.uuid,
-.monospace-data {
-  /* Break long strings to prevent overflow */
-  word-break: break-all;
-  overflow-wrap: break-word;
-
-  /* Ensure monospace for readability */
-  font-family: monospace;
-
-  /* Optional: smaller font on mobile */
-  font-size: 0.875rem;
-}
-```
-
-**Adjacent copy button → single-line scroll-box, never wrap** (the copy button is the intended way to get the value, so hiding overflow behind a scroll costs nothing and keeps the pill from inflating to multiple lines):
-
-```css
-.onion-address,
-.i2p-address,
-.copy-value {
-  display: inline-block;
-  max-width: 100%;
-  overflow-x: auto;
-  white-space: nowrap;
-  -webkit-overflow-scrolling: touch;
-  font-family: monospace;
-  font-size: 0.875rem;
-}
-
-/* Alternative: horizontal scroll for code blocks */
-.code-block {
-  overflow-x: auto;
-  white-space: nowrap;
-  -webkit-overflow-scrolling: touch;
-}
-```
-
-Apply `.copy-value` to any other long-string element (setup token, API token, session ID) rendered next to a copy-to-clipboard button.
-
-**Where to apply:**
-
-| Context | CSS Class | Behavior |
-|---------|-----------|----------|
-| Inline display, no copy button (tables, lists) | `.long-string` | Word-break to wrap |
-| Onion / I2P address (always has a copy button) | `.onion-address` / `.i2p-address` | Single-line scroll, never wrap |
-| Any other value with an adjacent copy button | `.copy-value` | Single-line scroll, never wrap |
-| Code blocks | `.code-block` | Horizontal scroll |
-| Copy-friendly fields with no copy button | `.monospace-data` | Word-break + select all |
-
-**NEVER let long strings overflow their container or break mobile layouts.**
-
----
-
 ## CSS — Font Family Variables
 
 Use CSS custom properties for repeated or long strings. Never hardcode them inline.
@@ -21666,46 +21924,44 @@ Use CSS custom properties for repeated or long strings. Never hardcode them inli
 }
 ```
 
----
-
 ## CSS Variable Reference
 
-Full `:root` block — copy verbatim into your `static/css/variables.css`:
+**All components use these CSS variables for consistent theming** — copy the block into `static/css/variables.css`:
 
 ```css
 :root {
-  /* --- Colors (dark theme defaults; overridden by .theme-light) --- */
-  --color-bg:          #282a36;
-  --color-fg:          #f8f8f2;
-  --color-primary:     #bd93f9;
-  --color-secondary:   #50fa7b;
-  --color-accent:      #ff79c6;
-  --color-success:     #50fa7b;
-  --color-warning:     #ffb86c;
-  --color-error:       #ff5555;
-  --color-info:        #8be9fd;
-  --color-on-error:    #ffffff;
-  /* Status banner/tint pairs (background + readable text) */
-  --color-success-bg:  rgba(80, 250, 123, 0.15);
-  --color-success-text:#50fa7b;
-  --color-warning-bg:  rgba(255, 184, 108, 0.15);
-  --color-warning-text:#ffb86c;
-  --color-error-bg:    rgba(255, 85, 85, 0.15);
-  --color-error-text:  #ff5555;
-  --color-info-bg:     rgba(139, 233, 253, 0.15);
-  --color-info-text:   #8be9fd;
-  --color-surface:     #2b2d3a;
-  --color-surface-alt: #21222c;
-  --color-border:      #44475a;
-  --color-muted:       #6272a4;
+  /* Backgrounds — dark palette */
+  --color-bg: #282a36;
+  --color-bg-secondary: #21222c;
+  --color-bg-card: #2b2d3a;
+  --color-bg-hover: #343746;
+  --color-bg-active: #44475a;
+  --color-code-bg: rgba(255, 255, 255, 0.1);
 
-  /* --- Typography --- */
-  --font-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace,
-    SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
-    monospace;
-  --font-serif: "Lora", Georgia, "Times New Roman", Times, serif;
+  /* Text */
+  --color-text: #f8f8f2;
+  --color-muted: #6272a4;
+
+  /* Borders */
+  --color-border: #44475a;
+  --color-border-hover: #6272a4;
+
+  /* Status colors */
+  --color-success: #50fa7b;
+  --color-success-bg: rgba(80, 250, 123, 0.15);
+  --color-error: #ff5555;
+  --color-error-bg: rgba(255, 85, 85, 0.15);
+  --color-warning: #ffb86c;
+  --color-warning-bg: rgba(255, 184, 108, 0.15);
+  --color-info: #8be9fd;
+  --color-info-bg: rgba(139, 233, 253, 0.15);
+  --color-primary: #bd93f9;
+  --color-primary-bg: rgba(189, 147, 249, 0.15);
+  --color-secondary: #50fa7b;
+  --color-accent: #ff79c6;
+  --color-on-error: #ffffff;
+
+  /* Typography (font families defined in "CSS — Font Family Variables" above) */
   --font-size-xs:   0.75rem;
   --font-size-sm:   0.875rem;
   --font-size-base: 1rem;
@@ -21722,7 +21978,7 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
   --font-weight-semibold: 600;
   --font-weight-bold:     700;
 
-  /* --- Spacing (4 px base) --- */
+  /* Spacing (4px base) */
   --space-0:  0;
   --space-px: 1px;
   --space-1:  0.25rem;
@@ -21739,7 +21995,7 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
   --space-20: 5rem;
   --space-24: 6rem;
 
-  /* --- Border radius --- */
+  /* Border radius */
   --radius-none: 0;
   --radius-sm:   0.125rem;
   --radius-base: 0.25rem;
@@ -21750,7 +22006,7 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
   --radius-3xl:  1.5rem;
   --radius-full: 9999px;
 
-  /* --- Shadows --- */
+  /* Shadows */
   --shadow-sm:  0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-base: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   --shadow-md:  0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
@@ -21758,7 +22014,7 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
   --shadow-xl:  0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
 
-  /* --- Z-index layers --- */
+  /* Z-index layers */
   --z-below:   -1;
   --z-base:     0;
   --z-raised:   10;
@@ -21769,43 +22025,42 @@ Full `:root` block — copy verbatim into your `static/css/variables.css`:
   --z-toast:    500;
   --z-tooltip:  600;
 
-  /* --- Transitions --- */
+  /* Transitions */
   --transition-fast:   150ms ease;
   --transition-base:   250ms ease;
   --transition-slow:   400ms ease;
   --transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* --- Focus ring --- */
+  /* Focus ring */
   --focus-ring: 0 0 0 3px var(--color-primary);
   --focus-ring-offset: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-primary);
 }
 
-/* Light theme overrides */
-.theme-light {
-  /* based on GitHub Light */
-  --color-bg:          #ffffff;
-  --color-fg:          #1f2328;
-  --color-primary:     #0969da;
-  --color-secondary:   #1a7f37;
-  --color-accent:      #8250df;
-  --color-success:     #1a7f37;
-  --color-warning:     #9a6700;
-  --color-error:       #d1242f;
-  --color-info:        #0969da;
-  --color-on-error:    #ffffff;
-  /* Status banner/tint pairs (background + readable text) */
-  --color-success-bg:  rgba(26, 127, 55, 0.12);
-  --color-success-text:#1a7f37;
-  --color-warning-bg:  rgba(154, 103, 0, 0.12);
-  --color-warning-text:#9a6700;
-  --color-error-bg:    rgba(209, 36, 47, 0.12);
-  --color-error-text:  #d1242f;
-  --color-info-bg:     rgba(9, 105, 218, 0.12);
-  --color-info-text:   #0969da;
-  --color-surface:     #f6f8fa;
-  --color-surface-alt: #eff2f5;
-  --color-border:      #d1d9e0;
-  --color-muted:       #59636e;
+/* Light theme overrides — light palette, based on GitHub Light */
+html.theme-light {
+  --color-bg: #ffffff;
+  --color-bg-secondary: #f6f8fa;
+  --color-bg-card: #ffffff;
+  --color-bg-hover: #eff2f5;
+  --color-bg-active: #e6eaef;
+  --color-code-bg: rgba(0, 0, 0, 0.05);
+  --color-text: #1f2328;
+  --color-muted: #59636e;
+  --color-border: #d1d9e0;
+  --color-border-hover: #818b98;
+  --color-success: #1a7f37;
+  --color-success-bg: rgba(26, 127, 55, 0.12);
+  --color-error: #d1242f;
+  --color-error-bg: rgba(209, 36, 47, 0.12);
+  --color-warning: #9a6700;
+  --color-warning-bg: rgba(154, 103, 0, 0.12);
+  --color-info: #0969da;
+  --color-info-bg: rgba(9, 105, 218, 0.12);
+  --color-primary: #0969da;
+  --color-primary-bg: rgba(9, 105, 218, 0.12);
+  --color-secondary: #1a7f37;
+  --color-accent: #8250df;
+  --color-on-error: #ffffff;
 }
 ```
 
@@ -21868,6 +22123,16 @@ This rule governs the entire spec — it is not restricted to buttons, not restr
 
 ## Technology Stack
 
+| Rule | Description | Details |
+|------|-------------|---------|
+| **Tera Templates** | ALL HTML uses Tera (`tera` crate) | See Template Rules below |
+| **Pure Vanilla JS** | NO frameworks | See JavaScript Rules below |
+| **CSS-First** | Prefer CSS over JS | See CSS Rules below |
+| **NO JS Alerts** | Use custom modals/toasts | See UI Components below |
+| **NO Inline CSS/JS** | External files only | See CSS/JS Rules below |
+
+**Rust frontend stack:**
+
 | Layer | Technology |
 |---|---|
 | Language | Rust |
@@ -21878,16 +22143,78 @@ This rule governs the entire spec — it is not restricted to buttons, not restr
 | JavaScript | Vanilla ES modules (no bundler required) |
 | Static files | `tower-http::services::ServeDir` |
 | Embedded assets | `rust-embed` |
+| JSON | `serde_json` |
+| HTTP client | `reqwest` |
+| HTML sanitizer | `ammonia` |
+| Logging | `tracing` + `tracing-subscriber` |
 | Fonts | System UI stack + optional Google Fonts |
 | Icons | Inline SVG |
-
----
 
 ## UI Components
 
 **No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works.
 
 ### Buttons
+
+| Type | Use For | Style |
+|------|---------|-------|
+| Primary | Main actions (Save, Submit, Create) | Filled, brand color |
+| Secondary | Alternative actions (Cancel, Back) | Outlined or muted |
+| Danger | Destructive actions (Delete, Remove) | Red, requires confirmation |
+| Icon | Compact actions (Edit, Copy, Refresh) | Icon only with tooltip |
+
+**Button States:** Normal, Hover, Active, Disabled, Loading
+
+**Submit Button Behavior :**
+
+| Rule | Implementation |
+|------|----------------|
+| **Single submit only** | Disable button immediately on click (prevent double-submit) |
+| **Show action state** | Change text to indicate action (Saving..., Searching..., Loading...) |
+| **Re-enable on complete** | Re-enable button after success OR error response |
+| **Preserve width** | Button width should not change when text changes |
+
+**Loading Text Examples:**
+
+| Original | Loading State |
+|----------|---------------|
+| Save | Saving... |
+| Search | Searching... |
+| Submit | Submitting... |
+| Create | Creating... |
+| Delete | Deleting... |
+| Send | Sending... |
+| Login | Logging in... |
+| Register | Registering... |
+| Upload | Uploading... |
+| Download | Downloading... |
+
+```html
+<!-- Submit button with loading state (bound in app.js - inline handlers are never allowed) -->
+<button type="submit" id="save-btn" data-action="submit-loading" data-loading-text="Saving...">
+  Save
+</button>
+```
+
+```javascript
+// app.js - disable button + show loading text on submit (bound via data-action)
+const btn = document.getElementById('save-btn');
+btn.closest('form').addEventListener('submit', () => {
+  btn.disabled = true;
+  btn.textContent = btn.dataset.loadingText;
+});
+
+// Re-enable after response
+fetch('/api/save', { method: 'POST', body: data })
+  .then(response => { /* handle success */ })
+  .catch(error => { /* handle error */ })
+  .finally(() => {
+    btn.disabled = false;
+    btn.textContent = 'Save';
+  });
+```
+
+**Button markup & base styles:**
 
 ```html
 <!-- Primary -->
@@ -21930,22 +22257,23 @@ This rule governs the entire spec — it is not restricted to buttons, not restr
 }
 .btn:focus-visible { box-shadow: var(--focus-ring-offset); outline: none; }
 .btn-primary   { background: var(--color-primary);   color: var(--color-bg); }
-.btn-secondary { background: var(--color-surface);   color: var(--color-fg); border-color: var(--color-border); }
+.btn-secondary { background: var(--color-bg-card);   color: var(--color-text); border-color: var(--color-border); }
 .btn-danger    { background: var(--color-error);     color: var(--color-on-error); }
-.btn-ghost     { background: transparent;            color: var(--color-fg); border-color: var(--color-border); }
+.btn-ghost     { background: transparent;            color: var(--color-text); border-color: var(--color-border); }
 .btn[disabled], .btn[aria-busy="true"] { opacity: 0.6; cursor: not-allowed; }
 ```
 
-
 ### Toggle Switches
+
+**CSS-only toggle using hidden checkbox:**
 
 ```html
 <label class="toggle">
-  <input type="checkbox" role="switch" aria-checked="false">
+  <input type="checkbox" name="setting" role="switch" aria-checked="false">
   <span class="toggle-track">
     <span class="toggle-thumb"></span>
   </span>
-  <span class="toggle-label">Enable notifications</span>
+  <span class="toggle-label">Enable Feature</span>
 </label>
 ```
 
@@ -21955,7 +22283,7 @@ This rule governs the entire spec — it is not restricted to buttons, not restr
   position: relative;
   width: 2.5rem;
   height: 1.5rem;
-  background: var(--color-surface-alt);
+  background: var(--color-bg-secondary);
   border-radius: var(--radius-full);
   border: 1px solid var(--color-border);
   transition: background var(--transition-fast);
@@ -21976,49 +22304,274 @@ This rule governs the entire spec — it is not restricted to buttons, not restr
 
 ### Modals
 
+**Modal Behavior :**
+
+| Action | Modal Behavior |
+|--------|----------------|
+| Success (Save, Submit, Create) | Close automatically after success |
+| Error | Stay open, display error message |
+| Cancel button clicked | Close immediately |
+| Escape key pressed | Close immediately |
+| Backdrop clicked | Close immediately |
+| Form with unsaved changes | Warn before closing |
+
+**Modal Features:**
+- Focus trap (Tab stays within modal)
+- Escape key closes modal
+- Backdrop click closes modal
+- Body scroll locked while open
+- Centered vertically and horizontally
+- Responsive (full-width on mobile)
+
+**Accessibility :**
+
+| Requirement | Implementation |
+|-------------|----------------|
+| **Focus trap** | Tab/Shift+Tab cycles through modal elements only |
+| **Initial focus** | First focusable element OR primary action button |
+| **Return focus** | Restore focus to trigger element on close |
+| **ARIA attributes** | `role="dialog"`, `aria-modal="true"`, `aria-labelledby` |
+| **Escape key** | Close modal (unless confirmation required) |
+| **Screen reader** | Announce modal title on open |
+
 ```html
-<dialog class="modal" id="confirm-delete-modal" aria-labelledby="modal-title" aria-modal="true">
-  <div class="modal-content">
-    <header class="modal-header">
-      <h2 id="modal-title" class="modal-title">Confirm Delete</h2>
-      <form method="dialog">
-        <button class="btn btn-icon modal-close" aria-label="Close dialog">
-          <svg>…</svg>
-        </button>
-      </form>
-    </header>
-    <div class="modal-body">
-      <p>Are you sure you want to delete this item? This action cannot be undone.</p>
-    </div>
-    <footer class="modal-footer">
-      <form method="dialog">
-        <button class="btn btn-secondary">Cancel</button>
-      </form>
-      <button type="submit" class="btn btn-danger" form="delete-form">Delete</button>
-    </footer>
-  </div>
+<!-- Modal structure using native <dialog> -->
+<dialog id="confirm-modal" aria-labelledby="modal-title">
+  <header>
+    <h2 id="modal-title">Modal Title</h2>
+    <!-- form method="dialog" closes the dialog with zero JS (CSP-safe) -->
+    <form method="dialog">
+      <button aria-label="Close">✕</button>
+    </form>
+  </header>
+  <main>Modal content here</main>
+  <footer>
+    <form method="dialog">
+      <button>Cancel</button>
+    </form>
+    <button type="submit" autofocus>Confirm</button>
+  </footer>
 </dialog>
 ```
+
+**Note:** Native `<dialog>` element handles focus trap and backdrop automatically. Use `showModal()` to open with backdrop; close/cancel buttons use `<form method="dialog">` — zero JS and CSP-safe.
 
 The Cancel and X buttons close the dialog natively via `<form method="dialog">` — zero JavaScript, and `Esc` closes it as well. Only opening the modal uses JS (`showModal()` has no HTML equivalent for `<dialog>`), which is a permitted enhancement: without JS the triggering action falls back to its plain-page flow.
 
 ```javascript
 // Open — the only JS the modal needs; closing is native <form method="dialog">
-document.getElementById('confirm-delete-modal').showModal();
+document.getElementById('confirm-modal').showModal();
 // Close on backdrop click (enhancement)
 modal.addEventListener('click', e => { if (e.target === modal) modal.close(); });
 ```
 
+### Toast vs Modal: When to Use Which
+
+**Toasts and modals serve DIFFERENT purposes. Do NOT use them interchangeably.**
+
+**Quick Reference:**
+
+| Scenario | Use | Reason |
+|----------|-----|--------|
+| "Settings saved" | **Toast** | Non-blocking confirmation |
+| "Are you sure you want to delete?" | **Modal** | Requires user decision |
+| "File uploaded successfully" | **Toast** | Non-blocking confirmation |
+| "Enter new password" | **Modal** | Requires user input |
+| "Network error, try again" | **Toast** | Informational, user can retry |
+| "Session expired, please login" | **Modal** | Blocking, requires action |
+| "Item added to cart" | **Toast** | Non-blocking confirmation |
+| "Select shipping address" | **Modal** | Requires user selection |
+| "Email sent" | **Toast** | Non-blocking confirmation |
+| "Confirm your email address" | **Modal** | Requires user input/action |
+
+**Use TOAST When:**
+
+| Criteria | Examples |
+|----------|----------|
+| **Confirmation of action** | "Saved", "Deleted", "Copied", "Sent" |
+| **Non-blocking information** | "New update available", "You have 3 notifications" |
+| **Transient feedback** | "Loading...", "Processing..." |
+| **Errors that don't need input** | "Network error", "Rate limited, try again" |
+| **User can continue working** | Any message that doesn't require immediate attention |
+
+**Use MODAL When:**
+
+| Criteria | Examples |
+|----------|----------|
+| **Requires user decision** | "Delete this item?", "Discard unsaved changes?" |
+| **Requires user input** | Forms, password entry, settings that need confirmation |
+| **Destructive action confirmation** | Delete, remove, revoke, disconnect |
+| **Blocking workflow** | Must complete before continuing (login, terms acceptance) |
+| **Complex information** | Details that need space (error details, help text) |
+| **Multi-step process** | Wizards, setup flows, guided processes |
+
+**NEVER Do This:**
+
+| Wrong | Right |
+|-------|-------|
+| Toast: "Are you sure?" | Modal: "Are you sure?" (needs decision) |
+| Modal: "Settings saved" | Toast: "Settings saved" (just confirmation) |
+| Toast with buttons | Modal with buttons (toasts should auto-dismiss) |
+| Modal for every error | Toast for simple errors (modal for blocking errors) |
+| Stacking modals | One modal at a time (queue if needed) |
+| Toast requiring action | Modal if action required |
+
+**Decision Flowchart:**
+```
+Does user need to make a decision or provide input?
+├── YES → Use MODAL
+└── NO → Does user need to acknowledge before continuing?
+         ├── YES → Use MODAL
+         └── NO → Is it destructive action confirmation?
+                  ├── YES → Use MODAL
+                  └── NO → Use TOAST
+```
+
+**Code Pattern:**
+```javascript
+// TOAST - Non-blocking feedback
+async function saveSettings(data) {
+    // server config is file-only (server.yml); no API endpoint
+    if (result.ok) {
+        // Non-blocking, auto-dismiss
+        showToast('Settings saved', 'success');
+    } else {
+        // Non-blocking error
+        showToast('Failed to save settings', 'error');
+    }
+}
+
+// MODAL - Blocking decision required
+function deleteItem(itemId) {
+    showModal({
+        title: 'Delete Item',
+        message: 'Are you sure you want to delete this item? This cannot be undone.',
+        confirmText: 'Delete',
+        confirmStyle: 'danger',
+        onConfirm: async () => {
+            await api.delete(`/items/${itemId}`);
+            // Confirmation after action
+            showToast('Item deleted', 'success');
+        }
+    });
+}
+```
+
 ### Toast Notifications
 
+**In-app notifications for immediate feedback. Follows common patterns (GitHub, GitLab, Slack).**
+
+**No-JS fallback:** toasts are a JS enhancement for AJAX actions. Non-AJAX form POSTs get a server-rendered flash message instead — rendered into the page on the post-submit redirect and auto-faded via CSS animation — so action feedback works without JavaScript.
+
+**Toast Behavior Rules:**
+
+| Rule | Value | Description |
+|------|-------|-------------|
+| **Position** | Top-right corner | Fixed position, doesn't scroll with page |
+| **Stacking** | Vertical, newest on top | Multiple toasts stack without overlapping |
+| **Max visible** | 5 toasts | Older toasts queue until space available |
+| **Auto-dismiss** | 3 seconds (default) | Countdown visible, can be paused on hover |
+| **Click to dismiss** | Always | User can click X or entire toast to dismiss |
+| **Keyboard dismiss** | Escape key | Dismisses topmost toast |
+| **Animation** | Slide in from right | Fade out on dismiss |
+| **Pause on hover** | Yes | Hovering pauses auto-dismiss countdown |
+
+**Toast Types:**
+
+| Type | Icon | Auto-dismiss | Use For |
+|------|------|--------------|---------|
+| **Success** | ✓ (checkmark) | 3 seconds | Action completed successfully |
+| **Error** | ✗ (X) | No auto-dismiss | Action failed, needs attention |
+| **Warning** | ⚠ (triangle) | 5 seconds | Caution needed, action may have issues |
+| **Info** | ℹ (info) | 3 seconds | General information, tips |
+
+**Toast Structure:**
 ```html
-<div class="toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
+<div class="toast toast-success" role="alert" aria-live="polite">
+  <span class="toast-icon">✓</span>
+  <span class="toast-message">Settings saved successfully</span>
+  <button class="toast-close" aria-label="Dismiss">&times;</button>
+  <div class="toast-progress"></div>
+</div>
 ```
+
+**Toast Container (for stacking):**
+```html
+<div id="toast-container" aria-label="Notifications">
+  <!-- Toasts inserted here, newest first -->
+</div>
+```
+
+**CSS for Stacking:**
+```css
+#toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: calc(100vh - 2rem);
+  overflow: hidden;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  animation: slideIn 0.3s ease-out;
+  position: relative;
+  min-width: 300px;
+  max-width: 400px;
+}
+
+.toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: rgba(255,255,255,0.5);
+  animation: countdown linear forwards;
+}
+
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } }
+@keyframes countdown { from { width: 100%; } to { width: 0%; } }
+
+/* Pause on hover is pure CSS - JS only syncs the removal timer */
+.toast:hover .toast-progress {
+  animation-play-state: paused;
+}
+```
+
+**JavaScript Toast API:**
+```javascript
+// Show toast - returns toast ID for programmatic control
+// 3s auto-dismiss
+const toastId = showToast("Settings saved", "success");
+// No auto-dismiss
+const toastId = showToast("Save failed", "error");
+// 5s auto-dismiss
+const toastId = showToast("Check your input", "warning", 5000);
+// 3s auto-dismiss
+const toastId = showToast("Tip: Use shortcuts", "info");
+
+// Dismiss programmatically
+dismissToast(toastId);
+
+// Dismiss all
+dismissAllToasts();
+```
+
+**Toast implementation (external `static/js/app.js`):**
 
 ```javascript
 // Auto-dismiss defaults: success/info 3s, warning 5s, error never (duration 0 = manual dismiss)
 function showToast(message, type = 'info', duration = 3000) {
-  const container = document.querySelector('.toast-container');
+  const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
@@ -22034,80 +22587,9 @@ function showToast(message, type = 'info', duration = 3000) {
 }
 ```
 
-Toasts are a JS enhancement for AJAX actions. Non-AJAX form POSTs get a server-rendered flash message instead: the redirect target renders the message in the same toast styling (auto-fade via CSS animation), so action feedback works without JavaScript — no dead ends.
-
-```css
-.toast-container {
-  position: fixed;
-  bottom: var(--space-6);
-  right: var(--space-6);
-  z-index: var(--z-toast);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.toast {
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  background: var(--color-surface);
-  color: var(--color-fg);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-lg);
-  opacity: 0;
-  transform: translateY(var(--space-4));
-  transition: opacity var(--transition-base), transform var(--transition-base);
-}
-.toast-visible { opacity: 1; transform: none; }
-.toast-success { border-color: var(--color-success); }
-.toast-warning { border-color: var(--color-warning); }
-.toast-error   { border-color: var(--color-error);   }
-```
-
-### Announcements
-
-**Operator messages (configured in `server.yml`) shown in UI for downtime notices, updates, etc.**
-
-Active announcements are rendered by the Site Banner (below) — multiple active announcements stack in config order.
-
-```yaml
-web:
-  announcements:
-    enabled: true
-    # List of announcement messages
-    messages: []
-```
-
-**Announcement structure:**
-
-```yaml
-messages:
-  - id: "maintenance-2025-01"
-    type: warning
-    # warning, info, error, success
-    title: "Scheduled Maintenance"
-    message: "The server will be down for maintenance on Jan 15, 2025 from 2-4 AM UTC."
-    start: "2025-01-14T00:00:00Z"
-    # When to start showing
-    end: "2025-01-15T04:00:00Z"
-    # When to stop showing
-    dismissible: true
-    # User can dismiss
-```
-
-| Element | Config Key | Description |
-|---|---|---|
-| Enable announcements | `announcements.enabled` | Turn announcements on/off |
-| Type | `announcements[].type` | warning, info, error, success |
-| Title | `announcements[].title` | Short title |
-| Message | `announcements[].message` | Full message content |
-| Start date | `announcements[].start` | When to start showing (ISO 8601) |
-| End date | `announcements[].end` | When to stop showing (ISO 8601) |
-| Dismissible | `announcements[].dismissible` | Allow users to dismiss |
-
 ### Site Banner
 
-**Site-wide announcements (scheduled maintenance, service notices) are a server-rendered banner — the FIRST element inside `<body>`, before `<main>`. No notification center, no bell icon — API projects have no user accounts and no server-side notification storage (see PART 17 → "Notification Storage"). The banner renders without JavaScript, and dismissal works without JavaScript too — the X button is a tiny POST form; JS only removes the reload.**
+**Site-wide announcements (scheduled maintenance, service notices) are a server-rendered banner — the FIRST element inside `<body>`, before `<main>`. No notification center, no bell icon — API projects have no user accounts and no server-side notification storage (see PART 17 → "Notification Storage"). The banner renders and dismisses without JavaScript; JS only makes dismissal reload-free.**
 
 **Banner Behavior:**
 
@@ -22122,12 +22604,14 @@ messages:
 | **Expiry** | Per-announcement `start`/`end` (ISO 8601, UTC); outside the window = banner not rendered |
 | **Stacking** | Multiple active announcements stack in config order; cookie consent and the PWA update banner share the slot, ordered: cookie consent → announcements → PWA update |
 
+**HTML Structure:**
 ```html
 <body>
   <div class="site-banner site-banner-warning" role="alert" data-announcement-id="maintenance-2025-01">
     <span class="site-banner-icon" aria-hidden="true">⚠</span>
     <span class="site-banner-text">Scheduled maintenance: 2026-07-06 02:00–04:00 UTC</span>
-    <form method="post" action="/announcements/dismiss">
+    <!-- Dismissal works with zero JS - the server appends the id to the cookie and redirects back -->
+    <form method="post" action="/announcements/dismiss" class="site-banner-dismiss">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="id" value="maintenance-2025-01">
       <input type="hidden" name="return_to" value="{{ current_path }}">
@@ -22143,35 +22627,43 @@ messages:
 
 The server only renders banners whose `id` is absent from the `dismissed_announcements` cookie; `POST /announcements/dismiss` appends the submitted `id` to that cookie and redirects back to `return_to` (same-site relative paths only, as with `/consent`).
 
+**CSS:**
 ```css
 .site-banner {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  font-size: var(--font-size-sm);
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
   background: var(--color-info-bg);
   color: var(--color-info-text);
 }
+
 .site-banner-warning, .site-banner-error {
   background: var(--color-warning-bg);
   color: var(--color-warning-text);
 }
-.site-banner-text { flex: 1; text-align: center; }
+
+.site-banner-text {
+  flex: 1;
+  text-align: center;
+}
+
 .site-banner-close {
   background: none;
   border: none;
   cursor: pointer;
   color: inherit;
-  font-size: var(--font-size-lg);
+  font-size: 1.25rem;
   line-height: 1;
 }
 ```
 
+**Dismissal JavaScript (enhancement only — the form POST works without it):**
 ```javascript
 // No-reload enhancement — the POST /announcements/dismiss fallback always works.
 // Dismissal is keyed on the announcement id — changing the id resets dismissals.
-document.querySelectorAll(".site-banner form").forEach((form) => {
+document.querySelectorAll(".site-banner .site-banner-dismiss").forEach((form) => {
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const id = form.elements.id.value;
@@ -22187,10 +22679,16 @@ document.querySelectorAll(".site-banner form").forEach((form) => {
 
 ### Theme Toggle
 
+**Theme toggle button in header, last item in the header-actions zone. No user accounts — but see "Header Layout" above for the profile/preferences zone that sits directly to its left, which is dependent on `owner_token` cookie state, not accounts/sessions.**
+
+**Theme Toggle Behavior:**
+
 | Feature | Description |
 |---------|-------------|
+| **Position** | Header, right side, last item (after the profile/preferences zone) |
 | **Options** | Dark / Light / Auto (follows OS preference) |
-| **Persistence** | `theme` cookie (`light` \| `dark` \| `auto`) — server-readable, so `detect_theme()` (see "System Theme Detection") renders the class on `<html>` with no init JS and no FOUC |
+| **Persistence** | `theme` cookie (`light` \| `dark` \| `auto`) — server-readable, so the theme class is rendered on `<html>` with no init JS and no FOUC |
+| **Keyboard** | Enter/Space cycles modes |
 | **Cycle order** | dark → light → auto → dark (wraps) — see "Theme Cycle Logic" below |
 | **No-JS fallback** | Auto theming works from pure CSS (`prefers-color-scheme`); the button IS a form submit, so switching without JS works identically to switching with JS |
 
@@ -22209,16 +22707,39 @@ fn next_theme(current: &str) -> &'static str {
 }
 ```
 
+**HTML Structure (no-JS-safe form; JS below is progressive enhancement only):**
 ```html
-<!-- {{ next_theme(theme) }} is a Tera call to the next_theme() helper above -->
-<form action="/preferences" method="POST" class="theme-toggle-form">
+<form action="/server/preferences" method="POST" class="theme-toggle-form">
   <input type="hidden" name="theme" value="{{ next_theme(theme) }}">
-  <button type="submit" class="btn btn-icon theme-button" aria-label="Switch theme (currently {{ theme }})" title="Switch theme">
-    <svg class="icon-theme" aria-hidden="true"><!-- reflects theme: moon/sun/circle-half --></svg>
+  <button type="submit" class="theme-button" aria-label="Switch theme (currently {{ theme }})" title="Switch theme">
+    <svg class="icon-dark"><!-- moon, shown when theme == "dark" --></svg>
+    <svg class="icon-light"><!-- sun, shown when theme == "light" --></svg>
+    <svg class="icon-auto"><!-- circle-half, shown when theme == "auto" --></svg>
   </button>
 </form>
 ```
 
+**CSS for Header Actions:**
+```css
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.theme-toggle-form {
+  display: flex;
+}
+
+.theme-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+```
 There is no client-side init and no `matchMedia` script. The only JS is an optional instant-preview enhancement (external file) — it does not intercept or replace the submit, so the cookie is always set server-side on every click, with or without JS:
 
 ```javascript
@@ -22246,15 +22767,27 @@ document.querySelectorAll('.theme-toggle-form').forEach((form) => {
 });
 ```
 
+- See PART 17: EMAIL & NOTIFICATIONS for full notification specification
 
 ### Empty States
 
+**Every list, table, and data view MUST have a proper empty state - NEVER show blank space.**
+
+| Scenario | Display | Call to Action |
+|----------|---------|----------------|
+| No search results | "No results found for '{query}'" | Suggest clearing filters or different search |
+| Empty list | "No {items} yet" | "Create your first {item}" button |
+| Empty table | Friendly message in table body | Action button or instructions |
+| Failed to load | Error message | "Retry" button |
+| No permissions | "You don't have access to this" | Link to request access or go back |
+
+**Empty State Structure:**
 ```html
 <div class="empty-state">
-  <svg class="empty-state-icon" aria-hidden="true">…</svg>
-  <h3 class="empty-state-title">No results found</h3>
-  <p class="empty-state-body">Try adjusting your search or filters.</p>
-  <a href="/new" class="btn btn-primary">Create one</a>
+  <svg class="empty-state-icon"><!-- relevant icon --></svg>
+  <h3 class="empty-state-title">No items yet</h3>
+  <p class="empty-state-message">Create your first item to get started.</p>
+  <a href="/items/new" class="btn btn-primary">Create Item</a>
 </div>
 ```
 
@@ -22269,13 +22802,103 @@ document.querySelectorAll('.theme-toggle-form').forEach((form) => {
 }
 .empty-state-icon { width: 3rem; height: 3rem; color: var(--color-muted); }
 .empty-state-title { font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold); }
-.empty-state-body  { color: var(--color-muted); max-width: 40ch; }
+.empty-state-message { color: var(--color-muted); max-width: 40ch; }
 ```
+
+**Rules:**
+- Always include an icon or illustration
+- Title should be short and clear
+- Message should explain what to do next
+- Include action button when user can fix the state
+- Center vertically and horizontally in the container
 
 ### Form Validation
 
+**All forms MUST provide clear, inline validation feedback.**
+
+**HTML5 first:** `required`, `pattern`, `min`/`max`, and `type="email"`/`type="url"`/`type="number"` are the first line of validation (see the "HTML5 & CSS Over JavaScript" table) — the browser blocks invalid submits with zero JS. CSS `:user-invalid` handles error-after-interaction styling with zero JS. JS only mirrors the field's `validationMessage` into the styled message element.
+
+| Rule | Implementation |
+|------|----------------|
+| **Validate on blur** | Show error when user leaves field (not while typing) |
+| **Inline errors** | Error message directly below the field, not in alert/modal |
+| **Highlight field** | Red border on invalid fields, green on valid (optional) |
+| **Clear on fix** | Remove error immediately when user corrects input |
+| **Submit validation** | Re-validate all fields on submit, focus first error |
+| **Accessible errors** | Use `aria-describedby` to link error to field |
+| **Trim whitespace** | Trim leading/trailing whitespace on all text inputs before validation |
+| **Password whitespace** | Reject passwords with leading/trailing whitespace (show error, don't trim) |
+
+**Error Message Style:**
 ```html
-<div class="field">
+<div class="form-group error">
+  <label for="email">Email</label>
+  <input type="email" id="email" name="email"
+         aria-describedby="email-error" aria-invalid="true">
+  <span id="email-error" class="field-error" role="alert">
+    Please enter a valid email address
+  </span>
+</div>
+```
+
+**Validation Timing:**
+
+| Event | Action |
+|-------|--------|
+| Field blur | Validate that field only |
+| Field input (after error shown) | Clear error when valid |
+| Form submit | Validate all fields, focus first error |
+| Field focus | Do NOT validate (let user type) |
+
+**Error Message Content:**
+
+| Field Type | Error Message |
+|------------|---------------|
+| Required empty | "{Field name} is required" |
+| Invalid email | "Please enter a valid email address" |
+| Password too short | "Password must be at least 8 characters" |
+| Password has whitespace | "Password cannot start or end with spaces" |
+| Passwords don't match | "Passwords do not match" |
+| Invalid URL | "Please enter a valid URL" |
+| Number out of range | "Value must be between {min} and {max}" |
+
+**CSS for Validation States:**
+```css
+/* Zero-JS error styling - :user-invalid matches only after interaction */
+input:user-invalid,
+select:user-invalid,
+textarea:user-invalid {
+  border-color: var(--color-error);
+}
+
+/* Show the styled message element purely via CSS once the field is invalid */
+input:user-invalid ~ .field-error,
+select:user-invalid ~ .field-error,
+textarea:user-invalid ~ .field-error {
+  display: block;
+}
+
+.form-group.error input,
+.form-group.error select,
+.form-group.error textarea {
+  border-color: var(--color-error);
+}
+
+.field-error {
+  color: var(--color-error);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+.form-group.success input {
+  border-color: var(--color-success);
+}
+```
+**Field hint pattern & base input styling:**
+
+```html
+<div class="form-group">
   <label class="label" for="email">Email</label>
   <input
     type="email"
@@ -22291,21 +22914,10 @@ document.querySelectorAll('.theme-toggle-form').forEach((form) => {
 </div>
 ```
 
-Error-after-interaction styling is pure CSS via `:user-invalid` (baseline 2023) — it matches only after the user has interacted with the field, so there is no blur-handler JS toggling `aria-invalid` classes and native validation blocks submission without any script (see "HTML5/CSS over JavaScript"). JS is optional and only mirrors the browser's `validationMessage` into the styled message element:
-
-```css
-.input:user-invalid {
-  border-color: var(--color-error);
-}
-.input:user-invalid ~ .field-error {
-  display: block;
-}
-```
-
 ```javascript
 // Optional enhancement: mirror the native validationMessage into the styled
 // error element — styling and submit-blocking already work without this
-document.querySelectorAll('.field input, .field select, .field textarea').forEach(el => {
+document.querySelectorAll('.form-group input, .form-group select, .form-group textarea').forEach(el => {
   el.addEventListener('invalid', () => {
     const error = document.getElementById(`${el.id}-error`);
     if (!error) return;
@@ -22316,24 +22928,21 @@ document.querySelectorAll('.field input, .field select, .field textarea').forEac
 ```
 
 ```css
-.field       { display: flex; flex-direction: column; gap: var(--space-1); }
+.form-group  { display: flex; flex-direction: column; gap: var(--space-1); }
 .label       { font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); }
 .input {
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-fg);
+  background: var(--color-bg-card);
+  color: var(--color-text);
   font-size: var(--font-size-base);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
-.input:focus         { border-color: var(--color-primary); box-shadow: var(--focus-ring); outline: none; }
+.input:focus { border-color: var(--color-primary); box-shadow: var(--focus-ring); outline: none; }
 .input[aria-invalid="true"] { border-color: var(--color-error); }
 .field-hint  { font-size: var(--font-size-xs); color: var(--color-muted); }
-.field-error { font-size: var(--font-size-xs); color: var(--color-error); }
 ```
-
----
 
 ## Import/Export UI Convention
 
@@ -22353,20 +22962,24 @@ document.querySelectorAll('.field input, .field select, .field textarea').forEac
 
 **Applies to (non-exhaustive — this is a rule, not a feature list):** audit log export, GDPR/CCPA data export, PGP key export, settings/config export, domain lists, created/shortened links, and any future export- or import-capable feature.
 
-## Accessibility (WCAG 2.1 AA)
+## Accessibility
+
+**WCAG 2.1 AA Compliance Required:**
 
 | Requirement | Implementation |
-|---|---|
-| Color contrast | Minimum 4.5:1 for normal text, 3:1 for large text |
-| Focus indicators | Visible `:focus-visible` ring on all interactive elements |
-| Keyboard navigation | All interactive elements reachable and operable by keyboard |
-| Skip link | `<a href="#main-content" class="skip-link">Skip to main content</a>` |
-| ARIA landmarks | `<header>`, `<nav>`, `<main>`, `<aside>`, `<footer>` |
-| ARIA live regions | `role="status"` / `role="alert"` / `aria-live` for dynamic content |
-| Image alt text | All `<img>` elements have descriptive `alt`; decorative images use `alt=""` |
-| Form labels | All form controls have a visible `<label>` or `aria-label` |
-| Error messages | Associated with the field via `aria-describedby` and `aria-invalid` |
-| Reduced motion | `@media (prefers-reduced-motion: reduce)` removes all non-essential transitions |
+|-------------|----------------|
+| **Keyboard Navigation** | All interactive elements focusable and operable via keyboard |
+| **Focus Indicators** | Visible `:focus-visible` ring on all focusable elements |
+| **ARIA Labels** | Proper `aria-label`, `aria-describedby`, `role` attributes |
+| **ARIA Landmarks** | `<header>`, `<nav>`, `<main>`, `<aside>`, `<footer>` |
+| **ARIA Live Regions** | `role="status"` / `role="alert"` / `aria-live` for dynamic content |
+| **Color Contrast** | Minimum 4.5:1 for normal text, 3:1 for large text |
+| **Alt Text** | All images have descriptive `alt` attributes; decorative images use `alt=""` |
+| **Form Labels** | All inputs have associated `<label>` elements |
+| **Error Messages** | Announced to screen readers via `aria-live`; linked via `aria-describedby` and `aria-invalid` |
+| **Skip Links** | `<a href="#main-content" class="skip-link">Skip to main content</a>` for keyboard users |
+| **Semantic HTML** | Proper heading hierarchy (h1 → h2 → h3) |
+| **Reduced Motion** | Respect `prefers-reduced-motion` preference |
 
 ```css
 /* Skip link */
@@ -22384,7 +22997,7 @@ document.querySelectorAll('.field input, .field select, .field textarea').forEac
 }
 .skip-link:focus { transform: none; }
 
-/* Reduced motion */
+/* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -22395,23 +23008,51 @@ document.querySelectorAll('.field input, .field select, .field textarea').forEac
 }
 ```
 
----
-
 ## PWA Support
 
 **No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works. The PWA layer itself is an enhancement — the site must be fully usable if the service worker never installs.
 
+**Progressive Web App = Native-like web app (installable, offline, GPS)**
+
+**Goal: Indistinguishable from native app** - same UX, capabilities, and performance.
+
+| Feature | Implementation | Notes |
+|---------|----------------|-------|
+| **Manifest** | `/manifest.json` with app metadata | Required for install |
+| **Icons** | Multiple sizes including maskable | For all platforms |
+| **Service Worker** | Cache, background sync, offline | Core of PWA |
+| **Installable** | Meets PWA install criteria | Add to home screen |
+| **HTTPS** | Required for service workers | Non-negotiable |
+| **Geolocation** | GPS access via Geolocation API | User permission required |
+| **Background Sync** | Queue actions when offline, sync when online | Seamless offline |
+| **App Updates** | Detect new SW version, prompt user | Keep app current |
+
 ### Service Worker Registration
 
+**Register service worker on app load:**
+
 ```javascript
-// static/js/sw-register.js
+// /static/js/app.js - Service Worker Registration
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
-      const reg = await navigator.serviceWorker.register('/static/sw.js', { scope: '/' });
-      console.log('SW registered:', reg.scope);
-    } catch (err) {
-      console.warn('SW registration failed:', err);
+      const registration = await navigator.serviceWorker.register('/sw.js', {
+        scope: '/'
+      });
+      console.log('SW registered:', registration.scope);
+
+      // Check for updates
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // New version available
+            showUpdateNotification();
+          }
+        });
+      });
+    } catch (error) {
+      console.error('SW registration failed:', error);
     }
   });
 }
@@ -22423,53 +23064,75 @@ if ('serviceWorker' in navigator) {
 > When a service worker calls `event.respondWith()` it owns that response completely. If the promise it passes **resolves to `undefined`** (a cache miss on the last fallback) or **rejects** (an uncaught network failure), the browser shows **`net::ERR_FAILED`** — a dead tab — instead of a page. A transient network blip on a page navigation MUST degrade to a real offline/error page, never a broken site. The handler below, and any service worker a project ships, MUST obey:
 >
 > - **Navigations are network-first** — fetch the network first so a new build's HTML is seen immediately (and the `Clear-Site-Data` build-purge has nothing stale to fight); only on failure fall back to the cached page, then to a **synthesized** `Response`.
-> - **Every `respondWith()` branch ends in a guaranteed `Response`** — a terminal `.catch()` returning a real `Response` (a synthesized 503 offline page for navigations, a 504 for subresources). Never end a chain on `cached || caches.match('/offline')`: that link can itself miss and resolve `undefined`.
+> - **Every `respondWith()` branch ends in a guaranteed `Response`** — a terminal `.catch()` returning a real `Response` (a synthesized 503 offline page for navigations, a 504 for subresources). Never end a chain on `cached || caches.match('/offline…')`: that link can itself miss and resolve `undefined`.
 > - **Only intercept same-origin GET.** Let API calls, cross-origin requests, and non-GET methods fall through untouched — never call `respondWith()` for them.
 > - **The service worker is an enhancement, never a dependency** — the site stays fully usable if it never installs (the No-JS-first rule above).
 
+**The service worker has three main lifecycle events:**
+
+| Event | When | Purpose |
+|-------|------|---------|
+| **install** | First registration or new version | Pre-cache static assets |
+| **activate** | After install, when no old SW controlling pages | Clean old caches |
+| **fetch** | Every network request from controlled pages | Serve from cache or network |
+
 ```javascript
-// static/sw.js
-// Cache name MUST embed the running version - see Cache Versioning below
-const CACHE_NAME = 'app-{project_version}';
-const PRECACHE_URLS = [
+// /sw.js - Service Worker
+const CACHE_VERSION = '{project_version}';
+const CACHE_NAME = `{app_name}-cache-${CACHE_VERSION}`;
+
+// Assets to pre-cache on install
+const PRECACHE_ASSETS = [
   '/',
-  '/static/css/main.css',
-  '/static/js/main.js',
+  '/static/css/app.css',
+  '/static/js/app.js',
   '/static/icons/icon-192.png',
-  '/offline',
+  '/static/icons/icon-512.png',
+  '/offline.html'
 ];
 
+// INSTALL - Pre-cache static assets
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_URLS))
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(PRECACHE_ASSETS))
+      // Activate immediately
+      .then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
+// ACTIVATE - Clean old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
+    caches.keys()
+      .then(keys => Promise.all(
+        keys
+          .filter(key => key.startsWith('{app_name}-cache-') && key !== CACHE_NAME)
+          .map(key => caches.delete(key))
+      ))
+      // Take control immediately
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Every response path MUST resolve to a real Response. A promise that
-// resolves to undefined - or rejects - makes the browser render
-// net::ERR_FAILED instead of a page. Every branch ends in a guaranteed Response.
+// FETCH - every response path MUST resolve to a real Response.
+// A promise that resolves to undefined - or rejects - makes the browser
+// render net::ERR_FAILED instead of a page. Every branch below therefore
+// ends in a guaranteed Response.
 self.addEventListener('fetch', event => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Only same-origin GET is handled; everything else falls through to the browser
+  // Only same-origin GET is handled here; everything else falls through to
+  // the browser untouched (never call respondWith for it)
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
 
   // API calls are network-only - never intercept
   if (url.pathname.startsWith('/api/')) return;
 
-  // Navigations: network-first, then cache, then a GUARANTEED synthesized page
-  // so a transient failure renders a real page, never net::ERR_FAILED
+  // Navigations (page loads): network-first, then cache, then a GUARANTEED
+  // synthesized offline page - a transient network failure renders a real
+  // error page, never net::ERR_FAILED
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -22480,27 +23143,40 @@ self.addEventListener('fetch', event => {
         })
         .catch(async () =>
           (await caches.match(request))
-            || (await caches.match('/offline'))
+            || (await caches.match('/offline.html'))
             || offlineFallbackResponse()
         )
     );
     return;
   }
 
-  // Everything else: cache-first, then network, then a GUARANTEED 504 -
-  // never let respondWith reject
+  // Static assets: cache-first, then network, then a GUARANTEED 504 -
+  // a failed subresource must never reject respondWith
+  if (url.pathname.startsWith('/static/')) {
+    event.respondWith(
+      caches.match(request)
+        .then(cached => cached || fetch(request).then(response => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+          return response;
+        }))
+        .catch(() => new Response('', { status: 504, statusText: 'Gateway Timeout' }))
+    );
+    return;
+  }
+
+  // Everything else: network-first, then cache, then a GUARANTEED 504
   event.respondWith(
-    caches.match(request)
-      .then(cached => cached || fetch(request).then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
-        return response;
-      }))
-      .catch(() => new Response('', { status: 504, statusText: 'Gateway Timeout' }))
+    fetch(request)
+      .catch(async () =>
+        (await caches.match(request))
+          || new Response('', { status: 504, statusText: 'Gateway Timeout' })
+      )
   );
 });
 
-// GUARANTEED last-resort page - synthesized in the worker so it can never miss
+// GUARANTEED last-resort page - synthesized in the worker so it needs no
+// cache hit and can never itself miss
 function offlineFallbackResponse() {
   return new Response(
     '<!doctype html><html lang="en"><head><meta charset="utf-8">'
@@ -22515,296 +23191,863 @@ function offlineFallbackResponse() {
 }
 ```
 
+### Cache Versioning & Updates
 
-### Cache Versioning
+**Cache version strategy:**
 
-The cache name MUST embed `{project_version}` so every release gets its own cache; the `activate` handler above deletes all caches from other versions:
+| Change Type | Action | Example |
+|-------------|--------|---------|
+| **Bug fix** | Increment patch | `v1.0.0` → `v1.0.1` |
+| **New feature** | Increment minor | `v1.0.1` → `v1.1.0` |
+| **Breaking change** | Increment major | `v1.1.0` → `v2.0.0` |
 
-```javascript
-const CACHE_NAME = `app-{project_version}`;
+**Cache naming convention:** `{app_name}-cache-v{major}.{minor}.{patch}`
+
+**Update flow:**
+```
+1. User visits app
+2. Browser checks for new sw.js
+3. If changed → install event fires
+4. New SW waits until old SW's pages close (or skipWaiting)
+5. activate event fires → clean old caches
+6. New SW controls all pages
 ```
 
-Inject the version at build time via a build script or template variable.
+**Force update check:**
+```javascript
+// Check for updates every hour when app is active
+setInterval(() => {
+  navigator.serviceWorker.ready.then(reg => reg.update());
+}, 60 * 60 * 1000);
+```
 
 ### App Update Notification
 
+**Notify user when new version is available:**
+
 ```javascript
-// Notify user when a new SW is waiting
-navigator.serviceWorker.ready.then(reg => {
-  reg.addEventListener('updatefound', () => {
-    const newWorker = reg.installing;
-    newWorker.addEventListener('statechange', () => {
-      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-        showToast('A new version is available. Refresh to update.', 'info', 0);
-        document.querySelector('.update-refresh-btn')?.addEventListener('click', () => {
-          newWorker.postMessage({ type: 'SKIP_WAITING' });
-          window.location.reload();
-        });
-      }
-    });
+// Show update banner
+function showUpdateNotification() {
+  const banner = document.createElement('div');
+  banner.className = 'update-banner';
+  const label = document.createElement('span');
+  label.textContent = 'A new version is available';
+  const updateBtn = document.createElement('button');
+  updateBtn.textContent = 'Update Now';
+  updateBtn.addEventListener('click', updateApp);
+  const laterBtn = document.createElement('button');
+  laterBtn.textContent = 'Later';
+  laterBtn.addEventListener('click', () => banner.remove());
+  banner.append(label, updateBtn, laterBtn);
+  document.body.appendChild(banner);
+}
+
+// Apply update
+function updateApp() {
+  navigator.serviceWorker.ready.then(reg => {
+    if (reg.waiting) {
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
   });
+  // Reload when new SW takes over
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
+```
+
+**In service worker - handle skip waiting message:**
+```javascript
+// sw.js
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 ```
 
 ### App Install Prompt
 
+**Capture and control the install prompt:**
+
 ```javascript
 let deferredPrompt;
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  deferredPrompt = e;
-  document.querySelector('.install-btn')?.removeAttribute('hidden');
+
+// Capture the install prompt
+window.addEventListener('beforeinstallprompt', event => {
+  // Don't show automatically
+  event.preventDefault();
+  deferredPrompt = event;
+  // Show custom install UI
+  showInstallButton();
 });
 
-document.querySelector('.install-btn')?.addEventListener('click', async () => {
+// Custom install button handler
+function installApp() {
   if (!deferredPrompt) return;
+
   deferredPrompt.prompt();
-  const { outcome } = await deferredPrompt.userChoice;
-  console.log('Install prompt outcome:', outcome);
+  deferredPrompt.userChoice.then(result => {
+    if (result.outcome === 'accepted') {
+      console.log('App installed');
+    }
+    deferredPrompt = null;
+    hideInstallButton();
+  });
+}
+
+// Detect if already installed
+window.addEventListener('appinstalled', () => {
+  console.log('App was installed');
+  hideInstallButton();
   deferredPrompt = null;
-  document.querySelector('.install-btn')?.setAttribute('hidden', '');
 });
+
+// Check if running as installed PWA
+function isInstalledPWA() {
+  return window.matchMedia('(display-mode: standalone)').matches
+    // iOS
+    || window.navigator.standalone === true;
+}
 ```
+
+**Install button visibility rules:**
+
+| Condition | Show Install Button |
+|-----------|---------------------|
+| `beforeinstallprompt` fired | ✅ Yes |
+| Already installed (standalone mode) | ❌ No |
+| iOS Safari (no prompt event) | ✅ Yes (manual instructions) |
+| Desktop browser | ✅ Yes (if supported) |
 
 ### Background Sync
 
-```javascript
-async function queueAction(tag, payload) {
-  const reg = await navigator.serviceWorker.ready;
-  await localforage.setItem(`sync-${tag}`, payload);
-  await reg.sync.register(tag);
-}
+**Queue actions when offline, automatically sync when back online:**
 
+```javascript
+// Register sync when offline action fails
+async function saveDataWithSync(data) {
+  try {
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  } catch (error) {
+    // Network failed - queue for background sync
+    await saveToIndexedDB('pending-sync', data);
+    const registration = await navigator.serviceWorker.ready;
+    await registration.sync.register('sync-data');
+  }
+}
+```
+
+**Service Worker - handle sync:**
+```javascript
+// sw.js
 self.addEventListener('sync', event => {
-  if (event.tag.startsWith('submit-')) {
-    event.waitUntil(flushQueue(event.tag));
+  if (event.tag === 'sync-data') {
+    event.waitUntil(syncPendingData());
   }
 });
-```
 
-### Geolocation
+async function syncPendingData() {
+  const db = await openIndexedDB();
+  const pending = await getAllFromStore(db, 'pending-sync');
 
-Only request if the feature requires it — never on page load. Always present a clear prompt explaining why.
-
-```javascript
-async function requestLocation() {
-  if (!('geolocation' in navigator)) return null;
-  return new Promise((resolve, reject) =>
-    navigator.geolocation.getCurrentPosition(
-      pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      err => reject(err),
-      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 }
-    )
-  );
+  for (const item of pending) {
+    try {
+      await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item.data)
+      });
+      await deleteFromStore(db, 'pending-sync', item.id);
+    } catch (error) {
+      // Will retry on next sync event
+      throw error;
+    }
+  }
 }
 ```
 
-### API Token Storage
+**Sync retry behavior:**
 
-Resource owner tokens use **dual delivery** in the browser (see PART 8 → "API Token Model"): the raw token is shown once at creation (copy button), only its SHA-256 hash is stored server-side, and the create response also sets an `owner_token` cookie (HttpOnly + Secure + SameSite=Strict, Max-Age matching the token lifetime). WEB management routes authenticate via that cookie as plain POST forms, so every owner flow works with JS disabled. API routes accept the `Authorization: Bearer` header only and ignore cookies. No dedicated forget/revoke route: the cookie expires via its Max-Age, and clearing site data (or uninstalling the PWA) removes it along with any local copies.
+| Attempt | Delay | Notes |
+|---------|-------|-------|
+| 1st | Immediate | When connection restored |
+| 2nd | ~5 minutes | If first fails |
+| 3rd | ~15 minutes | Exponential backoff |
+| Final | ~1 hour | Browser may give up |
 
-`localStorage` holds an optional JS convenience copy (pre-fill, copy button) — never load-bearing:
+### Geolocation (GPS Access)
 
-```javascript
-// Write - the literal key name comes from IDEA.md (owner_token: ...)
-localStorage.setItem('{project_name}_owner_token_XXXXXX', token);
-// Read
-const token = localStorage.getItem('{project_name}_owner_token_XXXXXX');
-// Remove
-localStorage.removeItem('{project_name}_owner_token_XXXXXX');
-```
-
-The operator token is never stored in the browser — not in localStorage and not in a cookie; it lives in the server config and is used from CLI tools or API clients only.
-
-### Client-Side Preferences
-
-This helper is for pure client-only state the server must never receive automatically. Server-relevant preferences (theme, language, consent, announcement dismissals) are cookies — the server reads them to render the correct page (see the "Client-Side Preferences" storage table in PART 0).
-
-**Cross-device preference sync (export/import — stateless, no preferences table required):** only `theme` and `lang` are portable across browsers/devices — never `cookie_consent`, `ccpa_opt_out` (per-browser legal acknowledgments), or `owner_token`/build-stamp cookies. Since preferences aren't tied to identity, the same values always produce the same code/URL — the code/URL *is* the state, not a lookup key, so nothing is ever stored server-side. Guest preferences live at `/server/preferences`, API-mirrored at `/api/{api_version}/server/preferences` — the export/import actions are sub-routes of it, never the standalone `/prefs/*` path, nor bare `/preferences` without the `/server` prefix. API projects have no admin panel or WebUI at all — administration is done entirely via `server.yml`/CLI (see "Account Types": only `Server` and `Operator` exist) — so there is no `/server/admin` route and no `{admin_path}`/`{admin_username}` segment to collide with, and the `{admin_path}` reserved-word-list rule (SERVER.md/HYBRID.md) does not apply here. If an old/non-canonical route (e.g. a bare `/preferences` or `/prefs/*`) exists in already-written code, delete it outright and update all callers to `/server/preferences` — never keep it as a redirect or alias "for backward compatibility" (see "Canonical Terms Only"). `GET /server/preferences/export` returns both a full import URL (`https://{host}/server/preferences/import?theme=dark&lang=fr`, plain query string, stable across schema changes) and a short code (`base64url` of the same query string, for manual retyping without paste). `GET /server/preferences/import?theme=dark&lang=fr` validates each value against its normal enum/BCP-47 allowlist — an imported value is still untrusted input — sets the matching cookies, and `303 See Other`s to a clean URL so the code never lingers in the address bar or history.
+**Access device GPS like a native app:**
 
 ```javascript
-const prefs = {
-  get(key, fallback = null) {
-    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
-    catch { return fallback; }
-  },
-  set(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); }
-    catch (e) { console.warn('prefs.set failed:', e); }
-  },
-  remove(key) { localStorage.removeItem(key); },
-};
+// Check if geolocation is available
+function hasGeolocation() {
+  return 'geolocation' in navigator;
+}
+
+// Get current position (one-time)
+async function getCurrentLocation() {
+  if (!hasGeolocation()) {
+    throw new Error('Geolocation not supported');
+  }
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      position => resolve({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        altitude: position.coords.altitude,
+        heading: position.coords.heading,
+        speed: position.coords.speed,
+        timestamp: position.timestamp
+      }),
+      error => reject(handleGeolocationError(error)),
+      {
+        // Use GPS if available
+        enableHighAccuracy: true,
+        // 10 second timeout
+        timeout: 10000,
+        // Accept cached position up to 1 minute old
+        maximumAge: 60000
+      }
+    );
+  });
+}
+
+// Watch position (continuous tracking)
+function watchLocation(callback, errorCallback) {
+  if (!hasGeolocation()) {
+    errorCallback(new Error('Geolocation not supported'));
+    return null;
+  }
+
+  return navigator.geolocation.watchPosition(
+    position => callback({
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      accuracy: position.coords.accuracy,
+      altitude: position.coords.altitude,
+      heading: position.coords.heading,
+      speed: position.coords.speed,
+      timestamp: position.timestamp
+    }),
+    error => errorCallback(handleGeolocationError(error)),
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      // Always get fresh position
+      maximumAge: 0
+    }
+  );
+}
+
+// Stop watching
+function stopWatchingLocation(watchId) {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+  }
+}
+
+// Handle errors
+function handleGeolocationError(error) {
+  switch (error.code) {
+    case error.PERMISSION_DENIED:
+      return new Error('Location permission denied');
+    case error.POSITION_UNAVAILABLE:
+      return new Error('Location unavailable');
+    case error.TIMEOUT:
+      return new Error('Location request timed out');
+    default:
+      return new Error('Unknown location error');
+  }
+}
 ```
+
+**Geolocation options:**
+
+| Option | Value | Purpose |
+|--------|-------|---------|
+| `enableHighAccuracy` | `true` | Use GPS (slower, battery drain) |
+| `enableHighAccuracy` | `false` | Use network location (faster, less accurate) |
+| `timeout` | milliseconds | How long to wait for position |
+| `maximumAge` | milliseconds | Accept cached position if newer than this |
+
+**Permission UX best practices:**
+
+| ❌ Bad | ✅ Good |
+|--------|---------|
+| Request on page load | Request when user taps "Find nearby" |
+| No explanation | Explain why location is needed first |
+| Silent failure | Show clear error if denied |
+| Always high accuracy | Use low accuracy when approximate is fine |
+
+**Location permission states:**
+```javascript
+// Check permission without prompting
+async function checkLocationPermission() {
+  if (!navigator.permissions) return 'unknown';
+
+  const result = await navigator.permissions.query({ name: 'geolocation' });
+  // 'granted', 'denied', or 'prompt'
+  return result.state;
+}
+```
+
+### API Token Storage in PWA
+
+**PWA maintains API token across app restarts.**
+
+| Storage | Use Case | Cleared |
+|---------|----------|---------|
+| **Cookies** | `owner_token` (HttpOnly + Secure + SameSite=Strict) — primary browser storage; enables no-JS web management. UI preferences (theme, lang) | Expiry/revocation |
+| **localStorage** | API token — optional JS convenience copy (copy button, pre-fill); never load-bearing | Manual/revocation |
+| **IndexedDB** | Offline data, cached responses | Manual/revocation |
+
+**Token persists when:**
+- App is closed and reopened
+- Device is restarted
+- Switching between browser and installed PWA
+
+**Token revocation clears credentials** (UI preferences are kept — they are not sensitive). No dedicated route: the `owner_token` cookie simply expires via its Max-Age, and uninstalling the PWA or clearing site data removes the cookie and all local copies. The JS enhancement clears local copies without waiting for that:
+
+```javascript
+// Clear local token copies — keeps UI preferences (theme, lang) intact
+async function revokeLocalToken() {
+  // Remove the optional localStorage copy; the owner_token cookie expires via Max-Age
+  localStorage.removeItem('{project_name}_owner_token_XXXXXX');
+
+  // Clear any cached private/token-scoped data from IndexedDB
+  const databases = await indexedDB.databases();
+  for (const db of databases) {
+    if (db.name.includes('private') || db.name.includes('token')) {
+      indexedDB.deleteDatabase(db.name);
+    }
+  }
+
+  // Reload page — public content still accessible
+  window.location.reload();
+}
+```
+
+### Client-Side Preferences (cookies)
+
+**User preferences are stored in cookies — the server reads them to render pages (theme class, language) with zero server persistence and zero user account needed. The `owner_token` cookie is HttpOnly and read only by WEB management routes — API routes ignore it entirely. localStorage holds only optional JS convenience copies; nothing stored there is load-bearing.**
+
+| Cookie | Values | Default |
+|--------|--------|---------|
+| `theme` | `dark` \| `light` \| `auto` | `dark` |
+| `lang` | BCP 47 tag: `en`, `es`, `fr`, … | `Accept-Language` header |
+| `cookie_consent` | JSON: granular categories + timestamp | unset (banner shown) |
+| `ccpa_opt_out` | `true` | unset |
+| `{project_name}_build` | running build stamp `{project_version}-{short_commit}` | set on first HTML response — drives the PART 9 version-change purge |
+
+**Preference writes (JS enhancement — the server sets the same cookies on its POST endpoints):**
+```javascript
+// Write - the server reads these on the next request
+document.cookie = "theme=light; path=/; max-age=31536000; SameSite=Lax";
+document.cookie = "lang=fr; path=/; max-age=31536000; SameSite=Lax";
+```
+
+**Rules:**
+- Preferences survive token revocation — they are UI state, not account data
+- Never persist preferences server-side — the server reads the cookie per request; there is no preferences table
+- Never store PII in cookies or localStorage
+- Always fall back to a safe default when a cookie is missing or invalid
+
+**Cross-device preference sync (export/import — stateless, no preferences table required):**
+
+Preferences aren't tied to identity — any two guests who set the same `theme`/`lang` produce the same code/URL, because the code/URL *is* the preference values, not a lookup key. This lets a preference be carried to a new browser/device without an account and without the server ever storing anything.
+
+- Only `theme` and `lang` are exportable. `cookie_consent` and `ccpa_opt_out` are NEVER included — consent is a per-browser legal acknowledgment that must be re-affirmed on each device, not a portable preference. `{project_name}_build` is NEVER included — it is a device-local cache-purge stamp.
+- Guest preferences live at `/server/preferences`, API-mirrored at `/api/{api_version}/server/preferences` — the export/import actions are sub-routes of it, never the standalone `/prefs/*` path, nor bare `/preferences` without the `/server` prefix. API projects have no admin panel or WebUI at all — administration is done entirely via `server.yml`/CLI (see "Account Types": only `Server` and `Operator` exist) — so there is no `/server/admin` route and no `{admin_path}`/`{admin_username}` segment to collide with, and the `{admin_path}` reserved-word-list rule (SERVER.md/HYBRID.md) does not apply here. If an old/non-canonical route (e.g. a bare `/preferences` or `/prefs/*`) exists in already-written code, delete it outright and update all callers to `/server/preferences` — never keep it as a redirect or alias "for backward compatibility" (see "Canonical Terms Only").
+- **Export** (`GET /server/preferences/export`, API-mirrored at `GET /api/{api_version}/server/preferences/export`, or a "Copy preferences" UI action): reads the current `theme`/`lang` cookies and returns two forms of the same state:
+  - **Full URL** — `https://{host}/server/preferences/import?theme=dark&lang=fr`: a plain query string, human-readable, and stable across schema changes (a link made before a new preference key existed just omits it on import).
+  - **Short code** — `base64url(theme=dark&lang=fr)`: the query string alone, for manual retyping on a device without copy/paste; the import form strips a leading `https://.../server/preferences/import?` if pasted with it.
+- **Import** (`GET /server/preferences/import?theme=dark&lang=fr`, API-mirrored at `GET /api/{api_version}/server/preferences/import`, or a paste-a-code field feeding the same route): validates each parameter against its normal enum/BCP-47 allowlist — reject or drop anything unknown or malformed, an imported value is still untrusted input — sets the matching cookies, then `303 See Other` to `/` (or the referring page) so the code never lingers in the visible URL or browser history.
+- No account, no DB row, no user-preferences table — decode → validate → set cookie → redirect happens in the one request; nothing is written or looked up server-side.
 
 ### Offline Behavior
 
-- Serve the pre-cached `/offline` page for navigation requests when the network is unavailable.
-- Queue mutating actions (POST/PUT/DELETE) via Background Sync when offline; flush on reconnect.
-- Display an offline banner using the `online`/`offline` events:
+| Resource Type | Cache Strategy | Offline Behavior |
+|---------------|----------------|------------------|
+| **Static assets** (CSS, JS, images) | Cache-first | Served from cache |
+| **HTML pages** | Network-first, cache fallback | Show cached version if offline |
+| **API calls** | Network-only + queue | Show offline indicator, queue for retry |
+| **Fonts** | Cache-first | Served from cache |
+| **User data** | IndexedDB | Full offline access |
 
+**Service Worker Caching Limits:**
+
+| Limit | Value | Notes |
+|-------|-------|-------|
+| Max cache size | 50MB | Browser may evict if exceeded |
+| Cache expiration | 7 days | For static assets |
+| Never cache | API responses | Except explicit offline-first data |
+| Quota check | Before large caches | `navigator.storage.estimate()` |
+
+**Offline detection:**
 ```javascript
-window.addEventListener('offline', () => showToast('You are offline', 'warning', 0));
-window.addEventListener('online',  () => showToast('Back online', 'success'));
-```
+// Check online status
+function isOnline() {
+  return navigator.onLine;
+}
 
+// Listen for connectivity changes
+window.addEventListener('online', () => {
+  hideOfflineIndicator();
+  triggerPendingSync();
+});
 
-### Web App Manifest
+window.addEventListener('offline', () => {
+  showOfflineIndicator();
+});
 
-```json
-{
-  "name": "App Name",
-  "short_name": "App",
-  "description": "One sentence describing the app.",
-  "start_url": "/?source=pwa",
-  "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#282a36",
-  "theme_color": "#bd93f9",
-  "icons": [
-    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/static/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ],
-  "screenshots": [
-    { "src": "/static/screenshots/desktop.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide" },
-    { "src": "/static/screenshots/mobile.png",  "sizes": "390x844",  "type": "image/png", "form_factor": "narrow" }
-  ],
-  "categories": ["productivity"],
-  "lang": "en"
+// Offline indicator UI
+function showOfflineIndicator() {
+  const indicator = document.getElementById('offline-indicator');
+  indicator.textContent = 'You are offline. Some features may be unavailable.';
+  indicator.classList.add('visible');
+}
+
+function hideOfflineIndicator() {
+  const indicator = document.getElementById('offline-indicator');
+  indicator.classList.remove('visible');
 }
 ```
 
-Serve at `/manifest.json` with `Content-Type: application/manifest+json`.
+### Manifest Configuration
+
+**Complete manifest.json:**
+```json
+{
+  "name": "{App Name}",
+  "short_name": "{app_name}",
+  "description": "{App description}",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "categories": ["utilities"],
+  "icons": [
+    {
+      "src": "/static/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/static/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/dashboard?source=shortcut",
+      "icons": [{ "src": "/static/icons/shortcut-dashboard.png", "sizes": "96x96" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/static/screenshots/desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/static/screenshots/mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ]
+}
+```
+
+**Manifest fields explained:**
+
+| Field | Purpose | Required |
+|-------|---------|----------|
+| `name` | Full app name (install dialog) | ✅ Yes |
+| `short_name` | Abbreviated name (home screen) | ✅ Yes |
+| `start_url` | URL when launched | ✅ Yes |
+| `scope` | URL scope SW controls | Recommended |
+| `display` | `standalone`, `fullscreen`, `minimal-ui`, `browser` | ✅ Yes |
+| `icons` | App icons (multiple sizes) | ✅ Yes |
+| `theme_color` | Browser toolbar color | Recommended |
+| `background_color` | Splash screen background | Recommended |
+| `orientation` | `any`, `portrait`, `landscape` | Optional |
+| `shortcuts` | Quick actions (right-click/long-press) | Optional |
+| `screenshots` | Install dialog preview | Optional |
+
+### Scope and Start URL
+
+**Understanding PWA scope:**
+
+| Concept | Description |
+|---------|-------------|
+| **scope** | URLs the service worker can control |
+| **start_url** | URL opened when app launches |
+| **Rule** | `start_url` must be within `scope` |
+
+```
+Example:
+  scope: "/app/"
+  start_url: "/app/dashboard"
+
+  ✅ Controlled: /app/*, /app/settings, /app/users/123
+  ❌ Not controlled: /server/*, /api/*
+```
+
+**Tracking PWA launches:**
+```javascript
+// start_url: "/?source=pwa"
+// Analytics can track PWA vs browser usage
+if (new URLSearchParams(window.location.search).get('source') === 'pwa') {
+  analytics.track('pwa_launch');
+}
+```
 
 ### Maskable Icons
 
-Maskable icons must have a safe zone of 40% (20% on each side). The icon artwork must be fully contained within the inner 60% of the image. Generate with [maskable.app](https://maskable.app).
+**Maskable icons adapt to different Android launcher shapes:**
 
-### iOS Considerations
+| Icon Type | Purpose | Safe Zone |
+|-----------|---------|-----------|
+| **Regular** | Standard icon with transparency | Full canvas |
+| **Maskable** | Adaptive icon (Android) | Inner 80% circle |
 
-```html
-<!-- Add to <head> -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="App">
-<link rel="apple-touch-icon" href="{{ asset(path="icons/apple-touch-icon.png") }}">
-<link rel="apple-touch-startup-image" href="{{ asset(path="splash/launch-2048x2732.png") }}"
-  media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)">
+**Design rules for maskable icons:**
+- Important content in center 80% (safe zone)
+- Background extends to full canvas
+- No transparency (use solid background)
+- Same icon, different padding
+
+```
+┌─────────────────────┐
+│                     │
+│   ┌───────────┐     │
+│   │           │     │  ← Safe zone (80%)
+│   │   LOGO    │     │
+│   │           │     │
+│   └───────────┘     │
+│                     │
+└─────────────────────┘   ← Full canvas
 ```
 
-iOS Safari does not support the Web App Manifest for install flow — `apple-mobile-web-app-capable` is required.
+**Testing maskable icons:** https://maskable.app/editor
 
-### Lighthouse Audit Targets
+### iOS-Specific Considerations
 
-| Category | Target |
-|---|---|
-| Performance | ≥ 90 |
-| Accessibility | 100 |
-| Best Practices | ≥ 95 |
-| SEO | ≥ 95 |
-| PWA | All checks pass |
+**iOS Safari has PWA limitations:**
+
+| Feature | Android | iOS |
+|---------|---------|-----|
+| Background sync | ✅ Yes | ❌ No |
+| `beforeinstallprompt` | ✅ Yes | ❌ No |
+| Persistent storage | ✅ Yes | ⚠️ Limited (7 days without use) |
+| Badging API | ✅ Yes | ❌ No |
+| Web Share Target | ✅ Yes | ❌ No |
+
+**iOS-specific meta tags:**
+```html
+<head>
+  <!-- Standard manifest -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#000000">
+
+  <!-- iOS-specific -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="{app_name}">
+  <link rel="apple-touch-icon" href="{{ asset "icons/icon-180.png" }}">
+
+  <!-- iOS splash screens -->
+  <link rel="apple-touch-startup-image"
+        href="{{ asset "splash/iphone-1179x2556.png" }}"
+        media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)">
+  <link rel="apple-touch-startup-image"
+        href="{{ asset "splash/iphone-1284x2778.png" }}"
+        media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)">
+</head>
+```
+
+**iOS install instructions (no beforeinstallprompt):**
+```javascript
+function showIOSInstallInstructions() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isInStandalone = window.navigator.standalone === true;
+
+  if (isIOS && !isInStandalone) {
+    showModal({
+      title: 'Install {App Name}',
+      content: `
+        <ol>
+          <li>Tap the Share button <img src="/static/icons/ios-share.svg" alt="Share"></li>
+          <li>Scroll down and tap "Add to Home Screen"</li>
+          <li>Tap "Add" in the top right</li>
+        </ol>
+      `
+    });
+  }
+}
+```
+
+**iOS storage eviction workaround:**
+```javascript
+// Request persistent storage (iOS may still evict)
+async function requestPersistentStorage() {
+  if (navigator.storage && navigator.storage.persist) {
+    const granted = await navigator.storage.persist();
+    console.log('Persistent storage:', granted ? 'granted' : 'denied');
+  }
+}
+```
+
+### Lighthouse PWA Audit
+
+**Lighthouse checks these PWA criteria:**
+
+| Category | Requirement | How to Pass |
+|----------|-------------|-------------|
+| **Installable** | Valid manifest | All required fields present |
+| **Installable** | Service worker | Registered and controlling |
+| **Installable** | HTTPS | Served over HTTPS |
+| **Installable** | Icons | 192x192 and 512x512 minimum |
+| **Optimized** | Redirects HTTP→HTTPS | Server config |
+| **Optimized** | Splash screen | `theme_color`, `background_color`, icons |
+| **Optimized** | Theme color | `<meta name="theme-color">` and manifest |
+| **Optimized** | Viewport | `<meta name="viewport" content="width=device-width">` |
+| **Optimized** | Content sized | No horizontal scroll at mobile width |
+| **Optimized** | Maskable icon | At least one with `purpose: maskable` |
+
+**Full HTML head for PWA compliance:**
+```html
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="{App description}">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ asset "icons/favicon-32.png" }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ asset "icons/favicon-16.png" }}">
+  <link rel="apple-touch-icon" href="{{ asset "icons/icon-180.png" }}">
+
+  <!-- iOS specific -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="{app_name}">
+
+  <title>{App Name}</title>
+  <link rel="stylesheet" href="{{ asset "css/app.css" }}">
+</head>
+<body>
+  <!-- Offline indicator -->
+  <div id="offline-indicator" aria-live="polite"></div>
+
+  <!-- App content -->
+  <div id="app"></div>
+
+  <script src="{{ asset "js/app.js" }}"></script>
+</body>
+</html>
+```
+
+**Run Lighthouse audit:**
+1. Chrome DevTools → Lighthouse tab
+2. Select "Progressive Web App" category
+3. Click "Analyze page load"
+4. Fix any failures before deployment
 
 ### PWA File Structure
 
+**Required files for full PWA:**
+
 ```
-static/
-  icons/
-    icon-192.png
-    icon-512.png
-    icon-maskable-512.png
-    apple-touch-icon.png
-    favicon.ico
-  splash/
-    launch-2048x2732.png   ← iOS 12.9" iPad Pro
-    launch-1668x2388.png   ← iOS 11" iPad Pro
-    launch-1242x2688.png   ← iPhone XS Max
-    launch-828x1792.png    ← iPhone XR
-    launch-750x1334.png    ← iPhone 8
-  js/
-    sw.js
-    sw-register.js
-  manifest.json
+/
+├── manifest.json                 # App manifest
+├── sw.js                         # Service worker
+├── offline.html                  # Offline fallback page
+├── static/
+│   ├── css/
+│   │   └── app.css
+│   ├── js/
+│   │   └── app.js                # Includes SW registration
+│   ├── icons/
+│   │   ├── favicon-16.png
+│   │   ├── favicon-32.png
+│   │   ├── icon-72.png
+│   │   ├── icon-96.png
+│   │   ├── icon-128.png
+│   │   ├── icon-144.png
+│   │   ├── icon-152.png
+│   │   ├── icon-180.png          # Apple touch icon
+│   │   ├── icon-192.png
+│   │   ├── icon-384.png
+│   │   ├── icon-512.png
+│   │   ├── icon-maskable-192.png # Maskable (Android adaptive)
+│   │   └── icon-maskable-512.png
+│   ├── splash/                   # iOS splash screens
+│   │   ├── iphone-1179x2556.png
+│   │   └── iphone-1284x2778.png
+│   └── screenshots/              # Install dialog previews
+│       ├── desktop.png
+│       └── mobile.png
+└── index.html                    # With all meta tags
 ```
 
 ### PWA Checklist
 
-- [ ] `manifest.json` served at `/manifest.json`
-- [ ] `<link rel="manifest">` in `<head>`
-- [ ] Service worker registered
-- [ ] HTTPS enforced (or `localhost`)
-- [ ] Offline page at `/offline`
-- [ ] Service worker `respondWith` never resolves `undefined` or rejects — every branch ends in a guaranteed `Response` (offline page, not `net::ERR_FAILED`)
-- [ ] Maskable icon provided
-- [ ] `apple-touch-icon` provided
-- [ ] `theme-color` meta tag present
-- [ ] `start_url` works offline
-- [ ] Lighthouse PWA score passes
-
----
+| Item | Status | Notes |
+|------|--------|-------|
+| HTTPS enabled | ◻️ | Required for SW |
+| manifest.json valid | ◻️ | All required fields |
+| Service worker registered | ◻️ | Controls all pages |
+| Offline page exists | ◻️ | `/offline.html` |
+| SW never yields `undefined`/rejects | ◻️ | Every `respondWith` branch ends in a guaranteed `Response`; transient failure shows the offline page, not `net::ERR_FAILED` |
+| Icons all sizes | ◻️ | 72 to 512px |
+| Maskable icon included | ◻️ | For Android |
+| Apple meta tags | ◻️ | For iOS |
+| Theme color set | ◻️ | Meta + manifest |
+| Viewport meta | ◻️ | Responsive |
+| Install prompt handled | ◻️ | Custom UI |
+| Update notification | ◻️ | New SW prompt |
+| Offline indicator | ◻️ | Connection status |
+| Background sync | ◻️ | If needed |
+| Geolocation | ◻️ | If needed |
+| Lighthouse score 100 | ◻️ | All audits pass |
 
 ## HTTP Status Codes
 
-| Code | Meaning | When to use |
-|---|---|---|
+**Use standard RFC 7231 HTTP status codes consistently:**
+
+| Code | Meaning | Use For |
+|------|---------|---------|
 | 200 | OK | Successful GET, PUT, PATCH |
-| 201 | Created | Successful POST that creates a resource |
+| 201 | Created | Successful POST creating resource |
 | 204 | No Content | Successful DELETE, or PUT with no body |
-| 301 | Moved Permanently | Canonical redirect (URL normalize, old → new URL) |
+| 301 | Moved Permanently | Permanent/canonical redirect (URL normalize, old → new URL) |
 | 302 | Found | Temporary redirect (post-form) |
 | 304 | Not Modified | Conditional GET cache hit |
-| 400 | Bad Request | Malformed request, validation failure |
+| 400 | Bad Request | Invalid input, validation errors |
 | 401 | Unauthorized | Not authenticated |
 | 403 | Forbidden | Authenticated but not authorized |
-| 404 | Not Found | Resource does not exist |
-| 405 | Method Not Allowed | Wrong HTTP verb |
-| 409 | Conflict | Duplicate resource, edit conflict |
+| 404 | Not Found | Resource doesn't exist |
+| 405 | Method Not Allowed | Wrong HTTP method |
+| 409 | Conflict | Duplicate resource, version conflict |
 | 410 | Gone | Resource permanently deleted |
-| 422 | Unprocessable Entity | Semantic validation failure |
-| 429 | Too Many Requests | Rate limited |
-| 500 | Internal Server Error | Unexpected server error |
+| 422 | Unprocessable Entity | Semantic validation errors |
+| 429 | Too Many Requests | Rate limit exceeded |
+| 500 | Internal Server Error | Server-side errors |
 | 502 | Bad Gateway | Upstream service failure |
-| 503 | Service Unavailable | Maintenance mode or overload |
-
----
+| 503 | Service Unavailable | Maintenance mode |
 
 ## Unified Response Format
 
+**ALL responses (server → client) use this exact format. Simple to parse everywhere.**
+
 **Canonical envelope — see PART 14 → "Error Response" for the authoritative definition.** All API endpoints return the same JSON shape; absent fields are omitted entirely, never emitted as `null`, and no endpoint may invent its own shape or add ad-hoc top-level fields.
 
-Success:
+### Success Response
 
 ```json
 {
   "ok": true,
-  "data": { … }
+  "data": {}
 }
 ```
 
-On error:
+### Error Response
 
 ```json
 {
   "ok": false,
-  "error": "NOT_FOUND",
-  "message": "The requested resource does not exist."
+  "error": "ERROR_CODE",
+  "message": "Human readable message"
 }
 ```
 
-With optional structured context:
+### Standard Error Codes (server sends, client parses)
 
-```json
-{
-  "ok": false,
-  "error": "VALIDATION_FAILED",
-  "message": "Human readable message",
-  "details": {
-    "field": "email",
-    "rule": "format"
-  }
-}
-```
+| Error Code | HTTP | Message | Client/Agent Display |
+|------------|------|---------|---------------------|
+| `BAD_REQUEST` | 400 | "Invalid request format" | Invalid request |
+| `VALIDATION_FAILED` | 400 | "Validation failed: {field}" | Check input: {field} |
+| `UNAUTHORIZED` | 401 | "Authentication required" | Authentication required |
+| `TOKEN_EXPIRED` | 401 | "Token has expired" | Token expired, please re-authenticate |
+| `TOKEN_INVALID` | 401 | "Invalid token" | Invalid token |
+| `FORBIDDEN` | 403 | "Permission denied" | Access denied |
+| `ACCOUNT_LOCKED` | 403 | "Account locked" | Account locked, try later |
+| `CSRF_FAILED` | 403 | "CSRF token validation failed" | Session expired, reload and retry |
+| `NOT_FOUND` | 404 | "Resource not found" | Not found |
+| `METHOD_NOT_ALLOWED` | 405 | "Method not allowed" | Invalid operation |
+| `CONFLICT` | 409 | "Resource already exists" | Already exists |
+| `RATE_LIMITED` | 429 | "Too many requests" | Slow down, try later |
+| `SERVER_ERROR` | 500 | "Internal server error" | Something went wrong |
+| `MAINTENANCE` | 503 | "Service unavailable" | Maintenance, try later |
+
+### Parsing Rules
+
+**All consumers (client binary, WebUI, external tools) parse the same way:**
 
 ```rust
+// Universal API response parser - works for server, client
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiResponse {
     pub ok: bool,
@@ -22817,35 +24060,139 @@ pub struct ApiResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub details: Option<serde_json::Value>,
 }
+
 pub fn parse_api_response(body: &[u8]) -> Result<ApiResponse, serde_json::Error> {
     serde_json::from_slice(body)
 }
+
 // Usage in client
 let resp = parse_api_response(body)?;
 if !resp.ok {
+    // Display: resp.message (human) or handle by resp.error (code)
     return Err(anyhow::anyhow!("{}: {}", resp.error.unwrap_or_default(), resp.message.unwrap_or_default()));
 }
+// Success: use resp.data
 ```
 
-```rust
-pub fn write_json<T: Serialize>(data: T) -> impl axum::response::IntoResponse {
-    axum::response::Json(data)
-}
-pub fn write_text(text: impl Into<String>) -> impl axum::response::IntoResponse {
-    let mut t = text.into();
-    if !t.ends_with('\n') {
-        t.push('\n');
-    }
-    (axum::http::StatusCode::OK,
-     [(axum::http::header::CONTENT_TYPE, "text/plain")],
-     t)
+### Client/Agent Message Display
+
+| Context | What to Show |
+|---------|--------------|
+| Terminal (CLI/TUI) | `resp.message` directly |
+| WebUI | `resp.message` in toast/alert |
+| Logging | `resp.error: resp.message` |
+| Machine parsing | Check `resp.error` code |
+
+### Examples
+
+**Success - List items:**
+```json
+{
+  "ok": true,
+  "data": {
+    "items": [],
+    "total": 42
+  }
 }
 ```
 
+**Success - Create item:**
+```json
+{
+  "ok": true,
+  "data": {
+    "id": 123,
+    "name": "new-item"
+  }
+}
+```
 
----
+**Error - Not authenticated:**
+```json
+{
+  "ok": false,
+  "error": "UNAUTHORIZED",
+  "message": "Authentication required"
+}
+```
+
+**Error - Validation:**
+```json
+{
+  "ok": false,
+  "error": "VALIDATION_FAILED",
+  "message": "Validation failed: email must be valid"
+}
+```
+
+**Error - Rate limit:**
+```json
+{
+  "ok": false,
+  "error": "RATE_LIMITED",
+  "message": "Too many requests, retry after 60 seconds"
+}
+```
+
+### Why This Format
+
+| Benefit | Explanation |
+|---------|-------------|
+| **Simple** | Just check `ok` field first |
+| **Consistent** | Same structure everywhere |
+| **Parseable** | One parser for all responses |
+| **Human-friendly** | `message` always displayable |
+| **Machine-friendly** | `error` code for programmatic handling |
+| **Minimal** | No nested complexity for simple cases |
+
+## Text Response Format
+
+**CLI text output uses standardized format. Easy to parse with grep/awk/cut.**
+
+### Success Response (text/plain)
+
+```
+OK: {message}
+{data lines...}
+```
+
+### Error Response (text/plain)
+
+```
+ERROR: {code}: {message}
+```
+
+### Text Response Examples
+
+**Success - Single value:**
+```
+OK: Retrieved successfully
+value: 42
+```
+
+**Success - List:**
+```
+OK: 3 items found
+item-1
+item-2
+item-3
+```
+
+**Error:**
+```
+ERROR: NOT_FOUND: Resource not found
+```
+
+**Error with details:**
+```
+ERROR: VALIDATION_FAILED: email must be valid
+```
 
 ## Server Response Rules
+
+**These rules apply SERVER-WIDE to ALL responses (API, frontend AJAX, CLI, webhooks).**
+
+**Core rules:**
 
 | Rule | Detail |
 |---|---|
@@ -22857,256 +24204,270 @@ pub fn write_text(text: impl Into<String>) -> impl axum::response::IntoResponse 
 | Consistent envelope | All JSON responses use the `ApiResponse` struct |
 | Set `Cache-Control` | Static assets: `immutable, max-age=31536000`; HTML: `no-store` |
 
----
+### Content-Type Detection
+
+| Source | Content-Type | Format |
+|--------|--------------|--------|
+| API routes (`/api/{api_version}/*`) | `application/json` | JSON |
+| `.txt` suffix (API only) | `text/plain` | Text |
+| `Accept: application/json` | `application/json` | JSON |
+| `Accept: text/plain` | `text/plain` | Text |
+| CLI/Agent (auto-detected) | `text/plain` | Text |
+| Browser (no Accept header) | `text/html` | HTML |
+| Frontend AJAX/fetch | Auto-detect from `Accept` | JSON/Text |
+
+**Notes:**
+- `.txt` suffix only works on API routes (`/api/{api_version}/*.txt`)
+- No `.json` suffix exists - JSON is the default for API
+- Frontend uses `Accept` header for format negotiation (set by fetch/XMLHttpRequest)
+
+### Newline Rules
+
+**ALL non-HTML responses MUST end with a single newline (`\n`).**
+
+| Format | Rule | Example |
+|--------|------|---------|
+| JSON | Single `\n` after closing `}` or `]` | `{"ok": true}\n` |
+| Text | Single `\n` after last line | `OK: done\n` |
+| HTML | No trailing newline requirement | `</html>` |
+
+**Why:** Ensures consistent parsing, clean terminal output, proper file concatenation.
+
+```rust
+// Server response helpers
+pub fn write_json<T: Serialize>(data: T) -> impl axum::response::IntoResponse {
+    // axum::Json serializes with a trailing newline appended by the helper below when needed
+    axum::response::Json(data)
+}
+
+pub fn write_text(text: impl Into<String>) -> impl axum::response::IntoResponse {
+    let mut t = text.into();
+    if !t.ends_with('\n') {
+        t.push('\n');
+    }
+    (axum::http::StatusCode::OK,
+     [(axum::http::header::CONTENT_TYPE, "text/plain")],
+     t)
+}
+```
+
+### JSON Rules
+
+| Rule | Correct | Wrong |
+|------|---------|-------|
+| No comments | `{"key": "value"}` | `{"key": "value" // comment}` |
+| No trailing commas | `{"a": 1, "b": 2}` | `{"a": 1, "b": 2,}` |
+| Double quotes only | `{"key": "value"}` | `{'key': 'value'}` |
+| No undefined | `{"key": null}` | `{"key": undefined}` |
+| 2-space indentation | `  "key": "value"` | `    "key"` or `\t"key"` |
+| Trailing newline | `}\n` | `}` (no newline) |
+
+### Text Rules
+
+| Rule | Correct | Wrong |
+|------|---------|-------|
+| Lines end with `\n` | `line1\nline2\n` | `line1\nline2` |
+| No trailing spaces | `value\n` | `value  \n` |
+| UTF-8 encoding | Always UTF-8 | Other encodings |
+| Unix line endings | `\n` | `\r\n` (Windows) |
 
 ## CORS Configuration
 
-Enable only for `/api/` routes. Never enable for HTML page routes.
+**See "CORS" section below for complete configuration and behavior.**
 
-**Default CORS policy allows all origins (`*`) unless configured.**
+Quick reference: Default allows all origins (`*`). Configure via `server.cors.allowed_origins` in server.yml.
 
-### Configuration
+### HTML5 & CSS Over JavaScript
 
-```rust
-use tower_http::cors::{CorsLayer, Any};
+**Priority Order: HTML5 first → CSS second → JavaScript last resort.**
 
-let cors = CorsLayer::new()
-    .allow_origin(cfg.server.cors.allowed_origins.iter().filter_map(|o| o.parse().ok()).collect::<Vec<_>>())
-    .allow_methods([
-        axum::http::Method::GET,
-        axum::http::Method::POST,
-        axum::http::Method::PUT,
-        axum::http::Method::PATCH,
-        axum::http::Method::DELETE,
-        axum::http::Method::OPTIONS,
-    ])
-    // Never AllowHeaders::any() — the `*` wildcard does NOT cover Authorization and is
-    // invalid with credentials; list every supported auth header by name.
-    // Keep in sync with PART 8 → "Auth Token Headers (All Headers Supported)".
-    .allow_headers([
-        axum::http::header::CONTENT_TYPE,
-        axum::http::header::ACCEPT,
-        axum::http::header::AUTHORIZATION,
-        axum::http::HeaderName::from_static("x-requested-with"),
-        axum::http::HeaderName::from_static("x-api-key"),
-        axum::http::HeaderName::from_static("api-key"),
-        axum::http::HeaderName::from_static("apikey"),
-        axum::http::HeaderName::from_static("x-auth-token"),
-        axum::http::HeaderName::from_static("x-access-token"),
-        axum::http::HeaderName::from_static("x-token"),
-        axum::http::HeaderName::from_static("token"),
-        axum::http::HeaderName::from_static("x-csrf-token"),
-        axum::http::HeaderName::from_static("x-xsrf-token"),
-        axum::http::HeaderName::from_static("x-session-id"),
-        axum::http::HeaderName::from_static("x-service-token"),
-        axum::http::HeaderName::from_static("x-internal-token"),
-    ])
-    .allow_credentials(true)
-    .max_age(std::time::Duration::from_secs(86400));
-```
+| Priority | Technology | Use For |
+|----------|------------|---------|
+| **1st** | HTML5 | Structure, forms, validation, semantic content, `<details>`, `<dialog>` |
+| **2nd** | CSS | Styling, layout, themes, animations, hover states, responsive design |
+| **3rd** | JavaScript | ONLY when HTML5/CSS cannot achieve the functionality |
 
-**Query param bypass:** `?token=` auth (last in the PART 8 priority order) travels in the URL, not a header — it never triggers a CORS preflight and works from any origin regardless of the allow_headers list.
+**JavaScript is the exception, not the rule. Every JS line must be justified.**
 
-```yaml
-server:
-  cors:
-    allowed_origins:
-      - "https://app.example.com"
-    allow_credentials: true
-    max_age: 86400
-```
+| Use Case | Use HTML5/CSS | Use JavaScript Only When |
+|----------|---------------|--------------------------|
+| Form validation | HTML5 `required`, `pattern`, `min`, `max`, `type="email"` | Complex cross-field validation |
+| Collapsible sections | `<details>/<summary>` | Need animation or programmatic control |
+| Tabs | CSS `:target` or radio button hack | Need deep linking or state management |
+| Tooltips | CSS `::after` with `data-tooltip` | Need dynamic positioning |
+| Modals | Native `<dialog>` (provides focus trap, Esc, and `::backdrop` natively) | Only `showModal()` to open; closing uses `<form method="dialog">` |
+| Hover effects | CSS `:hover`, `:focus`, `:active` | Never - always CSS |
+| Animations | CSS `@keyframes`, `transition` | Complex sequenced animations |
+| Responsive design | CSS media queries | Never - always CSS |
+| Toggle switches | CSS with hidden checkbox | Need state persistence |
+| Dropdowns/menus | CSS `:focus-within` | Complex multi-level menus |
+| Progress bars | HTML5 `<progress>` | Need dynamic updates |
+| Sliders | HTML5 `<input type="range">` | Complex custom styling |
+| Date pickers | HTML5 `<input type="date">` | Need custom calendar UI |
+| Color pickers | HTML5 `<input type="color">` | Need swatches or advanced features |
+| Accordions | `<details>/<summary>` | Need single-open behavior |
 
-### CORS Headers
+**JavaScript Guidelines:**
+- **Last resort** - only when HTML5/CSS cannot achieve the functionality
+- **Progressive enhancement** - features must work without JS where possible
+- **No JS for styling** - unless it cannot be done in HTML5 and CSS
+- **No JS for simple interactions** - hover, focus, basic toggles are CSS-only
 
-| Header | Value |
-|--------|-------|
-| `Access-Control-Allow-Origin` | Configured origin(s) or `*` |
-| `Access-Control-Allow-Methods` | `GET, POST, PUT, PATCH, DELETE, OPTIONS` |
-| `Access-Control-Allow-Headers` | `Content-Type, Accept, X-Requested-With, Authorization, X-API-Key, X-Api-Key, API-Key, ApiKey, X-Auth-Token, X-Access-Token, X-Token, Token, X-CSRF-Token, X-XSRF-Token, X-Session-ID, X-Service-Token, X-Internal-Token` |
-| `Access-Control-Allow-Credentials` | `true` (only when specific origin, not `*`) |
-| `Access-Control-Max-Age` | `86400` (24 hours) |
+**HTML5 Required :**
+- ALL HTML MUST be valid HTML5
+- Use `<!DOCTYPE html>` declaration
+- Use semantic HTML5 elements: `<header>`, `<nav>`, `<main>`, `<footer>`, `<article>`, `<section>`, `<aside>`
+- Use HTML5 form elements: `<input type="email">`, `<input type="date">`, `<input type="number">`, etc.
+- Use HTML5 attributes: `required`, `pattern`, `placeholder`, `autofocus`, `autocomplete`
+- NO deprecated elements: `<center>`, `<font>`, `<marquee>`, `<blink>`, etc.
+- NO deprecated attributes: `align`, `bgcolor`, `border`, `cellpadding`, etc.
+- **Required for**: API calls, dynamic content loading, complex state, WebSockets
+- **Size matters** - keep JS minimal, no large libraries for simple tasks
 
-**Never `*` here:** the Fetch spec's `Access-Control-Allow-Headers: *` wildcard does NOT cover `Authorization`, and wildcards are invalid when credentials are allowed. Every supported auth header is listed by name — keep in sync with PART 8 → "Auth Token Headers (All Headers Supported)".
+**Small JS Behaviors (external file) — inline handlers are NEVER allowed (the CSP blocks `onclick`/`onchange`):**
 
-### Behavior
-
-| Scenario | Behavior |
-|----------|----------|
-| `allowed_origins: ["*"]` | Allow all origins, credentials NOT allowed |
-| `allowed_origins: ["https://example.com"]` | Allow single origin, credentials allowed |
-| `allowed_origins: ["https://a.com", "https://b.com"]` | Allow listed origins, credentials allowed |
-| `allowed_origins: [""]` | No CORS headers (same-origin only) |
-| Preflight (OPTIONS) | Return CORS headers, 204 No Content |
-
-### CORS Allow-list Resolution Order
-
-The effective CORS allow-list is resolved from these sources in order; the request `Origin` is matched against the combined list:
-
-1. **Explicit config** — origins listed in `server.cors.allowed_origins`. A single `""` entry disables CORS entirely and stops resolution.
-2. **DOMAIN env entries** — every hostname from the `DOMAIN` environment variable is added as an `https://` origin.
-3. **Reverse-proxy-learned hosts** — hostnames observed via `X-Forwarded-Host` from trusted proxies only (gated on `trusted_proxies` — see PART 12 → "Trusted Proxies") are appended at runtime.
-4. **Default** — if no source produced a list, fall back to `*` (credentials NOT allowed).
-
-Credentials (`Access-Control-Allow-Credentials: true`) are sent only when the resolved list is explicit — never with `*`. CSP `connect-src` `{learned_origins}` (PART 11 → "Content Security Policy") uses this same resolved list.
-
-### Mode-Specific Behavior
-
-| Mode | Default | Behavior |
-|------|---------|----------|
-| Production | `*` | Allow all origins by default (configure if needed) |
-| Development | `*` | Allow all origins |
-
----
-
-## CSRF Protection
-
-Use the stateless double-submit cookie pattern — there are no sessions, so the token is never stored server-side. The server sets a `csrf_token` cookie (`SameSite=Strict`, `Secure`, NOT `HttpOnly` — JavaScript must read it) and every mutating browser request must echo the same value in the `X-CSRF-Token` header or a `csrf_token` form field. The middleware compares the two in constant time.
-
-Validation applies only to POST/PUT/PATCH/DELETE requests. Requests authenticated with a `Bearer` token bypass CSRF entirely (a bearer header cannot be sent cross-site by a form), as do safe methods and paths listed in `server.csrf.exempt_paths`.
-
-```rust
-// Generate a random token for the double-submit cookie
-pub fn generate_csrf_token() -> String {
-    use rand::Rng;
-    rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
-        .take(32)
-        .map(char::from)
-        .collect()
-}
-
-// Middleware
-async fn csrf_middleware(
-    cookies: axum_extra::extract::CookieJar,
-    request: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> Result<axum::response::Response, axum::http::StatusCode> {
-    let method = request.method().clone();
-    if matches!(method, axum::http::Method::POST | axum::http::Method::PUT |
-                axum::http::Method::PATCH | axum::http::Method::DELETE) {
-        // Bearer-authenticated API requests bypass CSRF
-        let is_bearer = request
-            .headers()
-            .get(axum::http::header::AUTHORIZATION)
-            .and_then(|v| v.to_str().ok())
-            .map(|v| v.starts_with("Bearer "))
-            .unwrap_or(false);
-        // Paths listed in server.csrf.exempt_paths bypass CSRF
-        let exempt = config::csrf_exempt_paths()
-            .iter()
-            .any(|p| request.uri().path() == p);
-        if !is_bearer && !exempt {
-            let cookie_token = cookies.get("csrf_token").map(|c| c.value().to_string());
-            // Prefer the X-CSRF-Token header (AJAX requests)
-            let header_token = request
-                .headers()
-                .get("X-CSRF-Token")
-                .and_then(|v| v.to_str().ok())
-                .map(|s| s.to_string());
-            // Fall back to the csrf_token form field (no-JS form posts)
-            let (request, submitted) = match header_token {
-                Some(t) => (request, Some(t)),
-                None => extract_form_csrf_token(request).await,
-            };
-            return match (cookie_token, submitted) {
-                (Some(c), Some(s)) if constant_time_eq(c.as_bytes(), s.as_bytes()) => {
-                    Ok(next.run(request).await)
-                }
-                _ => Err(axum::http::StatusCode::FORBIDDEN),
-            };
-        }
-    }
-    Ok(next.run(request).await)
-}
-
-// extract_form_csrf_token buffers a urlencoded form body, reads csrf_token,
-// and rebuilds the request so downstream extractors still see the body
-async fn extract_form_csrf_token(
-    request: axum::extract::Request,
-) -> (axum::extract::Request, Option<String>) {
-    let is_form = request
-        .headers()
-        .get(axum::http::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .map(|ct| ct.starts_with("application/x-www-form-urlencoded"))
-        .unwrap_or(false);
-    if !is_form {
-        return (request, None);
-    }
-    let (parts, body) = request.into_parts();
-    let bytes = match axum::body::to_bytes(body, 64 * 1024).await {
-        Ok(b) => b,
-        Err(_) => {
-            let rebuilt = axum::extract::Request::from_parts(parts, axum::body::Body::empty());
-            return (rebuilt, None);
-        }
-    };
-    let token = url::form_urlencoded::parse(&bytes)
-        .find(|(k, _)| k == "csrf_token")
-        .map(|(_, v)| v.into_owned());
-    let rebuilt = axum::extract::Request::from_parts(parts, axum::body::Body::from(bytes));
-    (rebuilt, token)
-}
-```
-
-**Validation failure logging:** every CSRF rejection (the `_ => Err(...)` arm above) is logged to `audit.log` as `security.csrf_failure` (IP, endpoint, reason — see PART 11 → "Audit Log Events").
-
-Include the CSRF token in every HTML form:
+Prefer zero-JS HTML5 equivalents first:
 
 ```html
-<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<!-- Scroll - pure HTML/CSS, no JS -->
+<a href="#top">Back to top</a>
+
+<!-- Form reset - native button type, no JS -->
+<form id="myform">
+  <button type="reset">Reset Form</button>
+</form>
 ```
 
-And in every AJAX request header:
+```css
+/* Smooth scrolling for the #top anchor */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+```
+
+Behaviors with no HTML5 equivalent are bound in `static/js/app.js` via `addEventListener` on data-attributes or IDs:
+
+```html
+<!-- Navigation -->
+<button data-action="back">Go Back</button>
+<button data-action="forward">Go Forward</button>
+<button data-action="reload">Refresh</button>
+
+<!-- Print -->
+<button data-action="print">Print</button>
+
+<!-- Form helpers -->
+<button data-action="select-all" data-target="field">Select All</button>
+```
 
 ```javascript
-headers: { 'X-CSRF-Token': document.cookie.match(/csrf_token=([^;]+)/)?.[1] ?? '' }
+// static/js/app.js - small behavior bindings (one place, CSP-safe)
+const actions = {
+  back: () => history.back(),
+  forward: () => history.forward(),
+  reload: () => location.reload(),
+  print: () => window.print(),
+  'select-all': (btn) => document.getElementById(btn.dataset.target).select()
+};
+
+document.querySelectorAll('[data-action]').forEach((btn) => {
+  const handler = actions[btn.dataset.action];
+  if (handler) {
+    btn.addEventListener('click', () => handler(btn));
+  }
+});
 ```
 
----
+**Rule:** These buttons are enhancements — hide them until JS runs if their action is JS-only.
+Keep bindings in `static/js/app.js`; never emit inline `onclick`/`onchange` attributes.
+See **JavaScript Rules** section below for `app.js` structure.
 
-## HTML5/CSS over JavaScript
+**CSS-First Patterns (use these instead of JS):**
 
-Prefer native HTML5 and CSS for UI features where possible. Use JavaScript only for behavior that HTML/CSS cannot provide.
+```html
+<!-- Collapsible section - use <details>/<summary> NOT JS -->
+<details>
+  <summary>Click to expand</summary>
+  <p>Hidden content revealed when clicked.</p>
+</details>
 
-| Feature | Native solution |
-|---|---|
-| Dropdown menus | `<details>` + `<summary>` |
-| Modals | `<dialog>` |
-| Form validation | `required`, `type`, `pattern`, `minlength`, `maxlength`; error styling via CSS `:user-invalid` |
-| Tooltips | `title` attribute + CSS `[title]::after` |
-| Accordions | `<details>` + `<summary>` |
-| Progress | `<progress>` |
-| Meter | `<meter>` |
-| Date picker | `<input type="date">` |
-| Color picker | `<input type="color">` |
-| Range slider | `<input type="range">` |
+<!-- Toggle menu - use checkbox hack NOT JS -->
+<label for="menu-toggle" class="menu-btn">☰ Menu</label>
+<input type="checkbox" id="menu-toggle" hidden>
+<nav class="menu">
+  <a href="/">Home</a>
+  <a href="/server/login">Login</a>
+</nav>
 
----
+<style>
+.menu { display: none; }
+#menu-toggle:checked ~ .menu { display: block; }
+</style>
 
-## Tera Templates
+<!-- Dropdown - use :focus-within NOT JS -->
+<div class="dropdown">
+  <button>Options</button>
+  <div class="dropdown-content">
+    <a href="#">Option 1</a>
+    <a href="#">Option 2</a>
+  </div>
+</div>
 
-### Template Structure
+<style>
+.dropdown-content { display: none; }
+.dropdown:focus-within .dropdown-content { display: block; }
+</style>
+```
 
+### Tera Templates
+
+**ALL frontend HTML MUST use Tera templates (`tera` crate).**
+
+**Untrusted-content rule:** pasted text, repo blobs, markdown files, and any user-submitted file content are data, not templates. Follow PART 11 "Untrusted File / Rich Content Handling" and NEVER pass user-controlled content through Tera's `| safe` filter unless it came from a sanitizer (ammonia) for an explicitly approved field.
+
+**`markdown_to_html` requirements:**
+- Disable raw HTML passthrough from the markdown source
+- Sanitize the rendered output with an allow-list policy (ammonia) before marking the result `| safe`
+- Escape code fences/source text before syntax-highlighting wrappers are added
+- Add safe link attributes for external URLs (`rel="noopener noreferrer nofollow ugc"`)
+
+| Location | Purpose |
+|----------|---------|
+| `template/` | All `.html.tera` template files |
+| `template/partial/` | Reusable template partials |
+| `template/layout/` | Base layouts |
+| `template/page/` | Page-specific templates |
+| `static/` | Static assets (CSS, JS, images) |
+
+**Template Structure (all files use `.html.tera` extension):**
 ```
 template/
-  layout/
-    base.html.tera
-    public.html.tera
-  partial/
-    public/
-      header.html.tera
-      footer.html.tera
-      nav.html.tera
-      head.html.tera
-      scripts.html.tera
-  page/
-    home.html.tera
-    search.html.tera
-    error.html.tera        # Error pages (404, 500, 502, 503, etc.) - MUST use site theme
-    offline.html.tera
+├── layout/
+│   ├── base.html.tera      # Root shell: <html>, <head>, <body> wrapper
+│   └── public.html.tera    # Public-facing layout (/, /server/*, project routes)
+├── partial/
+│   ├── public/
+│   │   ├── header.html.tera  # Public header (logo, nav, theme toggle)
+│   │   ├── nav.html.tera     # Public navigation
+│   │   └── footer.html.tera  # Public footer (about, privacy, etc.)
+│   ├── head.html.tera        # <head> contents (meta, CSS)
+│   └── scripts.html.tera     # JavaScript includes
+├── page/
+│   ├── index.html.tera       # Home page
+│   ├── healthz.html.tera     # Health check page
+│   └── error.html.tera       # Error pages (404, 500, 502, 503, etc.) - MUST use site theme
+└── component/
+    ├── modal.html.tera       # Reusable modal component
+    ├── toast.html.tera       # Toast notifications
+    └── ...
 ```
-
 
 ## Error Pages (MUST Match Theme)
 
@@ -23145,29 +24506,422 @@ template/
 {% endblock %}
 ```
 
-### Layout Separation
+## Layout Separation
 
-| Layout | Purpose |
-|---|---|
-| `base.html.tera` | Root shell: `<html>`, `<head>`, `<body>` wrapper |
-| `public.html.tera` | All pages (header, footer, no sidebar) — every page is public; there is no auth or admin layout |
+**All web routes are public — there is no admin web UI:**
+
+| Layout | Routes | Design Philosophy |
+|--------|--------|-------------------|
+| `base.html.tera` | (root shell extended by every layout) | `<html>`, `<head>`, `<body>` wrapper |
+| `public.html.tera` | `/`, `/server/*`, project routes | Clean, marketing-friendly, top navigation |
+
+### Public Layout (`public.html.tera`)
+
+**For end-users and public-facing pages:**
 
 ```
-{# base.html.tera #}
+┌─────────────────────────────────────────────────────────────────┐
+│  [Logo]              Home  API  Docs                [Theme]     │  ← Header + Top Nav
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│                                                                 │
+│                         <main>                                  │  ← Page content
+│                     (centered, clean)                           │
+│                                                                 │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│        About · Privacy · Contact · GitHub · {project_version}   │  ← Footer (centered)
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Public Layout Characteristics:**
+- Top horizontal navigation bar
+- Clean, minimal design with whitespace
+- Centered content area
+- Marketing/product-focused styling
+- Simple footer with links
+
+**Public Navigation Rules :**
+
+| Rule | Description |
+|------|-------------|
+| **App-focused** | Navigation reflects the application's features and purpose |
+| **NO admin links** | NEVER link to server administration from public pages |
+| **NO admin hints** | Do not advertise server-administration paths (there is no admin web UI) |
+| **Direct access only** | Server administration is via the config file or CLI only |
+
+**Public nav contains (project-specific):**
+- Home (`/`)
+- App-specific feature pages (e.g., API docs, features, pricing)
+
+**Public nav NEVER contains:**
+- ❌ Any link to server-administration paths (there is no admin web UI)
+- ❌ Dashboard link (no user accounts exist)
+- ❌ Settings link (server settings are config-file only)
+- ❌ Any hint of server administration routes
+
+### Shared Theme Classes
+
+**`public.html.tera` uses theme CSS classes applied globally. No conflicts, no ambiguities.**
+
+| Rule | Description |
+|------|-------------|
+| **Theme classes** | Use `theme-dark`, `theme-light` on `<html>` |
+| **CSS variables** | Theme colors defined once in `common.css`, used everywhere |
+| **Color schemes** | `dark.css` and `light.css` apply globally |
+| **No layout-specific themes** | Do NOT create layout-scoped CSS theme files |
+| **No class conflicts** | Theme class names are global and consistent |
+| **No ambiguity** | One set of theme rules for the entire project |
+
+**Layout starts with:**
+```html
 <!DOCTYPE html>
-<html lang="{{ lang }}" dir="{{ dir }}">
-<head>{% include "head.html" %}</head>
-<body>
-  {% include "header.html" %}
-  {% include "nav.html" %}
-  <main>{% block content %}{% endblock %}</main>
-  {% include "footer.html" %}
-  {% include "scripts.html" %}
-</body>
-</html>
+<!-- base.html.tera: server renders theme-dark, theme-light, or theme-auto from the theme cookie -->
+<html lang="{{ lang }}" dir="{{ dir }}" class="theme-{{ theme }}">
+<head>
+  {% include "head.html" %}
+</head>
 ```
 
-### Nav vs Footer
+**Theme class on `<html>` element (NOT `<body>`):**
+```html
+<!-- CORRECT -->
+<html class="theme-dark">
+
+<!-- WRONG - do not put theme class on body -->
+<body class="theme-dark">
+```
+
+**CSS variable inheritance:**
+```css
+/* common.css - theme variables */
+html.theme-dark {
+  --color-bg: #282a36;
+  --color-text: #f8f8f2;
+  --color-border: #44475a;
+  /* ... all theme colors ... */
+}
+
+html.theme-light {
+  --color-bg: #ffffff;
+  --color-text: #1f2328;
+  --color-border: #d1d9e0;
+  /* ... all theme colors ... */
+}
+
+/* public.css and components.css use the SAME variables */
+.sidebar { background: var(--color-bg); }
+.header { color: var(--color-text); }
+```
+
+**Theme preference source:**
+| Context | Preference Source | Fallback |
+|---------|-------------------|----------|
+| All users | `theme` cookie (`light` \| `dark` \| `auto`), read server-side | `dark` |
+
+**Server-rendered theme (no init JS, no FOUC):** the server reads the `theme` cookie and renders `class="theme-light"`, `class="theme-dark"`, or `class="theme-auto"` on `<html>`. `auto` is pure CSS — `@media (prefers-color-scheme: light)` overrides the dark-default custom properties — so no `matchMedia` detection JS exists. A no-JS visitor gets correct auto theming purely from CSS and can switch via a small `<noscript>` form POSTing to the theme endpoint.
+
+```css
+/* Auto mode - pure CSS, no matchMedia JS */
+@media (prefers-color-scheme: light) {
+  html.theme-auto {
+    --color-bg: #ffffff;
+    --color-text: #1f2328;
+    --color-border: #d1d9e0;
+  }
+}
+```
+
+**JavaScript theme switching (shared):**
+
+**Note:** Per "HTML5 & CSS Over JavaScript" rules - CSS does all theming via variables. JavaScript is ONLY the toggle click handler: set the cookie and swap the class (cannot be done in pure CSS). The form (see "Theme Toggle" → HTML Structure above) already works with zero JS; this is progressive enhancement only, intercepting the submit to avoid a full page reload. Critically, it recomputes the next mode from the LIVE `<html>` class on every click rather than trusting the form's `value` (which was rendered once at page load and would go stale after the first JS-driven switch) — this is what keeps repeated clicks working instead of "sticking" after one.
+
+```javascript
+// Theme cycle: dark -> light -> auto -> dark. Mirrors the server's
+// next_theme() (see "Theme Toggle" above) so the JS-enhanced and no-JS
+// paths always agree on what "next" means.
+const THEME_CYCLE = ['dark', 'light', 'auto'];
+
+function currentTheme() {
+  const match = document.documentElement.className.match(/theme-(dark|light|auto)/);
+  return match ? match[1] : 'dark';
+}
+
+function setTheme(theme) {
+  document.documentElement.className = `theme-${theme}`;
+  document.cookie = `theme=${theme}; path=/; max-age=31536000; SameSite=Lax`;
+}
+
+document.querySelectorAll('.theme-toggle-form').forEach((form) => {
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const next = THEME_CYCLE[(THEME_CYCLE.indexOf(currentTheme()) + 1) % THEME_CYCLE.length];
+    setTheme(next);
+  });
+});
+```
+
+### Layout Partials
+
+| Partial | Purpose |
+|---------|---------|
+| `partial/public/header.html.tera` | Logo + top nav |
+| `partial/public/nav.html.tera` | Horizontal navigation links |
+| `partial/public/footer.html.tera` | About, Privacy, Contact links |
+| `partial/head.html.tera` | Shared `<head>` contents |
+| `partial/scripts.html.tera` | Shared JavaScript includes |
+
+### Static Assets Organization
+
+```
+static/
+├── css/
+│   ├── common.css      # Reset, variables, utilities (loaded first)
+│   ├── public.css      # Public layout styles
+│   └── components.css  # Shared components (modals, buttons, toasts)
+├── js/
+│   └── app.js          # ALL JavaScript in ONE file (minimal)
+├── images/
+│   ├── logo.svg        # App logo (SVG preferred)
+│   ├── favicon.ico     # Favicon
+│   └── icons/          # UI icons (SVG preferred)
+└── fonts/              # Self-hosted fonts (if any)
+```
+
+### CSS Rules
+
+| Rule | Description |
+|------|-------------|
+| **One file per context** | `common.css`, `public.css`, `components.css` |
+| **Load order matters** | common → components → public |
+| **CSS variables** | Define in `common.css` `:root {}` for theming |
+| **NO inline styles** | All styles in CSS files, never in HTML |
+| **NO `!important`** | Exception: print styles only |
+| **BEM-like naming** | `.component`, `.component-element`, `.component--modifier` |
+| **Mobile-first** | Base styles for mobile, `@media (min-width)` for larger |
+
+**CSS Variables (common.css):**
+```css
+:root {
+  /* Colors — reuse the --color-* variables from the CSS Variable Reference
+     above (defined once in :root / html.theme-light); never redefine them
+     here with different names or values. */
+
+  /* Typography */
+  --font-family: system-ui, -apple-system, sans-serif;
+  --font-size-base: 1rem;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 2rem;
+
+  /* Borders */
+  --border-radius: 0.25rem;
+}
+```
+
+### JavaScript Rules
+
+| Rule | Description |
+|------|-------------|
+| **ONE file only** | All JS in `static/js/app.js` - no multiple files |
+| **Minimal JS** | CSS-first, JS only when absolutely necessary |
+| **No frameworks** | No React, Vue, Alpine, jQuery, etc. |
+| **No bundlers** | No webpack, vite, rollup - plain JS only |
+| **No transpilers** | No TypeScript, Babel - browser-native JS only |
+| **No npm/node** | No package.json for frontend |
+
+**app.js Structure:**
+```js
+// static/js/app.js - Keep this file SMALL
+
+// ============================================================================
+// Clipboard (with feedback)
+// ============================================================================
+function copyToClipboard(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const original = btn.textContent;
+    btn.textContent = btn.dataset.copiedLabel || 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+// ============================================================================
+// Toast notifications
+// ============================================================================
+// Durations per toast spec: success/info 3s, warning 5s, error never auto-dismisses
+const TOAST_DURATIONS = { success: 3000, info: 3000, warning: 5000, error: 0 };
+const TOAST_ICONS = { success: '✓', error: '✗', warning: '⚠', info: 'ℹ' };
+
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.setAttribute('role', 'alert');
+  toast.setAttribute('aria-live', 'polite');
+
+  const icon = document.createElement('span');
+  icon.className = 'toast-icon';
+  icon.textContent = TOAST_ICONS[type] || TOAST_ICONS.info;
+
+  const msg = document.createElement('span');
+  msg.className = 'toast-message';
+  msg.textContent = message;
+
+  const close = document.createElement('button');
+  close.className = 'toast-close';
+  close.setAttribute('aria-label', 'Dismiss');
+  close.innerHTML = '&times;';
+
+  toast.append(icon, msg, close);
+
+  // Click anywhere on the toast (or the X) dismisses it
+  toast.addEventListener('click', () => toast.remove());
+
+  const duration = TOAST_DURATIONS[type] ?? TOAST_DURATIONS.info;
+  // duration 0 = no auto-dismiss (errors stay until clicked)
+  if (duration > 0) {
+    const progress = document.createElement('div');
+    progress.className = 'toast-progress';
+    progress.style.animationDuration = `${duration}ms`;
+    toast.appendChild(progress);
+    setTimeout(() => toast.remove(), duration);
+  }
+
+  // Newest on top per the stacking spec
+  container.prepend(toast);
+}
+
+// ============================================================================
+// Modal helpers (for native <dialog>)
+// ============================================================================
+function openModal(id) {
+  document.getElementById(id).showModal();
+}
+
+function closeModal(id) {
+  document.getElementById(id).close();
+}
+
+// ============================================================================
+// Form helpers
+// ============================================================================
+// Delete confirmation uses the native <dialog> pattern - never confirm()
+// (see Forbidden Patterns). The dialog is opened from a click listener;
+// its confirm button submits the real delete form.
+document.querySelectorAll('[data-confirm-dialog]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.getElementById(btn.dataset.confirmDialog).showModal();
+  });
+});
+```
+
+```html
+<!-- Delete confirmation - native <dialog>, no confirm() -->
+<form id="delete-form" method="post" action="/items/123/delete">
+  <button type="button" data-confirm-dialog="confirm-delete">Delete</button>
+</form>
+
+<dialog id="confirm-delete">
+  <p>Are you sure?</p>
+  <!-- Cancel closes the dialog with zero JS -->
+  <form method="dialog">
+    <button>Cancel</button>
+  </form>
+  <!-- Confirm submits the real delete form -->
+  <button type="submit" form="delete-form" class="btn-danger">Delete</button>
+</dialog>
+```
+
+**What goes in app.js:**
+- Clipboard with feedback
+- Toast notifications
+- Modal helpers
+- Form validation (complex only)
+- Dynamic content loading (AJAX)
+- WebSocket connections
+
+**Small behaviors also live in app.js (never inline — the CSP blocks inline event handlers).** One-liners are bound via `addEventListener` on IDs or data-attributes:
+- `document.querySelectorAll('[data-action="back"]').forEach((b) => b.addEventListener('click', () => history.back()));`
+- `document.querySelectorAll('[data-action="print"]').forEach((b) => b.addEventListener('click', () => window.print()));`
+- Dialog close/cancel buttons need no JS at all — wrap them in `<form method="dialog">`
+
+### Template Rules
+
+| Rule | Description |
+|------|-------------|
+| **Tera templates only** | `tera` crate, `.html.tera` extension |
+| **Layouts for structure** | `layout/public.html.tera` |
+| **Partials for reuse** | Header, nav, footer, components |
+| **Pages for content** | One `.html.tera` per page/route |
+| **No logic in templates** | Minimal `{% if %}`, `{% for %}` - logic in handlers |
+
+**Template Inheritance:**
+```
+layout/public.html.tera
+  └── includes partial/head.html.tera
+  └── includes partial/public/header.html.tera
+  └── includes partial/public/nav.html.tera
+  └── yields to page content
+  └── includes partial/public/footer.html.tera
+  └── includes partial/scripts.html.tera
+```
+
+### Partials Rules
+
+| Rule | Description |
+|------|-------------|
+| **Shared partials** | `partial/head.html.tera`, `partial/scripts.html.tera` |
+| **Context partials** | `partial/public/*` |
+| **Component partials** | Reusable UI: `partial/toast.html.tera`, `partial/modal.html.tera` |
+| **No page-specific partials** | If used once, it's not a partial |
+| **Self-contained** | Partials include their own styles/scripts if needed |
+
+**Mandatory Partials:**
+```
+partial/
+├── head.html.tera           # <head> - meta, CSS links (REQUIRED)
+├── scripts.html.tera        # JS includes before </body> (REQUIRED)
+└── public/
+    ├── header.html.tera     # Public header (REQUIRED)
+    ├── nav.html.tera        # Public nav (REQUIRED)
+    └── footer.html.tera     # Public footer (REQUIRED)
+```
+
+**Optional Component Partials:**
+```
+partial/
+├── toast.html.tera          # Toast notification container
+├── modal.html.tera          # Reusable modal structure
+├── pagination.html.tera     # Pagination controls
+├── search.html.tera         # Search form
+└── {project}/          # Project-specific partials
+    └── *.html.tera
+```
+
+**Page Structure - Public:**
+
+```
+┌─────────────────────────────────────────┐
+│              <header>                   │  ← public/header.html.tera
+├─────────────────────────────────────────┤
+│               <nav>                     │  ← public/nav.html.tera (TOP)
+├─────────────────────────────────────────┤
+│                                         │
+│              <main>                     │  ← Page content
+│                                         │
+├─────────────────────────────────────────┤
+│              <footer>                   │  ← public/footer.html.tera (BOTTOM)
+└─────────────────────────────────────────┘
+```
+
+**Nav vs Footer :**
 
 | Element | Position | Purpose | Contents |
 |---------|----------|---------|----------|
@@ -23184,6 +24938,27 @@ template/
 - Help link (belongs in footer)
 - Preferences link (lives next to the theme toggle in the header, not in nav — it's UI state, not app content; also always present in the footer for discoverability)
 
+**Default Navigation (nav.html.tera):**
+
+```
+Desktop (single row, 4 zones):
+┌─────────────────────────────────────────────────────────────────┐
+│ {project_name}   Home | Section 1 | Section 2      [⚙] [Theme]  │  ← Header
+└─────────────────────────────────────────────────────────────────┘
+   ^logo/text       ^links (centered)              ^profile/prefs  ^theme
+
+Mobile:
+┌─────────────────────────────────────────────────────────────────┐
+│  {project_name}                            [☰]  [⚙] [Theme]     │  ← Header
+└─────────────────────────────────────────────────────────────────┘
+                                              ┌───────────────────┐
+                                              │  Home             │
+                                              │  App Section 1    │  ← Slide-in
+                                              │  App Section 2    │     from right
+                                              │  ...              │
+                                              └───────────────────┘
+```
+
 **Header Layout — single row, 4 zones, in this exact order:**
 
 ```
@@ -23193,14 +24968,13 @@ template/
 Brand sits left, nav links are horizontally centered (not pushed right against
 the actions), and the actions cluster (profile/preferences, then theme toggle)
 sits right. Do NOT split header/nav into two separate rows on desktop — that
-pushes links flush right against the header edge with no centering.
-
-**Default `header.html.tera`:**
+pushes links flush right against the header edge with no centering, which is
+the layout bug this section fixes.
 
 ```html
 <!-- Header bar: single row — brand | centered links | profile/preferences | theme toggle -->
 <header class="header">
-  <a href="/" class="site-brand">{{ project_name }}</a>
+  <a href="/" class="site-brand">{project_name}</a>
 
   <!-- Hidden checkbox controls mobile menu state - NO JavaScript -->
   <input type="checkbox" id="nav-toggle" class="nav-checkbox" hidden>
@@ -23224,13 +24998,13 @@ pushes links flush right against the header edge with no centering.
 
   <!-- Actions: profile/preferences zone, then theme toggle (always visible, far right) -->
   <div class="header-actions">
-    <!-- Profile/preferences zone — state-dependent. Route is always
-         /server/preferences regardless of state; only the menu CONTENTS
-         change with whether an owner_token cookie exists. -->
+    <!-- Profile/preferences zone — state-dependent, see "Profile/Preferences Zone" below.
+         Route is always /server/preferences regardless of state; only the menu
+         CONTENTS change with whether an owner_token cookie exists. -->
     {% if owner_token_cookie_exists %}
       <div class="dropdown">
-        <button type="button" class="dropdown-toggle header-link" aria-label="Preferences and resource management">
-          <svg class="icon-preferences" aria-hidden="true"><!-- gear icon --></svg>
+        <button class="dropdown-toggle header-link" aria-label="Preferences and resource management">
+          <svg class="icon-preferences"><!-- gear icon --></svg>
         </button>
         <div class="dropdown-menu">
           <a href="{{ owned_resource_url }}" class="dropdown-item" role="menuitem">Manage my {{ resource_label }}</a>
@@ -23240,17 +25014,17 @@ pushes links flush right against the header edge with no centering.
       </div>
     {% else %}
       <a href="/server/preferences" class="header-link" aria-label="Preferences" title="Preferences">
-        <svg class="icon-preferences" aria-hidden="true"><!-- gear icon --></svg>
+        <svg class="icon-preferences"><!-- gear icon --></svg>
       </a>
     {% endif %}
-    <!-- Theme toggle: a form whose target is the SERVER-COMPUTED next mode
-         (next_theme(), see "Theme Toggle" → "Theme Cycle Logic"), never a
-         hardcoded value - that's what makes repeated clicks keep cycling
-         instead of sticking after the first one. -->
-    <form action="/preferences" method="POST" class="theme-toggle-form">
+    <!-- Theme toggle: see "Theme Toggle" → HTML Structure above. Always a
+         form whose target is the SERVER-COMPUTED next mode (next_theme()),
+         never a hardcoded value - that's what makes repeated clicks keep
+         cycling instead of sticking after the first one. -->
+    <form action="/server/preferences" method="POST" class="theme-toggle-form">
       <input type="hidden" name="theme" value="{{ next_theme(theme) }}">
-      <button type="submit" class="btn btn-icon theme-button" aria-label="Switch theme (currently {{ theme }})" title="Switch theme">
-        <svg class="icon-theme" aria-hidden="true"><!-- reflects theme: moon/sun/circle-half --></svg>
+      <button type="submit" class="theme-button" aria-label="Switch theme (currently {{ theme }})" title="Switch theme">
+        <svg class="icon-theme"><!-- reflects theme: moon/sun/circle-half --></svg>
       </button>
     </form>
   </div>
@@ -23283,69 +25057,230 @@ pushes links flush right against the header edge with no centering.
 }
 ```
 
-No JS required for the theme toggle — see "System Theme Detection" above: the server reads the `theme` cookie and renders the correct class before the first byte of CSS, and a no-JS visitor can still switch theme via a `<noscript>` form POSTing to the theme endpoint. The `.header-link` to Preferences is a plain `<a>`, works with JS disabled by definition.
+**Mobile Menu Behavior:**
+- Menu slides in from RIGHT edge
+- Slides LEFT to open (right-to-left)
+- Slides RIGHT to close (left-to-right)
+- Overlay dims background, click to close
+- Theme toggle stays in header (NOT in menu) - keeps menu clean
 
-### Static Assets Organization
+**Smart Menu :**
+- If all nav links fit on screen → show inline links, NO hamburger
+- If nav links overflow → show hamburger menu
+- Detect dynamically on load and resize
+- Don't show hamburger if not needed
 
+**CSS-Only Mobile Menu (NO JavaScript) - Mobile-First:**
+```css
+/* Base: Mobile styles (no media query) */
+.nav-toggle { display: block; cursor: pointer; }
+.nav-links { display: none; }
+
+/* Slide-in panel (mobile) */
+.nav-panel {
+  position: fixed;
+  top: 0;
+  /* Hidden off-screen right */
+  right: -280px;
+  width: 280px;
+  height: 100vh;
+  background: var(--color-bg);
+  transition: right 0.3s ease;
+  z-index: 1001;
+}
+
+/* Overlay (hidden by default) */
+.nav-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  cursor: pointer;
+}
+
+/* When checkbox is checked: show menu and overlay */
+.nav-checkbox:checked ~ .nav-panel {
+  /* Slide in from right */
+  right: 0;
+}
+
+.nav-checkbox:checked ~ .nav-overlay {
+  display: block;
+}
+
+/* Desktop: show inline links, hide hamburger */
+@media (min-width: 768px) {
+  .nav-toggle, .nav-panel, .nav-overlay { display: none; }
+  .nav-links { display: flex; }
+}
 ```
-static/
-  css/
-    variables.css    ← CSS custom properties only
-    reset.css        ← Normalize / reset
-    base.css         ← Typography, body defaults
-    layout.css       ← Grid, flexbox utilities
-    components.css   ← Buttons, forms, modals, etc.
-    themes.css       ← .theme-light overrides
-    utilities.css    ← Single-purpose helpers
-    main.css         ← @import all of the above
-  js/
-    main.js          ← ES module entry point
-    sw.js            ← Service worker
-    sw-register.js   ← SW registration
-    components/      ← Per-component JS modules
-  icons/             ← SVG icons (inline-able)
-  fonts/             ← Self-hosted fonts (woff2)
-  images/            ← Static images
-  manifest.json
+
+**Mobile Responsive Rules:**
+- Links live in the single header row: inline links (desktop) or hamburger (mobile) — no separate nav row
+- Profile/preferences and theme toggle ALWAYS in header actions (never in the mobile slide-in menu)
+- Menu slides from right edge
+- Touch-friendly: minimum 44x44px tap targets
+- Overlay closes menu on tap (CSS label toggles checkbox - no JS)
+
+**No Fixed/Pinned Elements :**
+- Header, nav, footer all scroll with page
+- NOTHING pinned/fixed to viewport
+- User scrolls down → header/nav scroll away
+- User scrolls to bottom → footer appears
+
+**Footer Position :**
+- Footer ALWAYS at bottom of page (not floating in middle)
+- If content is short → footer still at bottom of viewport
+- If content is long → footer below content (scroll to see)
+- Use min-height layout to push footer down
+
+```css
+/* Footer at bottom, no fixed elements */
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  /* Grows to push footer to bottom */
+  flex: 1;
+}
+
+/* NO position: fixed or position: sticky on header/nav/footer */
 ```
 
-### CSS Rules
+**Print Styles :**
 
-- One `variables.css` file per project — all custom properties live there.
-- Never use `!important` except for utility overrides (`.sr-only`, `.hidden`).
-- Component styles are scoped with a BEM block class (`.card`, `.btn`, `.modal`).
-- Media queries are co-located with the component they modify, not in a separate file.
-- Dark theme is the default; `.theme-light` overrides colors only.
+```css
+@media print {
+  /* Hide non-essential elements */
+  header,
+  nav,
+  footer,
+  .nav-toggle,
+  .nav-panel,
+  .nav-overlay,
+  .no-print,
+  button:not(.print-include),
+  .toast,
+  .modal {
+    display: none !important;
+  }
 
-### JavaScript Rules
+  /* Reset backgrounds for ink saving */
+  body {
+    background: white !important;
+    color: black !important;
+  }
 
-- Vanilla ES modules. No bundler required for development; optional esbuild for production.
-- `type="module"` on all `<script>` tags.
-- No global state — use module-scoped variables or `CustomEvent` for cross-component communication.
-- Progressive enhancement: all core functionality works without JavaScript.
-- `defer` is implicit with `type="module"` — do not add it redundantly.
+  /* Ensure content is full width */
+  main, .container {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
 
-### Template Rules
+  /* Show URLs after links */
+  a[href^="http"]:after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666;
+  }
 
-- Templates are HTML-first — no logic beyond conditionals and loops.
-- All user-supplied data is auto-escaped by Tera (`{{ var }}` escapes; `{{ var | safe }}` opts out — use only for pre-sanitized HTML).
-- Partials receive only the variables they need — pass explicit context, not a god-object.
-- Template files use `.html.tera` extension.
+  /* Avoid page breaks inside elements */
+  pre, blockquote, table, img {
+    page-break-inside: avoid;
+  }
 
-### Partials Rules
+  /* Start new sections on new page */
+  h1, h2 {
+    page-break-after: avoid;
+  }
+}
+```
 
-- A partial may not include another partial more than one level deep.
-- Each partial documents its required variables in a comment at the top.
-- Partials are stateless — they render only what they receive.
+**Print utility classes:**
+- `.no-print` - Hide element when printing
+- `.print-only` - Show element only when printing (use `display: none` normally)
+- `.print-include` - Exception for buttons that should print
 
-### Embedding Templates
+**Footer contains (informational links):**
+- Standard pages: About, Privacy, Contact, Help
+- External links: GitHub
+- Branding: project name, version, copyright
+
+**Rule:** Every page template MUST include header, nav, and footer partials. No page may define its own.
+
+**App-Specific Partials (Optional):**
+
+Projects can create additional partials for functionality unique to that application. Place these in `partial/` alongside the mandatory ones.
+
+| Example Partial | Project | Purpose |
+|-----------------|---------|---------|
+| `search-box.html.tera` | airports, jokes | Reusable search form component |
+| `airport-card.html.tera` | airports | Airport info display card |
+| `joke-card.html.tera` | jokes | Joke display with copy button |
+| `map.html.tera` | airports | Embedded map component |
+| `passphrase-generator.html.tera` | wordList | Generator form and output |
+| `geoip-result.html.tera` | airports | GeoIP lookup result display |
+| `code-block.html.tera` | gitignore | Syntax-highlighted code display |
+| `pagination.html.tera` | any | Reusable pagination controls |
+| `filters.html.tera` | any | Search/filter form for lists |
+| `stats-card.html.tera` | any | Statistics display card |
+
+**App-Specific Partials (add to existing structure):**
+
+See **Template Structure** above for mandatory partials (`partial/public/*`, `partial/head.html.tera`, `partial/scripts.html.tera`).
+
+Projects add app-specific partials alongside the mandatory ones:
+```
+template/partial/
+├── public/                  # MANDATORY (see Template Structure)
+├── head.html.tera                # MANDATORY
+├── scripts.html.tera             # MANDATORY
+├── search-box.html.tera          # APP-SPECIFIC - search component
+├── result-card.html.tera         # APP-SPECIFIC - result display
+└── pagination.html.tera          # APP-SPECIFIC - pagination controls
+```
+
+**Usage in page templates:**
+```
+{% block content %}
+<div class="search-section">
+  {% include "search-box.html" %}
+</div>
+
+<div class="results">
+  {% for result in results %}
+    {% include "result-card.html" %}
+  {% endfor %}
+</div>
+
+{% include "pagination.html" %}
+{% endblock %}
+```
+
+**Guidelines for app-specific partials:**
+- Create a partial when the same HTML is used in 2+ places
+- Keep partials focused on one component/purpose
+- Pass only the data the partial needs
+- Name clearly: `{thing}-{purpose}.html.tera` (e.g., `airport-card.html.tera`, `joke-list.html.tera`)
+
+**Embedding Templates :**
+
+All templates and static assets MUST be embedded in the binary:
 
 ```rust
 use rust_embed::RustEmbed;
+
 #[derive(RustEmbed)]
 #[folder = "template/"]
 #[include = "*.html.tera"]
 struct TemplateAssets;
+
 #[derive(RustEmbed)]
 #[folder = "static/"]
 struct StaticAssets;
@@ -23368,1184 +25303,112 @@ pub fn build_tera() -> Result<Tera> {
 }
 ```
 
-#### Usage in page templates
-
+**Template Usage (`base.html.tera`):**
 ```
-{% block content %}
-<div class="search-section">
-  {% include "search-box.html" %}
-</div>
-<div class="results">
-  {% for result in results %}
-    {% include "result-card.html" %}
-  {% endfor %}
-</div>
-{% include "pagination.html" %}
-{% endblock %}
-```
-
----
-
-## Unified Color Palette
-
-**Canonical definition — see PART 16 → "Themes (NON-NEGOTIABLE - PROJECT-WIDE)" → "Unified Color Palette" below for the `ThemePalette` struct, `dark_palette()`/`light_palette()` functions, and the full literal hex source of truth.**
-
-### System Theme Detection
-
-```rust
-// Resolve the theme cookie: explicit light/dark wins; "auto" (or no cookie) defers to CSS
-pub fn detect_theme(headers: &axum::http::HeaderMap, cookies: &CookieJar) -> &'static str {
-    if let Some(c) = cookies.get("theme") {
-        match c.value() {
-            "light" => return "light",
-            "dark"  => return "dark",
-            _ => {}
-        }
-    }
-    "auto"
-}
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>{% include "head.html" %}</head>
+<body>
+  {% include "header.html" %}
+  {% include "nav.html" %}
+  <main>{% block content %}{% endblock %}</main>
+  {% include "footer.html" %}
+  {% include "scripts.html" %}
+</body>
+</html>
 ```
 
-The base template renders `<html class="theme-light">` or `<html class="theme-dark">` for an explicit choice, and no theme class for `auto`. No client-side mirror is needed — system-preference detection is pure CSS:
-
-```css
-/* Auto theme: dark-default custom properties, overridden when the OS prefers light */
-@media (prefers-color-scheme: light) {
-  html:not(.theme-dark):not(.theme-light) {
-    /* light palette custom properties */
-  }
-}
-```
-
-
-**See PART 16 → "Themes (NON-NEGOTIABLE - PROJECT-WIDE)" → "Theme Implementation Location" below for the canonical file/purpose table.**
-
----
-
-## Branding & SEO
-
-### Meta Tags
-
-All pages include:
-
-```html
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="{{ page_description }}">
-<meta name="robots" content="{{ robots_directive }}">
-
-<!-- Open Graph -->
-<meta property="og:title"       content="{{ og_title }}">
-<meta property="og:description" content="{{ og_description }}">
-<meta property="og:image"       content="{{ og_image }}">
-<meta property="og:url"         content="{{ canonical_url }}">
-<meta property="og:type"        content="{{ og_type | default(value='website') }}">
-<meta property="og:site_name"   content="{{ site_name }}">
-
-<!-- Twitter Card -->
-<meta name="twitter:card"        content="summary_large_image">
-<meta name="twitter:title"       content="{{ og_title }}">
-<meta name="twitter:description" content="{{ og_description }}">
-<meta name="twitter:image"       content="{{ og_image }}">
-
-<!-- Canonical -->
-<link rel="canonical" href="{{ canonical_url }}">
-
-<!-- Structured Data -->
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "{{ site_name }}",
-  "description": "{{ page_description }}",
-  "url": "{{ canonical_url }}"
-}
-</script>
-```
-
-### Robots Directive
-
-`{{ robots_directive }}` is computed server-side per route, never hardcoded:
-
-| Route type | Value |
-|------------|-------|
-| Public pages (homepage, docs, about) | `index,follow` |
-| `/admin`, `/api/*`, auth pages (login, register, reset) | `noindex,nofollow` |
-| Internal/health/debug endpoints | `noindex,nofollow` |
-
-Default to `index,follow` only for routes explicitly marked public; every other route defaults to `noindex,nofollow` (fail closed).
-
-### Site Verification Meta Tags
-
-Add only if the project requires search console verification:
-
-```html
-<meta name="google-site-verification" content="{{ site_verification.google }}">
-<meta name="msvalidate.01"            content="{{ site_verification.bing }}">
-```
-
-### Static Files
-
-```
-static/
-  robots.txt
-  sitemap.xml
-  favicon.ico
-  icons/
-    icon-192.png
-    icon-512.png
-    icon-maskable-512.png
-    apple-touch-icon.png
-```
-
-Serve with `tower-http::services::ServeDir`:
-
-```rust
-use tower_http::services::ServeDir;
-router.nest_service("/static", ServeDir::new("static"))
-```
-
-### Sitemap.xml
-
-Generate dynamically and serve at `/sitemap.xml`:
-
-```rust
-async fn sitemap_handler(State(state): State<AppState>) -> impl axum::response::IntoResponse {
-    let urls = state.db.list_public_urls().await.unwrap_or_default();
-    let body = render_sitemap(&urls);
-    (
-        axum::http::StatusCode::OK,
-        [(axum::http::header::CONTENT_TYPE, "application/xml; charset=utf-8")],
-        body,
-    )
-}
-```
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://example.com/</loc>
-    <lastmod>2024-01-01</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-</urlset>
-```
-
----
-
-## Branding Configuration
-
-```yaml
-server:
-  branding:
-    # Display name (e.g., "Jokes API")
-    title: "{project_name}"
-    # Short slogan (e.g., "The best jokes API")
-    tagline: ""
-    # Longer description for SEO/about
-    description: ""
-    # empty = use embedded default
-    favicon: ""
-    # empty = use embedded default
-    logo: ""
-
-  seo:
-    # Project-specific - define per app
-    # e.g., ["jokes", "api", "humor", "free api"]
-    keywords: []
-    # Author/organization name
-    author: ""
-    # OpenGraph image URL for social sharing
-    og_image: ""
-    # Twitter @handle for cards
-    twitter_handle: ""
-```
-
----
-
-## Remote URL Fetching
-
-```rust
-// src/common/urlutil/fetch.rs
-use std::time::Duration;
-use anyhow::{anyhow, Result};
-use url::Url;
-use reqwest::Client;
-
-pub struct FetchRemoteImageConfig {
-    pub max_size: u64,
-    pub timeout: Duration,
-    pub allowed_types: Vec<String>,
-    pub allowed_schemes: Vec<String>,
-}
-pub fn default_fetch_remote_image_config() -> FetchRemoteImageConfig {
-    FetchRemoteImageConfig {
-        max_size: 10 * 1024 * 1024,
-        timeout: Duration::from_secs(30),
-        allowed_types: vec![
-            "image/png".into(), "image/jpeg".into(), "image/gif".into(),
-            "image/webp".into(), "image/x-icon".into(),
-        ],
-        allowed_schemes: vec!["https".into()],
-    }
-}
-
-pub async fn validate_remote_url(raw_url: &str, cfg: &FetchRemoteImageConfig) -> Result<()> {
-    let parsed = Url::parse(raw_url).map_err(|e| anyhow!("invalid URL: {}", e))?;
-    if !cfg.allowed_schemes.contains(&parsed.scheme().to_string()) {
-        return Err(anyhow!("URL scheme not allowed: {}", parsed.scheme()));
-    }
-    let host = parsed.host_str().ok_or_else(|| anyhow!("URL has no host"))?;
-    validate_not_private_ip(host).await?;
-    Ok(())
-}
-
-async fn validate_not_private_ip(hostname: &str) -> Result<()> {
-    use std::net::ToSocketAddrs;
-    let addrs: Vec<_> = format!("{}:443", hostname)
-        .to_socket_addrs()
-        .map_err(|e| anyhow!("DNS resolution failed: {}", e))?
-        .collect();
-    for addr in addrs {
-        let ip = addr.ip();
-        if ip.is_loopback() || ip.is_private() || ip.is_link_local() || ip.is_unspecified() {
-            return Err(anyhow!("private or loopback IP not allowed: {}", ip));
-        }
-    }
-    Ok(())
-}
-
-pub async fn fetch_remote_image(raw_url: &str, cfg: &FetchRemoteImageConfig) -> Result<(Vec<u8>, String)> {
-    validate_remote_url(raw_url, cfg).await?;
-    let client = Client::builder()
-        .timeout(cfg.timeout)
-        .user_agent(format!("reqwest/{}", env!("CARGO_PKG_VERSION")))
-        .build()?;
-    let response = client.get(raw_url).send().await?;
-    if !response.status().is_success() {
-        return Err(anyhow!("remote returned HTTP {}", response.status()));
-    }
-    let content_type = response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .split(';')
-        .next()
-        .unwrap_or("")
-        .trim()
-        .to_string();
-    if !cfg.allowed_types.contains(&content_type) {
-        return Err(anyhow!("content type not allowed: {}", content_type));
-    }
-    let content_length = response.content_length().unwrap_or(0);
-    if content_length > cfg.max_size {
-        return Err(anyhow!("remote image too large: {} bytes", content_length));
-    }
-    let bytes = response.bytes().await?;
-    if bytes.len() as u64 > cfg.max_size {
-        return Err(anyhow!("remote image too large after download: {} bytes", bytes.len()));
-    }
-    Ok((bytes.to_vec(), content_type))
-}
-```
-
-Usage:
-
-```rust
-let cfg = default_fetch_remote_image_config();
-match fetch_remote_image(logo_url, &cfg).await {
-    Ok((data, content_type)) => Ok((data, content_type)),
-    Err(e) => {
-        tracing::warn!(url = %logo_url, error = %e, "failed to fetch remote logo");
-        Ok((embedded_default_logo(), "image/png".to_string()))
-    }
-}
-```
-
-
----
-
-## Footer Customization
-
-### Configuration
-
-**Note:** Analytics tracking → `server.tracking` (PART 12). Privacy/consent → `server.privacy` (PART 12).
-
-```yaml
-web:
-  footer:
-    # Custom branding HTML above the Application Footer
-    # - Not set or "": Use default branding (built-in)
-    # - " " (space): Disable branding, show only Application Footer
-    # - Custom HTML: Use your own branding (SANITIZED - no scripts)
-    custom_html: ""
-```
-
-### SanitizeFooterHTML
-
-```rust
-use ammonia::Builder;
-
-pub fn sanitize_footer_html(html: &str) -> String {
-    if html.is_empty() || html == " " { return html.to_string(); }
-    Builder::new()
-        .tags(["p", "br", "span", "div", "strong", "b", "em", "i", "u", "s", "small",
-               "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "a", "img"]
-              .iter().cloned().collect())
-        .clean(html).to_string()
-}
-
-pub fn validate_footer_html(html: &str) -> Result<String> {
-    let sanitized = sanitize_footer_html(html);
-    if !html.is_empty() && sanitized.is_empty() {
-        return Err(anyhow::anyhow!("custom HTML contained only disallowed elements"));
-    }
-    if html != sanitized && !html.is_empty() && html != " " {
-        tracing::warn!("footer custom_html was sanitized: removed potentially dangerous content");
-    }
-    Ok(sanitized)
-}
-```
-
-### Footer HTML — Valid Examples
-
-```html
-<!-- Minimal: single paragraph -->
-<p>© 2024 Acme Corp. All rights reserved.</p>
-
-<!-- Links row -->
-<p>
-  <a href="/terms">Terms</a> ·
-  <a href="/privacy">Privacy</a> ·
-  <a href="https://status.example.com">Status</a>
-</p>
-
-<!-- Multi-line with emphasis -->
-<p>Made with ❤️ in NYC.</p>
-<p><small>© 2024 Acme Corp</small></p>
-
-<!-- Ordered list -->
-<ul>
-  <li><a href="/blog">Blog</a></li>
-  <li><a href="/changelog">Changelog</a></li>
-  <li><a href="/api">API</a></li>
-</ul>
-```
-
-### Footer HTML — Invalid Examples (stripped by sanitizer)
-
-```html
-<!-- INVALID: script tags are stripped -->
-<script>alert('xss')</script>
-
-<!-- INVALID: inline event handlers are stripped -->
-<a href="#" onclick="evil()">Click me</a>
-
-<!-- INVALID: style tags are stripped -->
-<style>body { display: none; }</style>
-
-<!-- INVALID: iframe is stripped -->
-<iframe src="https://evil.com"></iframe>
-```
-
-### Available Footer Variables
-
-| Variable | Description |
-|----------|-------------|
-| `{footer_custom_html}` | Pre-sanitized custom branding HTML rendered above the Application Footer (`web.footer.custom_html`) |
-| `{project_name}` | Application name |
-| `{project_version}` | Application version |
-| `{build_datetime}` | Build date/time (`%B %d, %Y at %H:%M:%S %Z`) |
-| `{onion_address}` | Tor `.onion` address (only when Tor is enabled, running, and an address is published; empty otherwise) |
-| `{i2p_address}` | I2P `.b32.i2p` address (only when I2P is enabled, running, and an address is published; empty otherwise) |
-
-### Default Application Footer (Always Shown)
-
-```html
-<footer class="footer">
-  <!-- Custom branding HTML (sanitized) rendered above the Application Footer -->
-  {% if footer_custom_html %}
-  {footer_custom_html}
-  {% endif %}
-
-  <!-- Onion address (only shown if Tor is enabled, running, and an onion address is published) -->
-  {% if tor_enabled && tor_running && !tor_address.is_empty() %}
-  <p class="footer-onion">
-    <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
-    <code class="onion-address">{onion_address}</code>
-    <button type="button" class="copy-btn" data-copy="{onion_address}" aria-live="polite" aria-label="Copy onion address">📋</button>
-  </p>
-  {% endif %}
-
-  <!-- I2P address (only shown if I2P is enabled, running, and a .b32.i2p address is published) -->
-  {% if i2p_enabled && i2p_running && !i2p_address.is_empty() %}
-  <p class="footer-i2p">
-    <a href="/server/help#i2p-access" aria-label="I2P Support">🔗</a>
-    <code class="i2p-address">{i2p_address}</code>
-    <button type="button" class="copy-btn" data-copy="{i2p_address}" aria-live="polite" aria-label="Copy I2P address">📋</button>
-  </p>
-  {% endif %}
-
-  <!-- Standard page links -->
-  <p>
-    <a href="/server/about">About</a>
-    <span>•</span>
-    <a href="/server/privacy">Privacy</a>
-    <span>•</span>
-    <a href="/server/contact">Contact</a>
-    <span>•</span>
-    <a href="/server/help">Help</a>
-    <span>•</span>
-    <a href="/server/preferences">Preferences</a>
-  </p>
-
-  <!-- Application branding -->
-  <p>
-    <a href="{PLATFORM_REPO_URL}" target="_blank">Made with</a> ❤️
-    <span>•</span>
-    <span>{project_version}</span>
-  </p>
-
-  <!-- Build stamp -->
-  <p>
-    <a href="/server/healthz">Last update: {build_datetime}</a>
-  </p>
-</footer>
-```
-
-**No `<br />` spacers between rows** — rows are consecutive `<p>` elements; vertical rhythm comes from CSS (`footer p { margin: 0.25rem 0; }`), kept tight. Row order is fixed: onion address (Tor only) → page links → branding → last update. A disabled feature drops its row entirely without leaving a gap.
-
----
-
-## Cookie Consent Banner
-
-### Implementation
-
-The cookie consent banner blocks all optional scripts/embeds until the user grants consent. Consent is stored in a cookie and re-read on every page load — the server must be able to read it, so consent state NEVER lives in `localStorage`. The banner is fully server-rendered: when no valid consent cookie exists (or its version is stale), the server renders the banner visible; once a valid cookie is present, the server omits it entirely. Accept/Reject/Save are plain form submits to `POST /consent`, so consent works with zero JavaScript.
-
-```rust
-// src/server/consent.rs
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ConsentPreferences {
-    pub analytics: bool,
-    pub preferences: bool,
-    pub marketing: bool,
-}
-
-pub fn get_consent_from_request(headers: &axum::http::HeaderMap) -> Option<ConsentPreferences> {
-    let cookie_header = headers.get("cookie")?.to_str().ok()?;
-    for pair in cookie_header.split(';') {
-        let (k, v) = pair.trim().split_once('=')?;
-        if k.trim() == "consent" {
-            return serde_json::from_str(
-                &urlencoding::decode(v.trim()).ok()?
-            ).ok();
-        }
-    }
-    None
-}
-```
-
-**Banner visibility is decided server-side.** The base template renders the banner when `get_consent_from_request` returns `None` (no cookie, or stale `version`) — or when the request carries `?consent=manage`, which re-opens the banner for a visitor who wants to change their choices. There is no `hidden` attribute and no JS `init()` reveal: a no-JS visitor sees the banner exactly when the server decides they should.
-
-```rust
-// src/server/consent.rs
-// Bump to re-prompt every visitor after a policy change
-pub const CONSENT_VERSION: u32 = 1;
-
-#[derive(Debug, Deserialize)]
-pub struct ConsentForm {
-    pub action: String,
-    pub analytics: Option<String>,
-    pub preferences: Option<String>,
-    pub marketing: Option<String>,
-    pub return_to: Option<String>,
-}
-
-// POST /consent — sets the consent cookie and redirects back to the originating page
-pub async fn post_consent(
-    axum::Form(form): axum::Form<ConsentForm>,
-) -> impl axum::response::IntoResponse {
-    let prefs = match form.action.as_str() {
-        "accept_all" => ConsentPreferences { analytics: true,  preferences: true,  marketing: true },
-        "reject_all" => ConsentPreferences { analytics: false, preferences: false, marketing: false },
-        _ => ConsentPreferences {
-            analytics:   form.analytics.is_some(),
-            preferences: form.preferences.is_some(),
-            marketing:   form.marketing.is_some(),
-        },
-    };
-    let value = urlencoding::encode(
-        &serde_json::json!({
-            "analytics": prefs.analytics,
-            "preferences": prefs.preferences,
-            "marketing": prefs.marketing,
-            "version": CONSENT_VERSION,
-        }).to_string()
-    ).into_owned();
-    let cookie = format!(
-        "consent={value}; Path=/; Max-Age={}; SameSite=Lax; Secure",
-        60 * 60 * 24 * 365
-    );
-    // Only same-site relative paths are accepted for the redirect target
-    let target = form.return_to
-        .filter(|p| p.starts_with('/') && !p.starts_with("//"))
-        .unwrap_or_else(|| "/".to_string());
-    (
-        [(axum::http::header::SET_COOKIE, cookie)],
-        axum::response::Redirect::to(&target),
-    )
-}
-```
-
-A request carrying `Sec-GPC: 1` is still handled by the compliance layer (see "Privacy Signal Headers") — the GPC opt-out overrides any affirmative consent for data-sale/sharing categories regardless of what this form submits.
-
-```html
-{% if show_consent_banner %}
-<div id="consent-banner" class="consent-banner" role="dialog"
-     aria-label="Cookie preferences" aria-modal="false">
-  <form method="post" action="/consent" class="consent-banner-inner">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <input type="hidden" name="return_to" value="{{ current_path }}">
-    <div class="consent-text">
-      <h2 class="consent-title">Cookie Preferences</h2>
-      <p>{{ consent_message }}</p>
-    </div>
-    <div class="consent-options">
-      <label class="toggle">
-        <input type="checkbox" id="consent-analytics" name="analytics" value="1">
-        <span class="toggle-track"><span class="toggle-thumb"></span></span>
-        <span class="toggle-label">Analytics</span>
-      </label>
-      <label class="toggle">
-        <input type="checkbox" id="consent-preferences" name="preferences" value="1">
-        <span class="toggle-track"><span class="toggle-thumb"></span></span>
-        <span class="toggle-label">Preferences</span>
-      </label>
-      <label class="toggle">
-        <input type="checkbox" id="consent-marketing" name="marketing" value="1">
-        <span class="toggle-track"><span class="toggle-thumb"></span></span>
-        <span class="toggle-label">Marketing</span>
-      </label>
-    </div>
-    <div class="consent-actions">
-      <button type="submit" name="action" value="reject_all" class="btn btn-secondary">Reject All</button>
-      <button type="submit" name="action" value="save"       class="btn btn-secondary">Save Preferences</button>
-      <button type="submit" name="action" value="accept_all" class="btn btn-primary">Accept All</button>
-    </div>
-  </form>
-</div>
-{% endif %}
-```
-
-**Progressive enhancement (external file, optional):** the consent module in `static/js/app.js` may intercept the form's `submit` event, write the same `consent` cookie from the submitted values, and remove the banner from the DOM without a page reload. The server-side `POST /consent` path remains the source of truth; the script only removes the round trip.
-
-```javascript
-// static/js/app.js — consent module; no-reload enhancement; the POST /consent fallback always works
-const CONSENT_VERSION = 1;
-
-document.getElementById('consent-banner')?.querySelector('form')
-  ?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const action = e.submitter?.value ?? 'save';
-    const all = action === 'accept_all';
-    const none = action === 'reject_all';
-    const prefs = {
-      analytics:   all || (!none && e.target.elements.analytics.checked),
-      preferences: all || (!none && e.target.elements.preferences.checked),
-      marketing:   all || (!none && e.target.elements.marketing.checked),
-      version: CONSENT_VERSION,
-    };
-    const value = encodeURIComponent(JSON.stringify(prefs));
-    document.cookie = `consent=${value}; path=/; max-age=${60*60*24*365}; SameSite=Lax; Secure`;
-    document.getElementById('consent-banner').remove();
-  });
-```
-
-```rust
-pub fn check_tracking_allowed(headers: &axum::http::HeaderMap, cfg: &Config) -> bool {
-    let consent = get_consent_from_request(headers);
-    match consent {
-        None => false,
-        Some(c) if !c.analytics => false,
-        _ => !cfg.server.tracking.tracking_type.is_empty(),
-    }
-}
-pub fn tracking_script(headers: &axum::http::HeaderMap, cfg: &Config) -> String {
-    if !check_tracking_allowed(headers, cfg) { return String::new(); }
-    generate_tracking_script()
-}
-```
-
-In templates:
-
-```html
-{% if tracking_allowed %}
-  {{ tracking_script | safe }}
-{% endif %}
-{% if not preferences_allowed %}
-<div class="embed-blocked">
-  <p>Enable Preferences cookies to see this content.</p>
-  <a href="?consent=manage" class="btn btn-secondary">Manage Cookies</a>
-</div>
-{% else %}
-<!-- Actual embed -->
-{% endif %}
-```
-
-The Manage Cookies link navigates with `?consent=manage`; the server answers by re-rendering the page with the banner shown. No inline handler — the CSP blocks inline event handlers, and this path works without JavaScript.
-
-Dynamic consent message selection:
-
-```rust
-let message = cfg.privacy.get_consent_message();
-```
-
-
----
-
-## Standard Pages
-
-**No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works.
-
-### /server/about
-
-Displays server information, software version, and operator contact.
-
-**Template variables:**
-
-| Variable | Type | Description |
-|---|---|---|
-| `app_name` | `String` | Application name |
-| `app_version` | `String` | Semver version string |
-| `app_description` | `String` | Short description |
-| `operator_name` | `String` | Server operator name |
-| `operator_url` | `String` | Operator website URL |
-| `source_url` | `String` | Source code URL |
-| `license` | `String` | SPDX license identifier |
-| `uptime` | `String` | Human-readable uptime |
-| `rust_version` | `String` | Rust version (from `rustc --version`) |
-| `build_date` | `String` | ISO 8601 build timestamp |
-| `attribution` | `Vec<String>` | Required third-party license notices (GeoIP DB-IP/NRO CC BY 4.0 — see PART 19: GEOIP; any others required by dependencies), rendered verbatim, not hidden behind a click-through |
-
-### /server/privacy
-
-**Privacy policy page - MUST display all privacy information from `server.privacy` config.**
-
-**Required Sections (auto-generated from config):**
-
-| Section | Source | Description |
-|---------|--------|-------------|
-| Summary | Dynamic | Key points: data stored on server, sold/not-sold (based on `data.sold`) |
-| Cookie Policy | `server.privacy.cookies` | What cookies are used and why |
-| Data Collection | `server.privacy.content.data_collection` | What data is collected |
-| Data Usage | `get_data_usage_content()` | Dynamic: returns `data_usage` or `data_usage_if_sold` |
-| Data Security | `server.privacy.content.data_security` | How data is protected |
-| Data Storage | `server.privacy.sharing` | Where data is stored, third-party conditions |
-| Data Retention | `server.privacy.retention` | How long data is kept |
-| Third Parties | `server.privacy.third_party` | Services that receive data (if any) |
-| Your Rights | `server.privacy.retention` | Export/deletion options |
-| **CCPA Opt-Out** | Conditional | **Only shown when `data.sold = true`** - Do Not Sell toggle |
-| Manage Preferences | Link | Button to open cookie preferences modal |
-| Contact | `/server/contact` link | How to contact for privacy concerns |
-
-**Page Layout:**
-
-```html
-<article class="privacy-policy">
-  <h1>Privacy Policy</h1>
-  <p class="last-updated">Last updated: {build_datetime}</p>
-
-  <!-- Summary - Key Points (always shown first) -->
-  <!-- Dynamic: Second key-point changes based on server.privacy.data.sold -->
-  <section id="summary" class="privacy-summary">
-    <h2>Summary</h2>
-    <div class="key-points">
-      <div class="key-point">
-        <span class="icon">🔒</span>
-        <strong>Your data is stored on our servers</strong>
-        <p>All personal data is stored securely on our infrastructure.</p>
-      </div>
-      {% if privacy.data.sold %}
-      <div class="key-point key-point-warning">
-        <span class="icon">⚠️</span>
-        <strong>Your data may be sold</strong>
-        <p>Your personal information may be shared with or sold to third parties. <a href="#ccpa-opt-out">Opt out of data sales</a>.</p>
-      </div>
-      {% else %}
-      <div class="key-point">
-        <span class="icon">🚫</span>
-        <strong>We never sell your data</strong>
-        <p>Your personal information is never sold to third parties.</p>
-      </div>
-      {% endif %}
-      <div class="key-point">
-        <span class="icon">🎛️</span>
-        <strong>You control your data</strong>
-        <p>Export or delete your data anytime from account settings.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- Cookie Policy Section - from server.privacy.cookies -->
-  <section id="cookies">
-    <h2>Cookie Policy</h2>
-    <p>We use cookies to ensure our website functions properly and to improve your experience.</p>
-
-    <h3>Essential Cookies</h3>
-    <p>{{ privacy.cookies.essential.description }}</p>
-
-    <h3>Preference Cookies</h3>
-    <p>{{ privacy.cookies.preferences.description }}</p>
-
-    <h3>Analytics Cookies</h3>
-    {% if !tracking.tracking_type.is_empty() %}
-    <!-- Dynamic: get_analytics_description() returns description + appropriate suffix based on data.sold -->
-    <p>{{ privacy.get_analytics_description() }}</p>
-    <p>We use <strong>{{ tracking.type_name }}</strong> for analytics.</p>
-    {% else %}
-    <p>We do not use analytics tracking on this site.</p>
-    {% endif %}
-
-    <div class="manage-cookies">
-      <!-- Bound in app.js via data-action - inline handlers are blocked by the CSP -->
-      <button data-action="cookie-preferences">Manage Cookie Preferences</button>
-    </div>
-  </section>
-
-  <!-- Data Collection - operator-defined content -->
-  <section id="data-collection">
-    <h2>Data We Collect</h2>
-    {{ privacy.content.data_collection|markdown_to_html|safe }}
-  </section>
-
-  <!-- Data Usage - operator-defined content -->
-  <!-- Dynamic: get_data_usage_content() returns data_usage or data_usage_if_sold based on data.sold -->
-  <section id="data-usage">
-    <h2>How We Use Your Data</h2>
-    {{ privacy.get_data_usage_content()|markdown_to_html|safe }}
-  </section>
-
-  <!-- Data Security - operator-defined content -->
-  <section id="data-security">
-    <h2>Data Security</h2>
-    {{ privacy.content.data_security|markdown_to_html|safe }}
-  </section>
-
-  <!-- Data Storage - from server.privacy.data -->
-  <section id="data-storage">
-    <h2>Data Storage & Third-Party Sharing</h2>
-    <p><strong>All your data is stored on our servers.</strong> We do not use third-party cloud storage for your personal data.</p>
-
-    <h3>When Data May Be Shared</h3>
-    <p>Your data is only sent to third parties in these specific situations:</p>
-    <ul>
-      {% for entry in privacy.data.sharing %}
-      <li><strong>{{ entry.condition|humanize }}:</strong> {{ entry.when }} - {{ entry.data }}</li>
-      {% endfor %}
-    </ul>
-
-    <p><strong>In all cases:</strong></p>
-    <ul>
-      <li>Data is only shared when necessary for the stated purpose</li>
-      <li>You can opt out of analytics by declining cookies</li>
-      {% if privacy.data.sold %}
-      <li>Your data <strong>may be sold</strong> to third parties. See <a href="#ccpa-opt-out">CCPA opt-out</a> below.</li>
-      {% else %}
-      <li>Your data is <strong>never sold</strong></li>
-      {% endif %}
-    </ul>
-  </section>
-
-  <!-- Data Retention - from server.privacy.retention -->
-  <section id="data-retention">
-    <h2>Data Retention</h2>
-    <p>{{ privacy.retention.period }}</p>
-  </section>
-
-  <!-- Third Parties - from server.privacy.third_party -->
-  <section id="third-parties">
-    <h2>Third-Party Services</h2>
-    {% if !privacy.third_party.services.is_empty() %}
-    <p>We use the following third-party services:</p>
-    <table>
-      <thead>
-        <tr><th>Service</th><th>Purpose</th><th>Data Sent</th><th>Privacy Policy</th></tr>
-      </thead>
-      <tbody>
-        {% for svc in privacy.third_party.services %}
-        <tr>
-          <td>{{ svc.name }}</td>
-          <td>{{ svc.purpose }}</td>
-          <td>{{ svc.data_sent }}</td>
-          <td><a href="{{ svc.policy_url }}" target="_blank" rel="noopener">View Policy</a></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p><strong>We do not currently use any third-party services that receive your data.</strong></p>
-    <p>If analytics tracking is enabled and you consent, anonymized usage data may be sent to the configured analytics provider. Check the Cookie Policy section above for details.</p>
-    {% endif %}
-  </section>
-
-  <!-- Your Rights - from server.privacy.retention -->
-  <section id="your-rights">
-    <h2>Your Rights</h2>
-    <p>You have the following rights regarding your data:</p>
-    <ul>
-      <li><strong>Access:</strong> View all data we have about you in your account settings.</li>
-      {% if privacy.retention.export_available %}
-      <li><strong>Export:</strong> Download a copy of all your data in a portable format.</li>
-      {% endif %}
-      {% if privacy.retention.deletion_available %}
-      <li><strong>Deletion:</strong> Delete your account and all associated data permanently.</li>
-      {% endif %}
-      <li><strong>Correction:</strong> Update or correct your personal information anytime.</li>
-      <!-- Bound in app.js via data-action - inline handlers are blocked by the CSP -->
-      <li><strong>Cookie Control:</strong> <button type="button" class="link-button" data-action="cookie-preferences">Manage your cookie preferences</button></li>
-    </ul>
-  </section>
-
-  <!-- CCPA "Do Not Sell" - ONLY shown when server.privacy.data.sold = true -->
-  {% if privacy.data.sold %}
-  <section id="ccpa-opt-out" class="ccpa-section">
-    <h2>California Privacy Rights (CCPA)</h2>
-    <p>Under the California Consumer Privacy Act (CCPA), California residents have the right to:</p>
-    <ul>
-      <li><strong>Know</strong> what personal information is collected and how it's used</li>
-      <li><strong>Request deletion</strong> of personal information</li>
-      <li><strong>Opt out</strong> of the sale of personal information</li>
-      <li><strong>Non-discrimination</strong> for exercising your privacy rights</li>
-    </ul>
-
-    <div class="ccpa-opt-out-box">
-      <h3>Do Not Sell My Personal Information</h3>
-      <p>Click the button below to opt out of the sale of your personal information.</p>
-      {% if ccpa_opted_out %}
-      <div class="ccpa-status opted-out">
-        <span class="status-icon">✓</span>
-        <span>You have opted out of data sales.</span>
-      </div>
-      <!-- POST forms work with zero JS - the server sets/clears the ccpa_opt_out cookie and redirects back; app.js intercepts to skip the reload -->
-      <form method="post" action="/consent/ccpa">
-        <input type="hidden" name="opt_out" value="false">
-        <button type="submit" class="btn-secondary">Opt Back In</button>
-      </form>
-      {% else %}
-      <form method="post" action="/consent/ccpa">
-        <input type="hidden" name="opt_out" value="true">
-        <button type="submit" class="btn-primary btn-ccpa-opt-out">Do Not Sell My Personal Information</button>
-      </form>
-      {% endif %}
-    </div>
-
-    <p class="ccpa-note">Note: This opt-out applies to the sale of personal information. Essential cookies and site functionality will continue to work normally.</p>
-  </section>
-  {% endif %}
-
-  <!-- Contact -->
-  <section id="contact">
-    <h2>Contact Us</h2>
-    <p>For privacy-related inquiries, please <a href="/server/contact">contact us</a>.</p>
-  </section>
-</article>
-```
-
-**API Endpoint (`/api/{api_version}/server/privacy`):**
-
-```json
-{
-  "ok": true,
-  "data": {
-    "summary": {
-      "data_stored_on_server": true,
-      "data_sold": false,
-      "user_control": true
-    },
-    "cookies": {
-      "essential": {
-        "enabled": true,
-        "description": "Required for the site to function. Includes security tokens (CSRF) and site preferences."
-      },
-      "preferences": {
-        "enabled": true,
-        "description": "Remember your settings such as theme (dark/light), language, and UI preferences."
-      },
-      "analytics": {
-        "enabled": true,
-        "description": "Help us understand how visitors use our site. Analytics data is anonymized and never sold."
-      }
-    },
-    "data": {
-      "sold": false,
-      "stored_on_server": true,
-      "sharing": [
-        {
-          "condition": "analytics",
-          "when": "Tracking configured AND user consents",
-          "data": "Anonymized: page views, browser type, country"
-        },
-        {
-          "condition": "email",
-          "when": "SMTP configured for sending emails",
-          "data": "Email address, message content"
-        },
-        {
-          "condition": "user_initiated",
-          "when": "User explicitly shares content",
-          "data": "Whatever user chooses to share"
-        }
-      ]
-    },
-    "tracking": {
-      "enabled": false,
-      "type": "",
-      "type_name": ""
-    },
-    "retention": {
-      "period": "Account data is retained while your account is active. Upon account deletion, all personal data is permanently deleted within 30 days.",
-      "export_available": true,
-      "deletion_available": true
-    },
-    "third_party": {
-      "services": []
-    },
-    "ccpa": {
-      "applicable": false,
-      "opt_out_url": "/server/privacy#ccpa-opt-out",
-      "user_opted_out": false
-    },
-    "content": {
-      "consent_message": "...",
-      "data_usage": "..."
-    }
-  }
-}
-```
-
-**Dynamic Fields:**
-- `summary.data_sold`: Reflects `server.privacy.data.sold`
-- `cookies.analytics.description`: From `get_analytics_description()` (includes suffix)
-- `content.consent_message`: From `get_consent_message()` (returns sold/not-sold message)
-- `content.data_usage`: From `get_data_usage_content()` (returns sold/not-sold content)
-- `ccpa.applicable`: `true` only when `data.sold = true` (the `ccpa` object is always included; the CCPA opt-out UI is only shown when `applicable` is `true`)
-- `ccpa.user_opted_out`: From the `ccpa_opt_out` cookie check
-
-**Note:** The `tracking` and `third_party.services` fields are populated based on `server.tracking` config. If no tracking is configured, they remain empty.
-
-**Privacy Configuration (config file):**
-
-| Section | Config Keys |
+### Embedded vs External Assets
+
+| Type | Embedded in Binary | External (Downloaded) |
+|------|-------------------|----------------------|
+| Templates (`.html.tera`) | YES | NO |
+| CSS files | YES | NO |
+| JavaScript files | YES | NO |
+| Images/Icons | YES | NO |
+| Fonts | YES | NO |
+| Application data (JSON) | YES | NO |
+| GeoIP databases | NO | YES - downloaded on first run, updated weekly |
+| IP/Domain Blocklists | NO | YES - downloaded on first run, updated daily |
+| CVE databases | NO | YES - downloaded on first run, updated daily |
+| SSL certificates | NO | YES - only when using ports 80,443 |
+
+**External Data Rules:**
+- Security-related data that needs frequent updates is NEVER embedded
+- Downloaded automatically on first run if not present
+- Updated automatically via built-in scheduler (see PART 18: SCHEDULER)
+- All scheduler tasks configurable via API
+- Graceful degradation if download fails (continues without data)
+- SSL certificates only generated/managed when running on ports `80,443`
+
+**Benefits:**
+- Single static binary deployment
+- No external file dependencies at runtime
+- Consistent layout across all pages
+- Reusable components (DRY principle)
+- Auto-escaping for security (XSS prevention)
+
+### CSS Rules
+
+| Bad | Good |
+|-----|------|
+| `<div style="color: red;">` | `<div class="error-text">` |
+| `style="margin: 10px;"` | `class="spacing-sm"` |
+
+**All styles MUST be in CSS files, not HTML elements.**
+
+### Frontend UI Elements
+
+**NEVER use default JavaScript UI elements. ALWAYS use custom styled components.**
+
+| NEVER Use | ALWAYS Use Instead |
+|-----------|---------------------|
+| `alert()` | Custom modal with CSS classes |
+| `confirm()` | Native `<dialog>` confirmation modal |
+| `prompt()` | Custom input modal or inline form |
+| Plain text inputs for options | Dropdowns (`<select>`) |
+| Plain text for yes/no | Checkboxes or toggle switches |
+| Plain text for multiple options | Radio buttons or dropdown |
+| Inline text entry | Only when truly needed (search, names, etc.) |
+
+**UI Element Guidelines:**
+
+| Element | When to Use |
 |---------|-------------|
-| **Data Policies** | `server.privacy.data.sold` (default: false), `server.privacy.data.stored_on_server`, `server.privacy.data.sharing[]` |
-| **Consent Banner** | `server.privacy.consent.message`, `server.privacy.consent.message_if_sold`, `server.privacy.consent.policy.url`, `server.privacy.consent.policy.text`, `server.privacy.consent.buttons.decline`, `server.privacy.consent.buttons.accept` |
-| **Cookie Descriptions** | `server.privacy.cookies.essential`, `server.privacy.cookies.preferences`, `server.privacy.cookies.analytics` |
-| **Data Collection** | `server.privacy.content.data_collection` (Markdown) |
-| **Data Usage** | `server.privacy.content.data_usage`, `server.privacy.content.data_usage_if_sold` (Markdown) |
-| **Data Security** | `server.privacy.content.data_security` (Markdown) |
-| **Data Retention** | `server.privacy.retention.period`, `server.privacy.retention.export_available`, `server.privacy.retention.deletion_available` |
-| **Third Parties** | `server.privacy.third_party.services[]` (name, purpose, data_sent, policy_url) |
+| **Dropdown (`<select>`)** | Selecting from predefined options |
+| **Checkbox** | Boolean on/off, enable/disable |
+| **Toggle Switch** | Boolean with visual feedback |
+| **Radio Buttons** | Mutually exclusive options (2-5 choices) |
+| **Dropdown** | Mutually exclusive options (>5 choices) |
+| **Multi-select** | Multiple selections from list |
+| **Text Input** | Free-form text (names, URLs, search) |
+| **Textarea** | Multi-line free-form text |
+| **Number Input** | Numeric values with spin buttons |
+| **Date/Time Picker** | Date and time selection |
+| **Color Picker** | Color selection |
+| **File Upload** | File selection with drag-drop |
 
-**Default content provided, fully customizable via config file.**
+**Modal Requirements:**
+- Custom CSS-styled modals (no browser defaults)
+- Backdrop overlay
+- Close button (X) in corner
+- Click outside to close (default behavior; warns first when the modal has unsaved changes — see "Modal Behavior" in PART 16)
+- Escape key to close
+- Focus trap (tab stays within modal)
+- Animated entrance/exit
+- **Auto-close on action** - clicking any action button (OK, Yes, No, Cancel, Save, Delete, Submit, etc.) automatically closes the modal after performing the action. User should never need to click an action then manually close.
 
-### /server/contact
-
-Displays operator contact information and/or a contact form.
-
-**Template variables:**
-
-| Variable | Type | Description |
-|---|---|---|
-| `contact_email` | `String` | Public contact email |
-| `contact_form_enabled` | `bool` | Whether the contact form is active |
-| `contact_message` | `String` | Optional introductory message |
-| `csrf_token` | `String` | CSRF token for the form |
-
-**Below the form, the page MUST render exactly two informational sections — the content is spec'd here; never improvise it:**
-
-| Section | Content |
-|---------|---------|
-| Security Issues | "To report a security vulnerability, consult our security policy at `/server/security`." — rendered as a link to `/server/security`. Never point users at the raw `/.well-known/security.txt` file from this page. |
-| Abuse Reports | "To report abusive content or policy violations, use this contact form." — append " or email {abuse_email}" where `{abuse_email}` resolves to `server.contact.abuse.email` if set, else `server.contact.general.email` if set; omit the email clause entirely when neither is set. NEVER render `server.contact.admin.email` here (it is never public). |
-
-### /server/help
-
-General help and FAQ page. Includes a Tor access section when Tor is configured and running.
-
-**Template variables:**
-
-| Variable | Type | Description |
-|---|---|---|
-| `faqs` | `Vec<Faq>` | List of FAQ entries (`question`, `answer` fields) |
-| `tor_enabled` | `bool` | Tor is configured |
-| `tor_running` | `bool` | Tor process is active |
-| `tor_address` | `String` | `.onion` hostname |
-| `i2p_enabled` | `bool` | I2P is configured (opt-in) |
-| `i2p_running` | `bool` | I2P process/session is active |
-| `i2p_address` | `String` | `.b32.i2p` hostname |
-
-```html
-{% if tor_enabled and tor_running and tor_address %}
-<section id="tor-access" class="tor-access">
-  <h4>Onion Address</h4>
-  <div class="code-block">
-    <code class="code-content">{{ tor_address }}</code>
-    <button type="button" class="copy-btn" data-copy="{{ tor_address }}" aria-label="Copy to clipboard">
-      <span class="copy-icon">📋</span>
-      <span class="copy-text" aria-live="polite">Copy</span>
-    </button>
-  </div>
-</section>
-{% endif %}
-{% if i2p_enabled and i2p_running and i2p_address %}
-<section id="i2p-access" class="i2p-access">
-  <h4>I2P Address</h4>
-  <div class="code-block">
-    <code class="code-content">{{ i2p_address }}</code>
-    <button type="button" class="copy-btn" data-copy="{{ i2p_address }}" aria-label="Copy to clipboard">
-      <span class="copy-icon">📋</span>
-      <span class="copy-text" aria-live="polite">Copy</span>
-    </button>
-  </div>
-</section>
-{% endif %}
-```
-
-**Copy feedback is mandatory:** every copy button MUST show a visible "Copied!" confirmation on success — checkmark icon plus the translated label (i18n key `copied`, rendered server-side into `data-copied-label`), `.copied` class for the success colors (CSS custom properties only), reverting after 2 seconds. The `aria-live="polite"` region announces the change to screen readers. Icon-only buttons (e.g. the footer 📋) swap their own content and carry `aria-live="polite"` on the button itself.
-
-### /server/terms
-
-Displays the Terms of Service. Content is loaded from configuration or a markdown file.
-
-**Template variables:**
-
-| Variable | Type | Description |
-|---|---|---|
-| `terms_content` | `String` | Markdown; rendered via `markdown_to_html` filter |
-| `last_updated` | `String` | ISO 8601 date |
-
----
-
-## Configuration YAML
-
-```yaml
-server:
-  branding:
-    title: "{project_name}"
-    tagline: ""
-    description: ""
-    favicon: ""
-    logo: ""
-  seo:
-    keywords: []
-    author: ""
-    og_image: ""
-    twitter_handle: ""
-  tracking:
-    # Analytics type: google, matomo, piwik, owa, fathom, plausible, umami, simple, cloudflare
-    # Empty or "none" = disabled
-    type: ""
-    # Tracking/Site ID (format depends on type)
-    id: ""
-    # Self-hosted URL (required for: matomo, piwik, owa, umami)
-    url: ""
-  operator:
-    name: ""
-    url: ""
-    contact_email: ""
-  cors:
-    allowed_origins: []
-    allow_credentials: true
-    max_age: 86400
-
-web:
-  footer:
-    # Custom branding HTML above the Application Footer (sanitized)
-    custom_html: ""
-
-privacy:
-  data:
-    sold: false
-    sharing: []
-  content:
-    data_collection: ""
-    cookie_policy: ""
-  # empty = use built-in default
-  consent_message: ""
-
-pages:
-  about:
-    # Additional content for about page (markdown supported)
-    content: ""
-  privacy:
-    # Privacy policy content (markdown supported)
-    # If empty, uses default template
-    content: ""
-  contact:
-    # Enable contact form
-    enabled: true
-    # Captcha type: recaptcha, hcaptcha, simple (built-in)
-    captcha: simple
-    # Success message after form submission
-    success_message: "Thank you for your message. We'll respond soon."
-  help:
-    # Help page content (markdown supported)
-    # Project-specific - must be defined per application
-    content: ""
-  terms:
-    # Terms of service content (markdown supported)
-    # If empty, uses default template
-    content: ""
-```
-
----
-
-## Pages Configuration
-
-| Page | Config keys |
-|---|---|
-| `/server/about` | `pages.about.content` (Markdown) |
-| `/server/privacy` | `pages.privacy.content` (Markdown) |
-| `/server/contact` | `pages.contact.enabled`, `pages.contact.captcha`, `pages.contact.success_message` |
-| `/server/help` | `pages.help.content` (Markdown) |
-| `/server/terms` | `pages.terms.content` (Markdown) |
-
-When the contact form is disabled (`pages.contact.enabled: false`), the contact form endpoint returns 404; the other pages are always available.
-
----
-
-## /server/ API Endpoints
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `GET` | `/server/about` | None | Server information page |
-| `GET` | `/server/privacy` | None | Privacy policy page |
-| `POST` | `/server/contact` | None | Submit contact form |
-| `GET` | `/server/contact` | None | Contact page |
-| `GET` | `/server/help` | None | Help and FAQ page |
-| `GET` | `/server/terms` | None | Terms of service page |
-| `GET` | `/server/healthz` | None | Health check (JSON) |
-| `GET` | `/server/version` | None | Version info (JSON) |
-
----
-
-## /server/ Frontend Routes
-
-| Route | Handler | Description |
-|---|---|---|
-| `/server/about` | `about_handler` | About page |
-| `/server/privacy` | `privacy_handler` | Privacy policy page |
-| `/server/contact` | `contact_handler` | Contact page |
-| `/server/help` | `help_handler` | Help page |
-| `/server/terms` | `terms_handler` | Terms of service page |
-
----
+**Toast/Notification Requirements :**
+- Non-blocking notifications (never use JS alerts)
+- Stackable - multiple toasts display vertically (max 5 visible)
+- Auto-dismiss: 3 seconds (success/info), 5 seconds (warning), never (error)
+- Click to dismiss - user can click X or toast body to dismiss early
+- Pause on hover - hovering pauses auto-dismiss countdown
+- Position: top-right corner, fixed position
+- Animation: slide in from right, fade out on dismiss
+- Types: success (✓), error (✗), warning (⚠), info (ℹ)
+- Progress bar shows remaining time before auto-dismiss
+- See "Toast Notifications" section in PART 16 for full implementation
 
 ## Layout
 
@@ -24555,19 +25418,15 @@ When the contact form is disabled (`pages.contact.enabled: false`), the contact 
 | < 768px | 98% (1% margins) |
 | Footer | Always centered, always at bottom |
 
----
-
-
 ## Themes (NON-NEGOTIABLE - PROJECT-WIDE)
 
 **Theme system applies to THE ENTIRE PROJECT - ALL interfaces share the same colors and settings:**
 - Web interface (HTML pages)
-- Admin panel
 - Swagger UI
 - GraphiQL interface
 - CLI colored output
 - TUI (ratatui/crossterm)
-- Native GUI
+- Native GUI (GTK/Cocoa/Win32)
 - ReadTheDocs documentation (if possible)
 - All interactive elements
 
@@ -24585,11 +25444,11 @@ When the contact form is disabled (`pages.contact.enabled: false`), the contact 
 - **BOTH light AND dark themes MUST be easy to read**
 - **NO color conflicts** - nothing should be invisible or unreadable in either theme
 - **Sufficient contrast ratio** - minimum WCAG AA compliance (4.5:1) in both themes
-- **Theme applies everywhere** - WebUI, admin panel, Swagger, GraphQL, etc.
+- **Theme applies everywhere** - WebUI, Swagger, GraphQL, etc.
 - **Theme switching MUST work seamlessly** without page reload
 - **All interactive elements MUST be clearly visible** in both themes
 - **Syntax highlighting MUST adapt** to theme (use appropriate colors for each theme)
-- **User preference persisted** in the `theme` cookie (server-readable; per-user DB preference for logged-in users) — NOT localStorage, so the server can render the correct theme class
+- **User preference persisted** in the `theme` cookie (server-readable — renders the class on `<html>`)
 - **Default to dark** if no preference set
 
 **Theme Implementation Location:**
@@ -24754,32 +25613,31 @@ widgets with the hex values from `dark_palette()`/`light_palette()`.
 | **Windows** | Registry `AppsUseLightTheme` | 0 = dark, 1 = light |
 | **Terminal** | `COLORFGBG` env or fallback to dark | Terminal-specific |
 
-**See "CLI/TUI/GUI Theming" later in this document for implementation details.**
+**See PART 32 for CLI/TUI/GUI implementation details.**
 
 **Theme Detection Flow:**
 ```
-1. Server reads the `theme` cookie (logged-in users: DB preference) and renders
-   the theme class on <html> server-side - no FOUC, works without JS
-2. If no preference OR preference is "auto":
-   - Render no explicit theme class - pure CSS prefers-color-scheme media query
-     applies light or dark (no JS, no matchMedia)
+1. Server reads the theme cookie and renders the class on <html>
+2. If no cookie OR preference is "auto":
+   - Render theme-auto; pure CSS applies the system preference via
+     the prefers-color-scheme media query (no detection JS)
 3. If preference is "light" or "dark":
-   - Render that theme class directly
+   - Render theme-light / theme-dark directly
 4. Default to dark if all detection fails
 ```
 
 **Theme Switching:**
 - Provide theme toggle in UI (☀️ Light / 🌙 Dark / 🔄 Auto) — see "Theme Toggle" above
-- Store preference in the `theme` cookie (per-user DB preference when logged in) — server-readable, so every full page load renders correctly
-- Apply theme class to `<html>` element: `theme-light`, `theme-dark` (no class for `auto`)
+- Store preference in the `theme` cookie so the server renders the class on `<html>`
+- Apply theme class to `<html>` element: `theme-light`, `theme-dark`, `theme-auto`
 - The toggle's target is always the NEXT mode computed from the current cookie
-  (`next_theme()`, dark → light → auto → dark) — never a hardcoded value. This
-  is what makes repeated clicks keep cycling instead of only working once.
-- Without JS: the toggle is a form — server sets the cookie and redirects back
-- With JS: gives an instant visual preview on click, but does not prevent the
-  real submit — the form always POSTs so a logged-in user's DB preference is
-  actually persisted
-- All components (Swagger, GraphQL, admin) switch simultaneously
+  (`next_theme()`, dark → light → auto → dark) — never a hardcoded value. This is
+  what makes repeated clicks keep cycling instead of only working once.
+- NO page reload required when JS is available - it intercepts the form submit,
+  recomputes the next mode from the live `<html>` class, and swaps it instantly
+- No-JS visitors get correct auto theming from pure CSS, and switching works
+  identically without JS since the toggle is a real form submit, not a JS-only handler
+- All components (Swagger, GraphQL, public pages) switch simultaneously
 
 **Accessibility Requirements:**
 - Both themes MUST pass WCAG AA contrast requirements (4.5:1 minimum)
@@ -24788,6 +25646,2032 @@ widgets with the hex values from `dark_palette()`/`light_palette()`.
 - Screen readers MUST work correctly in both themes
 - No information conveyed by color alone
 
+## Branding & SEO
+
+**White labeling is cosmetic only - it changes what users see, not how the server works.**
+
+### What Branding Changes
+
+| Changes (User-Visible) | Does NOT Change (System) |
+|------------------------|--------------------------|
+| Page titles | Directory names (`{internal_name}/`) |
+| Browser tab | System username (`{internal_name}`) |
+| Header/logo text | Log filenames |
+| Footer branding | Config paths |
+| Email "From" name | Binary name |
+| SEO meta tags | API routes |
+| OpenGraph data | Service names |
+| Swagger UI title | Container names |
+
+### Configuration
+
+```yaml
+server:
+  branding:
+    # Display name (e.g., "Jokes API")
+    title: "{project_name}"
+    # Short slogan (e.g., "The best jokes API")
+    tagline: ""
+    # Longer description for SEO/about
+    description: ""
+    # empty = use embedded default
+    favicon: ""
+    # empty = use embedded default
+    logo: ""
+
+  seo:
+    # Project-specific - define per app
+    # e.g., ["jokes", "api", "humor", "free api"]
+    keywords: []
+    # Author/organization name
+    author: ""
+    # OpenGraph image URL for social sharing
+    og_image: ""
+    # Twitter @handle for cards
+    twitter_handle: ""
+```
+
+### Where Branding Is Used
+
+| Field | Used In |
+|-------|---------|
+| `title` | `<title>` tag, header, emails, footer, Swagger UI |
+| `tagline` | Homepage hero section, meta description fallback |
+| `description` | Meta description, OpenGraph description, about page |
+| `keywords` | Meta keywords tag |
+| `author` | Meta author tag |
+| `og_image` | OpenGraph/Twitter card image |
+| `twitter_handle` | Twitter card attribution |
+
+### SEO Meta Tags (Generated)
+
+```html
+<head>
+  <title>{title} - {tagline}</title>
+  <meta name="description" content="{description}">
+  <meta name="keywords" content="{keywords}">
+  <meta name="author" content="{author}">
+  <meta name="robots" content="{robots}">
+  <link rel="canonical" href="{current_url}">
+
+  <!-- OpenGraph -->
+  <meta property="og:title" content="{title}">
+  <meta property="og:description" content="{description}">
+  <meta property="og:image" content="{og_image}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{current_url}">
+  <meta property="og:site_name" content="{title}">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{title}">
+  <meta name="twitter:description" content="{description}">
+  <meta name="twitter:image" content="{og_image}">
+  <meta name="twitter:site" content="{twitter_handle}">
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "{title}",
+    "description": "{description}",
+    "url": "{current_url}"
+  }
+  </script>
+</head>
+```
+
+### Robots Directive
+
+`{robots}` is computed server-side per route, never hardcoded:
+
+| Route type | Value |
+|------------|-------|
+| Public pages (homepage, docs, about) | `index,follow` |
+| `/api/*` and any non-public route | `noindex,nofollow` (no admin or auth pages exist in API projects) |
+| Internal/health/debug endpoints | `noindex,nofollow` |
+
+Default to `index,follow` only for routes explicitly marked public; every other route defaults to `noindex,nofollow` (fail closed).
+
+### Site Verification Meta Tags
+
+**Custom verification meta tags for search engines and services MUST be validated before rendering.**
+
+**Configuration:**
+
+```yaml
+server:
+  seo:
+    verification:
+      # Format: { "provider": "verification_code" }
+      # Google Search Console
+      google: ""
+      # Bing Webmaster Tools
+      bing: ""
+      # Yandex Webmaster
+      yandex: ""
+      # Baidu Webmaster
+      baidu: ""
+      # Pinterest verification
+      pinterest: ""
+      # Facebook domain verification
+      facebook: ""
+      # Custom meta tags (see below)
+      custom: []
+```
+
+**Generated Meta Tags:**
+
+```html
+<head>
+  <!-- Site Verification (only rendered if configured) -->
+  <meta name="google-site-verification" content="{google}">
+  <meta name="msvalidate.01" content="{bing}">
+  <meta name="yandex-verification" content="{yandex}">
+  <meta name="baidu-site-verification" content="{baidu}">
+  <meta name="p:domain_verify" content="{pinterest}">
+  <meta property="fb:domain_verification" content="{facebook}">
+</head>
+```
+
+**Validation Rules :**
+
+| Provider | Format | Max Length | Pattern |
+|----------|--------|------------|---------|
+| Google | Alphanumeric | 43 chars | `^[a-zA-Z0-9_-]+$` |
+| Bing | Hex string | 32 chars | `^[A-F0-9]+$` |
+| Yandex | Hex string | 32 chars | `^[a-f0-9]+$` |
+| Baidu | Alphanumeric | 32 chars | `^[a-zA-Z0-9]+$` |
+| Pinterest | Hex string | 32 chars | `^[a-f0-9]+$` |
+| Facebook | Alphanumeric | 64 chars | `^[a-z0-9]+$` |
+
+**Custom Verification Tags:**
+
+```yaml
+server:
+  seo:
+    verification:
+      custom:
+        - name: "norton-safeweb-site-verification"
+          content: "abc123..."
+        - name: "alexaVerifyID"
+          content: "xyz789..."
+        - property: "fb:app_id"
+          content: "123456789"
+```
+
+**Custom Tag Validation:**
+
+| Field | Required | Validation |
+|-------|----------|------------|
+| `name` OR `property` | One required | Must be valid meta attribute name |
+| `content` | Yes | Non-empty string, max 256 chars |
+| `name`/`property` value | Yes | Alphanumeric + hyphens/underscores only |
+
+**NEVER render:**
+- Tags with empty content
+- Tags that fail validation
+- Tags with invalid characters (potential XSS)
+- Tags exceeding max length
+
+**SEO Configuration (config file):**
+
+| Element | Config Key | Description |
+|---------|------------|-------------|
+| Google Verification | `server.seo.verification.google` | Google Search Console code |
+| Bing Verification | `server.seo.verification.bing` | Bing Webmaster code |
+| Yandex Verification | `server.seo.verification.yandex` | Yandex Webmaster code |
+| Baidu Verification | `server.seo.verification.baidu` | Baidu Webmaster code |
+| Pinterest Verification | `server.seo.verification.pinterest` | Pinterest verification code |
+| Facebook Verification | `server.seo.verification.facebook` | Facebook domain verification code |
+| Custom Tags | `server.seo.verification.custom` | Additional verification tags |
+
+**Validation:** Server validates codes on startup and logs errors for invalid formats.
+
+### Static Files
+
+**If the project serves user-controlled files/blobs, follow PART 11 "Private File Delivery" and PART 11 "Untrusted File / Rich Content Handling".**
+
+| File | Purpose | Generated |
+|------|---------|-----------|
+| `/sitemap.xml` | Site map for search engines | Yes - auto-generated |
+| `/favicon.ico` | Browser favicon | Embedded default, customizable |
+| `/.well-known/*` | Standards/discovery/verification endpoints only | Mix of dynamic, config-backed, embedded, or feature-gated |
+
+Serve static assets with `tower-http::services::ServeDir` (over the embedded FS):
+
+```rust
+use tower_http::services::ServeDir;
+router.nest_service("/static", ServeDir::new("static"))
+```
+
+### Sitemap.xml
+
+**ALL projects MUST serve a dynamically generated sitemap at `/sitemap.xml`.**
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>{app_url}/</loc>
+    <lastmod>{last_modified}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>{app_url}/docs</loc>
+    <lastmod>{last_modified}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <!-- Additional pages dynamically added -->
+</urlset>
+```
+
+```rust
+async fn sitemap_handler(State(state): State<AppState>) -> impl axum::response::IntoResponse {
+    let urls = state.db.list_public_urls().await.unwrap_or_default();
+    let body = render_sitemap(&urls);
+    (
+        axum::http::StatusCode::OK,
+        [(axum::http::header::CONTENT_TYPE, "application/xml; charset=utf-8")],
+        body,
+    )
+}
+```
+
+**Sitemap Generation Rules:**
+
+| Page Type | Include | Priority | Change Frequency |
+|-----------|---------|----------|------------------|
+| Homepage (`/`) | Always | 1.0 | daily |
+| Public pages | Always | 0.8 | weekly |
+| Public documentation pages (project-defined, if any) | Dynamic | 0.8 | weekly |
+| API docs (`/server/docs/swagger`, `/server/docs/graphql`) | Always | 0.7 | weekly |
+| Project-specific public resources | Dynamic | 0.6 | weekly |
+| Authenticated server-management pages | **NEVER** | - | - |
+| API endpoints (`/api/*`) | **NEVER** | - | - |
+
+**Dynamic Content:**
+- Project resource pages: Include only if public/published
+
+**Sitemap Configuration:**
+
+```yaml
+server:
+  seo:
+    sitemap:
+      # Default: true
+      enabled: true
+      # Sitemap protocol limit
+      max_urls: 50000
+      # Include image URLs
+      include_images: false
+```
+
+**Large Sites (>50,000 URLs):**
+- Generate sitemap index file at `/sitemap.xml`
+- Split into multiple sitemap files: `/sitemap-1.xml`, `/sitemap-2.xml`, etc.
+- Each sitemap file max 50,000 URLs
+
+### Branding Configuration (config file)
+
+| Element | Config Key | Description |
+|---------|------------|-------------|
+| Title | `server.branding.title` | Application display name |
+| Tagline | `server.branding.tagline` | Short slogan |
+| Description | `server.branding.description` | Longer description for SEO |
+| Keywords | `server.seo.keywords` | SEO keywords (list) |
+| Author | `server.seo.author` | Author/organization |
+| OG Image | `server.seo.og_image` | Social sharing image |
+| Twitter Handle | `server.seo.twitter_handle` | @handle |
+| Favicon | `server.branding.favicon` | Custom favicon |
+| Logo | `server.branding.logo` | Custom logo (header) |
+
+### Image Sources
+
+**Logo, favicon, and OG image can be from local file or remote URL.**
+
+| Source | Format | Example |
+|--------|--------|---------|
+| Local file | File path | Set `server.branding.logo` in config to an absolute file path |
+| Remote URL | URL input | `https://example.com/logo.png` |
+| Embedded default | - | Built-in fallback |
+
+### Image Scaling
+
+**Images are automatically scaled/resized as needed:**
+
+| Image | Sizes Generated |
+|-------|-----------------|
+| Logo | Original, 200px width (header), 50px width (mobile) |
+| Favicon | 16x16, 32x32, 48x48, 180x180 (apple-touch-icon), 192x192, 512x512 |
+| OG Image | Original, 1200x630 (OpenGraph standard) |
+
+**Scaling Rules:**
+- Preserve aspect ratio
+- Generate multiple sizes on upload/fetch
+- Cache scaled versions locally
+- Re-fetch remote URLs periodically (configurable, default: daily)
+- Fallback to embedded default if remote URL fails
+
+### Remote URL Fetching
+
+**When fetching remote URLs for logo/favicon/images, use secure functions with validation.**
+
+```rust
+// src/common/urlutil/fetch.rs
+use std::time::Duration;
+use anyhow::{bail, Context, Result};
+use reqwest::Client;
+use url::Url;
+
+pub struct FetchRemoteImageConfig {
+    pub max_size: u64,
+    pub timeout: Duration,
+    pub allowed_types: Vec<String>,
+    pub allowed_schemes: Vec<String>,
+}
+
+impl Default for FetchRemoteImageConfig {
+    fn default() -> Self {
+        Self {
+            max_size: 10 * 1024 * 1024,
+            timeout: Duration::from_secs(30),
+            allowed_types: vec![
+                "image/png".into(),
+                "image/jpeg".into(),
+                "image/gif".into(),
+                "image/webp".into(),
+                "image/x-icon".into(),
+            ],
+            // NEVER allow http in production
+            allowed_schemes: vec!["https".into()],
+        }
+    }
+}
+
+pub fn validate_remote_url(raw_url: &str, cfg: &FetchRemoteImageConfig) -> Result<Url> {
+    let u = Url::parse(raw_url).context("invalid URL")?;
+
+    let scheme_allowed = cfg
+        .allowed_schemes
+        .iter()
+        .any(|s| s.eq_ignore_ascii_case(u.scheme()));
+    if !scheme_allowed {
+        bail!("scheme not allowed: {} (allowed: {:?})", u.scheme(), cfg.allowed_schemes);
+    }
+
+    let host = u.host_str().unwrap_or("");
+    let hostname = host.to_lowercase();
+
+    if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" {
+        bail!("localhost URLs not allowed");
+    }
+    if hostname.ends_with(".local") || hostname.ends_with(".internal") {
+        bail!("internal hostnames not allowed");
+    }
+
+    validate_not_private_ip(host)?;
+
+    Ok(u)
+}
+
+fn validate_not_private_ip(hostname: &str) -> Result<()> {
+    use std::net::ToSocketAddrs;
+    let addrs = format!("{}:443", hostname)
+        .to_socket_addrs()
+        .context("DNS lookup failed")?;
+    for addr in addrs {
+        let ip = addr.ip();
+        if ip.is_loopback() || is_private_ip(ip) {
+            bail!("private/local IP not allowed: {} resolves to {}", hostname, ip);
+        }
+    }
+    Ok(())
+}
+
+fn is_private_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => v4.is_private() || v4.is_link_local(),
+        std::net::IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified(),
+    }
+}
+
+pub async fn fetch_remote_image(
+    raw_url: &str,
+    cfg: &FetchRemoteImageConfig,
+) -> Result<(Vec<u8>, String)> {
+    let validated = validate_remote_url(raw_url, cfg)?;
+
+    let client = Client::builder()
+        .timeout(cfg.timeout)
+        .redirect(reqwest::redirect::Policy::custom({
+            let cfg_schemes = cfg.allowed_schemes.clone();
+            move |attempt| {
+                let url = attempt.url();
+                let ok = cfg_schemes
+                    .iter()
+                    .any(|s| s.eq_ignore_ascii_case(url.scheme()));
+                if !ok || attempt.previous().len() >= 5 {
+                    attempt.error("redirect blocked or too many redirects")
+                } else {
+                    attempt.follow()
+                }
+            }
+        }))
+        .build()
+        .context("building HTTP client")?;
+
+    let accept = cfg.allowed_types.join(", ");
+    let resp = client
+        .get(validated)
+        .header("User-Agent", "{project_name}/1.0")
+        .header("Accept", accept)
+        .send()
+        .await
+        .context("fetching URL")?;
+
+    if !resp.status().is_success() {
+        bail!("unexpected status: {}", resp.status());
+    }
+
+    let content_type = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    let type_allowed = cfg
+        .allowed_types
+        .iter()
+        .any(|t| content_type.starts_with(t.as_str()));
+    if !type_allowed {
+        bail!("content type not allowed: {}", content_type);
+    }
+
+    let bytes = resp.bytes().await.context("reading response")?;
+    if bytes.len() as u64 > cfg.max_size {
+        bail!("file too large (max: {} bytes)", cfg.max_size);
+    }
+
+    Ok((bytes.to_vec(), content_type))
+}
+```
+
+**Usage for logo/favicon:**
+
+```rust
+let cfg = FetchRemoteImageConfig::default();
+let (data, content_type) = fetch_remote_image(&logo_url, &cfg).await.unwrap_or_else(|err| {
+    tracing::warn!(url = %logo_url, error = %err, "failed to fetch remote logo");
+    (EMBEDDED_DEFAULT_LOGO.to_vec(), "image/png".into())
+});
+```
+
+**Security Rules:**
+| Rule | Implementation |
+|------|----------------|
+| **HTTPS only** | Block http:// URLs in production |
+| **No private IPs** | Validate resolved IPs are not RFC1918/loopback |
+| **No localhost** | Block localhost, 127.0.0.1, ::1 |
+| **No internal hosts** | Block .local, .internal domains |
+| **Size limits** | Limit download size (default 10MB) |
+| **Type validation** | Only allow image MIME types |
+| **Redirect validation** | Validate each redirect URL |
+| **Timeout** | Set reasonable timeout (default 30s) |
+
+**Rule:** remote user-controlled images follow the same active-content rules as uploads. Do NOT allow remote SVG unless the project explicitly sanitizes and rasterizes it before storage/display.
+
+### Defaults
+
+| Field | Default Value |
+|-------|---------------|
+| `title` | `{project_name}` |
+| `tagline` | Empty |
+| `description` | Empty |
+| `keywords` | Empty |
+| All others | Empty |
+
+**Rule:** If `title` is empty, fall back to `{project_name}`. Other fields are optional.
+
+## Announcements
+
+**Operator messages (configured in `server.yml`) shown in UI for downtime notices, updates, etc.**
+
+Active announcements are rendered by the Site Banner (see PART 16 → "Site Banner") — multiple active announcements stack in config order.
+
+### Configuration
+
+```yaml
+web:
+  announcements:
+    enabled: true
+    # List of announcement messages
+    messages: []
+```
+
+### Announcement Structure
+
+```yaml
+messages:
+  - id: "maintenance-2025-01"
+    type: warning
+    # warning, info, error, success
+    title: "Scheduled Maintenance"
+    message: "The server will be down for maintenance on Jan 15, 2025 from 2-4 AM UTC."
+    start: "2025-01-14T00:00:00Z"
+    # When to start showing
+    end: "2025-01-15T04:00:00Z"
+    # When to stop showing
+    dismissible: true
+    # User can dismiss
+```
+
+### Announcements Configuration (config file)
+
+| Element | Config Key | Description |
+|---------|------------|-------------|
+| Enable announcements | `announcements.enabled` | Turn announcements on/off |
+| Type | `announcements[].type` | warning, info, error, success |
+| Title | `announcements[].title` | Short title |
+| Message | `announcements[].message` | Full message content |
+| Start date | `announcements[].start` | When to start showing (ISO 8601) |
+| End date | `announcements[].end` | When to stop showing (ISO 8601) |
+| Dismissible | `announcements[].dismissible` | Allow users to dismiss |
+
+## CORS
+
+**Default CORS policy allows all origins (`*`).**
+
+### Configuration
+
+```yaml
+server:
+  cors:
+    # Allowed origins list
+    # - ["*"]: Allow all origins (default)
+    # - ["https://example.com"]: Single origin
+    # - ["https://example.com", "https://app.example.com"]: Multiple origins
+    # - [""]: Disable CORS headers entirely
+    allowed_origins:
+      - "*"
+    allow_credentials: true
+    max_age: 86400
+```
+
+### CORS Headers
+
+| Header | Value |
+|--------|-------|
+| `Access-Control-Allow-Origin` | Configured origin(s) or `*` |
+| `Access-Control-Allow-Methods` | `GET, POST, PUT, PATCH, DELETE, OPTIONS` |
+| `Access-Control-Allow-Headers` | `Content-Type, Accept, X-Requested-With, Authorization, X-API-Key, X-Api-Key, API-Key, ApiKey, X-Auth-Token, X-Access-Token, X-Token, Token, X-CSRF-Token, X-XSRF-Token, X-Session-ID, X-Service-Token, X-Internal-Token` |
+| `Access-Control-Allow-Credentials` | `true` (only when specific origin, not `*`) |
+| `Access-Control-Max-Age` | `86400` (24 hours) |
+
+**Never `*` here:** the Fetch spec's `Access-Control-Allow-Headers: *` wildcard does NOT cover `Authorization`, and wildcards are invalid when credentials are allowed. Every supported auth header is listed by name — keep in sync with PART 8 → "Auth Token Headers (All Headers Supported)".
+
+**Query param bypass:** `?token=` auth (last in the PART 8 priority order) travels in the URL, not a header — it never triggers a CORS preflight and works from any origin regardless of the Allow-Headers list.
+
+### Behavior
+
+| Scenario | Behavior |
+|----------|----------|
+| `allowed_origins: ["*"]` | Allow all origins, credentials NOT allowed |
+| `allowed_origins: ["https://example.com"]` | Allow single origin, credentials allowed |
+| `allowed_origins: ["https://a.com", "https://b.com"]` | Allow listed origins, credentials allowed |
+| `allowed_origins: [""]` | No CORS headers (same-origin only) |
+| Preflight (OPTIONS) | Return CORS headers, 204 No Content |
+
+### CORS Allow-list Resolution Order
+
+The effective CORS allow-list is resolved from these sources in order; the request `Origin` is matched against the combined list:
+
+1. **Explicit config** — origins listed in `server.cors.allowed_origins`. A single `""` entry disables CORS entirely and stops resolution.
+2. **DOMAIN env entries** — every hostname from the `DOMAIN` environment variable is added as an `https://` origin.
+3. **Reverse-proxy-learned hosts** — hostnames observed via `X-Forwarded-Host` from trusted proxies only (gated on `trusted_proxies` — see PART 12 → "Trusted Proxies") are appended at runtime.
+4. **Default** — if no source produced a list, fall back to `*` (credentials NOT allowed).
+
+Credentials (`Access-Control-Allow-Credentials: true`) are sent only when the resolved list is explicit — never with `*`. CSP `connect-src` `{learned_origins}` (PART 11 → "Content Security Policy") uses this same resolved list.
+
+### Mode-Specific Behavior
+
+| Mode | Default | Behavior |
+|------|---------|----------|
+| Production | `*` | Allow all origins by default (configure if needed) |
+| Development | `*` | Allow all origins |
+
+### Web Configuration (config file)
+
+| Element | Config Key | Description |
+|---------|------------|-------------|
+| CORS Origins | `server.cors.allowed_origins` | List of allowed origins |
+| Root `/healthz` alias | `server.healthz.root.enabled` | Enables `/healthz` alias for compatibility with tools that require it |
+
+## CSRF Protection
+
+**Use the stateless double-submit cookie pattern — there are no sessions, so the token is never stored server-side. The server sets a `csrf_token` cookie (`SameSite=Strict`, `Secure`, NOT `HttpOnly` — JavaScript must read it) and every mutating browser request must echo the same value in the `X-CSRF-Token` header or a `csrf_token` form field. The middleware compares the two in constant time.**
+
+### When CSRF Validation Runs
+
+**Validate the CSRF token if and only if ALL of these are true:**
+
+| Condition | Reason |
+|-----------|--------|
+| Method is `POST`, `PUT`, `PATCH`, or `DELETE` | Read-only methods (`GET`, `HEAD`, `OPTIONS`) cannot change state |
+| No `Authorization: Bearer …` / `X-API-Token: …` / similar bearer header present | Bearer credentials are not auto-attached by browsers, so cross-site forgery has no vector |
+
+**Bypass the CSRF check (no validation, no token needed) if ANY of these are true:**
+
+| Bypass | Reason |
+|--------|--------|
+| `Authorization: Bearer …` or `X-API-Token: …` header present | Bearer auth — caller proves possession of a credential the browser cannot auto-attach. CSRF protects against forgery of *cookie-carried* values; this is a different auth model. |
+| Method is `GET`, `HEAD`, or `OPTIONS` | Safe per RFC 9110. Must remain side-effect-free; if a `GET` mutates, that is a separate spec violation, not a CSRF problem. |
+| WebSocket upgrade request (`Upgrade: websocket`) | Auth happens at the connection level, then per-message; CSRF tokens don't fit the WS lifecycle. |
+| Endpoint is in the explicit `server.csrf.exempt_paths` allow-list | Operator-declared exception. Used for OAuth callbacks, webhook receivers, and other endpoints that are POST'd to from origins the operator has whitelisted but cannot supply a token. |
+
+**There is NO Origin-based bypass.** A same-origin `Origin` header never skips token validation — `Origin`/`Referer` can be absent or spoofed by non-browser clients, and the double-submit check is cheap. Every mutating browser request presents the token.
+
+**Why these bypasses are safe:** CSRF is a defense against *the browser auto-attaching cookies to a cross-site request*. If the credential is not cookie-carried (Bearer), or the method cannot change state, there is no auto-attached value to forge. Adding CSRF on top of those situations breaks legitimate non-browser clients without adding any defense.
+
+### Cookie Posture (the first line of defense)
+
+| Cookie | `SameSite` | Why |
+|--------|------------|-----|
+| CSRF token cookie (`csrf_token`) | `Strict` | Browser form posts are same-origin; `Strict` blocks cross-site cookie attachment entirely, neutralizing most CSRF before the token is even checked. |
+| OAuth-callback cookie (state, PKCE-verifier) | `Lax` | OAuth providers redirect cross-site back to our callback; `Strict` would drop the cookie. CSRF token is the second layer here. |
+| Pre-auth cookies (e.g., auth continuation) | `Strict` | Set during auth flow; never crosses sites. |
+
+**Modern browsers default to `SameSite=Lax` if unset.** Always set `SameSite` explicitly — never rely on the default.
+
+### Configuration
+
+```yaml
+server:
+  csrf:
+    # default: true. Set false ONLY for API-only deployments (no browser forms at all).
+    enabled: true
+    # bytes
+    token_length: 32
+    cookie_name: csrf_token
+    header_name: X-CSRF-Token
+    # auto | true | false. "auto" sets Secure when proto is https.
+    secure: auto
+    # Endpoints exempt from CSRF (operator-declared). Glob patterns supported.
+    # Common exemptions: webhook receivers, external callbacks.
+    exempt_paths:
+      - /api/{api_version}/webhooks/*
+```
+
+### Implementation Rules
+
+| Rule | Detail |
+|------|--------|
+| Token in cookie + matching value in form/header | Double-submit cookie pattern. Token cookie is `SameSite=Strict`, `HttpOnly=false` (the form needs to read it), `Secure` per `csrf.secure`. |
+| Forms include hidden `<input name="csrf_token" value="…">` | Server-rendered HTML inserts the token automatically — no manual work in templates. |
+| Mutating requests without a bearer header check the token | Per the "When CSRF Validation Runs" table above — Bearer/read-only/exempt paths skip the check. |
+| Token regenerated when the `csrf_token` cookie is absent, and on token revocation | Prevents fixation. |
+| Validation failure → `403 FORBIDDEN` with canonical error body | `{"ok": false, "error": "CSRF_FAILED", "message": "CSRF token validation failed"}` (PART 14 → "Error Response"). |
+| Reject if cookie present and header/form missing, or if values mismatch | No silent fallback. |
+| Log to `security.log` as `security.csrf_failure` | IP, endpoint, reason — see PART 11. |
+
+### Threat Model — What CSRF Stops, What It Doesn't
+
+| Attack | Stops it? |
+|--------|-----------|
+| Attacker page POSTs a form to our domain from the victim's browser | ✓ Yes (token mismatch / SameSite=Strict drops the cookie) |
+| Attacker page calls our JSON API with `fetch()` from another origin, no Bearer | ✓ Yes (token mismatch + SameSite=Strict; CORS preflight also blocks) |
+| Attacker steals a CSRF token via XSS and submits a forged request | ✗ No (XSS bypasses CSRF — the attacker is now running in our origin). XSS defense is CSP + escaping. |
+| Attacker submits a request with a stolen Bearer token | ✗ No (Bearer auth bypasses CSRF by design). Defense is token rotation, scoping, and rate limiting. |
+| Public endpoint POST'd to from anywhere | n/a (no auth, nothing to abuse) |
+| Browser-issued report to `/api/{api_version}/server/reports/*` | n/a (PART 14 reports are deliberately public; rate-limited per-IP) |
+
+## Footer Customization
+
+### Configuration
+
+**Note:** Analytics tracking → `server.tracking` (PART 12). Privacy/consent → `server.privacy` (PART 12).
+
+```yaml
+web:
+  footer:
+    # Custom branding HTML above the Application Footer
+    # - Not set or "": Use default branding (built-in)
+    # - " " (space): Disable branding, show only Application Footer
+    # - Custom HTML: Use your own branding (SANITIZED - no scripts)
+    custom_html: ""
+```
+
+### Custom HTML Validation
+
+**`custom_html` is SANITIZED before rendering. Scripts and dangerous elements are NEVER executed.**
+
+```rust
+use ammonia::Builder;
+
+pub fn sanitize_footer_html(html: &str) -> String {
+    if html.is_empty() || html == " " { return html.to_string(); }
+    Builder::new()
+        .tags(["p", "br", "span", "div", "strong", "b", "em", "i", "u", "s", "small",
+               "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "a", "img"]
+              .iter().cloned().collect())
+        .clean(html).to_string()
+}
+
+pub fn validate_footer_html(html: &str) -> Result<String> {
+    let sanitized = sanitize_footer_html(html);
+    if !html.is_empty() && sanitized.is_empty() {
+        return Err(anyhow::anyhow!("custom HTML contained only disallowed elements"));
+    }
+    if html != sanitized && !html.is_empty() && html != " " {
+        tracing::warn!("footer custom_html was sanitized: removed potentially dangerous content");
+    }
+    Ok(sanitized)
+}
+```
+
+### Allowed vs Blocked Elements
+
+| Allowed | Blocked (Stripped) |
+|---------|-------------------|
+| `<p>`, `<br>`, `<span>`, `<div>` | `<script>`, `<noscript>` |
+| `<strong>`, `<b>`, `<em>`, `<i>` | `<iframe>`, `<frame>` |
+| `<a href="...">` | `<object>`, `<embed>` |
+| `<img src="...">` | `<form>`, `<input>`, `<button>` |
+| `<ul>`, `<ol>`, `<li>` | `<style>`, `<link>` |
+| `<h1>`-`<h6>` | `<meta>`, `<base>` |
+| `class`, `id` attributes | `onclick`, `onerror`, etc. |
+| | `javascript:` URLs |
+| | `style` attribute |
+
+### Example Valid Custom HTML
+
+```html
+<!-- Valid: Simple text branding -->
+<p>Powered by <strong>MyCompany</strong></p>
+
+<!-- Valid: Link with safe attributes -->
+<p>Built with <a href="https://example.com" target="_blank">Example Framework</a></p>
+
+<!-- Valid: Image (https or relative only) -->
+<p><img src="/static/logo.png" alt="Logo" width="100"></p>
+
+<!-- Valid: Using CSS classes (define in theme) -->
+<div class="custom-footer-brand">
+  <span class="brand-text">MyBrand</span>
+</div>
+```
+
+### Example Invalid Custom HTML (Stripped)
+
+```html
+<!-- STRIPPED: Script tags -->
+<script>alert('xss')</script>
+
+<!-- STRIPPED: Event handlers -->
+<img src="x" onerror="alert('xss')">
+
+<!-- STRIPPED: JavaScript URLs -->
+<a href="javascript:alert('xss')">Click</a>
+
+<!-- STRIPPED: Iframes -->
+<iframe src="https://evil.com"></iframe>
+
+<!-- STRIPPED: Style attribute (use classes instead) -->
+<p style="color: red;">Text</p>
+
+<!-- STRIPPED: Forms -->
+<form action="/steal"><input type="text"></form>
+```
+
+### Sanitization Preview (Startup Log)
+
+When the operator sets `custom_html` in `server.yml`, the server logs at startup:
+1. **Raw input** - What was configured
+2. **Sanitized output** - What will actually render
+3. **Warning** - If content was modified by sanitizer
+
+### Available Footer Variables
+
+| Variable | Description |
+|----------|-------------|
+| `{current_year}` | Current year (e.g., 2025) |
+| `{project_name}` | Project name |
+| `{project_org}` | Organization name |
+| `{project_version}` | Application version |
+| `{build_datetime}` | Build date/time (`%B %d, %Y at %H:%M:%S %Z`) |
+| `{onion_address}` | Tor `.onion` address (only when Tor is enabled, running, and an address is published; empty otherwise) |
+| `{i2p_address}` | I2P `.b32.i2p` address (only when I2P is enabled, running, and an address is published; empty otherwise) |
+
+### Default Application Footer (Always Shown)
+
+```html
+<footer class="footer">
+  <!-- Onion address (only shown if Tor is enabled, running, and an onion address is published) -->
+  {% if tor_enabled and tor_running and onion_address %}
+  <p class="footer-onion">
+    <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
+    <code class="onion-address">{onion_address}</code>
+    <button type="button" class="copy-btn" data-copy="{onion_address}" aria-live="polite" aria-label="Copy onion address">📋</button>
+  </p>
+  {% endif %}
+
+  <!-- I2P address (only shown if I2P is enabled, running, and a .b32.i2p address is published) -->
+  {% if i2p_enabled and i2p_running and i2p_address %}
+  <p class="footer-i2p">
+    <a href="/server/help#i2p-access" aria-label="I2P Support">🔗</a>
+    <code class="i2p-address">{i2p_address}</code>
+    <button type="button" class="copy-btn" data-copy="{i2p_address}" aria-live="polite" aria-label="Copy I2P address">📋</button>
+  </p>
+  {% endif %}
+
+  <!-- Standard page links -->
+  <p>
+    <a href="/server/about">About</a>
+    <span>•</span>
+    <a href="/server/privacy">Privacy</a>
+    <span>•</span>
+    <a href="/server/contact">Contact</a>
+    <span>•</span>
+    <a href="/server/help">Help</a>
+    <span>•</span>
+    <a href="/server/preferences">Preferences</a>
+  </p>
+
+  <!-- Application branding -->
+  <p>
+    <a href="{PLATFORM_REPO_URL}" target="_blank">Made with</a> ❤️
+    <span>•</span>
+    <span>{project_version}</span>
+  </p>
+
+  <!-- Build stamp -->
+  <p>
+    <a href="/server/healthz">Last update: {build_datetime}</a>
+  </p>
+</footer>
+```
+
+**No `<br />` spacers between rows** — rows are consecutive `<p>` elements; vertical rhythm comes from CSS (`footer p { margin: 0.25rem 0; }`), kept tight. Row order is fixed: onion address (Tor only) → page links → branding → last update. A disabled feature drops its row entirely without leaving a gap.
+
+### Footer Configuration (config file)
+
+| Element | Config Key | Description |
+|---------|------------|-------------|
+| Custom branding HTML | `web.footer.custom_html` | HTML above application footer (sanitized) |
+
+**Related configuration:**
+- Analytics tracking: `analytics` section (PART 12: Analytics Tracking)
+- Privacy & consent: `privacy` section (PART 12: Privacy & Consent)
+
+## Cookie Consent Banner
+
+**Fixed bottom banner for GDPR/privacy compliance. ALWAYS enabled - we use cookies.**
+
+**Configuration:** `server.privacy.consent` (see PART 12: Privacy & Consent)
+
+**Configuration:** `server.privacy` section in config file
+
+### Banner Layout
+
+**Desktop (full width, single row):**
+```
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│  {message} - {policy_link}                                    [Decline]  [I Agree]   │
+└──────────────────────────────────────────────────────────────────────────────────────┘
+  ↑ Fixed to bottom, full width, purple/magenta background
+    Message centered, buttons RIGHT-aligned
+```
+
+**Mobile (stacked, centered):**
+```
+┌─────────────────────────────────┐
+│  In accordance with the EU GDPR │
+│  law this message is being      │
+│  displayed.                     │
+│        - {policy_link}          │
+│                                 │
+│    [Decline]    [I Agree]       │
+└─────────────────────────────────┘
+  ↑ Text wraps and centers
+    Buttons side-by-side, centered below
+```
+
+### Banner Rules
+
+| Rule | Requirement |
+|------|-------------|
+| **Position** | Fixed bottom of viewport, full width |
+| **Background** | Purple/magenta (`#7c5295` or theme accent) |
+| **Text color** | White |
+| **Height** | Single row on desktop (~50px), expands on mobile |
+| **Message** | Centered text, inline with policy link |
+| **Policy link** | Inline after " - ", underlined, same color |
+| **Buttons (desktop)** | RIGHT-aligned, inline with message |
+| **Buttons (mobile)** | Centered below message, side-by-side |
+| **Decline button** | Text/outline style, no background |
+| **"I Agree" button** | Filled white background, purple text |
+| **Persistence** | Remember choice in the `cookie_consent` cookie (set server-side); server skips rendering the banner on later requests |
+| **Z-index** | Above all content, below modals |
+
+### Banner Behavior
+
+| Action | Result |
+|--------|--------|
+| **I Agree** | Form POST to `/server/consent` — server sets the `cookie_consent` cookie (all categories accepted), redirects back, enables all cookies + tracking |
+| **Decline** | Form POST to `/server/consent` — server sets the `cookie_consent` cookie (essential only), redirects back, session cookies only |
+| **Already set** | Server doesn't render the banner when a valid `cookie_consent` cookie exists |
+| **First visit** | Server renders the banner (visible, no JS required) until the user responds |
+
+### Implementation
+
+**Values from `server.privacy.consent`:**
+
+| Template Variable | Config Path | Notes |
+|-------------------|-------------|-------|
+| `{message}` | Dynamic selection | Uses `get_consent_message()` - returns `message_if_sold` when `data.sold=true`, otherwise `message` |
+| `{policy_url}` | `server.privacy.consent.policy.url` | |
+| `{policy_text}` | `server.privacy.consent.policy.text` | |
+| `{decline_text}` | `server.privacy.consent.buttons.decline` | |
+| `{accept_text}` | `server.privacy.consent.buttons.accept` | |
+| `{preferences_text}` | `server.privacy.consent.preferences_text` | |
+| `{data_sold}` | `server.privacy.data.sold` | Boolean data attribute read by `app.js` |
+
+**Dynamic Message Selection:**
+```rust
+// Template rendering uses get_consent_message() for {message}
+// Returns appropriate message based on data.sold
+let message = cfg.privacy.get_consent_message();
+```
+
+```html
+<!-- Cookie Consent Banner - server-rendered (visible) whenever no valid cookie_consent cookie exists (we use cookies) -->
+<!-- {message} is dynamically selected based on server.privacy.data.sold -->
+{% if not has_consent_cookie %}
+<div id="cookie-consent" class="cookie-banner" data-sold="{data_sold}">
+  <div class="cookie-banner-content">
+    <span class="cookie-message">
+      {message} - <a href="{policy_url}" class="policy-link">{policy_text}</a>
+    </span>
+    <div class="cookie-buttons">
+      <form method="post" action="/server/consent">
+        <input type="hidden" name="choice" value="decline">
+        <button type="submit" class="btn-decline">{decline_text}</button>
+      </form>
+      <form method="post" action="/server/consent">
+        <input type="hidden" name="choice" value="accept">
+        <button type="submit" class="btn-accept">{accept_text}</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+```
+
+**Server-side behavior (works with zero JavaScript):**
+
+| Step | Behavior |
+|------|----------|
+| **Render** | The server renders the banner only when the request has no valid `cookie_consent` cookie — no `display: none`, no reveal script |
+| **POST `/server/consent`** | Reads `choice` (`accept` / `decline` / `save` from the preferences form), sets the `cookie_consent` cookie (JSON: granular categories + timestamp), redirects back to the originating page |
+| **Later requests** | Server reads `cookie_consent` to skip the banner and to decide tracking injection (`check_tracking_allowed`) |
+| **CCPA** | POST `/server/ccpa` sets/clears the `ccpa_opt_out` cookie and redirects back |
+
+**Progressive enhancement (consent module in `static/js/app.js` — ONE JS file, referenced via `<script src>`, never inline):**
+
+```javascript
+// static/js/app.js - consent module (all JS lives in app.js per the ONE-file rule)
+// Enhancement only - the banner forms POST to /server/consent and work without JS.
+// This script intercepts the submits to skip the reload.
+
+// Granular consent state (matches server.privacy.cookies structure)
+const defaultConsent = {
+  // Always true, cannot be disabled
+  essential: true,
+  // Default from server.privacy.cookies.preferences.enabled
+  preferences: true,
+  // Default from server.privacy.cookies.analytics.enabled
+  analytics: true,
+  timestamp: 0
+};
+
+function readConsentCookie() {
+  const match = document.cookie.match(/(?:^|;\s*)cookie_consent=([^;]+)/);
+  if (!match) return null;
+  try {
+    return JSON.parse(decodeURIComponent(match[1]));
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeConsentCookie(consent) {
+  const value = encodeURIComponent(JSON.stringify(consent));
+  document.cookie = "cookie_consent=" + value + "; path=/; max-age=31536000; SameSite=Lax";
+}
+
+// Intercept the banner forms - set the cookie and hide the banner without a reload
+document.querySelectorAll('#cookie-consent form').forEach(function(form) {
+  form.addEventListener('submit', function(event) {
+    event.preventDefault();
+    const accepted = form.elements.choice.value === 'accept';
+    const consent = {
+      essential: true,
+      preferences: accepted,
+      analytics: accepted,
+      timestamp: Date.now()
+    };
+    saveAndApplyConsent(consent);
+  });
+});
+
+// Bound to buttons carrying data-action="cookie-preferences"
+function showCookiePreferences() {
+  // Open the granular preferences dialog (see Granular Consent UI in PART 12)
+  document.getElementById('cookie-preferences-modal').showModal();
+}
+
+document.querySelectorAll('[data-action="cookie-preferences"]').forEach(function(el) {
+  el.addEventListener('click', showCookiePreferences);
+});
+
+function savePreferences() {
+  // Called when the preferences dialog form is submitted
+  const consent = {
+    // Always true
+    essential: true,
+    preferences: document.getElementById('pref-preferences').checked,
+    analytics: document.getElementById('pref-analytics').checked,
+    timestamp: Date.now()
+  };
+  saveAndApplyConsent(consent);
+  document.getElementById('cookie-preferences-modal').close();
+}
+
+function saveAndApplyConsent(consent) {
+  writeConsentCookie(consent);
+  const banner = document.getElementById('cookie-consent');
+  if (banner) banner.remove();
+  applyConsent(consent);
+}
+
+function applyConsent(consent) {
+  // Essential cookies always work (sessions, CSRF)
+
+  // Preference cookies (theme, language)
+  if (consent.preferences) {
+    document.cookie = "preferencesEnabled=true; path=/; max-age=31536000";
+  }
+
+  // Analytics (only if enabled AND server.tracking configured)
+  if (consent.analytics) {
+    loadTracking();
+  }
+}
+
+function loadTracking() {
+  // Load analytics if server.tracking is configured
+  // Tracking script is injected server-side via the {{ tracking_script }} template function
+  // This function is called after user accepts cookies
+}
+
+// CCPA "Do Not Sell" - only shown when server.privacy.data.sold = true
+function initCCPA() {
+  const banner = document.getElementById('cookie-consent');
+  const dataSold = banner?.dataset.sold === 'true';
+
+  if (dataSold) {
+    // Check for existing "Do Not Sell" preference
+    const doNotSell = /(?:^|;\s*)ccpa_opt_out=true/.test(document.cookie);
+    if (doNotSell) {
+      // Apply immediately - no third-party data sharing
+      applyCCPAOptOut();
+    }
+  }
+}
+
+function ccpaDoNotSell() {
+  // User opted out of data sales (CCPA right)
+  applyCCPAOptOut();
+
+  // Also decline non-essential cookies
+  const consent = {
+    essential: true,
+    preferences: false,
+    analytics: false,
+    timestamp: Date.now(),
+    ccpaOptOut: true
+  };
+  saveAndApplyConsent(consent);
+}
+
+// Intercept the CCPA opt-out form (POST /server/ccpa) to skip the reload;
+// the opt-in variant is left to the server round-trip (it must clear the cookie)
+document.querySelectorAll('form[action="/server/ccpa"]').forEach(function(form) {
+  form.addEventListener('submit', function(event) {
+    if (form.elements.choice.value === 'opt-out') {
+      event.preventDefault();
+      ccpaDoNotSell();
+    }
+  });
+});
+
+function applyCCPAOptOut() {
+  // Disable any third-party data sharing
+  // - Block analytics if configured
+  // - Set GPC (Global Privacy Control) signal
+  document.cookie = "ccpa_opt_out=true; path=/; max-age=31536000";
+}
+
+// Initialize CCPA on page load
+initCCPA();
+```
+
+**Banner styles:**
+
+```css
+/* Cookie Consent Banner - matches reference design */
+.cookie-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  /* Purple/magenta - or var(--accent-color) */
+  background: #7c5295;
+  color: #ffffff;
+  z-index: 9999;
+}
+
+/* Base: Mobile styles - stacked, centered */
+.cookie-banner-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem 1rem;
+  max-width: 100%;
+  gap: 1rem;
+}
+
+.cookie-message {
+  text-align: center;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.cookie-banner .policy-link {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.cookie-banner .policy-link:hover {
+  opacity: 0.9;
+}
+
+.cookie-buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  justify-content: center;
+}
+
+.cookie-banner .btn-decline {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  padding: 0.625rem 1.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.cookie-banner .btn-decline:hover {
+  text-decoration: underline;
+}
+
+.cookie-banner .btn-accept {
+  background: #ffffff;
+  border: none;
+  color: #7c5295;
+  padding: 0.625rem 1.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  border-radius: 2px;
+}
+
+.cookie-banner .btn-accept:hover {
+  opacity: 0.95;
+}
+
+/* Desktop: side-by-side layout */
+@media (min-width: 601px) {
+  .cookie-banner-content {
+    flex-direction: row;
+    padding: 0.875rem 1.5rem;
+    gap: 2rem;
+  }
+
+  .cookie-banner .btn-decline,
+  .cookie-banner .btn-accept {
+    padding: 0.5rem 1.25rem;
+  }
+}
+```
+
+### Consent Logic (Granular)
+
+**Consent stored as JSON in the `cookie_consent` cookie (server-readable):** `{"essential":true,"preferences":true,"analytics":false,"timestamp":1704067200}`
+
+| Condition | Show Banner | Essential | Preferences | Analytics |
+|-----------|-------------|-----------|-------------|-----------|
+| No `cookie_consent` cookie (first visit) | **Yes** | Yes (always) | Wait | Wait |
+| Accept All clicked | No | Yes | **Yes** | **Yes** (if `server.tracking` configured) |
+| Decline clicked | No | Yes | No | No |
+| Custom preferences saved | No | Yes | User choice | User choice |
+
+**Cookie consent is ALWAYS enabled - we use cookies for sessions and preferences.**
+
+**Cookie categories:**
+
+| Category | Can Disable | Examples |
+|----------|-------------|----------|
+| **Essential** | No | Session, CSRF token, auth |
+| **Preferences** | Yes | Theme, language, UI settings |
+| **Analytics** | Yes | Tracking (only if `server.tracking` configured) |
+
+### Decline Behavior
+
+**When user clicks "Decline", the following MUST happen:**
+
+| Category | Behavior | Details |
+|----------|----------|---------|
+| **Analytics/Tracking** | **NEVER loaded** | No tracking scripts injected, no data sent to analytics providers |
+| **Preference cookies** | **NOT set** | Theme defaults to system/dark, language defaults to browser/en |
+| **Essential cookies** | **Still work** | Session, CSRF, auth tokens required for app to function |
+| **localStorage** | **Not used** | Decline is remembered in the `cookie_consent` cookie (essential — the server must read it to skip the banner and block tracking) |
+| **Third-party scripts** | **NOT loaded** | No Google Analytics, Matomo, etc. |
+| **Embedded content** | **Placeholder shown** | YouTube, social embeds show "Content blocked" placeholder |
+
+**What IS allowed after decline:**
+```
+✓ Session cookie (required for login/auth)
+✓ CSRF token cookie (required for form security)
+✓ Remember decline choice (`cookie_consent` cookie — essential)
+✓ Basic functionality (browse, view content)
+```
+
+**What is BLOCKED after decline:**
+```
+✗ Analytics tracking scripts (Google, Matomo, Fathom, etc.)
+✗ Theme/language preference cookies
+✗ "Remember me" extended sessions
+✗ Third-party embeds (YouTube, Twitter, etc.)
+✗ Marketing/advertising cookies (if any)
+✗ Any data sent to external analytics services
+```
+
+**Implementation:**
+
+```rust
+// check_tracking_allowed returns true only if:
+// 1. User has accepted cookies (analytics: true)
+// 2. server.tracking is configured
+pub fn check_tracking_allowed(consent: Option<&Consent>, cfg: &Config) -> bool {
+    match consent {
+        // No consent or declined
+        None => false,
+        Some(c) if !c.analytics => false,
+        Some(_) => !cfg.server.tracking.tracking_type.is_empty(),
+    }
+}
+
+// Template value - only inject tracking if allowed (marked safe AFTER this gate)
+pub fn tracking_script(consent: Option<&Consent>, cfg: &Config) -> String {
+    if !check_tracking_allowed(consent, cfg) {
+        // Return nothing - no tracking
+        return String::new();
+    }
+    generate_tracking_script(cfg)
+}
+```
+
+**Consent check in templates:**
+
+```html
+<!-- Only show tracking script if user consented -->
+{% if tracking_allowed %}
+  {{ tracking_script | safe }}
+{% endif %}
+
+<!-- Show placeholder for blocked embeds -->
+{% if not preferences_allowed %}
+  <div class="embed-blocked">
+    <p>External content blocked due to cookie preferences.</p>
+    <!-- Bound in app.js via data-action - inline handlers are blocked by the CSP -->
+    <button data-action="cookie-preferences">Manage Preferences</button>
+  </div>
+{% else %}
+  <!-- Actual embed -->
+{% endif %}
+```
+
+## Standard Pages
+
+**No-JS-first (PART 16 rule):** build the server-rendered form → POST → redirect path FIRST and verify it works with JavaScript disabled; JS may only enhance what already works.
+
+**ALL applications MUST have these standard pages. Content is defined per-application.**
+
+### /server/about
+
+**About the application - what it does and version info.**
+
+| Section | Description |
+|---------|-------------|
+| Application name | From branding config |
+| Version | Current version |
+| Description | From branding config or project-specific |
+| Features | Key features list (project-specific) |
+| Links | GitHub, documentation, etc. |
+| Third-party attribution | GeoIP (DB-IP / NRO CC BY 4.0 notices — see PART 19: GEOIP), plus any other license-required attribution |
+
+**⚠️ CRITICAL: Content MUST come from IDEA.md - NEVER use generic placeholders.**
+
+| Field | Source | Example |
+|-------|--------|---------|
+| Application name | `IDEA.md` → Project Name | "JokeAPI" |
+| Tagline | `IDEA.md` → Tagline | "A free API for random jokes" |
+| Description | `IDEA.md` → Description section | Actual project description |
+| Features | `IDEA.md` → Features section | List actual features from IDEA.md |
+| Links | `IDEA.md` → Links/URLs or infer from projectorg/projectname | GitHub, docs URLs |
+
+**DO NOT use:**
+- "Your application name here"
+- "Description of your application"
+- "Feature 1, Feature 2, Feature 3"
+- Any placeholder text
+
+**Example About Page (for a jokes API):**
+```html
+<article class="about-page">
+  <h1>JokeAPI</h1>
+  <p class="tagline">A free API for random jokes</p>
+
+  <section class="description">
+    <h2>About</h2>
+    <p>JokeAPI is a free, open-source REST API that serves random jokes.
+    It supports multiple categories, formats, and languages.</p>
+  </section>
+
+  <section class="features">
+    <h2>Features</h2>
+    <ul>
+      <li>Multiple joke categories (programming, misc, dark, pun)</li>
+      <li>Safe mode filtering</li>
+      <li>Multiple response formats (JSON, XML, YAML, plain text)</li>
+      <li>GraphQL support</li>
+      <li>No authentication required</li>
+    </ul>
+  </section>
+
+  <section class="version">
+    <h2>Version</h2>
+    <p>{{ version }} ({{ build_date }})</p>
+  </section>
+
+  <section class="links">
+    <h2>Links</h2>
+    <ul>
+      <li><a href="https://github.com/example/jokeapi">GitHub</a></li>
+      <li><a href="https://jokeapi.readthedocs.io">Documentation</a></li>
+    </ul>
+  </section>
+
+  <section class="attribution">
+    <h2>Third-Party Attribution</h2>
+    <p><a href="https://db-ip.com/">IP Geolocation by DB-IP</a></p>
+    <p>Country and ASN data licensed CC BY 4.0 by the Number Resource Organization (NRO).</p>
+  </section>
+</article>
+```
+
+**GeoIP attribution content above is canonical — see PART 19: GEOIP → "License & Attribution" for the source of these notices; do not let this copy drift if that section is ever updated.**
+
+**Note:** Tor address is NOT shown here. Tor access is available via:
+- **Footer**: "Tor Support" link → `/server/help#tor-access` (shown when Tor is enabled)
+- **Footer**: "I2P Support" link → `/server/help#i2p-access` (shown when I2P is enabled and running)
+- **`/server/help`**: Tor Access section with .onion address, copy button, and setup instructions
+- **`/server/healthz`**: Tor status and .onion address (technical/status view)
+
+### /server/privacy
+
+**Privacy policy page - MUST display all privacy information from `server.privacy` config.**
+
+**Required Sections (auto-generated from config):**
+
+| Section | Source | Description |
+|---------|--------|-------------|
+| Summary | Dynamic | Key points: data stored on server, sold/not-sold (based on `data.sold`) |
+| Cookie Policy | `server.privacy.cookies` | What cookies are used and why |
+| Data Collection | `server.privacy.content.data_collection` | What data is collected |
+| Data Usage | `get_data_usage_content()` | Dynamic: returns `data_usage` or `data_usage_if_sold` |
+| Data Security | `server.privacy.content.data_security` | How data is protected |
+| Data Storage | `server.privacy.sharing` | Where data is stored, third-party conditions |
+| Data Retention | `server.privacy.retention` | How long data is kept |
+| Third Parties | `server.privacy.third_party` | Services that receive data (if any) |
+| Your Rights | `server.privacy.retention` | Export/deletion options |
+| **CCPA Opt-Out** | Conditional | **Only shown when `data.sold = true`** - Do Not Sell toggle |
+| Manage Preferences | Link | Button to open cookie preferences modal |
+| Contact | `/server/contact` link | How to contact for privacy concerns |
+
+**Page Layout:**
+
+```html
+<article class="privacy-policy">
+  <h1>Privacy Policy</h1>
+  <p class="last-updated">Last updated: {build_datetime}</p>
+
+  <!-- Summary - Key Points (always shown first) -->
+  <!-- Dynamic: Second key-point changes based on server.privacy.data.sold -->
+  <section id="summary" class="privacy-summary">
+    <h2>Summary</h2>
+    <div class="key-points">
+      <div class="key-point">
+        <span class="icon">🔒</span>
+        <strong>Your data is stored on our servers</strong>
+        <p>All personal data is stored securely on our infrastructure.</p>
+      </div>
+      {% if privacy.data.sold %}
+      <div class="key-point key-point-warning">
+        <span class="icon">⚠️</span>
+        <strong>Your data may be sold</strong>
+        <p>Your personal information may be shared with or sold to third parties. <a href="#ccpa-opt-out">Opt out of data sales</a>.</p>
+      </div>
+      {% else %}
+      <div class="key-point">
+        <span class="icon">🚫</span>
+        <strong>We never sell your data</strong>
+        <p>Your personal information is never sold to third parties.</p>
+      </div>
+      {% endif %}
+      <div class="key-point">
+        <span class="icon">🎛️</span>
+        <strong>You control your data</strong>
+        <p>Export or delete your data anytime from account settings.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cookie Policy Section - from server.privacy.cookies -->
+  <section id="cookies">
+    <h2>Cookie Policy</h2>
+    <p>We use cookies to ensure our website functions properly and to improve your experience.</p>
+
+    <h3>Essential Cookies</h3>
+    <p>{{ privacy.cookies.essential.description }}</p>
+
+    <h3>Preference Cookies</h3>
+    <p>{{ privacy.cookies.preferences.description }}</p>
+
+    <h3>Analytics Cookies</h3>
+    {% if tracking.tracking_type %}
+    <!-- Dynamic: get_analytics_description() returns description + appropriate suffix based on data.sold -->
+    <p>{{ privacy.analytics_description }}</p>
+    <p>We use <strong>{{ tracking.type_name }}</strong> for analytics.</p>
+    {% else %}
+    <p>We do not use analytics tracking on this site.</p>
+    {% endif %}
+
+    <div class="manage-cookies">
+      <!-- Bound in app.js via data-action - inline handlers are blocked by the CSP -->
+      <button data-action="cookie-preferences">Manage Cookie Preferences</button>
+    </div>
+  </section>
+
+  <!-- Data Collection - operator-defined content -->
+  <section id="data-collection">
+    <h2>Data We Collect</h2>
+    {{ privacy.content.data_collection | markdown_to_html | safe }}
+  </section>
+
+  <!-- Data Usage - operator-defined content -->
+  <!-- Dynamic: get_data_usage_content() returns data_usage or data_usage_if_sold based on data.sold -->
+  <section id="data-usage">
+    <h2>How We Use Your Data</h2>
+    {{ privacy.data_usage_content | markdown_to_html | safe }}
+  </section>
+
+  <!-- Data Security - operator-defined content -->
+  <section id="data-security">
+    <h2>Data Security</h2>
+    {{ privacy.content.data_security | markdown_to_html | safe }}
+  </section>
+
+  <!-- Data Storage - from server.privacy.data -->
+  <section id="data-storage">
+    <h2>Data Storage & Third-Party Sharing</h2>
+    <p><strong>All your data is stored on our servers.</strong> We do not use third-party cloud storage for your personal data.</p>
+
+    <h3>When Data May Be Shared</h3>
+    <p>Your data is only sent to third parties in these specific situations:</p>
+    <ul>
+      {% for s in privacy.data.sharing %}
+      <li><strong>{{ s.condition | humanize }}:</strong> {{ s.when }} - {{ s.data }}</li>
+      {% endfor %}
+    </ul>
+
+    <p><strong>In all cases:</strong></p>
+    <ul>
+      <li>Data is only shared when necessary for the stated purpose</li>
+      <li>You can opt out of analytics by declining cookies</li>
+      {% if privacy.data.sold %}
+      <li>Your data <strong>may be sold</strong> to third parties. See <a href="#ccpa-opt-out">CCPA opt-out</a> below.</li>
+      {% else %}
+      <li>Your data is <strong>never sold</strong></li>
+      {% endif %}
+    </ul>
+  </section>
+
+  <!-- Data Retention - from server.privacy.retention -->
+  <section id="data-retention">
+    <h2>Data Retention</h2>
+    <p>{{ privacy.retention.period }}</p>
+  </section>
+
+  <!-- Third Parties - from server.privacy.third_party -->
+  <section id="third-parties">
+    <h2>Third-Party Services</h2>
+    {% if privacy.third_party.services %}
+    <p>We use the following third-party services:</p>
+    <table>
+      <thead>
+        <tr><th>Service</th><th>Purpose</th><th>Data Sent</th><th>Privacy Policy</th></tr>
+      </thead>
+      <tbody>
+        {% for svc in privacy.third_party.services %}
+        <tr>
+          <td>{{ svc.name }}</td>
+          <td>{{ svc.purpose }}</td>
+          <td>{{ svc.data_sent }}</td>
+          <td><a href="{{ svc.policy_url }}" target="_blank" rel="noopener">View Policy</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p><strong>We do not currently use any third-party services that receive your data.</strong></p>
+    <p>If analytics tracking is enabled and you consent, anonymized usage data may be sent to the configured analytics provider. Check the Cookie Policy section above for details.</p>
+    {% endif %}
+  </section>
+
+  <!-- Your Rights - from server.privacy.retention -->
+  <section id="your-rights">
+    <h2>Your Rights</h2>
+    <p>You have the following rights regarding your data:</p>
+    <ul>
+      <li><strong>Access:</strong> View all data we have about you in your account settings.</li>
+      {% if privacy.retention.export_available %}
+      <li><strong>Export:</strong> Download a copy of all your data in a portable format.</li>
+      {% endif %}
+      {% if privacy.retention.deletion_available %}
+      <li><strong>Deletion:</strong> Delete your account and all associated data permanently.</li>
+      {% endif %}
+      <li><strong>Correction:</strong> Update or correct your personal information anytime.</li>
+      <!-- Bound in app.js via data-action - inline handlers are blocked by the CSP -->
+      <li><strong>Cookie Control:</strong> <button type="button" class="link-button" data-action="cookie-preferences">Manage your cookie preferences</button></li>
+    </ul>
+  </section>
+
+  <!-- CCPA "Do Not Sell" - ONLY shown when server.privacy.data.sold = true -->
+  {% if privacy.data.sold %}
+  <section id="ccpa-opt-out" class="ccpa-section">
+    <h2>California Privacy Rights (CCPA)</h2>
+    <p>Under the California Consumer Privacy Act (CCPA), California residents have the right to:</p>
+    <ul>
+      <li><strong>Know</strong> what personal information is collected and how it's used</li>
+      <li><strong>Request deletion</strong> of personal information</li>
+      <li><strong>Opt out</strong> of the sale of personal information</li>
+      <li><strong>Non-discrimination</strong> for exercising your privacy rights</li>
+    </ul>
+
+    <div class="ccpa-opt-out-box">
+      <h3>Do Not Sell My Personal Information</h3>
+      <p>Click the button below to opt out of the sale of your personal information.</p>
+      {% if ccpa_opted_out %}
+      <div class="ccpa-status opted-out">
+        <span class="status-icon">✓</span>
+        <span>You have opted out of data sales.</span>
+      </div>
+      <!-- POST forms work with zero JS - the server sets/clears the ccpa_opt_out cookie and redirects back; app.js intercepts to skip the reload -->
+      <form method="post" action="/server/ccpa">
+        <input type="hidden" name="choice" value="opt-in">
+        <button type="submit" class="btn-secondary">Opt Back In</button>
+      </form>
+      {% else %}
+      <form method="post" action="/server/ccpa">
+        <input type="hidden" name="choice" value="opt-out">
+        <button type="submit" class="btn-primary btn-ccpa-opt-out">Do Not Sell My Personal Information</button>
+      </form>
+      {% endif %}
+    </div>
+
+    <p class="ccpa-note">Note: This opt-out applies to the sale of personal information. Essential cookies and site functionality will continue to work normally.</p>
+  </section>
+  {% endif %}
+
+  <!-- Contact -->
+  <section id="contact">
+    <h2>Contact Us</h2>
+    <p>For privacy-related inquiries, please <a href="/server/contact">contact us</a>.</p>
+  </section>
+</article>
+```
+
+**API Endpoint (`/api/{api_version}/server/privacy`):**
+
+```json
+{
+  "ok": true,
+  "data": {
+    "summary": {
+      "data_stored_on_server": true,
+      "data_sold": false,
+      "user_control": true
+    },
+    "cookies": {
+      "essential": {
+        "enabled": true,
+        "description": "Required for the site to function. Includes security tokens (CSRF) and site preferences."
+      },
+      "preferences": {
+        "enabled": true,
+        "description": "Remember your settings such as theme (dark/light), language, and UI preferences."
+      },
+      "analytics": {
+        "enabled": true,
+        "description": "Help us understand how visitors use our site. Analytics data is anonymized and never sold."
+      }
+    },
+    "data": {
+      "sold": false,
+      "stored_on_server": true,
+      "sharing": [
+        {
+          "condition": "analytics",
+          "when": "Tracking configured AND user consents",
+          "data": "Anonymized: page views, browser type, country"
+        },
+        {
+          "condition": "email",
+          "when": "SMTP configured for sending emails",
+          "data": "Email address, message content"
+        },
+        {
+          "condition": "user_initiated",
+          "when": "User explicitly shares content",
+          "data": "Whatever user chooses to share"
+        }
+      ]
+    },
+    "tracking": {
+      "enabled": false,
+      "type": "",
+      "type_name": ""
+    },
+    "retention": {
+      "period": "Account data is retained while your account is active. Upon account deletion, all personal data is permanently deleted within 30 days.",
+      "export_available": true,
+      "deletion_available": true
+    },
+    "third_party": {
+      "services": []
+    },
+    "ccpa": {
+      "applicable": false,
+      "opt_out_url": "/server/privacy#ccpa-opt-out",
+      "user_opted_out": false
+    },
+    "content": {
+      "consent_message": "...",
+      "data_usage": "..."
+    }
+  }
+}
+```
+
+**Dynamic Fields:**
+- `summary.data_sold`: Reflects `server.privacy.data.sold`
+- `cookies.analytics.description`: From `get_analytics_description()` (includes suffix)
+- `content.consent_message`: From `get_consent_message()` (returns sold/not-sold message)
+- `content.data_usage`: From `get_data_usage_content()` (returns sold/not-sold content)
+- `ccpa.applicable`: `true` only when `data.sold = true` (the `ccpa` object is always included; the CCPA opt-out UI is only shown when `applicable` is `true`)
+- `ccpa.user_opted_out`: From the `ccpa_opt_out` cookie check
+
+**Note:** The `tracking` and `third_party.services` fields are populated based on `server.tracking` config. If no tracking is configured, they remain empty.
+
+**Privacy Configuration (config file):**
+
+| Section | Config Keys |
+|---------|-------------|
+| **Data Policies** | `server.privacy.data.sold` (default: false), `server.privacy.data.stored_on_server`, `server.privacy.data.sharing[]` |
+| **Consent Banner** | `server.privacy.consent.message`, `server.privacy.consent.message_if_sold`, `server.privacy.consent.policy.url`, `server.privacy.consent.policy.text`, `server.privacy.consent.buttons.decline`, `server.privacy.consent.buttons.accept` |
+| **Cookie Descriptions** | `server.privacy.cookies.essential`, `server.privacy.cookies.preferences`, `server.privacy.cookies.analytics` |
+| **Data Collection** | `server.privacy.content.data_collection` (Markdown) |
+| **Data Usage** | `server.privacy.content.data_usage`, `server.privacy.content.data_usage_if_sold` (Markdown) |
+| **Data Security** | `server.privacy.content.data_security` (Markdown) |
+| **Data Retention** | `server.privacy.retention.period`, `server.privacy.retention.export_available`, `server.privacy.retention.deletion_available` |
+| **Third Parties** | `server.privacy.third_party.services[]` (name, purpose, data_sent, policy_url) |
+
+**Default content provided, fully customizable via config file.**
+
+### /server/contact
+
+**Contact form - sends message to the configured general contact recipient.**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| Name | Text | Yes | Sender's name |
+| Email | Email | Yes | Sender's email (for reply) |
+| Subject | Text | Yes | Message subject |
+| Message | Textarea | Yes | Message body |
+| Captcha | Captcha | Yes | Spam prevention |
+
+**Submission sends to `server.contact.general.email` (or falls back to `server.contact.admin.email` if general is empty).**
+
+**Below the form, the page MUST render exactly two informational sections — the content is spec'd here; never improvise it:**
+
+| Section | Content |
+|---------|---------|
+| Security Issues | "To report a security vulnerability, consult our security policy at `/server/security`." — rendered as a link to `/server/security`. Never point users at the raw `/.well-known/security.txt` file from this page. |
+| Abuse Reports | "To report abusive content or policy violations, use this contact form." — append " or email {abuse_email}" where `{abuse_email}` resolves to `server.contact.abuse.email` if set, else `server.contact.general.email` if set; omit the email clause entirely when neither is set. NEVER render `server.contact.admin.email` here (it is never public). |
+
+### /server/help
+
+**Help page - documentation and usage instructions for the application.**
+
+| Section | Description |
+|---------|-------------|
+| Getting started | Quick start guide |
+| Features | How to use key features |
+| API Documentation | Links to Swagger (`/server/docs/swagger`) and GraphQL (`/server/docs/graphql`) — UIs fetch from `/api/swagger` and `/api/graphql` aliases |
+| Tor Access | How to access via Tor (only shown if Tor enabled) |
+| I2P Access | How to access via I2P (only shown if I2P enabled and running) |
+| FAQ | Frequently asked questions |
+| Troubleshooting | Common issues and solutions |
+
+**⚠️ CRITICAL: Content MUST reflect the ACTUAL project - NEVER use generic placeholders.**
+
+| Section | Source | What to include |
+|---------|--------|-----------------|
+| Getting started | `IDEA.md` + actual endpoints | Real curl examples using actual API endpoints |
+| Features | `IDEA.md` → Features | How to USE each feature (not just list them) |
+| FAQ | Common questions for THIS project type | Real questions users would ask |
+| Troubleshooting | Actual error scenarios | Real errors and solutions |
+
+**DO NOT use:**
+- "curl https://api.example.com/endpoint"
+- "Replace YOUR_API_KEY with your actual key"
+- "This is how you use feature X"
+- Generic placeholder examples
+
+**Example Help Page (for a jokes API):**
+```html
+<article class="help-page">
+  <h1>Help</h1>
+
+  <section id="getting-started">
+    <h2>Getting Started</h2>
+    <p>Get a random joke with a single request:</p>
+    <pre><code>curl https://jokes.example.com/api/v1/joke</code></pre>
+
+    <p>Response:</p>
+    <pre><code>{
+  "id": "abc123",
+  "category": "programming",
+  "setup": "Why do programmers prefer dark mode?",
+  "punchline": "Because light attracts bugs."
+}</code></pre>
+  </section>
+
+  <section id="features">
+    <h2>Features</h2>
+
+    <h3>Categories</h3>
+    <p>Filter jokes by category:</p>
+    <pre><code>curl https://jokes.example.com/api/v1/joke?category=programming</code></pre>
+    <p>Available categories: <code>programming</code>, <code>misc</code>, <code>dark</code>, <code>pun</code></p>
+
+    <h3>Safe Mode</h3>
+    <p>Filter out NSFW content:</p>
+    <pre><code>curl https://jokes.example.com/api/v1/joke?safe=true</code></pre>
+
+    <h3>Response Formats</h3>
+    <p>Get jokes in different formats:</p>
+    <pre><code>curl -H "Accept: text/plain" https://jokes.example.com/api/v1/joke
+curl -H "Accept: application/xml" https://jokes.example.com/api/v1/joke</code></pre>
+  </section>
+
+  <section id="faq">
+    <h2>FAQ</h2>
+
+    <h3>Do I need an API key?</h3>
+    <p>No, the API is completely free and requires no authentication.</p>
+
+    <h3>Is there a rate limit?</h3>
+    <p>Yes, 100 requests per minute per IP address.</p>
+
+    <h3>Can I submit jokes?</h3>
+    <p>Yes, use the <code>POST /api/v1/joke/submit</code> endpoint.</p>
+  </section>
+
+  <section id="troubleshooting">
+    <h2>Troubleshooting</h2>
+
+    <h3>429 Too Many Requests</h3>
+    <p>You've exceeded the rate limit. Wait 60 seconds before retrying.</p>
+
+    <h3>No jokes in category</h3>
+    <p>Some category/filter combinations may have no results. Try removing filters.</p>
+  </section>
+</article>
+```
+
+**API Documentation section (always shown):**
+```html
+<div class="api-docs">
+  <h3>API Documentation</h3>
+  <p>This application provides a full REST API with interactive documentation.</p>
+  <ul>
+    <li><a href="/server/docs/swagger">Swagger UI</a> - Interactive REST API explorer</li>
+    <li><a href="/server/docs/graphql">GraphiQL</a> - Interactive GraphQL explorer</li>
+  </ul>
+</div>
+```
+
+**Tor Access section (only shown if Tor is enabled, running, and an onion address is published):**
+```html
+{% if tor_enabled and tor_running and onion_address %}
+<section id="tor-access" class="tor-access">
+  <h3>Tor Access</h3>
+  <p>This application is available as a Tor hidden service for enhanced privacy.</p>
+
+  <h4>Onion Address</h4>
+  <div class="code-block">
+    <code class="code-content">{{ onion_address }}</code>
+    <button type="button" class="copy-btn" data-copy="{{ onion_address }}" aria-label="Copy to clipboard">
+      <span class="copy-icon">📋</span>
+      <span class="copy-text" aria-live="polite">Copy</span>
+    </button>
+  </div>
+
+  <h4>How to Connect</h4>
+  <ol>
+    <li>Download <a href="https://www.torproject.org/download/" target="_blank" rel="noopener">Tor Browser</a></li>
+    <li>Open Tor Browser and wait for it to connect</li>
+    <li>Copy the onion address above and paste it into the Tor Browser address bar</li>
+  </ol>
+
+  <p class="note">Using Tor provides additional privacy by hiding your IP address and encrypting your connection through the Tor network.</p>
+</section>
+{% endif %}
+```
+
+**I2P Access section (only shown if I2P is enabled, running, and a `.b32.i2p` address is published):**
+```html
+{% if i2p_enabled and i2p_running and i2p_address %}
+<section id="i2p-access" class="i2p-access">
+  <h3>I2P Access</h3>
+  <p>This application is available as an I2P eepsite for enhanced privacy.</p>
+
+  <h4>I2P Address</h4>
+  <div class="code-block">
+    <code class="code-content">{{ i2p_address }}</code>
+    <button type="button" class="copy-btn" data-copy="{{ i2p_address }}" aria-label="Copy to clipboard">
+      <span class="copy-icon">📋</span>
+      <span class="copy-text" aria-live="polite">Copy</span>
+    </button>
+  </div>
+
+  <h4>How to Connect</h4>
+  <ol>
+    <li>Install <a href="https://geti2p.net/en/download" target="_blank" rel="noopener">I2P</a> or <a href="https://i2pd.website/" target="_blank" rel="noopener">i2pd</a> and wait for it to integrate with the network</li>
+    <li>Configure your browser to use the I2P HTTP proxy (default <code>127.0.0.1:4444</code>)</li>
+    <li>Copy the <code>.b32.i2p</code> address above and paste it into your browser address bar</li>
+  </ol>
+
+  <p class="note">Using I2P provides additional privacy by routing your connection through the I2P network. Eepsites are served over <code>http://</code> — the I2P tunnel provides the transport encryption, so no TLS certificate is used.</p>
+</section>
+{% endif %}
+```
+
+**⚠️ REMINDER: All content sections MUST be populated from IDEA.md - see sourcing rules above.**
+
+### /server/terms
+
+**Terms of Service - legal terms for using the application.**
+
+| Section | Description |
+|---------|-------------|
+| Acceptance | Agreement to terms by using the service |
+| Acceptable use | What is/isn't allowed |
+| Liability | Limitation of liability |
+| Changes | How terms may be updated |
+| Governing law | Jurisdiction |
+
+**Default template provided, customizable via API.**
+
+### Configuration
+
+```yaml
+server:
+  contact:
+    general:
+      # Contact form recipient
+      # If empty, falls back to server.contact.admin.email
+      email: ""
+
+  pages:
+    about:
+      # Additional content for about page (markdown supported)
+      content: ""
+
+    privacy:
+      # Privacy policy content (markdown supported)
+      # If empty, uses default template
+      content: ""
+
+    contact:
+      # Enable contact form
+      enabled: true
+      # Captcha type: recaptcha, hcaptcha, simple (built-in)
+      captcha: simple
+      # Success message after form submission
+      success_message: "Thank you for your message. We'll respond soon."
+
+    help:
+      # Help page content (markdown supported)
+      # Project-specific - must be defined per application
+      content: ""
+
+    terms:
+      # Terms of service content (markdown supported)
+      # If empty, uses default template
+      content: ""
+```
+
+### Pages Configuration (config file)
+
+| Page | Config Keys |
+|------|-------------|
+| **About Page** | `pages.about.content` (Markdown) |
+| **Privacy Policy** | `pages.privacy.content` (Markdown) |
+| **Contact Page** | `pages.contact.enabled`, `pages.contact.captcha`, `pages.contact.success_message` (recipient: `server.contact.general.email`, falls back to `server.contact.admin.email`) |
+| **Help Page** | `pages.help.content` (Markdown) |
+| **Terms of Service** | `pages.terms.content` (Markdown) |
+
+### /server/ API Endpoints
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/{api_version}/server/about` | GET | About information (JSON) |
+| `/api/{api_version}/server/privacy` | GET | Privacy policy (JSON) |
+| `/api/{api_version}/server/contact` | POST | Submit contact form |
+| `/api/{api_version}/server/help` | GET | Help content (JSON) |
+| `/api/{api_version}/server/terms` | GET | Terms of service (JSON) |
+| `/api/{api_version}/server/healthz` | GET | Health check (JSON default; text via API rules) |
+| `/api/{api_version}/server/swagger` | GET | OpenAPI JSON spec |
+| `/api/{api_version}/server/graphql` | POST | GraphQL endpoint |
+
+**Direct alias endpoints (same handler, no redirect):**
+
+| Alias | Canonical route |
+|-------|-----------------|
+| `/api/swagger` | `/api/{api_version}/server/swagger` |
+| `/api/graphql` | `/api/{api_version}/server/graphql` |
+| `/api/healthz` | `/api/{api_version}/server/healthz` |
+
+### /server/ Frontend Routes
+
+| Route | Description |
+|-------|-------------|
+| `/server` | Redirect → `/server/about` (301) |
+| `/server/about` | About page (HTML) |
+| `/server/privacy` | Privacy policy page (HTML) |
+| `/server/contact` | Contact form page (HTML) |
+| `/server/help` | Help page (HTML) |
+| `/server/terms` | Terms of service page (HTML) |
+| `/server/healthz` | Health page (HTML) |
+| `/healthz` | Optional direct alias to `/server/healthz` when `server.healthz.root.enabled` is `true` |
+| `/server/docs/swagger` | Swagger UI (HTML) |
+| `/server/docs/graphql` | GraphQL UI (HTML) |
+
+**All /server/ pages follow standard frontend rules (PART 16):**
+- Full HTML with header/footer
+- Theme support (light/dark)
+- Responsive layout
+- Proper SEO meta tags
 
 ---
 
@@ -25927,8 +28811,8 @@ server:
 
 ## Country Blocking Presets (Operator-Defined, Never Auto-Applied)
 
-**The admin panel MUST let operators save the current `deny_countries` or
-`allow_countries` selection as a named, reusable preset** (`geoip.presets`,
+**Operators MUST be able to save the current `deny_countries` or
+`allow_countries` selection as a named, reusable preset in `server.yml`** (`geoip.presets`,
 `name -> []code`) — so a list built once can be reapplied to other
 allow/deny fields or exported/imported across environments without
 hand-retyping ISO codes each time.
@@ -25947,7 +28831,7 @@ it in a compliance-sensitive form.
 **Preset rules:**
 - A preset is only ever a name plus the country codes the operator entered — the project never fetches, infers, or auto-suggests preset contents from any external source
 - `deny_countries: []` / `allow_countries: []` remain the defaults on every fresh install regardless of what presets exist — allow all, deny none, unchanged by this feature
-- Selecting a preset in the admin UI only pre-fills `deny_countries`/`allow_countries` for the operator to review and save; it is never applied automatically or silently
+- Referencing a preset only pre-fills `deny_countries`/`allow_countries` for the operator to review and save in `server.yml`; it is never applied automatically or silently
 - If an operator needs a compliance-driven blocklist, they build and save it themselves as a preset, sourced from their own current legal/compliance review — never from a template default
 - Presets are a pure config-reuse convenience; the actually-enforced behavior is always driven by `deny_countries`/`allow_countries` at the time of the request, never by the preset name itself
 
@@ -26277,7 +29161,7 @@ server:
 | `limit` | `global`, `per_ip`, `per_user`, `per_endpoint` | Rate limit type |
 | `status` | `allowed`, `limited` | Request outcome |
 
-**Cardinality note:** Never use `ip` as a metric label — unbounded cardinality is a memory-DoS vector. Log per-IP details to structured logs instead; metrics answer "how many?" while logs answer "which IPs?"
+**Cardinality note:** `per_ip` is a `limit` label *value*, never a per-address label. Never use a raw client IP as a metric label — per-IP labels are unbounded-cardinality and a memory-DoS vector. The rate limiter must cap the set of tracked IPs (e.g., a fixed-size LRU) or aggregate; never emit one label value per unique client IP. Log per-IP details to structured logs instead; metrics answer "how many?" while logs answer "which IPs?"
 
 ### System Metrics (if `include_system: true`)
 
@@ -26310,7 +29194,7 @@ server:
 
 ## Metrics Output Example
 
-**Sample `/server/metrics/prometheus` output (Prometheus text format):**
+**Sample `/server/metrics` output (Prometheus text format):**
 
 ```
 # HELP {project_name}_app_info Application information
@@ -28687,7 +31571,7 @@ useradd --system --uid {id} --gid {id} \
 | Drop | root→`{project_name}` | Binary drops privileges |
 | Run | `{project_name}` | Serve requests as unprivileged user |
 
-**The `{project_name}` user is created automatically by the binary on first startup.**
+**The `{internal_name}` user is created automatically by the binary on first startup.**
 
 macOS uses `dscl` (Directory Service Command Line) to create system users. The user is hidden from login screen and has no shell access.
 
@@ -28960,7 +31844,7 @@ fn install_windows_service() -> anyhow::Result<()> {
 
 ## Service Templates
 
-**Unix default:** service starts elevated only for privileged startup, then drops to `{project_name}` user after port binding.
+**Unix default:** service starts elevated only for privileged startup, then drops to `{internal_name}` user after port binding.
 **Windows: Service runs as Virtual Service Account (`NT SERVICE\{internal_name}`).**
 
 This allows any port configuration without service file changes.
@@ -34303,7 +37187,7 @@ REGISTRY = "ghcr.io/${PROJECT_ORG}/${INTERNAL_NAME}"
 
 ---
 
-# CHECKPOINT 5: BUILD & DEPLOYMENT VERIFICATION
+# CHECKPOINT 6: BUILD & DEPLOYMENT VERIFICATION
 
 Before proceeding, confirm you understand:
 - [ ] Docker uses tini as init, Alpine base
@@ -35660,6 +38544,96 @@ eval "$({project_name}-cli --shell init)"
 | **Rename-friendly** | Works even if user renames binary |
 | **No sync issues** | Can't have outdated completion files |
 
+## Browser E2E Testing (Headless Browser, On-Demand Beta Testing)
+
+The web frontend (PART 16) is verified end to end by driving the real frontend in a real headless browser. This suite is the project's beta-testing harness: it is built alongside the frontend and run **on demand** — when the user asks for beta testing, before a release, or after major frontend work. It is **NOT part of the commit gate** (`make test` does not run it). When it does run, every requirement in this section is non-negotiable: route unit tests and `curl` smoke tests are not a substitute for verifying what a user actually sees and does, with and without JavaScript. Every HTML page the server serves is in scope: the home page, project feature pages, the `/server/*` standard pages, and the Swagger/API docs pages (PART 14).
+
+**Engine:** `thirtyfour` (WebDriver) driving headless Chromium via `chromedriver` — pure Rust, no Node toolchain. Test code lives in `tests/e2e/` behind an `e2e` feature/`#[ignore]` gate, so `make test` never sees it; the entry point is `./tests/e2e.sh`, which Docker-wraps the gated `cargo test` invocation and joins the existing manual `./tests/*.sh` script family alongside `docker.sh`/`incus.sh`. No new Makefile target — the target set is fixed. Everything runs inside Docker like every other test (this PART → "Host System Safety Applies to All Testing & Debugging").
+
+### Three Mandatory Tiers
+
+| Tier | Engine | JavaScript | Verifies |
+|------|--------|------------|----------|
+| 1 — SSR | plain `reqwest` client (no browser) | n/a (raw HTML) | Server renders complete, correct HTML: real page content in the initial response, correct `<title>`, meta tags, valid structure — never an empty shell that JS fills in later |
+| 2 — No-JS browser | thirtyfour, JavaScript disabled via Chrome prefs | OFF | Progressive enhancement (PART 16 → "HTML5/CSS over JavaScript"): every core flow works without JS — native form POSTs, links, redirects, pagination |
+| 3 — Full browser | thirtyfour | ON | Full flows with JS enhancements; zero console errors; zero failed asset/XHR requests |
+
+All three tiers are REQUIRED. A feature that only passes Tier 3 is a PART 16 progressive-enhancement violation, not a passing test.
+
+Tier 2 disables JavaScript through Chrome content-settings prefs on the session capabilities:
+
+```rust
+// tests/e2e/nojs.rs — Tier 2: a dedicated no-JS browser session
+let mut caps = DesiredCapabilities::chrome();
+caps.add_arg("--headless=new")?;
+caps.add_experimental_option(
+    "prefs",
+    serde_json::json!({ "profile.managed_default_content_settings.javascript": 2 }),
+)?;
+let driver = WebDriver::new("http://localhost:9515", caps).await?;
+driver.goto(format!("{base_url}/")).await?;
+let html = driver.source().await?;
+```
+
+### SSR Correctness (Tier 1)
+
+- The initial HTML response contains the actual page content — assert on real domain data (the paste body, the shortened URL's stats, the metric values), never just HTTP 200
+- No loading spinners, empty `<div id="app">` shells, or client-side-only rendering — that violates PART 16 and MUST fail the test
+- Correct status per route: 200 for pages, 301/302 + `Location` for redirects, 404 for unknown paths
+- `<title>`, `lang`, charset, and viewport meta present and correct on every page
+- Content negotiation honored per PART 16 `detectClientType`: HTML for browsers, plain text for CLI tools, JSON for `Accept: application/json` — assert each on at least one route
+
+### Project-Scoped Feature Coverage (NON-NEGOTIABLE)
+
+Generic route checks alone are NON-COMPLIANT. The suite MUST exercise this project's actual domain features end to end, derived feature-by-feature from IDEA.md — every user-facing feature gets at least one Tier-1 assertion, one Tier-2 scenario, and one Tier-3 scenario, each a named test.
+
+| Example project | Minimum required E2E scenarios |
+|-----------------|-------------------------------|
+| Pastebin API | Create paste via web form POST → view rendered paste → raw view matches input exactly; syntax highlighting present; owner edit/delete via `owner_token` cookie works with JS off; expired paste → 404/410; unknown ID → 404 |
+| URL shortener | Shorten via form → redirect fires (301/302 + correct `Location`); stats page reflects the hit; invalid/dangerous URL rejected with a rendered error; reserved slug rejected |
+| Status/metrics API | Dashboard SSR shows real metric values from fixture data (PART 20); service detail pages render; `/server/healthz` returns JSON to `curl` and HTML to a browser; stale service shown as down |
+| Read-only data API | Search page renders real results without JS; pagination works as plain links; `/docs` lists every real endpoint from the generated OpenAPI spec (PART 14); empty query and no-results pages handled |
+
+The table is illustrative — the rule is universal: enumerate IDEA.md's features and map each to E2E scenarios covering create/read/update/delete/error paths as applicable. A feature without an E2E scenario is untested.
+
+### Universal Coverage (Every Project)
+
+- **Full crawl**: start at `/`, follow every internal link — no dead links, no 500s, every navigable route visited, including all `/server/*` standard pages (PART 16)
+- **Owner-token web management (PART 8)**: only when the project defines resource owner tokens per IDEA.md — web-form create shows the raw `tok_` token once AND sets the `owner_token` cookie; edit/delete plain POST forms then work with JS disabled; a revoked/invalid token gets a rendered error with no resource-existence hints
+- **API auth boundary**: HTML pages are public — assert no page ever demands a login; assert `/api/` mutating routes reject a cookie-only browser request (Bearer header required, PART 8)
+- **API docs (PART 14)**: `/docs` and the Swagger UI page render; Tier 1 asserts real endpoint paths from the generated spec appear in the HTML
+- **Theme**: dark, light, and auto all render; assert computed styles actually change (PART 16 theme rules)
+- **Responsive**: 375×812 viewport — no horizontal scroll, navigation usable (PART 16 mobile-first rules)
+- **i18n (PART 30)**: switching language changes rendered strings
+- **Forms**: validation errors render server-side (Tier 2) and inline (Tier 3); CSRF protection enforced on browser form POSTs (PART 16 → CSRF)
+- **Error pages**: 404 and 500 render the PART 16 themed error pages, not blank bodies or stack traces
+- **Static assets**: every referenced CSS/JS/image/font loads with 200
+- **Console**: zero JavaScript errors on every page visited (Tier 3)
+
+### Determinism & Hermeticity
+
+- Fixture data seeded into a fresh test database before the suite; never depends on prior runs
+- **Zero external network**: every outbound dependency (remote URL fetching, webhooks, GeoIP downloads, update checks) is stubbed with local mock HTTP servers (e.g. `wiremock` or a hand-rolled hyper listener) — the whole suite MUST pass offline
+- Server under test starts once per suite on a port from 64500–64999, PID captured, killed and cleaned in teardown
+- Failure artifacts (screenshots, page HTML, server log) go to the tempdir structure (this PART → "Temporary Directory Structure") — never the project tree
+
+### Invocation & CI
+
+| Target | Runs | When |
+|--------|------|------|
+| `make test` | Unit + route tests only — the commit gate; NEVER runs E2E | Before every commit |
+| `./tests/e2e.sh` | Full E2E suite (all three tiers) | On demand: beta testing, pre-release, after major frontend work |
+
+`./tests/e2e.sh` follows the same manual, developer-initiated pattern as `./tests/incus.sh` and is Docker-wrapped: the E2E container needs Chromium + `chromedriver` (installed in the test image, or a headless-shell-style sidecar with chromedriver). In CI, E2E is at most a manually triggered job (`workflow_dispatch`) that uploads failure artifacts — it is never a required check and never blocks commits, merges, or releases.
+
+### AI Exploratory Pass (Discovery Only — NEVER the Gate)
+
+In addition to the committed suite, AI-driven exploratory testing with a real browser (e.g. Claude driving the Playwright MCP server) is the defined workflow for finding what the scripted suite misses: walk every page, try hostile input, resize, toggle themes, read console/network errors.
+
+- Every finding is either fixed immediately or logged in `TODO.AI.md` — never left only in conversation
+- Every confirmed finding is converted into a committed deterministic thirtyfour test so it can never regress silently
+- Agent runs are not reproducible: they are NEVER a gate of any kind — the committed deterministic suite is the repeatable record of frontend correctness, run on demand alongside this pass
+
 ## Testing Open API Routes
 
 **All routes are publicly accessible — no authentication required. Tests verify responses, not access control.**
@@ -35795,96 +38769,6 @@ docker run --rm \
   -w /app \
   casjaysdev/rust:latest sh
 ```
-
-## Browser E2E Testing (Headless Browser, On-Demand Beta Testing)
-
-The web frontend (PART 16) is verified end to end by driving the real frontend in a real headless browser. This suite is the project's beta-testing harness: it is built alongside the frontend and run **on demand** — when the user asks for beta testing, before a release, or after major frontend work. It is **NOT part of the commit gate** (`make test` does not run it). When it does run, every requirement in this section is non-negotiable: route unit tests and `curl` smoke tests are not a substitute for verifying what a user actually sees and does, with and without JavaScript. Every HTML page the server serves is in scope: the home page, project feature pages, the `/server/*` standard pages, and the Swagger/API docs pages (PART 14).
-
-**Engine:** `thirtyfour` (WebDriver) driving headless Chromium via `chromedriver` — pure Rust, no Node toolchain. Test code lives in `tests/e2e/` behind an `e2e` feature/`#[ignore]` gate, so `make test` never sees it; the entry point is `./tests/e2e.sh`, which Docker-wraps the gated `cargo test` invocation and joins the existing manual `./tests/*.sh` script family alongside `docker.sh`/`incus.sh`. No new Makefile target — the target set is fixed. Everything runs inside Docker like every other test (this PART → "Host System Safety Applies to All Testing & Debugging").
-
-### Three Mandatory Tiers
-
-| Tier | Engine | JavaScript | Verifies |
-|------|--------|------------|----------|
-| 1 — SSR | plain `reqwest` client (no browser) | n/a (raw HTML) | Server renders complete, correct HTML: real page content in the initial response, correct `<title>`, meta tags, valid structure — never an empty shell that JS fills in later |
-| 2 — No-JS browser | thirtyfour, JavaScript disabled via Chrome prefs | OFF | Progressive enhancement (PART 16 → "HTML5/CSS over JavaScript"): every core flow works without JS — native form POSTs, links, redirects, pagination |
-| 3 — Full browser | thirtyfour | ON | Full flows with JS enhancements; zero console errors; zero failed asset/XHR requests |
-
-All three tiers are REQUIRED. A feature that only passes Tier 3 is a PART 16 progressive-enhancement violation, not a passing test.
-
-Tier 2 disables JavaScript through Chrome content-settings prefs on the session capabilities:
-
-```rust
-// tests/e2e/nojs.rs — Tier 2: a dedicated no-JS browser session
-let mut caps = DesiredCapabilities::chrome();
-caps.add_arg("--headless=new")?;
-caps.add_experimental_option(
-    "prefs",
-    serde_json::json!({ "profile.managed_default_content_settings.javascript": 2 }),
-)?;
-let driver = WebDriver::new("http://localhost:9515", caps).await?;
-driver.goto(format!("{base_url}/")).await?;
-let html = driver.source().await?;
-```
-
-### SSR Correctness (Tier 1)
-
-- The initial HTML response contains the actual page content — assert on real domain data (the paste body, the shortened URL's stats, the metric values), never just HTTP 200
-- No loading spinners, empty `<div id="app">` shells, or client-side-only rendering — that violates PART 16 and MUST fail the test
-- Correct status per route: 200 for pages, 301/302 + `Location` for redirects, 404 for unknown paths
-- `<title>`, `lang`, charset, and viewport meta present and correct on every page
-- Content negotiation honored per PART 16 `detectClientType`: HTML for browsers, plain text for CLI tools, JSON for `Accept: application/json` — assert each on at least one route
-
-### Project-Scoped Feature Coverage (NON-NEGOTIABLE)
-
-Generic route checks alone are NON-COMPLIANT. The suite MUST exercise this project's actual domain features end to end, derived feature-by-feature from IDEA.md — every user-facing feature gets at least one Tier-1 assertion, one Tier-2 scenario, and one Tier-3 scenario, each a named test.
-
-| Example project | Minimum required E2E scenarios |
-|-----------------|-------------------------------|
-| Pastebin API | Create paste via web form POST → view rendered paste → raw view matches input exactly; syntax highlighting present; owner edit/delete via `owner_token` cookie works with JS off; expired paste → 404/410; unknown ID → 404 |
-| URL shortener | Shorten via form → redirect fires (301/302 + correct `Location`); stats page reflects the hit; invalid/dangerous URL rejected with a rendered error; reserved slug rejected |
-| Status/metrics API | Dashboard SSR shows real metric values from fixture data (PART 20); service detail pages render; `/server/healthz` returns JSON to `curl` and HTML to a browser; stale service shown as down |
-| Read-only data API | Search page renders real results without JS; pagination works as plain links; `/docs` lists every real endpoint from the generated OpenAPI spec (PART 14); empty query and no-results pages handled |
-
-The table is illustrative — the rule is universal: enumerate IDEA.md's features and map each to E2E scenarios covering create/read/update/delete/error paths as applicable. A feature without an E2E scenario is untested.
-
-### Universal Coverage (Every Project)
-
-- **Full crawl**: start at `/`, follow every internal link — no dead links, no 500s, every navigable route visited, including all `/server/*` standard pages (PART 16)
-- **Owner-token web management (PART 8)**: only when the project defines resource owner tokens per IDEA.md — web-form create shows the raw `tok_` token once AND sets the `owner_token` cookie; edit/delete plain POST forms then work with JS disabled; a revoked/invalid token gets a rendered error with no resource-existence hints
-- **API auth boundary**: HTML pages are public — assert no page ever demands a login; assert `/api/` mutating routes reject a cookie-only browser request (Bearer header required, PART 8)
-- **API docs (PART 14)**: `/docs` and the Swagger UI page render; Tier 1 asserts real endpoint paths from the generated spec appear in the HTML
-- **Theme**: dark, light, and auto all render; assert computed styles actually change (PART 16 theme rules)
-- **Responsive**: 375×812 viewport — no horizontal scroll, navigation usable (PART 16 mobile-first rules)
-- **i18n (PART 30)**: switching language changes rendered strings
-- **Forms**: validation errors render server-side (Tier 2) and inline (Tier 3); CSRF protection enforced on browser form POSTs (PART 16 → CSRF)
-- **Error pages**: 404 and 500 render the PART 16 themed error pages, not blank bodies or stack traces
-- **Static assets**: every referenced CSS/JS/image/font loads with 200
-- **Console**: zero JavaScript errors on every page visited (Tier 3)
-
-### Determinism & Hermeticity
-
-- Fixture data seeded into a fresh test database before the suite; never depends on prior runs
-- **Zero external network**: every outbound dependency (remote URL fetching, webhooks, GeoIP downloads, update checks) is stubbed with local mock HTTP servers (e.g. `wiremock` or a hand-rolled hyper listener) — the whole suite MUST pass offline
-- Server under test starts once per suite on a port from 64500–64999, PID captured, killed and cleaned in teardown
-- Failure artifacts (screenshots, page HTML, server log) go to the tempdir structure (this PART → "Temporary Directory Structure") — never the project tree
-
-### Invocation & CI
-
-| Target | Runs | When |
-|--------|------|------|
-| `make test` | Unit + route tests only — the commit gate; NEVER runs E2E | Before every commit |
-| `./tests/e2e.sh` | Full E2E suite (all three tiers) | On demand: beta testing, pre-release, after major frontend work |
-
-`./tests/e2e.sh` follows the same manual, developer-initiated pattern as `./tests/incus.sh` and is Docker-wrapped: the E2E container needs Chromium + `chromedriver` (installed in the test image, or a headless-shell-style sidecar with chromedriver). In CI, E2E is at most a manually triggered job (`workflow_dispatch`) that uploads failure artifacts — it is never a required check and never blocks commits, merges, or releases.
-
-### AI Exploratory Pass (Discovery Only — NEVER the Gate)
-
-In addition to the committed suite, AI-driven exploratory testing with a real browser (e.g. Claude driving the Playwright MCP server) is the defined workflow for finding what the scripted suite misses: walk every page, try hostile input, resize, toggle themes, read console/network errors.
-
-- Every finding is either fixed immediately or logged in `TODO.AI.md` — never left only in conversation
-- Every confirmed finding is converted into a committed deterministic thirtyfour test so it can never regress silently
-- Agent runs are not reproducible: they are NEVER a gate of any kind — the committed deterministic suite is the repeatable record of frontend correctness, run on demand alongside this pass
 
 ## Build and Test
 
@@ -38712,7 +41596,7 @@ This prevents conflicts with any existing Tor installation on the system.
 
 **Process:**
 1. Server starts (possibly as root for port binding)
-2. Server drops privileges to `{project_name}` user (if started as root)
+2. Server drops privileges to `{internal_name}` user (if started as root)
 3. Server starts Tor process **as the current (dropped) user**
 4. Tor inherits user context from server process
 
@@ -45479,7 +48363,7 @@ When bootstrapping a new project from this specification:
 
 **Test:** Server starts and responds to `/server/healthz`
 
-#### Step 3: Docker & CI/CD (PARTS 27-28)
+#### Step 3: Docker & CI/CD (PARTS 26-27)
 
 1. **Create docker/Dockerfile** - Multi-stage build
 2. **Create docker-compose files** - Production, dev, test
@@ -45713,60 +48597,60 @@ When stuck:
 
 ## How to Read This Large File
 
-**rust/API.md is ~1.7MB and ~45,000 lines. You CANNOT read it all at once. Follow these procedures.**
+**AI.md is ~1.8MB and ~49,000 lines. You CANNOT read it all at once. Follow these procedures.**
 
 ### File Size Reality
 
 | Constraint | Value |
 |------------|-------|
-| File size | ~1.7MB |
-| Line count | ~45,000 lines |
+| File size | ~1.8MB |
+| Line count | ~49,000 lines |
 | Read limit | ~500 lines per read |
-| Full reads needed | ~90 reads (impractical) |
+| Full reads needed | ~97 reads (impractical) |
 
 **Use the PART index to find relevant sections, then read each section COMPLETELY.**
 
 ### PART Index (Quick Reference)
 
-**Use `grep -n "^# PART" rust/API.md` to get exact current line numbers.**
+**Use `grep -n "^# PART" AI.md` to get exact current line numbers.**
 
 | PART | Line | Topic | When to Read |
 |------|------|-------|--------------|
-| 0 | ~2368 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
-| 1 | ~4181 | Critical Rules | **ALWAYS READ FIRST** |
-| 2 | ~5445 | License & Attribution | License requirements |
-| 3 | ~5779 | Project Structure | Setting up new project, **CI/CD badge detection** |
-| 4 | ~6703 | OS-Specific Paths | Path handling |
-| 5 | ~6899 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
-| 6 | ~8666 | Application Modes | Mode handling, debug endpoints |
-| 7 | ~9182 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~9853 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags**, **Resource Owner Tokens** |
-| 9 | ~12838 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~13340 | Database | Database work |
-| 11 | ~13755 | Security & Logging | Security features, **Context Detection** |
-| 12 | ~15787 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~17242 | Health & Versioning | Health endpoints |
-| 14 | ~17954 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~19698 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~20661 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~23974 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~24551 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~24979 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~25100 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~26438 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~26938 | Update Command | Update feature |
-| 23 | ~27466 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~28088 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~28413 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~29243 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~30215 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~33484 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~35322 | ReadTheDocs Documentation | Documentation |
-| 30 | ~36116 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~37511 | Overlay Networks (Tor & I2P) | Tor (required) + I2P eepsite (opt-in) |
-| 32 | ~39663 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~42819 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | ~43056 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 0 | ~2396 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
+| 1 | ~4211 | Critical Rules | **ALWAYS READ FIRST** |
+| 2 | ~5475 | License & Attribution | License requirements |
+| 3 | ~5810 | Project Structure | Setting up new project, **CI/CD badge detection** |
+| 4 | ~6734 | OS-Specific Paths | Path handling |
+| 5 | ~6930 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
+| 6 | ~8697 | Application Modes | Mode handling, debug endpoints |
+| 7 | ~9213 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
+| 8 | ~9897 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags**, **Resource Owner Tokens** |
+| 9 | ~12904 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~13406 | Database | Database work |
+| 11 | ~13821 | Security & Logging | Security features, **Context Detection** |
+| 12 | ~15887 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~17342 | Health & Versioning | Health endpoints |
+| 14 | ~18064 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~19834 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~20786 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~27627 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~28206 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~28634 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~28787 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~30125 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~30625 | Update Command | Update feature |
+| 23 | ~31153 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~31775 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~32100 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~32930 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~33902 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~37159 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~38997 | ReadTheDocs Documentation | Documentation |
+| 30 | ~39791 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~41185 | Overlay Networks (Tor & I2P) | Tor (required) + I2P eepsite (opt-in) |
+| 32 | ~43381 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~46537 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~46774 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File
 
@@ -45779,9 +48663,9 @@ When stuck:
 Use `grep` to find the PART you need:
 ```bash
 # List all PARTs with line numbers
-grep -n "^# PART" rust/API.md
+grep -n "^# PART" AI.md
 # Find specific content
-grep -n "keyword" rust/API.md
+grep -n "keyword" AI.md
 ```
 
 **Step 3: Read the specific PART completely**
@@ -45824,16 +48708,16 @@ Example: If you're partway through PART 5 and it says "See PART 10", read PART 1
 
 ```bash
 # Find specific topics
-grep -n "rate limit" rust/API.md
-grep -n "CSRF" rust/API.md
-grep -n "server.yml" rust/API.md
+grep -n "rate limit" AI.md
+grep -n "CSRF" AI.md
+grep -n "server.yml" AI.md
 
 # Find code examples
-grep -n "```rust" rust/API.md
-grep -n "```yaml" rust/API.md
+grep -n "```rust" AI.md
+grep -n "```yaml" AI.md
 
 # Find tables
-grep -n "^|" rust/API.md | head -50
+grep -n "^|" AI.md | head -50
 ```
 
 ### Common Mistakes When Reading This File
