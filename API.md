@@ -1071,7 +1071,7 @@ src/
 | `models/` | Data structures | Structs, validation, serialization |
 | `store/` | Data persistence | Database queries, CRUD operations |
 | `middlewares/` | HTTP middleware | Auth, logging, rate limiting, CORS |
-| `templates/` | HTML templates | Tera/Askama templates for WebUI |
+| `templates/` | HTML templates | Askama templates for WebUI |
 | `static/` | Static assets | CSS, JS, images (embedded) |
 | `swagger/` | OpenAPI/Swagger | Spec generation, UI handler, theming (always `src/swagger/`) |
 | `graphql/` | GraphQL API | Schema, resolvers, UI handler, theming (always `src/graphql/`) |
@@ -1257,7 +1257,7 @@ Claude Code creates `.claude/rules/` on first session (see PART 0: Session Initi
 
 **Rules File Features:**
 - All `.md` files in `rules/` are automatically discovered recursively
-- Supports subdirectories for organization (e.g., `rules/frontend/axum.md`)
+- Supports subdirectories for organization (e.g., `rules/frontend/askama.md`)
 - Supports symlinks for sharing rules across projects
 - Supports YAML frontmatter for conditional/path-specific rules
 
@@ -1323,7 +1323,7 @@ paths:
 | Unsafe C FFI? | NEVER (Pure Rust always) | PART 7 |
 | Premium features? | NEVER (all features free) | PART 1 |
 | External cron? | NEVER (built-in scheduler) | PART 18 |
-| Client-side rendering? | NEVER (server-side Tera/Askama templates) | PART 16 |
+| Client-side rendering? | NEVER (server-side Askama templates) | PART 16 |
 
 ## TERMINOLOGY
 | Term | Meaning |
@@ -1365,7 +1365,7 @@ For complete details, see AI.md PART 0, 1
 - ❌ Empty handlers or placeholder routes
 
 ## CRITICAL - ALWAYS DO
-- ✅ Server-side rendering (Tera or Askama templates)
+- ✅ Server-side rendering (Askama templates)
 - ✅ Progressive enhancement (works without JS)
 - ✅ Mobile-first responsive CSS
 - ✅ CSS `word-break: break-all` for long strings (IPv6, .onion, tokens)
@@ -1579,7 +1579,7 @@ Purpose:
 8. Use Makefile in CI/CD → Explicit commands only
 9. Guess or assume values that a command can produce → Run the command (`date`, `basename "$PWD"`, `git config user.email`, `git rev-parse --short=7 HEAD`, `uname -m`, etc.) — when no command applies, read spec or ask user
 10. Skip platforms → Build all 7 (linux/darwin/windows × amd64/arm64; freebsd amd64)
-11. Client-side rendering (React/Vue) → Server-side Tera/Askama templates
+11. Client-side rendering (React/Vue) → Server-side Askama templates
 12. Add JavaScript for anything HTML5+CSS already does (forms, validation, show/hide, dialogs, tabs) → JS is a LAST RESORT; every `<script>` must name a capability impossible without it; default answer to "add JS?" is NO (PART 16)
 13. Let long strings break mobile → Use word-break CSS
 14. Skip validation → Server validates EVERYTHING
@@ -2810,7 +2810,7 @@ fi
 | Adding a new notification type | Add notification translation key |
 | Adding a new error type | Add `errors.*` translation key |
 | Adding new config with user-visible default | Ensure default falls back to translation key |
-| Adding HTML templates | Use the Tera `t` function: `{{ t(lang=lang, key="key") }}` — never hardcoded text |
+| Adding HTML templates | Use `{% call t(lang, "key") %}` — never hardcoded text |
 | Adding JavaScript UI text | Use `translations[key]` from loaded locale |
 | Modifying `<html>` tag | Use `lang="{{ lang }}" dir="{{ dir }}"` — never hardcoded `lang="en"` |
 
@@ -6684,8 +6684,8 @@ icu_locid = { version = "1", optional = true }
 icu_decimal = { version = "1", optional = true }
 icu_plurals = { version = "1", optional = true }
 
-# Optional: templating (embedded HTML templates via Tera)
-tera = { version = "1", optional = true }
+# Optional: templating (type-safe compiled HTML templates via Askama)
+askama = { version = "*", optional = true }
 rust-embed = { version = "8", optional = true }
 
 # Optional: HTML sanitization (custom footer branding)
@@ -9748,8 +9748,8 @@ icu_locid = { version = "1", optional = true }
 icu_decimal = { version = "1", optional = true }
 icu_plurals = { version = "1", optional = true }
 
-# Optional: templating (embedded HTML templates via Tera)
-tera = { version = "1", optional = true }
+# Optional: templating (type-safe compiled HTML templates via Askama)
+askama = { version = "*", optional = true }
 rust-embed = { version = "8", optional = true }
 
 # Optional: HTML sanitization (custom footer branding)
@@ -13263,7 +13263,7 @@ update. The fix is mandatory URL stamping:
 
 | Rule | Detail |
 |------|--------|
-| **`asset()` template helper** | Every static asset reference in every template goes through a shared helper that appends the build stamp: `/static/app.css?v={project_version}-{short_commit}`. Hand-written bare `/static/...` URLs in templates are a bug. Tera form: `{{ asset(path="css/app.css") }}`. |
+| **`asset()` template helper** | Every static asset reference in every template goes through a shared helper that appends the build stamp: `/static/app.css?v={project_version}-{short_commit}`. Hand-written bare `/static/...` URLs in templates are a bug. Askama form: `{{ asset("css/app.css") }}`. |
 | **`immutable` only on a matching stamp** | The static handler sends `public, max-age=31536000, immutable` ONLY when the request's `?v=` equals the running build's stamp. Missing or mismatched stamp → `no-cache` + `ETag` (the bytes still serve — cached HTML from an old version never breaks, it just revalidates). |
 | **HTML is never cached** | All HTML documents: `Cache-Control: no-store` plus an `ETag` derived from the build stamp, so any intermediary that ignores `no-store` still revalidates. |
 | **Service worker (if the project adds one)** | Cache name MUST embed `{project_version}`; `activate` deletes all caches from other versions. `/sw.js` and `/manifest.json` are served `no-cache` + build-stamp `ETag` — a cached service worker script delays every other update mechanism. |
@@ -22125,7 +22125,7 @@ This rule governs the entire spec — it is not restricted to buttons, not restr
 
 | Rule | Description | Details |
 |------|-------------|---------|
-| **Tera Templates** | ALL HTML uses Tera (`tera` crate) | See Template Rules below |
+| **Askama Templates** | ALL HTML uses Askama (type-safe, compiled) | See Template Rules below |
 | **Pure Vanilla JS** | NO frameworks | See JavaScript Rules below |
 | **CSS-First** | Prefer CSS over JS | See CSS Rules below |
 | **NO JS Alerts** | Use custom modals/toasts | See UI Components below |
@@ -22138,7 +22138,7 @@ This rule governs the entire spec — it is not restricted to buttons, not restr
 | Language | Rust |
 | Web framework | `axum` |
 | Middleware | `tower` / `tower-http` |
-| Template engine | Tera templates (`tera` crate) |
+| Template engine | Askama templates (`askama` crate) |
 | CSS | Custom properties + BEM |
 | JavaScript | Vanilla ES modules (no bundler required) |
 | Static files | `tower-http::services::ServeDir` |
@@ -24426,46 +24426,46 @@ See **JavaScript Rules** section below for `app.js` structure.
 </style>
 ```
 
-### Tera Templates
+### Askama Templates
 
-**ALL frontend HTML MUST use Tera templates (`tera` crate).**
+**ALL frontend HTML MUST use the `askama` crate for type-safe templating.**
 
-**Untrusted-content rule:** pasted text, repo blobs, markdown files, and any user-submitted file content are data, not templates. Follow PART 11 "Untrusted File / Rich Content Handling" and NEVER pass user-controlled content through Tera's `| safe` filter unless it came from a sanitizer (ammonia) for an explicitly approved field.
+**Untrusted-content rule:** pasted text, repo blobs, markdown files, and any user-submitted file content are data, not templates. Follow PART 11 "Untrusted File / Rich Content Handling" and NEVER pass user-controlled content as raw HTML unless it came from a sanitizer (ammonia) for an explicitly approved field.
 
 **`markdown_to_html` requirements:**
 - Disable raw HTML passthrough from the markdown source
-- Sanitize the rendered output with an allow-list policy (ammonia) before marking the result `| safe`
+- Sanitize the rendered output with an allow-list policy (ammonia) before returning safe HTML
 - Escape code fences/source text before syntax-highlighting wrappers are added
 - Add safe link attributes for external URLs (`rel="noopener noreferrer nofollow ugc"`)
 
 | Location | Purpose |
 |----------|---------|
-| `template/` | All `.html.tera` template files |
+| `template/` | All `.html` askama template files |
 | `template/partial/` | Reusable template partials |
 | `template/layout/` | Base layouts |
 | `template/page/` | Page-specific templates |
 | `static/` | Static assets (CSS, JS, images) |
 
-**Template Structure (all files use `.html.tera` extension):**
+**Template Structure (all files use `.html` extension with askama):**
 ```
 template/
 ├── layout/
-│   ├── base.html.tera      # Root shell: <html>, <head>, <body> wrapper
-│   └── public.html.tera    # Public-facing layout (/, /server/*, project routes)
+│   ├── base.html      # Root shell: <html>, <head>, <body> wrapper
+│   └── public.html    # Public-facing layout (/, /server/*, project routes)
 ├── partial/
 │   ├── public/
-│   │   ├── header.html.tera  # Public header (logo, nav, theme toggle)
-│   │   ├── nav.html.tera     # Public navigation
-│   │   └── footer.html.tera  # Public footer (about, privacy, etc.)
-│   ├── head.html.tera        # <head> contents (meta, CSS)
-│   └── scripts.html.tera     # JavaScript includes
+│   │   ├── header.html  # Public header (logo, nav, theme toggle)
+│   │   ├── nav.html     # Public navigation
+│   │   └── footer.html  # Public footer (about, privacy, etc.)
+│   ├── head.html        # <head> contents (meta, CSS)
+│   └── scripts.html     # JavaScript includes
 ├── page/
-│   ├── index.html.tera       # Home page
-│   ├── healthz.html.tera     # Health check page
-│   └── error.html.tera       # Error pages (404, 500, 502, 503, etc.) - MUST use site theme
+│   ├── index.html       # Home page
+│   ├── healthz.html     # Health check page
+│   └── error.html       # Error pages (404, 500, 502, 503, etc.) - MUST use site theme
 └── component/
-    ├── modal.html.tera       # Reusable modal component
-    ├── toast.html.tera       # Toast notifications
+    ├── modal.html       # Reusable modal component
+    ├── toast.html       # Toast notifications
     └── ...
 ```
 
@@ -24484,7 +24484,7 @@ template/
 | 503 | Service Unavailable | ✅ Yes |
 
 **Error page requirements:**
-- Use `error.html.tera` template (extends `public.html.tera` layout)
+- Use `error.html` template (extends `public.html` layout)
 - Respect user's theme preference (dark/light/auto)
 - Include navigation (user can navigate away)
 - Show appropriate error message (not stack traces in production)
@@ -24495,7 +24495,7 @@ template/
 **Error page structure:**
 ```
 {# Extends public layout #}
-{% extends "public.html.tera" %}
+{% extends "public.html" %}
 {% block content %}
 <div class="error-page">
   <h1>{{ status_code }}</h1>
@@ -24512,10 +24512,10 @@ template/
 
 | Layout | Routes | Design Philosophy |
 |--------|--------|-------------------|
-| `base.html.tera` | (root shell extended by every layout) | `<html>`, `<head>`, `<body>` wrapper |
-| `public.html.tera` | `/`, `/server/*`, project routes | Clean, marketing-friendly, top navigation |
+| `base.html` | (root shell extended by every layout) | `<html>`, `<head>`, `<body>` wrapper |
+| `public.html` | `/`, `/server/*`, project routes | Clean, marketing-friendly, top navigation |
 
-### Public Layout (`public.html.tera`)
+### Public Layout (`public.html`)
 
 **For end-users and public-facing pages:**
 
@@ -24562,7 +24562,7 @@ template/
 
 ### Shared Theme Classes
 
-**`public.html.tera` uses theme CSS classes applied globally. No conflicts, no ambiguities.**
+**`public.html` uses theme CSS classes applied globally. No conflicts, no ambiguities.**
 
 | Rule | Description |
 |------|-------------|
@@ -24576,7 +24576,7 @@ template/
 **Layout starts with:**
 ```html
 <!DOCTYPE html>
-<!-- base.html.tera: server renders theme-dark, theme-light, or theme-auto from the theme cookie -->
+<!-- base.html: server renders theme-dark, theme-light, or theme-auto from the theme cookie -->
 <html lang="{{ lang }}" dir="{{ dir }}" class="theme-{{ theme }}">
 <head>
   {% include "head.html" %}
@@ -24665,11 +24665,11 @@ document.querySelectorAll('.theme-toggle-form').forEach((form) => {
 
 | Partial | Purpose |
 |---------|---------|
-| `partial/public/header.html.tera` | Logo + top nav |
-| `partial/public/nav.html.tera` | Horizontal navigation links |
-| `partial/public/footer.html.tera` | About, Privacy, Contact links |
-| `partial/head.html.tera` | Shared `<head>` contents |
-| `partial/scripts.html.tera` | Shared JavaScript includes |
+| `partial/public/header.html` | Logo + top nav |
+| `partial/public/nav.html` | Horizontal navigation links |
+| `partial/public/footer.html` | About, Privacy, Contact links |
+| `partial/head.html` | Shared `<head>` contents |
+| `partial/scripts.html` | Shared JavaScript includes |
 
 ### Static Assets Organization
 
@@ -24856,68 +24856,68 @@ document.querySelectorAll('[data-confirm-dialog]').forEach((btn) => {
 
 | Rule | Description |
 |------|-------------|
-| **Tera templates only** | `tera` crate, `.html.tera` extension |
-| **Layouts for structure** | `layout/public.html.tera` |
+| **Askama templates only** | `askama` crate, `.html` extension |
+| **Layouts for structure** | `layout/public.html` |
 | **Partials for reuse** | Header, nav, footer, components |
-| **Pages for content** | One `.html.tera` per page/route |
+| **Pages for content** | One `.html` per page/route |
 | **No logic in templates** | Minimal `{% if %}`, `{% for %}` - logic in handlers |
 
-**Template Inheritance:**
+**Template Inheritance (askama):**
 ```
-layout/public.html.tera
-  └── includes partial/head.html.tera
-  └── includes partial/public/header.html.tera
-  └── includes partial/public/nav.html.tera
+layout/public.html
+  └── includes partial/head.html
+  └── includes partial/public/header.html
+  └── includes partial/public/nav.html
   └── yields to page content
-  └── includes partial/public/footer.html.tera
-  └── includes partial/scripts.html.tera
+  └── includes partial/public/footer.html
+  └── includes partial/scripts.html
 ```
 
 ### Partials Rules
 
 | Rule | Description |
 |------|-------------|
-| **Shared partials** | `partial/head.html.tera`, `partial/scripts.html.tera` |
+| **Shared partials** | `partial/head.html`, `partial/scripts.html` |
 | **Context partials** | `partial/public/*` |
-| **Component partials** | Reusable UI: `partial/toast.html.tera`, `partial/modal.html.tera` |
+| **Component partials** | Reusable UI: `partial/toast.html`, `partial/modal.html` |
 | **No page-specific partials** | If used once, it's not a partial |
 | **Self-contained** | Partials include their own styles/scripts if needed |
 
 **Mandatory Partials:**
 ```
 partial/
-├── head.html.tera           # <head> - meta, CSS links (REQUIRED)
-├── scripts.html.tera        # JS includes before </body> (REQUIRED)
+├── head.html           # <head> - meta, CSS links (REQUIRED)
+├── scripts.html        # JS includes before </body> (REQUIRED)
 └── public/
-    ├── header.html.tera     # Public header (REQUIRED)
-    ├── nav.html.tera        # Public nav (REQUIRED)
-    └── footer.html.tera     # Public footer (REQUIRED)
+    ├── header.html     # Public header (REQUIRED)
+    ├── nav.html        # Public nav (REQUIRED)
+    └── footer.html     # Public footer (REQUIRED)
 ```
 
 **Optional Component Partials:**
 ```
 partial/
-├── toast.html.tera          # Toast notification container
-├── modal.html.tera          # Reusable modal structure
-├── pagination.html.tera     # Pagination controls
-├── search.html.tera         # Search form
+├── toast.html          # Toast notification container
+├── modal.html          # Reusable modal structure
+├── pagination.html     # Pagination controls
+├── search.html         # Search form
 └── {project}/          # Project-specific partials
-    └── *.html.tera
+    └── *.html
 ```
 
 **Page Structure - Public:**
 
 ```
 ┌─────────────────────────────────────────┐
-│              <header>                   │  ← public/header.html.tera
+│              <header>                   │  ← public/header.html
 ├─────────────────────────────────────────┤
-│               <nav>                     │  ← public/nav.html.tera (TOP)
+│               <nav>                     │  ← public/nav.html (TOP)
 ├─────────────────────────────────────────┤
 │                                         │
 │              <main>                     │  ← Page content
 │                                         │
 ├─────────────────────────────────────────┤
-│              <footer>                   │  ← public/footer.html.tera (BOTTOM)
+│              <footer>                   │  ← public/footer.html (BOTTOM)
 └─────────────────────────────────────────┘
 ```
 
@@ -24938,7 +24938,7 @@ partial/
 - Help link (belongs in footer)
 - Preferences link (lives next to the theme toggle in the header, not in nav — it's UI state, not app content; also always present in the footer for discoverability)
 
-**Default Navigation (nav.html.tera):**
+**Default Navigation (nav.html):**
 
 ```
 Desktop (single row, 4 zones):
@@ -25220,30 +25220,30 @@ Projects can create additional partials for functionality unique to that applica
 
 | Example Partial | Project | Purpose |
 |-----------------|---------|---------|
-| `search-box.html.tera` | airports, jokes | Reusable search form component |
-| `airport-card.html.tera` | airports | Airport info display card |
-| `joke-card.html.tera` | jokes | Joke display with copy button |
-| `map.html.tera` | airports | Embedded map component |
-| `passphrase-generator.html.tera` | wordList | Generator form and output |
-| `geoip-result.html.tera` | airports | GeoIP lookup result display |
-| `code-block.html.tera` | gitignore | Syntax-highlighted code display |
-| `pagination.html.tera` | any | Reusable pagination controls |
-| `filters.html.tera` | any | Search/filter form for lists |
-| `stats-card.html.tera` | any | Statistics display card |
+| `search-box.html` | airports, jokes | Reusable search form component |
+| `airport-card.html` | airports | Airport info display card |
+| `joke-card.html` | jokes | Joke display with copy button |
+| `map.html` | airports | Embedded map component |
+| `passphrase-generator.html` | wordList | Generator form and output |
+| `geoip-result.html` | airports | GeoIP lookup result display |
+| `code-block.html` | gitignore | Syntax-highlighted code display |
+| `pagination.html` | any | Reusable pagination controls |
+| `filters.html` | any | Search/filter form for lists |
+| `stats-card.html` | any | Statistics display card |
 
 **App-Specific Partials (add to existing structure):**
 
-See **Template Structure** above for mandatory partials (`partial/public/*`, `partial/head.html.tera`, `partial/scripts.html.tera`).
+See **Template Structure** above for mandatory partials (`partial/public/*`, `partial/head.html`, `partial/scripts.html`).
 
 Projects add app-specific partials alongside the mandatory ones:
 ```
 template/partial/
 ├── public/                  # MANDATORY (see Template Structure)
-├── head.html.tera                # MANDATORY
-├── scripts.html.tera             # MANDATORY
-├── search-box.html.tera          # APP-SPECIFIC - search component
-├── result-card.html.tera         # APP-SPECIFIC - result display
-└── pagination.html.tera          # APP-SPECIFIC - pagination controls
+├── head.html                # MANDATORY
+├── scripts.html             # MANDATORY
+├── search-box.html          # APP-SPECIFIC - search component
+├── result-card.html         # APP-SPECIFIC - result display
+└── pagination.html          # APP-SPECIFIC - pagination controls
 ```
 
 **Usage in page templates:**
@@ -25267,7 +25267,7 @@ template/partial/
 - Create a partial when the same HTML is used in 2+ places
 - Keep partials focused on one component/purpose
 - Pass only the data the partial needs
-- Name clearly: `{thing}-{purpose}.html.tera` (e.g., `airport-card.html.tera`, `joke-list.html.tera`)
+- Name clearly: `{thing}-{purpose}.html` (e.g., `airport-card.html`, `joke-list.html`)
 
 **Embedding Templates :**
 
@@ -25278,7 +25278,7 @@ use rust_embed::RustEmbed;
 
 #[derive(RustEmbed)]
 #[folder = "template/"]
-#[include = "*.html.tera"]
+#[include = "*.html"]
 struct TemplateAssets;
 
 #[derive(RustEmbed)]
@@ -25286,24 +25286,20 @@ struct TemplateAssets;
 struct StaticAssets;
 ```
 
-Load templates into Tera at startup:
+Askama compiles every template into the binary at build time — each page/layout is a Rust struct deriving `Template`, and template variables/paths are type-checked at compile time (no runtime template loading):
 
 ```rust
-use tera::Tera;
+use askama::Template;
 
-pub fn build_tera() -> Result<Tera> {
-    let mut tera = Tera::default();
-    for file in TemplateAssets::iter() {
-        let content = TemplateAssets::get(&file)
-            .ok_or_else(|| anyhow::anyhow!("missing template: {}", file))?;
-        let src = std::str::from_utf8(content.data.as_ref())?;
-        tera.add_raw_template(&file, src)?;
-    }
-    Ok(tera)
+#[derive(Template)]
+#[template(path = "page/index.html")]
+pub struct IndexPage {
+    pub lang: String,
+    pub dir: String,
 }
 ```
 
-**Template Usage (`base.html.tera`):**
+**Template Usage (`base.html`):**
 ```
 <!DOCTYPE html>
 <html lang="{{ lang }}" dir="{{ dir }}">
@@ -25322,7 +25318,7 @@ pub fn build_tera() -> Result<Tera> {
 
 | Type | Embedded in Binary | External (Downloaded) |
 |------|-------------------|----------------------|
-| Templates (`.html.tera`) | YES | NO |
+| Templates (`.html`) | YES | NO |
 | CSS files | YES | NO |
 | JavaScript files | YES | NO |
 | Images/Icons | YES | NO |
@@ -26471,7 +26467,7 @@ When the operator sets `custom_html` in `server.yml`, the server logs at startup
 ```html
 <footer class="footer">
   <!-- Onion address (only shown if Tor is enabled, running, and an onion address is published) -->
-  {% if tor_enabled and tor_running and onion_address %}
+  {% if tor_enabled && tor_running && !onion_address.is_empty() %}
   <p class="footer-onion">
     <a href="/server/help#tor-access" aria-label="Tor Support">🧅</a>
     <code class="onion-address">{onion_address}</code>
@@ -26480,7 +26476,7 @@ When the operator sets `custom_html` in `server.yml`, the server logs at startup
   {% endif %}
 
   <!-- I2P address (only shown if I2P is enabled, running, and a .b32.i2p address is published) -->
-  {% if i2p_enabled and i2p_running and i2p_address %}
+  {% if i2p_enabled && i2p_running && !i2p_address.is_empty() %}
   <p class="footer-i2p">
     <a href="/server/help#i2p-access" aria-label="I2P Support">🔗</a>
     <code class="i2p-address">{i2p_address}</code>
@@ -26610,7 +26606,7 @@ let message = cfg.privacy.get_consent_message();
 ```html
 <!-- Cookie Consent Banner - server-rendered (visible) whenever no valid cookie_consent cookie exists (we use cookies) -->
 <!-- {message} is dynamically selected based on server.privacy.data.sold -->
-{% if not has_consent_cookie %}
+{% if !has_consent_cookie %}
 <div id="cookie-consent" class="cookie-banner" data-sold="{data_sold}">
   <div class="cookie-banner-content">
     <span class="cookie-message">
@@ -26963,11 +26959,11 @@ pub fn tracking_script(consent: Option<&Consent>, cfg: &Config) -> String {
 ```html
 <!-- Only show tracking script if user consented -->
 {% if tracking_allowed %}
-  {{ tracking_script | safe }}
+  {{ tracking_script|safe }}
 {% endif %}
 
 <!-- Show placeholder for blocked embeds -->
-{% if not preferences_allowed %}
+{% if !preferences_allowed %}
   <div class="embed-blocked">
     <p>External content blocked due to cookie preferences.</p>
     <!-- Bound in app.js via data-action - inline handlers are blocked by the CSP -->
@@ -27136,7 +27132,7 @@ pub fn tracking_script(consent: Option<&Consent>, cfg: &Config) -> String {
     <p>{{ privacy.cookies.preferences.description }}</p>
 
     <h3>Analytics Cookies</h3>
-    {% if tracking.tracking_type %}
+    {% if !tracking.tracking_type.is_empty() %}
     <!-- Dynamic: get_analytics_description() returns description + appropriate suffix based on data.sold -->
     <p>{{ privacy.analytics_description }}</p>
     <p>We use <strong>{{ tracking.type_name }}</strong> for analytics.</p>
@@ -27153,20 +27149,20 @@ pub fn tracking_script(consent: Option<&Consent>, cfg: &Config) -> String {
   <!-- Data Collection - operator-defined content -->
   <section id="data-collection">
     <h2>Data We Collect</h2>
-    {{ privacy.content.data_collection | markdown_to_html | safe }}
+    {{ privacy.content.data_collection|markdown_to_html|safe }}
   </section>
 
   <!-- Data Usage - operator-defined content -->
   <!-- Dynamic: get_data_usage_content() returns data_usage or data_usage_if_sold based on data.sold -->
   <section id="data-usage">
     <h2>How We Use Your Data</h2>
-    {{ privacy.data_usage_content | markdown_to_html | safe }}
+    {{ privacy.data_usage_content|markdown_to_html|safe }}
   </section>
 
   <!-- Data Security - operator-defined content -->
   <section id="data-security">
     <h2>Data Security</h2>
-    {{ privacy.content.data_security | markdown_to_html | safe }}
+    {{ privacy.content.data_security|markdown_to_html|safe }}
   </section>
 
   <!-- Data Storage - from server.privacy.data -->
@@ -27203,7 +27199,7 @@ pub fn tracking_script(consent: Option<&Consent>, cfg: &Config) -> String {
   <!-- Third Parties - from server.privacy.third_party -->
   <section id="third-parties">
     <h2>Third-Party Services</h2>
-    {% if privacy.third_party.services %}
+    {% if !privacy.third_party.services.is_empty() %}
     <p>We use the following third-party services:</p>
     <table>
       <thead>
@@ -27512,7 +27508,7 @@ curl -H "Accept: application/xml" https://jokes.example.com/api/v1/joke</code></
 
 **Tor Access section (only shown if Tor is enabled, running, and an onion address is published):**
 ```html
-{% if tor_enabled and tor_running and onion_address %}
+{% if tor_enabled && tor_running && !onion_address.is_empty() %}
 <section id="tor-access" class="tor-access">
   <h3>Tor Access</h3>
   <p>This application is available as a Tor hidden service for enhanced privacy.</p>
@@ -27540,7 +27536,7 @@ curl -H "Accept: application/xml" https://jokes.example.com/api/v1/joke</code></
 
 **I2P Access section (only shown if I2P is enabled, running, and a `.b32.i2p` address is published):**
 ```html
-{% if i2p_enabled and i2p_running and i2p_address %}
+{% if i2p_enabled && i2p_running && !i2p_address.is_empty() %}
 <section id="i2p-access" class="i2p-access">
   <h3>I2P Access</h3>
   <p>This application is available as an I2P eepsite for enhanced privacy.</p>
@@ -39975,7 +39971,7 @@ pub async fn language_middleware(
 
 ```html
 <form method="get" action="">
-  <select name="lang" aria-label="{{ t(key="common.select_language", lang=lang) }}">
+  <select name="lang" aria-label="{{ t(lang, "common.select_language") }}">
     {% for l in available_languages %}
       <option value="{{ l.code }}" {% if l.code == lang %}selected{% endif %}>{{ l.native_name }}</option>
     {% endfor %}
@@ -41121,7 +41117,7 @@ server:
 
 ### Screen Reader Announcements
 
-**Announce dynamic changes without moving focus.** The live region is a static element in the base Tera template (like the toast container) — screen readers only announce changes to live regions that already exist in the DOM, and a static element needs no JS to be created. JS only swaps its text:
+**Announce dynamic changes without moving focus.** The live region is a static element in the base Askama template (like the toast container) — screen readers only announce changes to live regions that already exist in the DOM, and a static element needs no JS to be created. JS only swaps its text:
 
 ```html
 <div id="sr-announcer" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
@@ -47861,7 +47857,7 @@ make docker
 - [ ] 500 Internal Server Error - themed
 - [ ] 502 Bad Gateway - themed
 - [ ] 503 Service Unavailable - themed
-- [ ] Error pages extend `public.html.tera` layout
+- [ ] Error pages extend `public.html` layout
 - [ ] Error pages include navigation (user can navigate away)
 - [ ] No stack traces in production mode
 - [ ] No generic browser error pages - always render themed template
