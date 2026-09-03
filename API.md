@@ -14545,9 +14545,9 @@ pub fn extract_context_from_path(path: &str) -> Result<Context, anyhow::Error> {
 
 | Scenario | HTTP Status | Error |
 |----------|-------------|-------|
-| Invalid path format | 400 | `{"error": "invalid API path"}` |
-| Resource not found | 404 | `{"error": "resource not found"}` |
-| Rate limit exceeded | 429 | `{"error": "rate limit exceeded", "retry_after": 60}` |
+| Invalid path format | 400 | `{"ok": false, "error": "BAD_REQUEST", "message": "invalid API path"}` |
+| Resource not found | 404 | `{"ok": false, "error": "NOT_FOUND", "message": "resource not found"}` |
+| Rate limit exceeded | 429 | `{"ok": false, "error": "RATE_LIMITED", "message": "rate limit exceeded", "details": {"retry_after": 60}}` |
 
 ## Well-Known Files
 
@@ -27445,7 +27445,7 @@ on a Sunday counts as daily + weekly + monthly + yearly - uses highest priority)
 |-----------|----------------------|----------|
 | **CLI** | Interactive prompt | Prompts: `Enter backup password:` |
 | **WebUI** | Shows dialog | Password input dialog before restore |
-| **API** | Returns 400 error | `{"error": "password_required", "message": "Encrypted backup requires password"}` |
+| **API** | Returns 400 error | `{"ok": false, "error": "VALIDATION_FAILED", "message": "Encrypted backup requires password"}` |
 
 **CLI Restore:**
 
