@@ -24035,36 +24035,324 @@ Displays server information, software version, and operator contact.
 
 ### /server/privacy
 
-Renders the privacy policy. Content is loaded from configuration or a markdown file.
+**Privacy policy page - MUST display all privacy information from `server.privacy` config.**
 
-**Template variables:**
+**Required Sections (auto-generated from config):**
 
-| Variable | Type | Description |
-|---|---|---|
-| `privacy` | `PrivacyPolicy` | Structured privacy policy data |
-| `privacy.content.data_collection` | `String` | Markdown; rendered via `markdown_to_html` filter |
-| `privacy.data.sold` | `bool` | Whether data is sold to third parties |
-| `privacy.data.sharing` | `Vec<DataSharingEntry>` | Third-party sharing entries |
-| `last_updated` | `String` | ISO 8601 date |
+| Section | Source | Description |
+|---------|--------|-------------|
+| Summary | Dynamic | Key points: data stored on server, sold/not-sold (based on `data.sold`) |
+| Cookie Policy | `server.privacy.cookies` | What cookies are used and why |
+| Data Collection | `server.privacy.content.data_collection` | What data is collected |
+| Data Usage | `get_data_usage_content()` | Dynamic: returns `data_usage` or `data_usage_if_sold` |
+| Data Security | `server.privacy.content.data_security` | How data is protected |
+| Data Storage | `server.privacy.sharing` | Where data is stored, third-party conditions |
+| Data Retention | `server.privacy.retention` | How long data is kept |
+| Third Parties | `server.privacy.third_party` | Services that receive data (if any) |
+| Your Rights | `server.privacy.retention` | Export/deletion options |
+| **CCPA Opt-Out** | Conditional | **Only shown when `data.sold = true`** - Do Not Sell toggle |
+| Manage Preferences | Link | Button to open cookie preferences modal |
+| Contact | `/server/contact` link | How to contact for privacy concerns |
+
+**Page Layout:**
 
 ```html
-{% if privacy.data.sold %}
-<div class="key-point key-point-warning">
-  <strong>Your data may be sold.</strong>
-</div>
-{% else %}
-<div class="key-point">
-  <strong>Your data is never sold.</strong>
-</div>
-{% endif %}
-{% for sharing in privacy.data.sharing %}
-<li>
-  <strong>{{ sharing.condition | title }}:</strong>
-  {{ sharing.when }} — {{ sharing.data }}
-</li>
-{% endfor %}
-{{ privacy.content.data_collection | markdown_to_html | safe }}
+<article class="privacy-policy">
+  <h1>Privacy Policy</h1>
+  <p class="last-updated">Last updated: {build_datetime}</p>
+
+  <!-- Summary - Key Points (always shown first) -->
+  <!-- Dynamic: Second key-point changes based on server.privacy.data.sold -->
+  <section id="summary" class="privacy-summary">
+    <h2>Summary</h2>
+    <div class="key-points">
+      <div class="key-point">
+        <span class="icon">🔒</span>
+        <strong>Your data is stored on our servers</strong>
+        <p>All personal data is stored securely on our infrastructure.</p>
+      </div>
+      {% if privacy.data.sold %}
+      <div class="key-point key-point-warning">
+        <span class="icon">⚠️</span>
+        <strong>Your data may be sold</strong>
+        <p>Your personal information may be shared with or sold to third parties. <a href="#ccpa-opt-out">Opt out of data sales</a>.</p>
+      </div>
+      {% else %}
+      <div class="key-point">
+        <span class="icon">🚫</span>
+        <strong>We never sell your data</strong>
+        <p>Your personal information is never sold to third parties.</p>
+      </div>
+      {% endif %}
+      <div class="key-point">
+        <span class="icon">🎛️</span>
+        <strong>You control your data</strong>
+        <p>Export or delete your data anytime from account settings.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cookie Policy Section - from server.privacy.cookies -->
+  <section id="cookies">
+    <h2>Cookie Policy</h2>
+    <p>We use cookies to ensure our website functions properly and to improve your experience.</p>
+
+    <h3>Essential Cookies</h3>
+    <p>{{ privacy.cookies.essential.description }}</p>
+
+    <h3>Preference Cookies</h3>
+    <p>{{ privacy.cookies.preferences.description }}</p>
+
+    <h3>Analytics Cookies</h3>
+    {% if !tracking.tracking_type.is_empty() %}
+    <!-- Dynamic: get_analytics_description() returns description + appropriate suffix based on data.sold -->
+    <p>{{ privacy.get_analytics_description() }}</p>
+    <p>We use <strong>{{ tracking.type_name }}</strong> for analytics.</p>
+    {% else %}
+    <p>We do not use analytics tracking on this site.</p>
+    {% endif %}
+
+    <div class="manage-cookies">
+      <!-- Bound in app.js via data-action - inline handlers are blocked by the CSP -->
+      <button data-action="cookie-preferences">Manage Cookie Preferences</button>
+    </div>
+  </section>
+
+  <!-- Data Collection - operator-defined content -->
+  <section id="data-collection">
+    <h2>Data We Collect</h2>
+    {{ privacy.content.data_collection|markdown_to_html|safe }}
+  </section>
+
+  <!-- Data Usage - operator-defined content -->
+  <!-- Dynamic: get_data_usage_content() returns data_usage or data_usage_if_sold based on data.sold -->
+  <section id="data-usage">
+    <h2>How We Use Your Data</h2>
+    {{ privacy.get_data_usage_content()|markdown_to_html|safe }}
+  </section>
+
+  <!-- Data Security - operator-defined content -->
+  <section id="data-security">
+    <h2>Data Security</h2>
+    {{ privacy.content.data_security|markdown_to_html|safe }}
+  </section>
+
+  <!-- Data Storage - from server.privacy.data -->
+  <section id="data-storage">
+    <h2>Data Storage & Third-Party Sharing</h2>
+    <p><strong>All your data is stored on our servers.</strong> We do not use third-party cloud storage for your personal data.</p>
+
+    <h3>When Data May Be Shared</h3>
+    <p>Your data is only sent to third parties in these specific situations:</p>
+    <ul>
+      {% for entry in privacy.data.sharing %}
+      <li><strong>{{ entry.condition|humanize }}:</strong> {{ entry.when }} - {{ entry.data }}</li>
+      {% endfor %}
+    </ul>
+
+    <p><strong>In all cases:</strong></p>
+    <ul>
+      <li>Data is only shared when necessary for the stated purpose</li>
+      <li>You can opt out of analytics by declining cookies</li>
+      {% if privacy.data.sold %}
+      <li>Your data <strong>may be sold</strong> to third parties. See <a href="#ccpa-opt-out">CCPA opt-out</a> below.</li>
+      {% else %}
+      <li>Your data is <strong>never sold</strong></li>
+      {% endif %}
+    </ul>
+  </section>
+
+  <!-- Data Retention - from server.privacy.retention -->
+  <section id="data-retention">
+    <h2>Data Retention</h2>
+    <p>{{ privacy.retention.period }}</p>
+  </section>
+
+  <!-- Third Parties - from server.privacy.third_party -->
+  <section id="third-parties">
+    <h2>Third-Party Services</h2>
+    {% if !privacy.third_party.services.is_empty() %}
+    <p>We use the following third-party services:</p>
+    <table>
+      <thead>
+        <tr><th>Service</th><th>Purpose</th><th>Data Sent</th><th>Privacy Policy</th></tr>
+      </thead>
+      <tbody>
+        {% for svc in privacy.third_party.services %}
+        <tr>
+          <td>{{ svc.name }}</td>
+          <td>{{ svc.purpose }}</td>
+          <td>{{ svc.data_sent }}</td>
+          <td><a href="{{ svc.policy_url }}" target="_blank" rel="noopener">View Policy</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p><strong>We do not currently use any third-party services that receive your data.</strong></p>
+    <p>If analytics tracking is enabled and you consent, anonymized usage data may be sent to the configured analytics provider. Check the Cookie Policy section above for details.</p>
+    {% endif %}
+  </section>
+
+  <!-- Your Rights - from server.privacy.retention -->
+  <section id="your-rights">
+    <h2>Your Rights</h2>
+    <p>You have the following rights regarding your data:</p>
+    <ul>
+      <li><strong>Access:</strong> View all data we have about you in your account settings.</li>
+      {% if privacy.retention.export_available %}
+      <li><strong>Export:</strong> Download a copy of all your data in a portable format.</li>
+      {% endif %}
+      {% if privacy.retention.deletion_available %}
+      <li><strong>Deletion:</strong> Delete your account and all associated data permanently.</li>
+      {% endif %}
+      <li><strong>Correction:</strong> Update or correct your personal information anytime.</li>
+      <!-- Bound in app.js via data-action - inline handlers are blocked by the CSP -->
+      <li><strong>Cookie Control:</strong> <button type="button" class="link-button" data-action="cookie-preferences">Manage your cookie preferences</button></li>
+    </ul>
+  </section>
+
+  <!-- CCPA "Do Not Sell" - ONLY shown when server.privacy.data.sold = true -->
+  {% if privacy.data.sold %}
+  <section id="ccpa-opt-out" class="ccpa-section">
+    <h2>California Privacy Rights (CCPA)</h2>
+    <p>Under the California Consumer Privacy Act (CCPA), California residents have the right to:</p>
+    <ul>
+      <li><strong>Know</strong> what personal information is collected and how it's used</li>
+      <li><strong>Request deletion</strong> of personal information</li>
+      <li><strong>Opt out</strong> of the sale of personal information</li>
+      <li><strong>Non-discrimination</strong> for exercising your privacy rights</li>
+    </ul>
+
+    <div class="ccpa-opt-out-box">
+      <h3>Do Not Sell My Personal Information</h3>
+      <p>Click the button below to opt out of the sale of your personal information.</p>
+      {% if ccpa_opted_out %}
+      <div class="ccpa-status opted-out">
+        <span class="status-icon">✓</span>
+        <span>You have opted out of data sales.</span>
+      </div>
+      <!-- POST forms work with zero JS - the server sets/clears the ccpa_opt_out cookie and redirects back; app.js intercepts to skip the reload -->
+      <form method="post" action="/consent/ccpa">
+        <input type="hidden" name="opt_out" value="false">
+        <button type="submit" class="btn-secondary">Opt Back In</button>
+      </form>
+      {% else %}
+      <form method="post" action="/consent/ccpa">
+        <input type="hidden" name="opt_out" value="true">
+        <button type="submit" class="btn-primary btn-ccpa-opt-out">Do Not Sell My Personal Information</button>
+      </form>
+      {% endif %}
+    </div>
+
+    <p class="ccpa-note">Note: This opt-out applies to the sale of personal information. Essential cookies and site functionality will continue to work normally.</p>
+  </section>
+  {% endif %}
+
+  <!-- Contact -->
+  <section id="contact">
+    <h2>Contact Us</h2>
+    <p>For privacy-related inquiries, please <a href="/server/contact">contact us</a>.</p>
+  </section>
+</article>
 ```
+
+**API Endpoint (`/api/{api_version}/server/privacy`):**
+
+```json
+{
+  "ok": true,
+  "data": {
+    "summary": {
+      "data_stored_on_server": true,
+      "data_sold": false,
+      "user_control": true
+    },
+    "cookies": {
+      "essential": {
+        "enabled": true,
+        "description": "Required for the site to function. Includes security tokens (CSRF) and site preferences."
+      },
+      "preferences": {
+        "enabled": true,
+        "description": "Remember your settings such as theme (dark/light), language, and UI preferences."
+      },
+      "analytics": {
+        "enabled": true,
+        "description": "Help us understand how visitors use our site. Analytics data is anonymized and never sold."
+      }
+    },
+    "data": {
+      "sold": false,
+      "stored_on_server": true,
+      "sharing": [
+        {
+          "condition": "analytics",
+          "when": "Tracking configured AND user consents",
+          "data": "Anonymized: page views, browser type, country"
+        },
+        {
+          "condition": "email",
+          "when": "SMTP configured for sending emails",
+          "data": "Email address, message content"
+        },
+        {
+          "condition": "user_initiated",
+          "when": "User explicitly shares content",
+          "data": "Whatever user chooses to share"
+        }
+      ]
+    },
+    "tracking": {
+      "enabled": false,
+      "type": "",
+      "type_name": ""
+    },
+    "retention": {
+      "period": "Account data is retained while your account is active. Upon account deletion, all personal data is permanently deleted within 30 days.",
+      "export_available": true,
+      "deletion_available": true
+    },
+    "third_party": {
+      "services": []
+    },
+    "ccpa": {
+      "applicable": false,
+      "opt_out_url": "/server/privacy#ccpa-opt-out",
+      "user_opted_out": false
+    },
+    "content": {
+      "consent_message": "...",
+      "data_usage": "..."
+    }
+  }
+}
+```
+
+**Dynamic Fields:**
+- `summary.data_sold`: Reflects `server.privacy.data.sold`
+- `cookies.analytics.description`: From `get_analytics_description()` (includes suffix)
+- `content.consent_message`: From `get_consent_message()` (returns sold/not-sold message)
+- `content.data_usage`: From `get_data_usage_content()` (returns sold/not-sold content)
+- `ccpa.applicable`: `true` only when `data.sold = true` (the `ccpa` object is always included; the CCPA opt-out UI is only shown when `applicable` is `true`)
+- `ccpa.user_opted_out`: From the `ccpa_opt_out` cookie check
+
+**Note:** The `tracking` and `third_party.services` fields are populated based on `server.tracking` config. If no tracking is configured, they remain empty.
+
+**Privacy Configuration (config file):**
+
+| Section | Config Keys |
+|---------|-------------|
+| **Data Policies** | `server.privacy.data.sold` (default: false), `server.privacy.data.stored_on_server`, `server.privacy.data.sharing[]` |
+| **Consent Banner** | `server.privacy.consent.message`, `server.privacy.consent.message_if_sold`, `server.privacy.consent.policy.url`, `server.privacy.consent.policy.text`, `server.privacy.consent.buttons.decline`, `server.privacy.consent.buttons.accept` |
+| **Cookie Descriptions** | `server.privacy.cookies.essential`, `server.privacy.cookies.preferences`, `server.privacy.cookies.analytics` |
+| **Data Collection** | `server.privacy.content.data_collection` (Markdown) |
+| **Data Usage** | `server.privacy.content.data_usage`, `server.privacy.content.data_usage_if_sold` (Markdown) |
+| **Data Security** | `server.privacy.content.data_security` (Markdown) |
+| **Data Retention** | `server.privacy.retention.period`, `server.privacy.retention.export_available`, `server.privacy.retention.deletion_available` |
+| **Third Parties** | `server.privacy.third_party.services[]` (name, purpose, data_sent, policy_url) |
+
+**Default content provided, fully customizable via config file.**
 
 ### /server/contact
 

@@ -1,7 +1,13 @@
 # TODO
 
-- [ ] API.md: add the `/api/{api_version}/server/privacy` response example
-  block ("API Endpoint" JSON + Dynamic Fields notes) present in go/API.md
-  and in this repo's SERVER.md/HYBRID.md — rust/API.md lists the route but
-  has no response example; use the enveloped `{ "ok": true, "data": ... }`
-  form from the sibling files
+- [ ] API.md: reconcile remaining structural drift against go/API.md
+  (pair should be identical except language specifics). Heading-level
+  diff shows go-only section groups (JSON/Text Response Format, Smart
+  Content Detection, Toast vs Modal, Banner, Consent Logic, Branding /
+  Announcements / CORS / CSRF config-file detail sections) and
+  rust-only ones ("How to Read This Large File" appendix, Circuit-ID
+  Export & PROXY-Protocol Backend Listener, CSS Font Family Variables),
+  plus PART-numbering differences ("PART 16" vs "PART 16, 17",
+  Step 3 "PARTS 26-27" vs "27-28") and "All 8 platforms" vs "All 7
+  platforms". Direction per divergence needs user decision; likely
+  also affects the SERVER.md/HYBRID.md pairs
