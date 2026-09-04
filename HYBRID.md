@@ -39901,16 +39901,18 @@ LANG=es_ES.UTF-8 {project_name}-cli --help
 2. Translate ALL keys (no key may be omitted)
 3. Add language code to `config.server.i18n.available_languages`
 4. Language automatically appears in the language selector (WebUI) and `--lang` flag (CLI)
-5. Run `make i18n-validate` to verify all keys are present
+5. Run `make test` (or the raw Docker command below) to verify all keys are present
 6. Rebuild ALL binaries — server and CLI both get the new language via `rust-embed`
 
 ### Build-Time Validation
 
+No standalone `i18n-validate` binary — an extra `[[bin]]` target adds Cargo.toml
+surface and a build step no generated project actually maintains. Validation
+instead lives in `src/common/i18n/` as ordinary `#[test]` functions, run like
+every other test inside Docker:
+
 ```bash
-# Makefile target
-i18n-validate:
-	@echo "Validating translation files..."
-	@cargo run --bin i18n-validate -- src/common/i18n/locales/
+$RUST_DOCKER casjaysdev/rust:latest cargo test -p {project_name} key_consistency locales_fs
 
 # Validates:
 # - All language files have identical key sets to en.json
@@ -39919,6 +39921,9 @@ i18n-validate:
 # - All plural categories required by the language are present
 # - No orphaned keys (keys in other languages not in en.json)
 ```
+
+`make test` already runs the full `cargo test` suite, including this module —
+no separate Makefile target is needed.
 
 ### RTL (Right-to-Left) Support
 
@@ -44185,7 +44190,7 @@ All gates run inside the project Docker image — never on the host.
 - [ ] `cargo doc --workspace --no-deps` (Docker-wrapped)
 - [ ] `cargo deny check licenses advisories bans sources` passes (Docker-wrapped)
 - [ ] `cargo about generate` output matches the generated region of `LICENSE.md` (Docker-wrapped diff check)
-- [ ] `make i18n-validate` passes with zero errors (if i18n is in scope — PART 26)
+- [ ] `make test` passes with zero i18n validation errors (if i18n is in scope — PART 26)
 - [ ] Web frontend assets are embedded in the release binary — verified by running the release build with the source `assets/`/`src/server/frontend/` tree removed or renamed and confirming the frontend still renders
 - [ ] Browser E2E suite (PART 23) exists and covers every IDEA.md feature with project-scoped scenarios across all three tiers (SSR, no-JS, full-JS) — run on demand for beta testing, never part of the commit gate
 - [ ] New behavior includes tests where practical

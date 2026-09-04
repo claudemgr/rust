@@ -50584,16 +50584,18 @@ LANG=es_ES.UTF-8 {project_name}-cli --help
 2. Translate ALL keys (no key may be omitted)
 3. Add language code to `config.server.i18n.available_languages`
 4. Language automatically appears in the language selector (WebUI) and `--lang` flag (CLI/agent)
-5. Run `cargo run --bin i18n-validate -- src/common/i18n/locales/` to verify all keys are present
+5. Run `make test` (or the raw Docker command below) to verify all keys are present
 6. Rebuild ALL binaries — server, CLI, and agent all get the new language via `rust-embed`
 
 ### Build-Time Validation
 
+No standalone `i18n-validate` binary — an extra `[[bin]]` target adds Cargo.toml
+surface and a build step no generated project actually maintains. Validation
+instead lives in `src/common/i18n/` as ordinary `#[test]` functions, run like
+every other test inside Docker:
+
 ```bash
-# Makefile target
-i18n-validate:
-	@echo "Validating translation files..."
-	@cargo run --bin i18n-validate -- src/common/i18n/locales/
+$RUST_DOCKER casjaysdev/rust:latest cargo test -p {project_name} key_consistency locales_fs
 
 # Validates:
 # - All language files have identical key sets to en.json
@@ -50602,6 +50604,9 @@ i18n-validate:
 # - All plural categories required by the language are present
 # - No orphaned keys (keys in other languages not in en.json)
 ```
+
+`make test` already runs the full `cargo test` suite, including this module —
+no separate Makefile target is needed.
 
 ### RTL (Right-to-Left) Support
 
@@ -66402,7 +66407,7 @@ make docker
 - [ ] All locale files have identical key sets to `en.json` (no missing, no extra)
 - [ ] All interpolation variables (`{var}`) match across all locale files
 - [ ] No empty string values in any locale file
-- [ ] `make i18n-validate` passes with zero errors
+- [ ] `make test` passes with zero i18n validation errors
 - [ ] `meta.language`, `meta.name`, `meta.native_name`, `meta.direction` correct in each file
 
 ### Binary Parity
