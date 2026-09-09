@@ -5984,7 +5984,10 @@ opt-level = "z"
 lto = true
 codegen-units = 1
 strip = true
-panic = "abort"
+# server MUST use unwind (not abort) so catch_unwind can isolate
+# per-request and per-task panics — see Scheduler > Task Execution
+# Panic Safety and Error Pages (MUST Match Theme)
+panic = "unwind"
 ```
 
 **Example crate doc comment:**
@@ -6906,7 +6909,10 @@ opt-level = "z"
 lto = true
 codegen-units = 1
 strip = true
-panic = "abort"
+# server MUST use unwind (not abort) so catch_unwind can isolate
+# per-request and per-task panics — see Scheduler > Task Execution
+# Panic Safety and Error Pages (MUST Match Theme)
+panic = "unwind"
 
 [dependencies]
 # Database drivers
@@ -34664,6 +34670,20 @@ update_installed = true
 | **Automatic Recovery** | Missed tasks run on startup if within catch-up window |
 | **Cluster Aware** | Only one node runs each task in cluster mode |
 | **No External Dependencies** | Built-in, no cron or external scheduler needed |
+
+### Task Execution Panic Safety (MUST)
+
+**A single scheduled task MUST NEVER be able to crash the scheduler or the server process.**
+
+Every task run MUST execute inside its own `catch_unwind` boundary, isolated from the scheduler's own control loop and from every other task:
+
+| Requirement | Description |
+|-------------|-------------|
+| **Per-task catch_unwind** | Each task invocation runs behind `std::panic::catch_unwind` (or `AssertUnwindSafe` + `catch_unwind` for non-`UnwindSafe` futures) that catches any panic raised by that task's code |
+| **Scheduler loop survives** | A panicking task MUST be logged and marked `failed` for that run — the scheduler loop itself MUST keep running and MUST still fire the task's next scheduled occurrence |
+| **No cross-task impact** | A panic in one task MUST NOT skip, delay, or corrupt the state of any other task |
+| **Same guarantee as HTTP handlers** | This is the same non-negotiable guarantee as the per-request panic/`catch_unwind` requirement in "Error Pages (MUST Match Theme)" — a background job is not exempt just because no browser is watching it |
+| **Requires `panic = "unwind"`** | `catch_unwind` cannot intercept a panic when the release profile uses `panic = "abort"` — this template sets `panic = "unwind"` in `[profile.release]` for exactly this reason, overriding the general Cargo.toml release-profile default |
 
 ## NEVER Use External Schedulers
 
@@ -65468,7 +65488,7 @@ make docker
 - [ ] Creates directories on first run
 - [ ] Sets permissions based on run context
 - [ ] Runs as root or user correctly
-- [ ] `Cargo.toml` contains `[profile.release]` with `opt-level = "z"`, `lto = true`, `codegen-units = 1`, `strip = true`, `panic = "abort"`
+- [ ] `Cargo.toml` contains `[profile.release]` with `opt-level = "z"`, `lto = true`, `codegen-units = 1`, `strip = true`, `panic = "unwind"` (not `"abort"` — required so `catch_unwind` can isolate per-request and per-task panics)
 
 **PART 8: Server Binary CLI**
 - [ ] `--help` - Shows help (no privileges needed)

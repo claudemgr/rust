@@ -1978,7 +1978,10 @@ opt-level = "z"
 lto = true
 codegen-units = 1
 strip = true
-panic = "abort"
+# server MUST use unwind (not abort) so catch_unwind can isolate
+# per-request and per-task panics — see Scheduler > Task Execution
+# Panic Safety and Error Pages (MUST Match Theme)
+panic = "unwind"
 ```
 
 When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
@@ -5130,7 +5133,10 @@ opt-level     = "z"
 lto           = true
 codegen-units = 1
 strip         = true
-panic         = "abort"
+# server MUST use unwind (not abort) so catch_unwind can isolate
+# per-request and per-task panics — see Scheduler > Task Execution
+# Panic Safety and Error Pages (MUST Match Theme)
+panic         = "unwind"
 ```
 
 - Required `.cargo/config.toml` snippets for static linking (Bootstrap Checklist enforces presence):
@@ -28909,6 +28915,20 @@ server:
 | **Automatic Recovery** | Missed tasks run on startup if within catch-up window |
 | **No External Dependencies** | Built-in, no cron or external scheduler needed |
 
+### Task Execution Panic Safety (MUST)
+
+**A single scheduled task MUST NEVER be able to crash the scheduler or the server process.**
+
+Every task run MUST execute inside its own `catch_unwind` boundary, isolated from the scheduler's own control loop and from every other task:
+
+| Requirement | Description |
+|-------------|-------------|
+| **Per-task catch_unwind** | Each task invocation runs behind `std::panic::catch_unwind` (or `AssertUnwindSafe` + `catch_unwind` for non-`UnwindSafe` futures) that catches any panic raised by that task's code |
+| **Scheduler loop survives** | A panicking task MUST be logged and marked `failed` for that run — the scheduler loop itself MUST keep running and MUST still fire the task's next scheduled occurrence |
+| **No cross-task impact** | A panic in one task MUST NOT skip, delay, or corrupt the state of any other task |
+| **Same guarantee as HTTP handlers** | This is the same non-negotiable guarantee as the per-request panic/`catch_unwind` requirement in "Error Pages (MUST Match Theme)" — a background job is not exempt just because no browser is watching it |
+| **Requires `panic = "unwind"`** | `catch_unwind` cannot intercept a panic when the release profile uses `panic = "abort"` — this template sets `panic = "unwind"` in `[profile.release]` for exactly this reason, overriding the general Cargo.toml release-profile default |
+
 ## NEVER Use External Schedulers
 
 **The built-in scheduler handles ALL scheduled tasks. NEVER use external schedulers.**
@@ -44140,7 +44160,7 @@ See **PART 8 → "Flag-to-Config Save Rules"** — flags only update `cli.yml` w
 - [ ] `ci.yml` and `release.yml` use `container: image: casjaysdev/rust:latest` — no `ensure-build-image` pre-flight, no `build-toolchain.yml`
 - [ ] If IDEA.md documents a `*-sys` exception requiring system dev libs at build time, only the minimum set needed by that crate is added to the image — by default the image carries no GUI-stack C dev libs (PART 0 → "Rust-Only Application")
 - [ ] `rust-toolchain.toml` pins the toolchain; `.cargo/config.toml` pins static-link rustflags
-- [ ] `Cargo.toml` release profile uses `opt-level = "z"`, `lto = true`, `codegen-units = 1`, `strip = true`, `panic = "abort"`
+- [ ] `Cargo.toml` release profile uses `opt-level = "z"`, `lto = true`, `codegen-units = 1`, `strip = true`, `panic = "unwind"` (not `"abort"` — required so `catch_unwind` can isolate per-request and per-task panics)
 - [ ] Repo has `assets/` (build-time source) and a Rust embedding module (`include_bytes!` / `rust-embed`) wiring it into the binary
 - [ ] Web frontend templates, static CSS/JS, and locale files live under `src/` and are embedded via `rust-embed` / `include_str!` — no on-disk asset directory shipped alongside the binary
 - [ ] Database schema/migration files (if any) are embedded in the binary — no separate `.sql` files required at runtime
