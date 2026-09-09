@@ -27484,6 +27484,63 @@ src/server/templates/
 - NO generic browser error pages - always render themed template
 - **Every request MUST terminate in a rendered response — the error path itself must never fail the request.** A panic/`catch_unwind` guard and a template-render failure MUST both fall back to a minimal, hardcoded error response (correct status code, short body, honoring content negotiation — HTML for browsers, JSON for API clients) instead of a blank body, a dropped connection, or a leaked stack trace. The failure handler must never be the thing that breaks the site — the backend mirror of the service-worker guaranteed-`Response` rule.
 
+**Panic-safety implementation (recover middleware):**
+
+```rust
+use axum::{
+    extract::Request,
+    http::{header, StatusCode},
+    middleware::Next,
+    response::{IntoResponse, Response},
+};
+
+// recover_middleware guarantees every request terminates in a response,
+// even when a handler panics. Wrap the router with this as the outermost
+// layer, before routing, logging, or any other layer that could itself
+// panic. Requires `panic = "unwind"` in [profile.release] — see Scheduler
+// > Task Execution Panic Safety. Running the handler inside a spawned task
+// isolates its panic as a catchable `JoinError` instead of unwinding into
+// the caller — the standard, executor-safe way to recover from a panic in
+// an async handler (a bare `catch_unwind` around a `.await` is not sound
+// in general, since the task may be polled by a different thread).
+pub async fn recover_middleware(request: Request, next: Next) -> Response {
+    let wants_json = request
+        .headers()
+        .get(header::ACCEPT)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|accept| accept.contains("application/json"));
+
+    match tokio::spawn(next.run(request)).await {
+        Ok(response) => response,
+        Err(join_err) => {
+            log::error!("panic recovered: {join_err}");
+            render_fallback_error(StatusCode::INTERNAL_SERVER_ERROR, wants_json)
+        }
+    }
+}
+
+// render_fallback_error is the last-resort error response used when the
+// themed error template itself fails to render, or a panic is recovered
+// here. It MUST NOT depend on the template engine, theme system, or any
+// state that could itself panic or fail — plain strings only.
+fn render_fallback_error(status: StatusCode, wants_json: bool) -> Response {
+    if wants_json {
+        return (
+            status,
+            [(header::CONTENT_TYPE, "application/json")],
+            format!(r#"{{"error":"{}","status":{}}}"#, status.canonical_reason().unwrap_or(""), status.as_u16()),
+        )
+            .into_response();
+    }
+    (
+        status,
+        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
+        format!("<html><body><h1>{} {}</h1></body></html>", status.as_u16(), status.canonical_reason().unwrap_or("")),
+    )
+        .into_response()
+}
+```
+
 **Error page structure (askama):**
 ```html
 {% extends "layouts/public.html" %}
