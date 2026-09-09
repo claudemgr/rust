@@ -1582,6 +1582,27 @@ docker run --rm \
 - Panic/backtrace behavior must be intentional and documented
 - GUI/TUI debug tooling must not leak into normal production UX by default
 
+**Standard exit codes (MUST):** `0` success · `1` general/runtime error, returned via `fn main() -> std::process::ExitCode` (or an explicit `std::process::exit(1)`) · `2` usage error (bad flags/args — matches `clap`'s own default). `--help`/`--version` always exit `0`. Never invent additional exit codes without documenting them in `--help` output.
+
+**Panic messaging under `panic = "abort"` (MUST):** this template's release profile sets `panic = "abort"` (see Build Rules) — correct for a short-lived CLI/GUI/TUI binary, but it means a panic terminates the process immediately via `abort()` and CANNOT be caught/continued with `catch_unwind`. To still avoid a raw Rust backtrace reaching a normal user, install a custom panic hook at the top of `main()` that prints a clean, user-facing message before the unavoidable abort happens:
+
+```rust
+fn main() -> std::process::ExitCode {
+    std::panic::set_hook(Box::new(|info| {
+        if debug_mode() {
+            eprintln!("panic: {info}\n\n{}", std::backtrace::Backtrace::force_capture());
+        } else {
+            eprintln!("error: {info}");
+        }
+    }));
+    run()
+}
+```
+
+Note the process still terminates via the platform's abort signal (exit code `134`/`SIGABRT` on Unix, not a controlled `1`) once the hook returns — the hook only controls what's printed, not the final exit code. Do not rely on this path for expected/recoverable errors; return `Result` from fallible functions and map errors to `ExitCode::from(1)` in `main()` instead of panicking for anything the program can reasonably anticipate.
+
+**Signal handling outside daemon mode (MUST):** a plain CLI/GUI/TUI binary (i.e., not running in PART 14's RFC daemon mode) MUST still install a `Ctrl+C`/`SIGTERM` handler (via `tokio::signal::ctrl_c()` for async binaries, or the `ctrlc` crate for sync ones) around its main operation so an interrupt during a long-running command (a download, a build, an IPC session) triggers cleanup (temp files, open IPC sockets/handles, partial output) before exiting `1` — never leave the process to terminate mid-write via the platform default. Daemon mode's own richer signal contract (SIGHUP reload, graceful drain) is defined separately in PART 14 and takes precedence when that mode is active.
+
 ## Directory Naming
 
 **Plural** — all directories use plural names (`handlers/`, `models/`, `routes/`, `utils/`). Rust module directories follow the same rule — `src/handlers/mod.rs` not `src/handler/mod.rs`. Tooling dirs are also plural (`scripts/`, `tests/`, `completions/`).

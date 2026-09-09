@@ -32345,6 +32345,38 @@ docker run --rm \
 - Avoid unnecessary allocations and duplicate state copies in hot paths
 - **MUST sustain at least 500,000 concurrently OPEN connections with no degradation** (no dropped connections, unbounded latency growth, crashes, or OOM) via async I/O on tokio's reactor, bounded task pools, backpressure, and idle-connection reaping — this is an idle-capable target (keep-alive/long-poll/websocket connections mostly idle between requests), NOT 500,000 requests executing in parallel, which stays CPU-bound and must go through the same capped task pool; scale horizontally behind a load balancer once a single instance hits its OS file-descriptor or hardware ceiling — this is why the security and resource-safety rules in this spec (bounded queues, closed handles, capped async tasks, `catch_unwind` boundaries) are non-negotiable
 
+**Concrete concurrency cap (required, not optional prose):** the "capped async task pool" above MUST be a real, configured bound — never an unbounded `tokio::spawn` per request/connection.
+
+```yaml
+performance:
+  # Concurrently EXECUTING (CPU-bound) tasks, independent of open-connection count.
+  # Default formula: num_cpus * 250. Override only with a measured reason in IDEA.md.
+  max_concurrent_tasks: 2000
+  # Bounded mpsc channel depth feeding the task pool; a full queue applies
+  # backpressure (503 + Retry-After) rather than growing unbounded.
+  task_queue_depth: 10000
+```
+
+```rust
+pub struct TaskPool {
+    semaphore: std::sync::Arc<tokio::sync::Semaphore>,
+}
+
+impl TaskPool {
+    pub fn new(cfg: &config::Performance) -> Self {
+        Self { semaphore: std::sync::Arc::new(tokio::sync::Semaphore::new(cfg.max_concurrent_tasks)) }
+    }
+
+    // Acquire a permit before spawning CPU-bound work; reject with 503 if the
+    // bounded queue (task_queue_depth) is also full rather than blocking forever.
+    pub async fn acquire(&self) -> Result<tokio::sync::OwnedSemaphorePermit, ServerError> {
+        self.semaphore.clone().try_acquire_owned().map_err(|_| ServerError::Overloaded)
+    }
+}
+```
+
+`max_concurrent_tasks` bounds CPU-bound work; it is deliberately independent of and much smaller than the 500,000 open-connection target, since most open connections are idle and never hold a permit.
+
 > Coverage thresholds and `cargo test`/`cargo tarpaulin` mechanics above are the single source for Rust unit-test coverage policy — the "Test Coverage" subsection below (endpoint/integration coverage) extends it to route coverage rather than restating it.
 
 ## Host System Safety Applies to All Testing & Debugging

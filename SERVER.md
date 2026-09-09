@@ -552,6 +552,24 @@ let primary_ip = "192.168.1.50".parse::<std::net::IpAddr>().unwrap();
 - Scale horizontally behind a load balancer once a single instance's OS file-descriptor limit or hardware ceiling is reached — the code itself must not be the bottleneck
 - This is why the security and resource-safety rules elsewhere in this spec are non-negotiable: bounded queues, closed file handles/sockets, capped async tasks, `catch_unwind` boundaries, and leak-free code are what keeps a fault that's harmless at 100 connections from becoming an outage at 500,000
 
+**Concrete concurrency cap (required, not optional prose):** the "capped task pool" above MUST be a real, configured admission-control mechanism — never an unbounded `tokio::spawn` per request/connection, and distinct from the worker-thread-count example below (thread count sizes the executor; this caps in-flight requests):
+
+```yaml
+server:
+  # Concurrently EXECUTING (CPU-bound) requests, independent of open-connection count.
+  # Default formula: num_cpus * 250. Override only with a measured reason in IDEA.md.
+  max_concurrent_requests: 2000
+```
+
+```rust
+// Gate request handling with a bounded concurrency-limit layer; a request
+// arriving once the limit is saturated is queued by tower, then sheds load
+// (503 + Retry-After) rather than growing the in-flight count unbounded.
+let app = Router::new()
+    .route("/", get(handler))
+    .layer(tower::limit::ConcurrencyLimitLayer::new(cfg.server.max_concurrent_requests));
+```
+
 **Example scaling:**
 ```rust
 // Worker pool scales to available CPUs
@@ -30618,7 +30636,7 @@ curl -H "Accept: application/xml" https://jokes.example.com/api/v1/joke</code></
     <p>No, the API is completely free and requires no authentication.</p>
 
     <h3>Is there a rate limit?</h3>
-    <p>Yes, 100 requests per minute per IP address.</p>
+    <p>Yes, 120 requests per minute per IP address.</p>
 
     <h3>Can I submit jokes?</h3>
     <p>Yes, use the <code>POST /api/v1/joke/submit</code> endpoint.</p>
@@ -32170,7 +32188,7 @@ Admin Panel Header:
 
 | Setting | Control | Default | Restart | Description |
 |---------|---------|---------|---------|-------------|
-| `session.timeout` | Duration | `24 hours` | No | Session expiry |
+| `session.timeout` | Duration | `24 hours` | No | Session expiry — writes `idle_timeout` for both admin and user sessions; each role's `max_age` is fixed and not exposed here |
 | `session.extend_on_activity` | Toggle | On | No | Extend on activity |
 | `mfa.enabled` | Toggle | Off | No | Require MFA for admins |
 | `mfa.methods` | Checkbox group | TOTP | No | Allowed MFA methods |

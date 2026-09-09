@@ -4400,8 +4400,8 @@ sqlx::query(&format!("SELECT * FROM users WHERE email = '{}'", email))
 | Endpoint Type | Default Limit | Default Window | Response |
 |---------------|---------------|----------------|----------|
 | **Failed auth attempts (invalid token)** | 5 | 15 minutes | 429 + lockout |
-| **API (authenticated)** | Configurable | 1 minute | 429 + Retry-After header |
-| **API (unauthenticated)** | Configurable | 1 minute | 429 + Retry-After header |
+| **API (authenticated)** | 60 | 1 minute | 429 + Retry-After header |
+| **API (unauthenticated)** | 20 | 1 minute | 429 + Retry-After header |
 | **File upload** | 10 | 1 hour | 429 |
 
 **Project-specific defaults:** Each project defines its own default rate limits based on expected usage patterns. High-traffic APIs may need higher limits; sensitive operations may need lower limits. Define project-appropriate defaults in IDEA.md.
