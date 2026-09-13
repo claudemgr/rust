@@ -34413,6 +34413,7 @@ on:
   schedule:
     # weekly Monday 06:00 UTC
     - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -34765,6 +34766,7 @@ on:
   schedule:
     # Weekly security run (Monday 06:00 UTC) — only security jobs run on schedule
     - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -35127,6 +35129,7 @@ on:
   push:
     branches:
       - beta
+  workflow_dispatch:
 
 concurrency:
   group: beta-${{ github.ref }}
@@ -36035,6 +36038,7 @@ on:
   push:
     branches:
       - beta
+  workflow_dispatch:
 
 concurrency:
   group: beta-${{ gitea.ref }}

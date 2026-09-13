@@ -5900,7 +5900,7 @@ Full license: https://spdx.org/licenses/BSD-3-Clause.html
 # .github/workflows/licenses.yml
 name: License Check
 
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   check-licenses:
@@ -42080,6 +42080,7 @@ on:
     branches: [main, master]
   schedule:
     - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -42161,6 +42162,7 @@ on:
     tags:
       - 'v*'
       - '[0-9]*.[0-9]*.[0-9]*'
+  workflow_dispatch: {}
 
 concurrency:
   group: release-${{ github.ref }}
@@ -42402,6 +42404,7 @@ on:
   push:
     branches:
       - beta
+  workflow_dispatch:
 
 concurrency:
   group: beta-${{ github.ref }}
@@ -43289,6 +43292,7 @@ on:
     tags:
       - 'v*'
       - '[0-9]*.[0-9]*.[0-9]*'
+  workflow_dispatch: {}
 
 concurrency:
   group: release-${{ gitea.ref }}
@@ -43518,6 +43522,7 @@ on:
   push:
     branches:
       - beta
+  workflow_dispatch:
 
 concurrency:
   group: beta-${{ gitea.ref }}

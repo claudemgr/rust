@@ -1822,6 +1822,7 @@ on:
   schedule:
     # weekly Monday 06:00 UTC
     - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
