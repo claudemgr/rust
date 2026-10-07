@@ -716,7 +716,7 @@ permissions:
 jobs:
   build:
     # Inherits read-only — no overrides needed
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     ...
 
   release:
@@ -750,7 +750,7 @@ Every external action (`uses: owner/action@...`) MUST be pinned to a full commit
 **When updating a pinned SHA**, verify three things:
 
 1. **Action is still maintained** — check the upstream repo is not archived, deprecated, or abandoned
-2. **Runtime is still supported** — open the action's `action.yml` at the new SHA and check `runs.using`; if it names a runtime that GitHub has deprecated or scheduled for removal, the action will silently fail after that date. Example: `node20` is removed from GitHub-hosted runners on **2026-09-16** — any action still on `node20` must be updated to a SHA where it has migrated to `node24` — all common `actions/*` and `docker/*` actions have already done so
+2. **Runtime is still supported** — open the action's `action.yml` at the new SHA and check `runs.using`; if it names a runtime that GitHub has deprecated or scheduled for removal, the action will silently fail after that date. Example: `node20` is removed from GitHub-hosted runners on **2026-09-23** — any action still on `node20` must be updated to a SHA where it has migrated to `node24` — all common `actions/*` and `docker/*` actions have already done so
 3. **No supply-chain change** — skim the diff between the old and new SHA; unexpected new dependencies, changed entrypoints, or network calls added to setup steps are red flags
 
 Renovate covers `github-actions` SHA updates automatically via `pinDigests: true` — but it only updates the SHA, not the runtime verification. The runtime check is always manual.
@@ -5907,7 +5907,7 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   check-licenses:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/rust:latest
       options: "--user 0:0"
@@ -42096,7 +42096,7 @@ concurrency:
 jobs:
   lint:
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/rust:latest
       options: "--user 0:0"
@@ -42107,7 +42107,7 @@ jobs:
 
   test:
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/rust:latest
       options: "--user 0:0"
@@ -42129,7 +42129,7 @@ jobs:
   build:
     if: github.event_name != 'schedule'
     needs: [lint, test]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/rust:latest
       options: "--user 0:0"
@@ -42138,7 +42138,7 @@ jobs:
       - run: cargo build --release --target x86_64-unknown-linux-musl
 
   vuln-scan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/rust:latest
       options: "--user 0:0"
@@ -42180,7 +42180,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/rust:latest
       options: "--user 0:0"
@@ -42312,7 +42312,7 @@ jobs:
 
   release:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       # create GitHub release + upload assets, plus tag ownership (Ensure release tag)
       contents: write
@@ -42422,7 +42422,7 @@ env:
 
 jobs:
   version:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       version: ${{ steps.v.outputs.version }}
       tag: ${{ steps.v.outputs.tag }}
@@ -42443,7 +42443,7 @@ jobs:
 
   build:
     needs: [version]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/rust:latest
       options: "--user 0:0"
@@ -42571,7 +42571,7 @@ jobs:
 
   release:
     needs: [version, build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       # OIDC token for artifact attestation
@@ -42651,7 +42651,7 @@ env:
 
 jobs:
   version:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
@@ -42665,7 +42665,7 @@ jobs:
 
   build:
     needs: [version]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/rust:latest
       options: "--user 0:0"
@@ -42793,7 +42793,7 @@ jobs:
 
   release:
     needs: [version, build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       # OIDC token for artifact attestation
@@ -42906,7 +42906,7 @@ env:
 
 jobs:
   build-standard:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     if: github.event_name != 'schedule'
     permissions:
       contents: read
@@ -43006,7 +43006,7 @@ jobs:
             manifest:org.opencontainers.image.licenses=MIT
 
   build-devel:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
     permissions:
       contents: read
@@ -43118,7 +43118,7 @@ env:
 
 jobs:
   build-aio:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       packages: write
@@ -43269,7 +43269,7 @@ Key differences from GitHub Actions:
 | Container Registry | Enable in Site Administration → Packages |
 | Token | User Settings → Applications → Generate Access Token |
 
-For self-hosted runners, change `runs-on: ubuntu-latest` to your runner label.
+For self-hosted runners, change `runs-on: ubuntu-26.04` to your runner label.
 
 ## Workflow Files (Gitea/Forgejo Actions)
 
@@ -43310,7 +43310,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/rust:latest
       options: "--user 0:0"
@@ -43442,7 +43442,7 @@ jobs:
 
   release:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
 
@@ -43540,7 +43540,7 @@ env:
 
 jobs:
   version:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       version: ${{ steps.v.outputs.version }}
       tag: ${{ steps.v.outputs.tag }}
@@ -43561,7 +43561,7 @@ jobs:
 
   build:
     needs: [version]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/rust:latest
       options: "--user 0:0"
@@ -43689,7 +43689,7 @@ jobs:
 
   release:
     needs: [version, build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
 
@@ -43759,7 +43759,7 @@ env:
 
 jobs:
   version:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
@@ -43773,7 +43773,7 @@ jobs:
 
   build:
     needs: [version]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     container:
       image: casjaysdev/rust:latest
       options: "--user 0:0"
@@ -43898,7 +43898,7 @@ jobs:
 
   release:
     needs: [version, build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
 
@@ -43976,7 +43976,7 @@ env:
 
 jobs:
   build-standard:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     if: gitea.event_name != 'schedule'
     permissions:
       contents: read
@@ -44089,7 +44089,7 @@ jobs:
             manifest:org.opencontainers.image.licenses=MIT
 
   build-devel:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     if: gitea.event_name == 'schedule' || gitea.event_name == 'workflow_dispatch' || (gitea.event_name == 'push' && !startsWith(gitea.ref, 'refs/tags/'))
     permissions:
       contents: read
@@ -44207,7 +44207,7 @@ env:
 
 jobs:
   build-aio:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       packages: write
@@ -44342,7 +44342,7 @@ jobs:
 - Use `secrets.GITEA_TOKEN` or `secrets.FORGEJO_TOKEN` for authentication
 - Works with gitea.com, self-hosted Gitea, and self-hosted Forgejo
 - Container registry auto-detected from server URL (e.g., `git.example.com/owner/repo`)
-- Self-hosted runners: change `runs-on: ubuntu-latest` to your runner label
+- Self-hosted runners: change `runs-on: ubuntu-26.04` to your runner label
 - Forgejo can use `.gitea/workflows/` directory for Gitea compatibility
 - Some advanced GitHub features may not be available on older versions
 
@@ -46748,7 +46748,7 @@ make test
 ```yaml
 # .github/workflows/ci.yml (test job with coverage)
 test:
-  runs-on: ubuntu-latest
+  runs-on: ubuntu-26.04
   container:
     image: casjaysdev/rust:latest
     options: "--user 0:0"
