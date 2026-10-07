@@ -1770,14 +1770,10 @@ Both files use the same structure. Settings are merged: `settings.local.json` ov
 
 ```json
 {
-  "thinking": "off",
   "permissions": {
     "allow": [],
     "deny": [],
     "ask": []
-  },
-  "preferences": {
-    "auto_commit": false
   },
   "hooks": {
     "PreToolUse": [],
@@ -1791,9 +1787,7 @@ Both files use the same structure. Settings are merged: `settings.local.json` ov
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `thinking` | string | Extended thinking: `"off"`, `"on"`, or token limit (e.g., `"10000"`) |
 | `permissions` | object | Tool permission rules (allow/deny/ask arrays) |
-| `preferences` | object | Behavior preferences |
 | `hooks` | object | Pre/post tool execution hooks |
 | `env` | object | Environment variables for Bash commands |
 
@@ -1801,7 +1795,6 @@ Both files use the same structure. Settings are merged: `settings.local.json` ov
 
 ```json
 {
-  "thinking": "off",
   "permissions": {
     "allow": [
       "Read(**)",
@@ -1847,9 +1840,6 @@ Both files use the same structure. Settings are merged: `settings.local.json` ov
       "Bash(git reset *)",
       "Bash(git checkout -- *)"
     ]
-  },
-  "preferences": {
-    "auto_commit": false
   },
   "hooks": {
     "PreToolUse": [
