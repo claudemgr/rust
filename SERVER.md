@@ -41573,7 +41573,7 @@ rm -rf "$TEMP_DIR"
 Development mode with optional debug. Humans run this manually for local development.
 
 ```yaml
-name: {project_name}-dev
+name: {project_name}
 
 x-logging: &default-logging
   driver: json-file
@@ -41610,11 +41610,11 @@ services:
       retries: 3
       start_period: 90s
     networks:
-      - {project_name}-dev
+      - {project_name}
 
 networks:
-  {project_name}-dev:
-    name: {project_name}-dev
+  {project_name}:
+    name: {project_name}
     external: false
 ```
 
@@ -41726,7 +41726,7 @@ cd "$TEMP_DIR" && docker compose up -d
 Debug enabled for test visibility. **MUST be copied to temp directory before use - NEVER run from project directory.**
 
 ```yaml
-name: {project_name}-test
+name: {project_name}
 
 x-logging: &default-logging
   driver: json-file
@@ -41766,7 +41766,7 @@ services:
       {project_name}-cache:
         condition: service_healthy
     networks:
-      - {project_name}-test
+      - {project_name}
 
   {project_name}-cache:
     image: valkey/valkey:alpine
@@ -41784,11 +41784,11 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - {project_name}-test
+      - {project_name}
 
 networks:
-  {project_name}-test:
-    name: {project_name}-test
+  {project_name}:
+    name: {project_name}
     external: false
 ```
 

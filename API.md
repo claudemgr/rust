@@ -33521,13 +33521,13 @@ exec $APP_BIN $FLAGS "$@"
 | `build:` | **NEVER include** — all three compose files pull registry images |
 | `image:` tag | `:latest` in `docker-compose.yml` (production) · `:devel` in `docker-compose.dev.yml` and `docker-compose.test.yml` |
 | `version:` | **NEVER include** |
-| `name:` | `{project_name}` (production) · `{project_name}-dev` (dev) · `{project_name}-test` (test) |
+| `name:` | `{project_name}` (production, dev, and test) |
 | `container_name:` | **Always set**, one fixed name per service, the same in production, dev, and test: `{project_name}-app`, `{project_name}-db`, `{project_name}-cache` (only the services that file includes). Dev and test never run on a production host, so a clash fails `docker compose up` instead of replacing production; their compose `name:` and network keep the `-dev` / `-test` suffix so it fails rather than adopting production's project |
 | Main service name | `{project_name}` (matches project name in every variant) |
 | `pull_policy:` | `always` on every service |
 | `restart:` | `always` (production/dev) · `"no"` (test — services are ephemeral) |
 | `x-logging:` | Anchor for consistent logging (see below); applied to every service via `logging: *default-logging` |
-| Network | Named to match the compose file's `name:` (`{project_name}`, `{project_name}-dev`, or `{project_name}-test`) — never a `-net` or other suffix; `external: false` |
+| Network | Named `{project_name}` in every file — never a `-net`, `-dev`, `-test` or other suffix; `external: false` |
 | Environment variables | **YAML map style** (`KEY: value`), never list style (`- KEY=value`) — inline `${VAR:-default}` fallbacks so the stack works with zero `.env` files |
 | `PORT` | Always `80` — the container's internal port never changes; only the published host-side port varies |
 | **environment: DEBUG/MODE** | **Never set in `docker-compose.yml`** (production) · `DEBUG: true` and `MODE: development` in `docker-compose.dev.yml` and `docker-compose.test.yml` |
@@ -33610,7 +33610,7 @@ networks:
 
 | Field | Value | Description |
 |-------|-------|-------------|
-| `name:` | `{project_name}` / `{project_name}-dev` / `{project_name}-test` | Top-level compose project name, per variant |
+| `name:` | `{project_name}` | Top-level compose project name, the same in production, dev, and test |
 | `container_name:` | `{project_name}-app`, `{project_name}-db`, `{project_name}-cache` in every file (production, dev, test) | e.g., `jokes-app`, `jokes-db`, `jokes-cache`; dev and test reuse production's names on purpose, so running them on a production host fails loudly |
 | Main service | `{project_name}` | Service name matches project name |
 | Database service | `{project_name}-db` | Database service name |
@@ -33618,7 +33618,7 @@ networks:
 | `restart:` | `always` (prod/dev) · `"no"` (test) | Restart policy |
 | `pull_policy:` | `always` | Always pull latest image |
 | `logging:` | `*default-logging` | Use the logging anchor |
-| `networks:` | `{project_name}` (prod), `{project_name}-dev` (dev), `{project_name}-test` (test) | Isolated network per project/variant |
+| `networks:` | `{project_name}` | Isolated network per project, the same name in production, dev, and test |
 
 ### Logging Anchor
 
@@ -33649,7 +33649,7 @@ services:
 Single-service, debug mode enabled, no Valkey (no cache service at all), no `172.17.0.1:` bind. Uses the `:devel` image.
 
 ```yaml
-name: {project_name}-dev
+name: {project_name}
 
 x-logging: &default-logging
   driver: json-file
@@ -33682,11 +33682,11 @@ services:
       retries: 3
       start_period: 90s
     networks:
-      - {project_name}-dev
+      - {project_name}
 
 networks:
-  {project_name}-dev:
-    name: {project_name}-dev
+  {project_name}:
+    name: {project_name}
     external: false
 ```
 
@@ -33886,7 +33886,7 @@ rm -rf "$TEMP_DIR"
 **FOR AI AND AUTOMATED TESTING.** AI's preferred interface is the project's `tests/` scripts; invoking this file directly is a fallback only. **Pulls the `:devel` image (`pull_policy: always`) — the current development build.** `DEBUG: true`, `MODE: development`, `172.17.0.1:` bind, Valkey cache included (ephemeral). **MUST be copied to a temp directory before use - NEVER run from the project directory.**
 
 ```yaml
-name: {project_name}-test
+name: {project_name}
 
 x-logging: &default-logging
   driver: json-file
@@ -33923,7 +33923,7 @@ services:
       {project_name}-cache:
         condition: service_healthy
     networks:
-      - {project_name}-test
+      - {project_name}
 
   {project_name}-cache:
     image: valkey/valkey:alpine
@@ -33940,11 +33940,11 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - {project_name}-test
+      - {project_name}
 
 networks:
-  {project_name}-test:
-    name: {project_name}-test
+  {project_name}:
+    name: {project_name}
     external: false
 ```
 
