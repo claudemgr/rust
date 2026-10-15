@@ -1314,13 +1314,13 @@ PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+
 │   └── workflows/
 │       ├── release.yml     # Stable releases
 │       ├── beta.yml        # Beta releases
-│       ├── daily.yml       # Daily builds
+│       ├── devel.yml       # Devel builds
 │       └── docker.yml      # Docker images
 ├── .gitea/                 # Gitea Actions (if using Gitea)
 │   └── workflows/
 │       ├── release.yml     # Stable releases
 │       ├── beta.yml        # Beta releases
-│       ├── daily.yml       # Daily builds
+│       ├── devel.yml       # Devel builds
 │       └── docker.yml      # Docker images
 ├── CLAUDE.md               # Project memory - critical rules (REQUIRED, primary location)
 ├── AGENTS.md               # identical copy of CLAUDE.md, for non-Claude agents
@@ -2601,7 +2601,7 @@ restore <file>                        - Restore from backup file
 update [cmd]                          - Manage updates
   check                               - Check for available updates
   yes                                 - Download and install update
-  branch <name>                       - Switch update branch (stable|beta|daily)
+  branch <name>                       - Switch update branch (stable|beta|devel)
 
 mode <mode>                           - Set application mode
   production                          - Normal operation (default)
@@ -2663,7 +2663,7 @@ yes                                   - Download and install update
 branch <name>                         - Switch update branch
   stable                              - Stable releases (default)
   beta                                - Beta/preview releases
-  daily                               - Daily builds (development)
+  devel                               - Devel builds (development)
 
 Examples:
   {project_name} --update check
@@ -5308,7 +5308,7 @@ PROJECT_ORG := $(shell git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/
 VERSION ?= $(shell cat release.txt 2>/dev/null || echo "devel")
 
 # Build info - BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
-# Unix build timestamp (seconds, UTC) - used by the updater's daily-channel check
+# Unix build timestamp (seconds, UTC) - used by the updater's devel-channel check
 BUILD_EPOCH := $(shell date -u +%s)
 # ISO 8601 UTC - derived from BUILD_EPOCH (docker build-arg / OCI label use only, not embedded in the app)
 BUILD_DATE := $(shell date -u -d @$(BUILD_EPOCH) +"%Y-%m-%dT%H:%M:%SZ")
@@ -5680,7 +5680,7 @@ make build
 |--------------|---------------------|
 | Stable | `1.2.3` (semver without `v` prefix) |
 | Beta | `20251205143022-beta` (timestamp-beta) |
-| Daily | `a1b2c3d` (short commit id) |
+| Devel | `a1b2c3d` (short commit id) |
 
 ## Release Types
 
@@ -5711,21 +5711,21 @@ make build
 | sha512.txt | SHA-512 checksums of every uploaded binary (`{hash}  {filename}` lines) |
 | GitHub release | Yes, marked as pre-release |
 
-### Daily Build
+### Devel Build
 
 | Property | Value |
 |----------|-------|
 | Trigger | Daily schedule (3am UTC) + push to main/master |
-| Git tag | `daily` (single rolling tag, NOT a timestamp) |
+| Git tag | `devel` (single rolling tag, NOT a timestamp) |
 | Version format | Short commit id (`git rev-parse --short=7 HEAD`) — NO `v` prefix |
-| Release name | `Daily Build {VERSION}` |
+| Release name | `Devel Build {VERSION}` |
 | version.txt | Same as version format (e.g., `a1b2c3d`) |
 | sha256.txt | SHA-256 checksums of every uploaded binary (`{hash}  {filename}` lines) |
 | sha512.txt | SHA-512 checksums of every uploaded binary (`{hash}  {filename}` lines) |
-| GitHub release | Yes, **replaces previous daily** |
-| Max releases | **1** (always overwrites previous daily) |
+| GitHub release | Yes, **replaces previous devel** |
+| Max releases | **1** (always overwrites previous devel) |
 
-**Daily Build Rules:** Only ONE daily release exists at any time, identified by the rolling `daily` tag; each daily build **deletes and recreates** that `daily` release (`prerelease: true`), preventing accumulation of thousands of releases. Identity is the commit itself — `VERSION` is always the short commit id of the commit that triggered the build, never a stamped `release.txt` value or a timestamp.
+**Devel Build Rules:** Only ONE devel release exists at any time, identified by the rolling `devel` tag; each devel build **deletes and recreates** that `devel` release (`prerelease: true`), preventing accumulation of thousands of releases. Identity is the commit itself — `VERSION` is always the short commit id of the commit that triggered the build, never a stamped `release.txt` value or a timestamp.
 
 ### Version Tag Summary (Quick Reference)
 
@@ -5734,10 +5734,10 @@ make build
 | **Stable** | `v1.2.3` or `1.2.3` | ✓ YES (numbers) | `v1.2.3` | `1.2.3` |
 | **Stable** | `v0.2.0` or `0.2.0` | ✓ YES (numbers) | `v0.2.0` | `0.2.0` |
 | **Beta** | (branch push) | ✗ NO (timestamp) | `20251205-beta` | `20251205-beta` |
-| **Daily** | `daily` (rolling tag) | ✗ NO (commit id) | `Daily Build {VERSION}` | `a1b2c3d` |
+| **Devel** | `devel` (rolling tag) | ✗ NO (commit id) | `Devel Build {VERSION}` | `a1b2c3d` |
 | **Dev** | `dev` | ✗ NO (text) | `dev` | `dev` |
 
-**NEVER:** `vdev`, `vbeta`, `vdaily` (text versions never get v) · `v20251218` (timestamps never get v) · `vv1.2.3` (don't double the v).
+**NEVER:** `vdev`, `vbeta`, `vdevel` (text versions never get v) · `v20251218` (timestamps never get v) · `vv1.2.3` (don't double the v).
 
 ### Version Tag `v` Prefix Rules
 
@@ -5761,7 +5761,7 @@ make build
 | `1.2.3-rc1` | Number (semver+suffix) | YES | `v1.2.3-rc1` | Numeric version gets v |
 | `dev` | Text | NO | `dev` | Text version NO v |
 | `beta` | Text | NO | `beta` | Text version NO v |
-| `daily` | Text | NO | `daily` | Text version NO v |
+| `devel` | Text | NO | `devel` | Text version NO v |
 | `20251218060432` | Timestamp | NO | `20251218060432` | Not semver NO v |
 | `20251218060432-beta` | Timestamp+text | NO | `20251218060432-beta` | Not semver NO v |
 
@@ -5778,7 +5778,7 @@ format_version_tag() {
 
     # Step 2: If it's a semantic version (starts with digit.digit.digit), add v
     # Matches: 0.2.0, 1.2.3, 10.5.2-rc1
-    # Does NOT match: dev, beta, daily, 20251218
+    # Does NOT match: dev, beta, devel, 20251218
     if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
         echo "v$tag"
     else
@@ -5806,7 +5806,7 @@ format_version_tag() {
 |------|--------|-----------------|---------------|
 | Stable | CI/CD (tag) or `make release` (local) | `1.2.3` | Unlimited |
 | Beta | CI/CD only | `20251205143022-beta` | Unlimited |
-| Daily | CI/CD only | `20251218060432` | **1** (rolling) |
+| Devel | CI/CD only | `20251218060432` | **1** (rolling) |
 
 **Note:** `make release` is for manual local releases only. All automated releases use CI/CD (GitHub Actions, Gitea Actions, or GitLab CI depending on git provider).
 
@@ -6924,7 +6924,7 @@ fn main() {
 pub const VERSION: &str = option_env!("APP_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"));
 pub const OFFICIAL_SITE: &str = option_env!("APP_OFFICIAL_SITE").unwrap_or("");
 pub const COMMIT_ID: &str = option_env!("APP_COMMIT_ID").unwrap_or("N/A");
-// Unix build timestamp (seconds, UTC) - used by the updater's daily-channel check
+// Unix build timestamp (seconds, UTC) - used by the updater's devel-channel check
 pub const BUILD_EPOCH: &str = option_env!("APP_BUILD_EPOCH").unwrap_or("0");
 // Build date derived from BUILD_EPOCH (RFC 3339 UTC); "N/A" when unset
 pub fn build_date() -> String {
@@ -6945,7 +6945,7 @@ Every binary MUST have these values embedded at build time:
 |----------|---------|-------------|
 | `Version` | `1.2.3` | Semantic version from `release.txt` |
 | `CommitID` | `a1b2c3d` | Git short commit hash |
-| `BUILD_EPOCH` | `1765112713` | Unix build timestamp (seconds, UTC) — the single captured time source; used by the updater's daily-channel check |
+| `BUILD_EPOCH` | `1765112713` | Unix build timestamp (seconds, UTC) — the single captured time source; used by the updater's devel-channel check |
 | `BuildDate` | `2025-12-04T13:05:13Z` | Build timestamp (ISO 8601 / RFC 3339 UTC) — derived from `BUILD_EPOCH` by build systems (`date -u -d @$BUILD_EPOCH ...`) or in-app via `build_date()`; never embedded as its own `APP_*` value |
 | `OfficialSite` | `https://api.example.com` | Default server URL (empty if self-hosted) |
 
@@ -6955,7 +6955,7 @@ Every binary MUST have these values embedded at build time:
 // Build info - set via build.rs, which maps VERSION/COMMIT_ID/BUILD_EPOCH/OFFICIAL_SITE to APP_*
 pub const VERSION: &str = option_env!("APP_VERSION").unwrap_or("devel");
 pub const COMMIT_ID: &str = option_env!("APP_COMMIT_ID").unwrap_or("N/A");
-// Unix build timestamp (seconds, UTC) - used by the updater's daily-channel check
+// Unix build timestamp (seconds, UTC) - used by the updater's devel-channel check
 pub const BUILD_EPOCH: &str = option_env!("APP_BUILD_EPOCH").unwrap_or("0");
 // Build date derived from BUILD_EPOCH (RFC 3339 UTC); "N/A" when unset
 pub fn build_date() -> String {
@@ -7261,7 +7261,7 @@ NO_COLOR=1 {project_name} --status | grep -E '✅|❌|⚠️|🚀'
 --lang {code}
 --maintenance {backup,restore,update,mode,setup,pgp,secret,--help} [optional-file-or-setting-or-action]
 # Check/perform updates
---update [check|yes|branch {stable|beta|daily}|--help]
+--update [check|yes|branch {stable|beta|devel}|--help]
 # Shell integration
 --shell {completions,init,--help} [SHELL]
 ```
@@ -18702,7 +18702,7 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 
 - Stable: Semantic versioning `MAJOR.MINOR.PATCH` (e.g., `1.0.0`); git tag `v{version}`
 - Beta: `YYYYMMDDHHMMSS-beta` (e.g., `20251205143022-beta`); git tag matches the version string
-- Daily: git tag is always the literal rolling tag `daily` (deleted and recreated nightly); the VERSION embedded in the binary is the short commit id (`git rev-parse --short=7 HEAD`, e.g., `a1b2c3d`) — never `release.txt` and never a timestamp
+- Devel: git tag is always the literal rolling tag `devel` (deleted and recreated nightly); the VERSION embedded in the binary is the short commit id (`git rev-parse --short=7 HEAD`, e.g., `a1b2c3d`) — never `release.txt` and never a timestamp
 
 ### Sources (Priority Order)
 
@@ -18711,7 +18711,7 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 2. Git tag (if available)
 3. Fallback: `dev`
 
-**Daily:** always `git rev-parse --short=7 HEAD` — `release.txt` is never consulted for the daily channel
+**Devel:** always `git rev-parse --short=7 HEAD` — `release.txt` is never consulted for the devel channel
 
 ### --version Output
 
@@ -31509,7 +31509,7 @@ Restoring...
 |---------|-------------|
 | `yes` (default) | Check and perform in-place update with restart |
 | `check` | Check for updates without installing (no privileges required) |
-| `branch {stable\|beta\|daily}` | Set update branch |
+| `branch {stable\|beta\|devel}` | Set update branch |
 
 ### Exit Codes
 
@@ -31526,7 +31526,9 @@ Restoring...
 |--------|--------------|-------------|---------|
 | `stable` (default) | Release | `v*`, `*.*.*` | `v1.0.0` |
 | `beta` | Pre-release | `*-beta` | `202512051430-beta` |
-| `daily` | Pre-release | `daily` (single rolling tag, deleted and recreated nightly) | `daily` |
+| `devel` | Pre-release | `devel` (single rolling tag, deleted and recreated nightly) | `devel` |
+
+**Channel names:** `devel` is the canonical name of the rolling channel. `daily`, `rolling`, `dev`, and `development` are accepted anywhere a channel is read (`--update branch`, `update.branch`, `cli.yml`) and normalized to `devel` before it is stored or compared, so a stored value is always `stable`, `beta`, or `devel`. `stable` follows the version tags with or without a `v` prefix (`v1.0.1` and `1.0.1`); `beta` follows the `*-beta` tags.
 
 ### Examples
 
@@ -31541,7 +31543,7 @@ Restoring...
 
 # Switch channels
 {project_name} --update branch beta
-{project_name} --update branch daily
+{project_name} --update branch devel
 {project_name} --update branch stable
 ```
 
@@ -31550,7 +31552,7 @@ Restoring...
 ```yaml
 server:
   update:
-    # Release channel: stable | beta | daily (also settable via --update branch)
+    # Release channel: stable | beta | devel (also settable via --update branch)
     branch: stable
 
     # Auto-install updates found by the update_check task
@@ -31572,11 +31574,11 @@ server:
 |---------|-----------|-----------|
 | `stable` (default) | Full releases only (`v*`, `*.*.*`) | Newest stable |
 | `beta` | Beta pre-releases (`*-beta`) + all stable releases | Newest of both — beta users are never stuck behind a stable release |
-| `daily` | Rolling `daily` release (rebuilt nightly) + beta + stable | Newest overall — for the rolling `daily` tag, "newest" is determined by comparing `published_at` against this binary's embedded `BUILD_EPOCH` |
+| `devel` | Rolling `devel` release (rebuilt nightly) + beta + stable | Newest overall — for the rolling `devel` tag, "newest" is determined by comparing `published_at` against this binary's embedded `BUILD_EPOCH` |
 
 ### Defer Semantics (`defer_days`)
 
-**A release is eligible only once `now - published_at >= defer_days` (GitHub Releases `published_at`, UTC). This applies to `stable` and `beta` releases only — see "Daily channel is exempt" below.**
+**A release is eligible only once `now - published_at >= defer_days` (GitHub Releases `published_at`, UTC). This applies to `stable` and `beta` releases only — see "Devel channel is exempt" below.**
 
 | Rule | Behavior |
 |------|----------|
@@ -31584,7 +31586,7 @@ server:
 | Eligibility is per-release | The task selects the NEWEST eligible release that is newer than the running version. A brand-new release does not reset the clock for older, already-eligible releases |
 | Rolling delay, never deadlock | Rapid `stable`/`beta` release cadence still converges: each run adopts the newest release that has aged past the window |
 | Example | Running v1.2.2; v1.2.3 published 40 days ago, v1.2.4 published 5 days ago, `defer_days: 30` → task notifies/installs v1.2.3; v1.2.4 becomes eligible 25 days later |
-| Daily channel is exempt | `defer_days` never gates the `daily` channel — the rolling `daily` release is deleted and recreated every night, so its `published_at` is always fresh (hours old, at most) and an age-based window can never be satisfied; on the `daily` channel, eligibility is always the `published_at` vs. embedded `BUILD_EPOCH` comparison described in "Channel Semantics", with no defer delay applied |
+| Devel channel is exempt | `defer_days` never gates the `devel` channel — the rolling `devel` release is deleted and recreated every night, so its `published_at` is always fresh (hours old, at most) and an age-based window can never be satisfied; on the `devel` channel, eligibility is always the `published_at` vs. embedded `BUILD_EPOCH` comparison described in "Channel Semantics", with no defer delay applied |
 
 ### Scheduled Check (update_check Task)
 
@@ -31749,7 +31751,7 @@ pub async fn check_for_update(current_version: &str, branch: &str) -> Result<Opt
     let url = match branch {
         "stable" => "https://api.github.com/repos/{project_org}/{project_name}/releases/latest".to_string(),
         _ => {
-            // For beta/daily, get all releases and filter
+            // For beta/devel, get all releases and filter
             "https://api.github.com/repos/{project_org}/{project_name}/releases".to_string()
         }
     };
@@ -31778,7 +31780,7 @@ pub async fn check_for_update(current_version: &str, branch: &str) -> Result<Opt
         return Ok(Some(release));
     }
 
-    // For beta/daily, filter releases and pick the newest by published_at
+    // For beta/devel, filter releases and pick the newest by published_at
     // (channels are cumulative — see Channel Semantics)
     let releases: Vec<Release> = resp.json().await?;
 
@@ -31790,7 +31792,7 @@ pub async fn check_for_update(current_version: &str, branch: &str) -> Result<Opt
     match newest {
         // Rolling tag: tag_name never changes, so a newer nightly is detected by
         // comparing the release's published_at against this binary's BUILD_EPOCH
-        Some(r) if r.tag_name == "daily" => {
+        Some(r) if r.tag_name == "devel" => {
             if release_published_epoch(&r.published_at) > build_epoch() {
                 Ok(Some(r))
             } else {
@@ -31902,12 +31904,12 @@ fn matches_branch(r: &Release, branch: &str) -> bool {
     let is_stable = !r.prerelease;
     // Beta pre-releases carry a -beta suffix
     let is_beta = r.tag_name.ends_with("-beta");
-    // The daily channel is a single rolling release: tag "daily", rebuilt nightly
-    let is_daily = r.tag_name == "daily";
+    // The devel channel is a single rolling release: tag "devel", rebuilt nightly
+    let is_devel = r.tag_name == "devel";
 
     match branch {
         "beta" => is_stable || is_beta,
-        "daily" => is_stable || is_beta || is_daily,
+        "devel" => is_stable || is_beta || is_devel,
         _ => is_stable,
     }
 }
@@ -34266,7 +34268,7 @@ This binary is one deliverable with two consumption modes (PART 2 → "Applicati
 
 | Artifact class | Produced by | Where |
 |---|---|---|
-| Native per-platform binaries (7-target matrix: linux/darwin/windows × amd64/arm64 + freebsd/amd64 — `aarch64-unknown-freebsd` is Rust Tier 3 with no prebuilt std, so there is no FreeBSD ARM64 leg; darwin targets are pure-Rust/bundled-C only — the build image ships no Apple SDK, so crates linking macOS frameworks cannot build) | `cargo zigbuild --release --target $TARGET` | `release.yml` / `beta.yml` / `daily.yml` build job |
+| Native per-platform binaries (7-target matrix: linux/darwin/windows × amd64/arm64 + freebsd/amd64 — `aarch64-unknown-freebsd` is Rust Tier 3 with no prebuilt std, so there is no FreeBSD ARM64 leg; darwin targets are pure-Rust/bundled-C only — the build image ships no Apple SDK, so crates linking macOS frameworks cannot build) | `cargo zigbuild --release --target $TARGET` | `release.yml` / `beta.yml` / `devel.yml` build job |
 | Server-mode Docker image | `docker buildx build` against `docker/Dockerfile` | `docker.yml` |
 | Database migration check | Run migrations against a throwaway DB container before the image is tagged/pushed; fail the job on migration error (PART 10 → "Database") | `docker.yml` or a dedicated `migrate-check` job gating `build-standard` |
 
@@ -34735,11 +34737,11 @@ If signing or attestation is required but keys/permissions are unavailable, stop
 | `ci.yml` | Push, PR to default branch; security jobs also run on weekly cron | Build + test + lint + coverage + secret scanning + image scanning + workflow-policy |
 | `release.yml` | Tag push (`v*`, `*.*.*`) + manual dispatch | Production releases |
 | `beta.yml` | Push to `beta` branch | Beta releases |
-| `daily.yml` | Daily at 3am UTC + push to main/master | Daily builds |
+| `devel.yml` | Daily at 3am UTC + push to main/master | Devel builds |
 | `docker.yml` | Any push (all branches) + version tags + daily schedule | Docker images (`build-standard` + `build-devel` jobs) |
-> **Note:** `ci.yml` and `release.yml` are required on every project. Rust projects never have `build-toolchain.yml` — `casjaysdev/rust:latest` is maintained externally. `beta.yml`, `daily.yml`, and `docker.yml` are project-specific optional workflows — include only when the project requires them.
+> **Note:** `ci.yml` and `release.yml` are required on every project. Rust projects never have `build-toolchain.yml` — `casjaysdev/rust:latest` is maintained externally. `beta.yml`, `devel.yml`, and `docker.yml` are project-specific optional workflows — include only when the project requires them.
 
-**Branch push auto-cancel policy:** Any workflow triggered by pushes to `main`, `master`, `devel`, `dev`, or `beta` MUST use workflow concurrency to cancel older in-progress runs for the same ref. This applies to branch-based CI (for example `beta.yml`, `daily.yml`, `docker.yml`, and any project-specific branch-push workflow).
+**Branch push auto-cancel policy:** Any workflow triggered by pushes to `main`, `master`, `devel`, `dev`, or `beta` MUST use workflow concurrency to cancel older in-progress runs for the same ref. This applies to branch-based CI (for example `beta.yml`, `devel.yml`, `docker.yml`, and any project-specific branch-push workflow).
 
 **Tag release auto-cancel policy:** Tag-only release workflows like `release.yml` MUST also use workflow concurrency, but only per exact tag ref. A newer run for `refs/tags/v1.2.3` should cancel the older `refs/tags/v1.2.3` run. A run for `v1.2.4` must NOT cancel `v1.2.3`.
 
@@ -35326,12 +35328,12 @@ jobs:
           generate_release_notes: true
 ```
 
-## Daily Workflow (GitHub Actions)
+## Devel Workflow (GitHub Actions)
 
-**File:** `.github/workflows/daily.yml`
+**File:** `.github/workflows/devel.yml`
 
 ```yaml
-name: Daily Build
+name: Devel Build
 
 on:
   schedule:
@@ -35344,7 +35346,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: daily-${{ github.ref }}-${{ github.event_name }}
+  group: devel-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/devel' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/beta' }}
 
 permissions:
@@ -35363,7 +35365,7 @@ jobs:
       - name: Compute version
         id: v
         run: |
-          # Daily builds are identified by the commit they're built from - not a
+          # Devel builds are identified by the commit they're built from - not a
           # release.txt version, not a timestamp
           VERSION="$(git rev-parse --short=7 HEAD)"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -35516,10 +35518,10 @@ jobs:
         with:
           subject-path: binaries/*
 
-      - name: Delete previous daily release
+      - name: Delete previous devel release
         run: |
-          gh release delete daily --yes 2>/dev/null || true
-          git push origin :refs/tags/daily 2>/dev/null || true
+          gh release delete devel --yes 2>/dev/null || true
+          git push origin :refs/tags/devel 2>/dev/null || true
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -35527,11 +35529,11 @@ jobs:
         # v3.0.2
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3.0.3
         with:
-          tag_name: daily
-          name: "Daily Build ${{ env.VERSION }}"
+          tag_name: devel
+          name: "Devel Build ${{ env.VERSION }}"
           files: binaries/*
           prerelease: true
-          body: "Daily build: ${{ env.VERSION }}"
+          body: "Devel build: ${{ env.VERSION }}"
 ```
 
 ## Docker Workflow (GitHub Actions)
@@ -35825,7 +35827,7 @@ For self-hosted runners, change `runs-on: ubuntu-26.04` to your runner label.
 | `ci.yml` | Push and pull requests; weekly schedule for security jobs | Build, test, lint, coverage, security jobs |
 | `release.yml` | Tag push (`v*`, `*.*.*`) + manual dispatch | Production releases |
 | `beta.yml` | Push to `beta` branch | Beta releases |
-| `daily.yml` | Daily at 3am UTC + push to main/master | Daily builds |
+| `devel.yml` | Daily at 3am UTC + push to main/master | Devel builds |
 | `docker.yml` | Any push (all branches) + version tags + daily schedule | Docker images (`build-standard` + `build-devel` jobs) |
 
 ## Release Workflow — Stable (Gitea/Forgejo Actions)
@@ -36227,12 +36229,12 @@ jobs:
           prerelease: true
 ```
 
-## Daily Workflow (Gitea/Forgejo Actions)
+## Devel Workflow (Gitea/Forgejo Actions)
 
-**File:** `.gitea/workflows/daily.yml`
+**File:** `.gitea/workflows/devel.yml`
 
 ```yaml
-name: Daily Build
+name: Devel Build
 
 on:
   schedule:
@@ -36245,7 +36247,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: daily-${{ gitea.ref }}-${{ gitea.event_name }}
+  group: devel-${{ gitea.ref }}-${{ gitea.event_name }}
   cancel-in-progress: ${{ gitea.ref == 'refs/heads/main' || gitea.ref == 'refs/heads/master' || gitea.ref == 'refs/heads/devel' || gitea.ref == 'refs/heads/dev' || gitea.ref == 'refs/heads/beta' }}
 
 permissions:
@@ -36264,7 +36266,7 @@ jobs:
       - name: Compute version
         id: v
         run: |
-          # Daily builds are identified by the commit they're built from - not a
+          # Devel builds are identified by the commit they're built from - not a
           # release.txt version, not a timestamp
           VERSION="$(git rev-parse --short=7 HEAD)"
           echo "version=$VERSION" >> "$GITEA_OUTPUT"
@@ -36410,23 +36412,23 @@ jobs:
           sha256sum $FILES > sha256.txt
           sha512sum $FILES > sha512.txt
 
-      - name: Delete previous daily release
+      - name: Delete previous devel release
         run: |
-          # Use Gitea API to delete previous daily release
+          # Use Gitea API to delete previous devel release
           curl -X DELETE \
             -H "Authorization: token ${{ secrets.GITEA_TOKEN }}" \
-            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/releases/tags/daily" || true
-          git push origin :refs/tags/daily 2>/dev/null || true
+            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/releases/tags/devel" || true
+          git push origin :refs/tags/devel 2>/dev/null || true
 
       - name: Create Release
         # v3.0.2
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3.0.3
         with:
-          tag_name: daily
-          name: "Daily Build ${{ env.VERSION }}"
+          tag_name: devel
+          name: "Devel Build ${{ env.VERSION }}"
           files: binaries/*
           prerelease: true
-          body: "Daily build: ${{ env.VERSION }}"
+          body: "Devel build: ${{ env.VERSION }}"
 ```
 
 ## Docker Workflow (Gitea/Forgejo Actions)
@@ -36709,7 +36711,7 @@ All `$CI_*` variables are auto-populated by GitLab (works with self-hosted).
 
 ```yaml
 # GitLab CI/CD Pipeline for {project_name}
-# Equivalent to GitHub Actions: release.yml, beta.yml, daily.yml, docker.yml
+# Equivalent to GitHub Actions: release.yml, beta.yml, devel.yml, docker.yml
 
 variables:
   PROJECT_NAME: "{project_name}"
@@ -37050,14 +37052,14 @@ release:beta:
     - if: $CI_COMMIT_BRANCH == "beta"
 
 # =============================================================================
-# DAILY BUILDS (Scheduled + main/master push) - All 7 platforms
+# DEVEL BUILDS (Scheduled + main/master push) - All 7 platforms
 # =============================================================================
 
-build:daily:
+build:devel:
   <<: *rust-build
   stage: build
   before_script:
-    # Daily builds are identified by the commit they're built from - not a
+    # Devel builds are identified by the commit they're built from - not a
     # release.txt version, not a timestamp
     - export VERSION="${CI_COMMIT_SHA:0:7}"
     - export COMMIT_ID="${CI_COMMIT_SHA:0:7}"
@@ -37090,23 +37092,23 @@ build:daily:
       when: manual
       allow_failure: true
 
-release:daily:
+release:devel:
   stage: release
   # BUILD_IMAGE (not release-cli) so tar/cargo-cyclonedx are available; the
   # `release:` keyword still works - GitLab's docker/kubernetes executor injects
   # release-cli via the runner helper image regardless of the job's own image
   image: $BUILD_IMAGE
   needs:
-    - job: build:daily
+    - job: build:devel
       artifacts: true
     - test
   before_script:
-    # Delete the prior rolling `daily` release + tag via the GitLab Releases API
-    # before publishing a new one - daily is a rolling release, not versioned
-    - curl --request DELETE --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases/daily" || true
-    - curl --request DELETE --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/tags/daily" || true
+    # Delete the prior rolling `devel` release + tag via the GitLab Releases API
+    # before publishing a new one - devel is a rolling release, not versioned
+    - curl --request DELETE --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases/devel" || true
+    - curl --request DELETE --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/repository/tags/devel" || true
   script:
-    # Daily builds are identified by the commit they're built from - not a
+    # Devel builds are identified by the commit they're built from - not a
     # release.txt version, not a timestamp
     - echo "${CI_COMMIT_SHA:0:7}" > version.txt
     - tar --exclude='.git' --exclude='.github' --exclude='.gitea' --exclude='binaries' --exclude='releases' --exclude='*.tar.gz' -czf ${PROJECT_NAME}-${CI_COMMIT_SHA:0:7}-source.tar.gz .
@@ -37125,33 +37127,33 @@ release:daily:
       - ${PROJECT_NAME}-*
     expire_in: 1 day
   release:
-    tag_name: "daily"
-    name: "Daily Build ${CI_COMMIT_SHA:0:7}"
-    description: "Daily build: ${CI_COMMIT_SHA:0:7}"
+    tag_name: "devel"
+    name: "Devel Build ${CI_COMMIT_SHA:0:7}"
+    description: "Devel build: ${CI_COMMIT_SHA:0:7}"
     assets:
       links:
         - name: "sha256.txt"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/sha256.txt?job=release:daily"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/devel/raw/sha256.txt?job=release:devel"
         - name: "sha512.txt"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/sha512.txt?job=release:daily"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/devel/raw/sha512.txt?job=release:devel"
         - name: "${PROJECT_NAME}-${CI_COMMIT_SHA:0:7}-source.tar.gz"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-${CI_COMMIT_SHA:0:7}-source.tar.gz?job=release:daily"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/devel/raw/${PROJECT_NAME}-${CI_COMMIT_SHA:0:7}-source.tar.gz?job=release:devel"
         - name: "${PROJECT_NAME}-bom.json"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-bom.json?job=release:daily"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/devel/raw/${PROJECT_NAME}-bom.json?job=release:devel"
         - name: "${PROJECT_NAME}-linux-amd64"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-linux-amd64?job=build:daily"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/devel/raw/${PROJECT_NAME}-linux-amd64?job=build:devel"
         - name: "${PROJECT_NAME}-linux-arm64"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-linux-arm64?job=build:daily"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/devel/raw/${PROJECT_NAME}-linux-arm64?job=build:devel"
         - name: "${PROJECT_NAME}-darwin-amd64"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-darwin-amd64?job=build:daily"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/devel/raw/${PROJECT_NAME}-darwin-amd64?job=build:devel"
         - name: "${PROJECT_NAME}-darwin-arm64"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-darwin-arm64?job=build:daily"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/devel/raw/${PROJECT_NAME}-darwin-arm64?job=build:devel"
         - name: "${PROJECT_NAME}-windows-amd64.exe"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-windows-amd64.exe?job=build:daily"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/devel/raw/${PROJECT_NAME}-windows-amd64.exe?job=build:devel"
         - name: "${PROJECT_NAME}-windows-arm64.exe"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-windows-arm64.exe?job=build:daily"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/devel/raw/${PROJECT_NAME}-windows-arm64.exe?job=build:devel"
         - name: "${PROJECT_NAME}-freebsd-amd64"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/daily/raw/${PROJECT_NAME}-freebsd-amd64?job=build:daily"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/devel/raw/${PROJECT_NAME}-freebsd-amd64?job=build:devel"
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
@@ -37299,13 +37301,13 @@ Set these in GitLab Project → Settings → CI/CD → Variables:
 | `CI_REGISTRY_PASSWORD` | Registry password (auto-set) | `$CI_JOB_TOKEN` |
 | `CI_REGISTRY_IMAGE` | Full image path (auto-set) | `registry.gitlab.com/org/project` |
 
-## GitLab Scheduled Pipelines (for Daily Builds)
+## GitLab Scheduled Pipelines (for Devel Builds)
 
 Create in GitLab Project → Build → Pipeline schedules:
 
 | Field | Value |
 |-------|-------|
-| Description | Daily Build |
+| Description | Devel Build |
 | Interval Pattern | `0 3 * * *` (3am UTC daily) |
 | Cron Timezone | UTC |
 | Target Branch | `main` or `master` |
@@ -37353,8 +37355,8 @@ Jenkins provides equivalent functionality to GitHub Actions, Gitea Actions, and 
 |---------|----------------|---------------|
 | Tag push | `when { buildingTag() }` | `release.yml` |
 | Beta branch | `when { branch 'beta' }` | `beta.yml` |
-| Main/master | `when { anyOf { branch 'main'; branch 'master' } }` | `daily.yml` |
-| Scheduled | `triggers { cron('0 3 * * *') }` | `daily.yml` schedule |
+| Main/master | `when { anyOf { branch 'main'; branch 'master' } }` | `devel.yml` |
+| Scheduled | `triggers { cron('0 3 * * *') }` | `devel.yml` schedule |
 | All branches | Default (no `when`) | `docker.yml` |
 
 ## Jenkinsfile
@@ -37366,7 +37368,7 @@ pipeline {
     agent none
 
     triggers {
-        // Daily build at 3am UTC (matches GitHub Actions daily.yml)
+        // Devel build at 3am UTC (matches GitHub Actions devel.yml)
         cron('0 3 * * *')
     }
 
@@ -37421,10 +37423,10 @@ pipeline {
                         env.BUILD_TYPE = 'beta'
                         env.VERSION = sh(script: 'date -u +"%Y%m%d%H%M%S"', returnStdout: true).trim() + '-beta'
                     } else if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master') {
-                        // Daily build - matches daily.yml
-                        // Daily builds are identified by the commit they're built from -
+                        // Devel build - matches devel.yml
+                        // Devel builds are identified by the commit they're built from -
                         // not a release.txt version, not a timestamp
-                        env.BUILD_TYPE = 'daily'
+                        env.BUILD_TYPE = 'devel'
                         env.VERSION = sh(script: 'git rev-parse --short=7 HEAD', returnStdout: true).trim()
                     } else {
                         // Other branches - dev build
@@ -37814,11 +37816,11 @@ pipeline {
             }
         }
 
-        // Daily Release - matches daily.yml (main/master + scheduled)
-        stage('Release: Daily') {
+        // Devel Release - matches devel.yml (main/master + scheduled)
+        stage('Release: Devel') {
             agent { label 'amd64' }
             when {
-                expression { env.BUILD_TYPE == 'daily' }
+                expression { env.BUILD_TYPE == 'devel' }
             }
             steps {
                 sh '''
@@ -37929,7 +37931,7 @@ pipeline {
             agent { label 'amd64' }
             when {
                 anyOf {
-                    expression { env.BUILD_TYPE == 'daily' }
+                    expression { env.BUILD_TYPE == 'devel' }
                     not { buildingTag() }
                 }
             }
@@ -38049,9 +38051,9 @@ REGISTRY = "ghcr.io/${PROJECT_ORG}/${INTERNAL_NAME}"
 |--------------|----------------|---------|
 | Stable | `release.yml` (tag push) | `BUILD_TYPE == 'release'` (tag) |
 | Beta | `beta.yml` (beta branch) | `BUILD_TYPE == 'beta'` (beta branch) |
-| Daily | `daily.yml` (schedule + main) | `BUILD_TYPE == 'daily'` (cron + main/master) |
+| Devel | `devel.yml` (schedule + main) | `BUILD_TYPE == 'devel'` (cron + main/master) |
 | Docker | `docker.yml` (all branches) | Docker stage (always runs) |
-| Docker devel | `docker.yml` `build-devel` job (push + daily) | Docker Devel stage (push + daily) |
+| Docker devel | `docker.yml` `build-devel` job (push + devel) | Docker Devel stage (push + devel) |
 
 ---
 
@@ -38070,7 +38072,7 @@ Before proceeding, confirm you understand:
 |---------|----------------|---------------|-----------|---------|
 | Stable release | `release.yml` | `release.yml` | `rules: tag` | `BUILD_TYPE == 'release'` |
 | Beta release | `beta.yml` | `beta.yml` | `rules: beta` | `BUILD_TYPE == 'beta'` |
-| Daily release | `daily.yml` | `daily.yml` | `rules: schedule` | `BUILD_TYPE == 'daily'` |
+| Devel release | `devel.yml` | `devel.yml` | `rules: schedule` | `BUILD_TYPE == 'devel'` |
 | Docker images | `docker.yml` | `docker.yml` | `docker:build` | Docker stage |
 | Docker devel image | `docker.yml` `build-devel` job | `docker.yml` `build-devel` job | `docker:build:devel` | Docker Devel stage |
 | Self-hosted | No | Yes | Yes | Yes |
@@ -43403,7 +43405,7 @@ On first run, a one-time setup token is generated and displayed in console. Admi
 
 | Setting | Control | Default | Restart | Description |
 |---------|---------|---------|---------|-------------|
-| `update.branch` | Dropdown | `stable` | No | Release channel: `stable` / `beta` / `daily`. Channels are cumulative; also set by `--update branch {name}` (config is the single source of truth) |
+| `update.branch` | Dropdown | `stable` | No | Release channel: `stable` / `beta` / `devel`. Channels are cumulative; also set by `--update branch {name}` (config is the single source of truth) |
 | `update.auto_install` | Toggle | Off | No | Run the full `--update yes` flow from the `update_check` task for eligible releases. Off = notify only; never touches the binary |
 | `update.defer_days` | Number | `0` | No | 0-365. A release is eligible for the scheduled task only once it is this many days old; manual `--update check` / `--update yes` ignore it. See Defer Semantics for per-channel behavior |
 | `update.cli_min_version` | Text | (empty) | No | Minimum CLI version the server accepts. Returned verbatim as `cli_min_version` by `/api/autodiscover`; empty means no minimum is enforced. Never derived from the server version |
@@ -44573,7 +44575,7 @@ The six examples below are carried forward from the two source templates this HY
 ```markdown
 ## Project description
 
-A local-first notes application with a native GUI for daily use and a CLI for scripting.
+A local-first notes application with a native GUI for devel use and a CLI for scripting.
 Notes are stored on the user's machine — no cloud sync, no telemetry, fully offline.
 
 ## Project variables
