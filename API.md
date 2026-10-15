@@ -33522,7 +33522,7 @@ exec $APP_BIN $FLAGS "$@"
 | `image:` tag | `:latest` in `docker-compose.yml` (production) · `:devel` in `docker-compose.dev.yml` and `docker-compose.test.yml` |
 | `version:` | **NEVER include** |
 | `name:` | `{project_name}` (production) · `{project_name}-dev` (dev) · `{project_name}-test` (test) |
-| `container_name:` | **Always set**, one fixed name per compose file: production `{project_name}-app`, `{project_name}-db`, `{project_name}-cache` (only the services that file includes) · dev `{project_name}-dev` · test `{project_name}-test`, `{project_name}-cache-test` |
+| `container_name:` | **Always set**, one fixed name per service, the same in production, dev, and test: `{project_name}-app`, `{project_name}-db`, `{project_name}-cache` (only the services that file includes). Dev and test never run on a production host, so a clash fails `docker compose up` instead of replacing production; their compose `name:` and network keep the `-dev` / `-test` suffix so it fails rather than adopting production's project |
 | Main service name | `{project_name}` (matches project name in every variant) |
 | `pull_policy:` | `always` on every service |
 | `restart:` | `always` (production/dev) · `"no"` (test — services are ephemeral) |
@@ -33611,7 +33611,7 @@ networks:
 | Field | Value | Description |
 |-------|-------|-------------|
 | `name:` | `{project_name}` / `{project_name}-dev` / `{project_name}-test` | Top-level compose project name, per variant |
-| `container_name:` | production `{project_name}-app`, `{project_name}-db`, `{project_name}-cache` · dev `{project_name}-dev` · test `{project_name}-test`, `{project_name}-cache-test` | e.g., `jokes-app`, `jokes-db`, `jokes-cache`, `jokes-dev`, `jokes-test`; the dev and test names keep those stacks from colliding with production |
+| `container_name:` | `{project_name}-app`, `{project_name}-db`, `{project_name}-cache` in every file (production, dev, test) | e.g., `jokes-app`, `jokes-db`, `jokes-cache`; dev and test reuse production's names on purpose, so running them on a production host fails loudly |
 | Main service | `{project_name}` | Service name matches project name |
 | Database service | `{project_name}-db` | Database service name |
 | `hostname:` | `{project_name}` | Hardcoded container hostname |
@@ -33660,7 +33660,7 @@ x-logging: &default-logging
 services:
   {project_name}:
     image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:devel
-    container_name: {project_name}-dev
+    container_name: {project_name}-app
     hostname: {project_name}
     restart: always
     pull_policy: always
@@ -33700,11 +33700,11 @@ docker compose -f docker/docker-compose.dev.yml up -d
 | Service Type | Service Name | Container Name |
 |--------------|--------------|-----------------|
 | Main app (production) | `{project_name}` | `{project_name}-app` |
-| Main app (dev) | `{project_name}` | `{project_name}-dev` |
-| Main app (test) | `{project_name}` | `{project_name}-test` |
+| Main app (dev) | `{project_name}` | `{project_name}-app` |
+| Main app (test) | `{project_name}` | `{project_name}-app` |
 | Database | `{project_name}-db` | `{project_name}-db` |
 | Cache (Valkey, production) | `{project_name}-cache` | `{project_name}-cache` |
-| Cache (Valkey, test) | `{project_name}-cache-test` | `{project_name}-cache-test` |
+| Cache (Valkey, test) | `{project_name}-cache` | `{project_name}-cache` |
 | Proxy (Nginx) | `{project_name}-proxy` | `{project_name}-proxy` |
 
 ### Compose Variants
@@ -33898,7 +33898,7 @@ services:
   {project_name}:
     image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:devel
     pull_policy: always
-    container_name: {project_name}-test
+    container_name: {project_name}-app
     hostname: {project_name}
     restart: "no"
     logging: *default-logging
@@ -33907,7 +33907,7 @@ services:
       MODE: development
       PORT: 80
       TZ: ${TZ:-America/New_York}
-      CACHE_URL: valkey://{project_name}-cache-test:6379
+      CACHE_URL: valkey://{project_name}-cache:6379
     volumes:
       - ./volumes/config:/config:z
       - ./volumes/data:/data:z
@@ -33920,14 +33920,14 @@ services:
       retries: 3
       start_period: 90s
     depends_on:
-      {project_name}-cache-test:
+      {project_name}-cache:
         condition: service_healthy
     networks:
       - {project_name}-test
 
-  {project_name}-cache-test:
+  {project_name}-cache:
     image: valkey/valkey:alpine
-    container_name: {project_name}-cache-test
+    container_name: {project_name}-cache
     restart: "no"
     logging: *default-logging
     tmpfs:

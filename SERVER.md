@@ -40772,7 +40772,7 @@ exec $APP_BIN $FLAGS "$@"
 | `version:` | **NEVER include** |
 | `image:` tag | `:latest` in `docker-compose.yml` (production) · `:devel` in `docker-compose.dev.yml` and `docker-compose.test.yml` |
 | `name:` | `{project_name}` (top-level) |
-| `container_name:` | **Always set**, one fixed name per compose file: production `{project_name}-app`, `{project_name}-db`, `{project_name}-cache` (only the services that file includes) · dev `{project_name}-dev` · test `{project_name}-test`, `{project_name}-cache-test` |
+| `container_name:` | **Always set**, one fixed name per service, the same in production, dev, and test: `{project_name}-app`, `{project_name}-db`, `{project_name}-cache` (only the services that file includes). Dev and test never run on a production host, so a clash fails `docker compose up` instead of replacing production; their compose `name:` and network keep the `-dev` / `-test` suffix so it fails rather than adopting production's project |
 | Main service name | `{project_name}` (matches project name) |
 | `pull_policy:` | `always` |
 | `restart:` | `always` |
@@ -40853,7 +40853,7 @@ networks:
 | Field | Value | Description |
 |-------|-------|-------------|
 | `name:` | `{project_name}` | Top-level compose project name |
-| `container_name:` | production `{project_name}-app`, `{project_name}-db`, `{project_name}-cache` · dev `{project_name}-dev` · test `{project_name}-test`, `{project_name}-cache-test` | e.g., `jokes-app`, `jokes-db`, `jokes-cache`, `jokes-dev`, `jokes-test`; the dev and test names keep those stacks from colliding with production |
+| `container_name:` | `{project_name}-app`, `{project_name}-db`, `{project_name}-cache` in every file (production, dev, test) | e.g., `jokes-app`, `jokes-db`, `jokes-cache`; dev and test reuse production's names on purpose, so running them on a production host fails loudly |
 | Main service | `{project_name}` | Service name matches project name |
 | Database service | `{project_name}-db` | Database service name |
 | Cache service | `{project_name}-cache` | Valkey cache service name |
@@ -41585,7 +41585,7 @@ services:
   {project_name}:
     image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:devel
     pull_policy: always
-    container_name: {project_name}-dev
+    container_name: {project_name}-app
     hostname: {project_name}
     restart: always
     logging: *default-logging
@@ -41738,7 +41738,7 @@ services:
   {project_name}:
     image: {PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}:devel
     pull_policy: always
-    container_name: {project_name}-test
+    container_name: {project_name}-app
     hostname: {project_name}
     restart: "no"
     logging: *default-logging
@@ -41747,7 +41747,7 @@ services:
       MODE: development
       PORT: 80
       TZ: America/New_York
-      CACHE_URL: valkey://{project_name}-cache-test:6379
+      CACHE_URL: valkey://{project_name}-cache:6379
     ports:
       - "172.17.0.1:64581:80"
     volumes:
@@ -41763,15 +41763,15 @@ services:
       retries: 3
       start_period: 90s
     depends_on:
-      {project_name}-cache-test:
+      {project_name}-cache:
         condition: service_healthy
     networks:
       - {project_name}-test
 
-  {project_name}-cache-test:
+  {project_name}-cache:
     image: valkey/valkey:alpine
     pull_policy: always
-    container_name: {project_name}-cache-test
+    container_name: {project_name}-cache
     restart: "no"
     logging: *default-logging
     tmpfs:
