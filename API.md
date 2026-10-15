@@ -43672,7 +43672,8 @@ let user_agent = format!("{}-cli/{}", PROJECT_NAME, version);
 
 ```yaml
 update:
-  # default false for CLI (interactive prompt unless explicitly opted in). Server default true.
+  # default false: the CLI prompts unless this is true AND the run is non-interactive AND --update yes was passed.
+  # The server's equivalent is server.update.auto_install (default false).
   auto: false
   # CLI is short-lived; checks once per command. No background poll.
   check_interval: per_invocation
