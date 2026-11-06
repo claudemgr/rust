@@ -24567,7 +24567,8 @@ if (new URLSearchParams(window.location.search).get('source') === 'pwa') {
 | Badging API | Yes | No |
 | Web Share Target | Yes | No |
 
-**iOS-specific meta tags:**```html
+**iOS-specific meta tags:**
+```html
 <head>
   <!-- Standard manifest -->
   <link rel="manifest" href="/manifest.json">
