@@ -2945,12 +2945,12 @@ Exceptions (do NOT translate):
 3. Ask for explicit permission to deviate
 4. Document deviation if approved
 
-### Editing AI.md
+### Reading AI.md (it is read-only)
 
 1. Search first: `grep -n "keyword" AI.md`
 2. Read the PART completely
-3. Update existing content (don't duplicate)
-4. Update PART index line numbers after edits
+3. **Never edit `AI.md` in a project** — it is a read-only copy of the template. Project values go in `IDEA.md ## Project variables`; deviations go in `SPEC.md`
+4. Changes to the spec itself are made only in the template source repository, then re-copied into projects
 
 **See Critical Rules: "Files & Directories Master Rules" for allowed files/directories - nothing else.**
 
