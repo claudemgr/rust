@@ -151,7 +151,7 @@ Free-form prose. This is the human-readable elevator pitch.)
 
 (All project variables in `key: value` form. Values are the canonical source used to
 resolve placeholders referenced in AI.md. Required keys at minimum: `project_name`, `project_org`,
-`internal_name`. Add more as the project needs — `app_name`, `official_site`,
+`internal_name`, `internal_org`. Add more as the project needs — `app_name`, `official_site`,
 `maintainer_name`, `maintainer_email`, etc. Use lower_snake_case for keys.)
 
 Example:
@@ -160,8 +160,10 @@ Example:
     project_org:   casjay
     # STABLE — set at first-time setup; change only on an explicit rename or fork reset
     internal_name: jokes
+    # STABLE — set at first-time setup; change only on an explicit rename or fork reset
+    internal_org:  casjay
     app_name:      jokes
-    official_site: jokes.example.com
+    official_site: https://jokes.example.com
 
 **`{plist_name}` is NOT stored** — it is derived at substitution time as
 `io.github.{project_org}.{internal_name}`.
@@ -175,6 +177,7 @@ Example:
   it is allowed only on an explicit org/repo rename (with a coordinated migration of
   every directory, service, and plist on every host) or at a fork's first setup.
 - A project rename changes `project_name` only. `internal_name` stays.
+- `internal_org` follows the same freeze rule: initial value MUST equal `project_org`, stable once the project ships, and an org rename changes `project_org` only.
 
 ## Business logic
 
@@ -1369,7 +1372,7 @@ For complete details, see AI.md PART 0, 1
 - ✅ Progressive enhancement (works without JS)
 - ✅ Mobile-first responsive CSS
 - ✅ CSS `word-break: break-all` for long strings (IPv6, .onion, tokens)
-- ✅ All settings configurable via API and config file
+- ✅ All settings configurable via `server.yml` (file-only: no runtime config API, no admin UI)
 - ✅ WCAG 2.1 AA accessibility
 - ✅ Touch targets minimum 44x44px
 - ✅ /server/about content from IDEA.md (name, tagline, description, features)
@@ -1599,7 +1602,7 @@ Purpose:
 4. All features work without JavaScript
 5. Tor hidden service support (auto-enabled if Tor found)
 6. Built-in scheduler, GeoIP, metrics, email, backup, update
-7. All settings configurable via API and config file
+7. All settings configurable via `server.yml` (file-only, hot-reloaded)
 8. Client binary for ALL projects
 9. Commit via `gitcommit --dir {project_dir} all` — each with a fresh accurate `.git/COMMIT_MESS`. See "gitcommit Script" → "Commit Cadence". A commit's scope is the resolved unit of work, not "one fix" by default — decide the scope BEFORE fixing, in this order (first match wins): **(1)** user states or implies a single commit → everything for that request in one commit, overriding every rule below; **(2)** ad hoc "fix X and anything else you find" → one commit for the whole request; **(3)** multi-file bug fixes → one commit per group of files actually coupled by dependency/root cause, split when files are independent; **(4)** findings-based work (audits, reviews, numbered fix-lists) → one commit per finding by default, batched only when genuinely inseparable; **(5)** feature work → one commit for the entire feature plus directly-related bugs, never split per part. Unrelated bugs found mid-feature go to `TODO.AI.md`, except app-breaking bugs, which must be fixed immediately. **Subagents never commit, no exceptions** — complete edits and report back to the parent instance; only the parent reviews the diff and owns the commit.
 
@@ -2974,7 +2977,7 @@ Getting code correct on the first try is much harder than iterating with feedbac
 | Configuration / settings | Start the binary with the new config; verify defaults; verify validation rejects bad input with a useful error |
 | Docker / container build | Build the image; run the container; smoke-test at least one endpoint or command to confirm the image actually starts and serves |
 | CI/CD workflow | Run the workflow on a branch (or via `act`/equivalent dry-run); verify each job's exit status, not just YAML validity |
-| Health / observability | Hit `/healthz`, `/readyz`, `/server/metrics`; verify scrape format and that new metrics actually appear |
+| Health / observability | Hit `/server/healthz` (and `/healthz` when `server.healthz.root.enabled` is true), `/server/metrics`; verify scrape format and that new metrics actually appear |
 | Logging / error paths | Trigger the error path; verify the log line/structured event was emitted with expected fields |
 | i18n / translation | Switch each supported locale; verify text renders correctly and no placeholders leak |
 | Security-sensitive change (auth, crypto, input validation) | Test both the success path AND attempted bypass paths; never assume a guard works without exercising it |
@@ -4388,7 +4391,7 @@ sqlx::query(&format!("SELECT * FROM users WHERE email = '{}'", email))
 
 ### Rate Limiting Defaults
 
-**These are sensible defaults - all limits are configurable via API and config file.**
+**These are sensible defaults - all limits are configurable via `server.yml` (file-only, hot-reloaded).**
 
 | Endpoint Type | Default Limit | Default Window | Response |
 |---------------|---------------|----------------|----------|
@@ -16353,7 +16356,7 @@ server:
 |----------------|---------------|--------|-------|
 | Read (GET, HEAD) | 120 req/min | 60s | Per IP (anonymous) or per token (authenticated), sliding window |
 | Write (POST, PUT, PATCH, DELETE) | 10 req/min | 60s | Per IP (anonymous) or per token (authenticated), sliding window |
-| Health / status | 120 req/min | 60s | `/healthz`, `/readyz`, `/livez` |
+| Health / status | 120 req/min | 60s | `/server/healthz` (and the optional `/healthz` root alias) |
 | Global burst | 240 req/min | 60s | Absolute ceiling across all types |
 
 **Response when limited:** `429 Too Many Requests` with `Retry-After` header set to seconds until the window resets. Body: `{"ok":false,"error":"RATE_LIMITED","message":"Too many requests","details":{"retry_after":N}}` — retry seconds go in `details` and the `Retry-After` header, never as a top-level field (PART 14).
@@ -23708,7 +23711,7 @@ async function revokeLocalToken() {
 
 **This page must be editable, not read-only:** every cookie above except `{project_name}_build` needs a control on `/server/preferences` that the visitor can act on directly — a theme selector, a language selector, cookie-consent category toggles (reachable here, not only from the first-visit banner), a CCPA opt-out toggle, and a control for every app-specific `{project_name}_pref_*` setting below. Rendering the current values as plain text with no way to change them turns a preferences page into a status page — the entire point of this page is letting the guest change these settings in place. The page layout, buttons and save behavior are fixed by rules 13–17 of the sync contract below. `{project_name}_build` is the one exemption from the control requirement: it is an automatic, device-local cache-purge stamp set by the server on the first HTML response — it has no control, is never exported or imported, and is removed only by Reset.
 
-**App-specific guest preferences:** the table above is the base set every project needs; a project adds its own guest-scoped preferences as further cookies of the same kind, recorded in IDEA.md and never as new rows in this `AI.md` table (a project whose table lacks its `{project_name}_pref_*` cookies is correct, not incomplete): settings a visitor can adjust without an account (default view mode, results-per-page, sort order, syntax-highlighting theme, unit system, etc.). Name them `{project_name}_pref_{key}`, document each one (exact name, allowed values, default, export/import behavior) in IDEA.md `## Business logic` → `### Product scope & non-goals` — `AI.md` is read-only, so the base table above is never edited, and hold them to the same rules as `theme`/`lang`: cookie-only, read per request, never persisted server-side. They belong here because API projects have no authenticated end-user accounts to attach a preference to (only `Server`/`Operator` plus credential-only owners — see "Account Types") — if a setting genuinely needs identity-scoping, it belongs on the relevant resource/tenant config, never in a user-preferences table, since none exists here.
+**App-specific guest preferences:** the table above is the base set every project needs; a project adds its own guest-scoped preferences as further cookies of the same kind, recorded in IDEA.md `## Business logic` → `### Product scope & non-goals` and never as new rows in this `AI.md` table (a project whose table lacks its `{project_name}_pref_*` cookies is correct, not incomplete): settings a visitor can adjust without an account (default view mode, results-per-page, sort order, syntax-highlighting theme, unit system, etc.). Name them `{project_name}_pref_{key}`, document each one (exact name, allowed values, default, export/import behavior) in IDEA.md `## Business logic` → `### Product scope & non-goals` — `AI.md` is read-only, so the base table above is never edited, and hold them to the same rules as `theme`/`lang`: cookie-only, read per request, never persisted server-side. They belong here because API projects have no authenticated end-user accounts to attach a preference to (only `Server`/`Operator` plus credential-only owners — see "Account Types") — if a setting genuinely needs identity-scoping, it belongs on the relevant resource/tenant config, never in a user-preferences table, since none exists here.
 
 **Preference writes (JS enhancement — the server sets the same cookies on its POST endpoints):**
 ```javascript
@@ -27305,7 +27308,7 @@ pub fn tracking_script(consent: Option<&Consent>, cfg: &Config) -> String {
 | Application name | `IDEA.md` → Project Name | "JokeAPI" |
 | Tagline | `IDEA.md` → Tagline | "A free API for random jokes" |
 | Description | `IDEA.md` → Description section | Actual project description |
-| Features | `IDEA.md` → Features section | List actual features from IDEA.md |
+| Features | `IDEA.md ## Business logic` (features and user flows) | List actual features from IDEA.md |
 | Links | `IDEA.md` → Links/URLs or infer from projectorg/projectname | GitHub, docs URLs |
 
 **DO NOT use:**
@@ -27728,7 +27731,7 @@ pub fn tracking_script(consent: Option<&Consent>, cfg: &Config) -> String {
 | Section | Source | What to include |
 |---------|--------|-----------------|
 | Getting started | `IDEA.md` + actual endpoints | Real curl examples using actual API endpoints |
-| Features | `IDEA.md` → Features | How to USE each feature (not just list them) |
+| Features | `IDEA.md ## Business logic` (features and user flows) | How to USE each feature (not just list them) |
 | FAQ | Common questions for THIS project type | Real questions users would ask |
 | Troubleshooting | Actual error scenarios | Real errors and solutions |
 
@@ -27894,7 +27897,7 @@ When `server.mcp.enabled` is `false`, both routes return `404` and no link to th
 | `#limits` | Behavior and limits | `POST` only; no sessions; the same rate limits and audit as the API; `Origin` validated; the supported MCP protocol versions |
 | `#troubleshooting` | Troubleshooting | A table of `400` (protocol-version or header mismatch), `401` (missing, invalid or expired token — `WWW-Authenticate: Bearer`), `403` (bad `Origin` or insufficient scope), `404` (MCP disabled), `405` (GET or DELETE; the endpoint is POST-only) with the fix for each |
 
-**Project expansion (required content):** the project appends its own section, `#project`, after the base sections. The text comes from IDEA.md and is stored as Markdown in `pages.help.mcp` (editable in the admin panel's Pages → Help editor where an admin panel exists). It MUST use the project's real tool names and real data — example prompts a user can paste into an assistant, per-tool tips and limits, and documentation of any MCP resources or prompts the project exposes. It never repeats or contradicts the base sections, and generic placeholder text is forbidden (same rule as `/server/help`).
+**Project expansion (required content):** the project appends its own section, `#project`, after the base sections. The text comes from IDEA.md `## Business logic` and is stored as Markdown in `pages.help.mcp` (editable in the admin panel's Pages → Help editor where an admin panel exists). It MUST use the project's real tool names and real data — example prompts a user can paste into an assistant, per-tool tips and limits, and documentation of any MCP resources or prompts the project exposes. It never repeats or contradicts the base sections, and generic placeholder text is forbidden (same rule as `/server/help`).
 
 **JSON body (`GET /api/{api_version}/server/help/mcp`, envelope `{ "ok": true, "data": ... }`; field names are fixed):**
 ```json
@@ -47120,7 +47123,7 @@ internal_name:   {project_name}
 # STABLE — equals project_org on first install; change only on an explicit rename or fork reset
 internal_org:    {project_org}
 app_name:        {project_name}
-official_site:   {fqdn}
+official_site:   https://{fqdn}
 maintainer_name: {maintainer_name — defaults to {project_org} if unset}
 maintainer_email: {maintainer_email — or empty; used only if set}
 
@@ -47171,7 +47174,7 @@ project_org:     casjay
 internal_name:   jokes-api
 internal_org:    casjay
 app_name:        Jokes API
-official_site:   jokes.example.com
+official_site:   https://jokes.example.com
 maintainer_name: Jane Doe
 maintainer_email: jane@example.com
 
@@ -47224,7 +47227,7 @@ project_org:     casjay
 internal_name:   linkshort
 internal_org:    casjay
 app_name:        LinkShort
-official_site:   short.example.com
+official_site:   https://short.example.com
 maintainer_name: Jane Doe
 maintainer_email: jane@example.com
 
@@ -47277,7 +47280,7 @@ project_org:     casjay
 internal_name:   weather-api
 internal_org:    casjay
 app_name:        Weather API
-official_site:   weather.example.com
+official_site:   https://weather.example.com
 maintainer_name: Jane Doe
 maintainer_email: jane@example.com
 
@@ -47700,7 +47703,7 @@ make docker
 ### Phase 6: Email & Notifications (PART 17)
 
 **PART 17: Email & Notifications**
-- [ ] SMTP configuration in config file and API
+- [ ] SMTP configuration in `server.yml` (file-only; no runtime config API)
 - [ ] Email disabled gracefully if no SMTP
 - [ ] Customizable email templates
 - [ ] WebUI notifications always available
