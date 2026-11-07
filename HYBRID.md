@@ -3343,14 +3343,28 @@ pub fn safe_path(input: &str) -> Result<String, PathError> {
 
 **Configuration paths:**
 
-**CLI flags:**
+**CLI flags (filesystem directory overrides: `--config`, `--data`, `--cache`, `--log`, `--backup`):** these are real filesystem paths, so `safe_path` (URL and route normalization) is NOT used. It strips the leading slash and enforces the URL segment charset, which would turn `--data /var/lib/app` into the relative path `var/lib/app`. Use `safe_dir_path`: it preserves absolute paths, rejects NUL and control characters and any `..` component in the raw input, and returns the cleaned path. Relative inputs are accepted and resolved against the working directory at startup.
 ```rust
+use std::path::{Component, Path, PathBuf};
+
+// safe_dir_path validates a filesystem directory override and preserves absolute paths
+pub fn safe_dir_path(input: &str) -> anyhow::Result<PathBuf> {
+    if input.is_empty() || input.chars().any(|c| c == '\0' || c == '\r' || c == '\n') {
+        anyhow::bail!("invalid characters");
+    }
+    let path = Path::new(input);
+    if path.components().any(|c| matches!(c, Component::ParentDir)) {
+        anyhow::bail!("path traversal");
+    }
+    Ok(path.components().collect())
+}
+
 fn parse_flags(matches: &clap::ArgMatches) -> anyhow::Result<()> {
     let data_dir = matches.get_one::<String>("data").map(|s| s.as_str()).unwrap_or("/var/lib/app");
 
-    let safe = safe_path(data_dir)
+    let safe = safe_dir_path(data_dir)
         .map_err(|e| anyhow::anyhow!("invalid --data path: {}", e))?;
-    cfg.data_dir = safe;
+    cfg.data_dir = safe.to_string_lossy().into_owned();
     Ok(())
 }
 ```

@@ -7481,8 +7481,22 @@ impl Config {
 }
 ```
 
-**CLI flags:**
+**CLI flags (filesystem directory overrides: `--config`, `--data`, `--cache`, `--log`, `--backup`):** these are real filesystem paths, so `safe_path` (URL and route normalization) is NOT used. It strips the leading slash and enforces the URL segment charset, which would turn `--data /var/lib/app` into the relative path `var/lib/app`. Use `safe_dir_path`: it preserves absolute paths, rejects NUL and control characters and any `..` component in the raw input, and returns the cleaned path. Relative inputs are accepted and resolved against the working directory at startup.
 ```rust
+use std::path::{Component, Path, PathBuf};
+
+// safe_dir_path validates a filesystem directory override and preserves absolute paths
+pub fn safe_dir_path(input: &str) -> anyhow::Result<PathBuf> {
+    if input.is_empty() || input.chars().any(|c| c == '\0' || c == '\r' || c == '\n') {
+        anyhow::bail!("invalid characters");
+    }
+    let path = Path::new(input);
+    if path.components().any(|c| matches!(c, Component::ParentDir)) {
+        anyhow::bail!("path traversal");
+    }
+    Ok(path.components().collect())
+}
+
 use clap::Parser;
 
 #[derive(Parser)]
@@ -7491,10 +7505,10 @@ struct Cli {
     data: String,
 }
 
-fn parse_args() -> Result<Config, PathError> {
+fn parse_args() -> anyhow::Result<Config> {
     let cli = Cli::parse();
-    let safe = safe_path(&cli.data)?;
-    Ok(Config { data_dir: safe, ..Default::default() })
+    let safe = safe_dir_path(&cli.data)?;
+    Ok(Config { data_dir: safe.to_string_lossy().into_owned(), ..Default::default() })
 }
 ```
 
@@ -9356,7 +9370,8 @@ Before proceeding, confirm you understand:
 **Mode:**
 1. `--mode` CLI flag (highest priority)
 2. `MODE` environment variable
-3. Default: `production`
+3. `server.mode` in `server.yml` (a supported source, read only when neither of the above is set)
+4. Default: `production`
 
 **Debug:**
 1. `--debug` CLI flag (highest priority)

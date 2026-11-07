@@ -7096,14 +7096,28 @@ pub fn safe_path(input: &str) -> Result<String, PathError> {
 
 **Configuration paths:**
 
-**CLI flags:**
+**CLI flags (filesystem directory overrides: `--config`, `--data`, `--cache`, `--log`, `--backup`):** these are real filesystem paths, so `safe_path` (URL and route normalization) is NOT used. It strips the leading slash and enforces the URL segment charset, which would turn `--data /var/lib/app` into the relative path `var/lib/app`. Use `safe_dir_path`: it preserves absolute paths, rejects NUL and control characters and any `..` component in the raw input, and returns the cleaned path. Relative inputs are accepted and resolved against the working directory at startup.
 ```rust
+use std::path::{Component, Path, PathBuf};
+
+// safe_dir_path validates a filesystem directory override and preserves absolute paths
+pub fn safe_dir_path(input: &str) -> anyhow::Result<PathBuf> {
+    if input.is_empty() || input.chars().any(|c| c == '\0' || c == '\r' || c == '\n') {
+        anyhow::bail!("invalid characters");
+    }
+    let path = Path::new(input);
+    if path.components().any(|c| matches!(c, Component::ParentDir)) {
+        anyhow::bail!("path traversal");
+    }
+    Ok(path.components().collect())
+}
+
 fn parse_flags(matches: &clap::ArgMatches) -> anyhow::Result<()> {
     let data_dir = matches.get_one::<String>("data").map(|s| s.as_str()).unwrap_or("/var/lib/app");
 
-    let safe = safe_path(data_dir)
+    let safe = safe_dir_path(data_dir)
         .map_err(|e| anyhow::anyhow!("invalid --data path: {}", e))?;
-    cfg.data_dir = safe;
+    cfg.data_dir = safe.to_string_lossy().into_owned();
     Ok(())
 }
 ```
@@ -8713,7 +8727,8 @@ Before proceeding, confirm you understand:
 **Mode:**
 1. `--mode` CLI flag (highest priority)
 2. `MODE` environment variable
-3. Default: `production`
+3. `server.mode` in `server.yml` (a supported source, read only when neither of the above is set)
+4. Default: `production`
 
 **Debug:**
 1. `--debug` CLI flag (highest priority)
@@ -28447,15 +28462,11 @@ Next run: {next_run}
 
 Templates are stored as files on disk. Override any built-in template by placing a file in the configured template directory. Use `{project_name} email test` to send a test email and verify configuration.
 
-**Editor Features:**
-- Syntax highlighting for `{variables}`
-- Variable autocomplete
-- Live preview with sample data
-- Validation (warn if unknown variables used)
+**No web editor:** API projects have no admin or settings UI (PART 16), so templates are edited as files on disk and hot-reloaded. Validation and preview run from the CLI: `{project_name} email test --dry-run` renders every template with the sample data below and runs the validation below without sending anything (it warns on unknown `{variables}`).
 
 ### Template Preview
 
-**Editor Layout:** Subject field, body editor with syntax highlighting, variable sidebar (click to insert), live preview with sample data, action buttons (Send Test, Reset to Default, Save).
+**Preview:** `--dry-run` prints each template's subject and body with the sample data. **Reset to default:** delete the override file in `{config_dir}/template/`; the embedded default applies on the next reload.
 
 **Sample Data for Preview:**
 | Variable | Sample Value |
@@ -28469,15 +28480,15 @@ Templates are stored as files on disk. Override any built-in template by placing
 
 ### Send Test Email
 
-**Dialog:** Email input (defaults to `server.notifications.email.reply_to`), warning that it sends real email with sample data, Cancel/Send Test buttons.
+**Command:** `{project_name} email test [--to ADDRESS]` (the recipient defaults to `server.notifications.email.reply_to`); it sends real email with sample data.
 
 **Rules:** Requires SMTP, uses sample data, subject prefixed `[TEST]`, logged to audit log.
 
-**Success toast:** Shows recipient, template name, subject line.
+**Confirmation:** the command prints the recipient, template name and subject line.
 
 ### Template Validation
 
-**Templates are validated before saving:**
+**Templates are validated before they are loaded and by `--dry-run`:**
 
 | Check | Error Message |
 |-------|---------------|
