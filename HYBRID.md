@@ -40893,6 +40893,9 @@ server:
     # Circuit timeout (how long before giving up)
     circuit_timeout: 60s
 
+    # Startup timeout (wait for Tor to publish its control_port file)
+    startup_timeout: 60s
+
     # Bootstrap timeout (wait for Tor network connection)
     bootstrap_timeout: 3m
 
@@ -41242,6 +41245,10 @@ pub struct TorService {
     tor_backend_port: u16,
     // SOCKS listener address for outbound Tor connections (None if disabled)
     socks_addr: Option<String>,
+    // Control port address discovered at startup (127.0.0.1:{port})
+    control_addr: String,
+    // {data_dir}/tor (holds control_auth_cookie)
+    data_dir: std::path::PathBuf,
 }
 
 // TorConfig holds Tor-related configuration from server config
@@ -41258,6 +41265,8 @@ pub struct TorConfig {
     pub max_circuits: u32,
     // 10-300s, default 60
     pub circuit_timeout: u32,
+    // 10-300s, default 60 (control_port file wait)
+    pub startup_timeout: u32,
     // 30-600s, default 180
     pub bootstrap_timeout: u32,
 
@@ -41291,6 +41300,7 @@ pub fn default_tor_config() -> TorConfig {
         use_network: false,
         max_circuits: 32,
         circuit_timeout: 60,
+        startup_timeout: 60,
         bootstrap_timeout: 180,
         safe_logging: true,
         max_streams_per_circuit: 100,
@@ -41354,28 +41364,68 @@ pub async fn start_dedicated_tor(cfg: &TorConfig) -> anyhow::Result<TorService> 
     update_torrc(&torrc_path, torrc_content.as_bytes()).await?;
     tracing::info!("Regenerated torrc at {:?} (backend port {})", torrc_path, tor_backend_port);
 
+    // A leftover control_port file from a previous run MUST NOT be trusted
+    let control_port_file = tor_data_dir.join("control_port");
+    let _ = tokio::fs::remove_file(&control_port_file).await;
+
     // Start OUR OWN Tor process - completely separate from system Tor
     // Server starts → Tor starts; Server stops → Tor stops
-    let child = tokio::process::Command::new(&tor_binary)
+    // __OwningControllerProcess: Tor exits by itself if this server dies (crash/SIGKILL)
+    let mut child = tokio::process::Command::new(&tor_binary)
         .arg("-f")
         .arg(&torrc_path)
         .arg("--DataDirectory")
         .arg(&tor_data_dir)
+        .arg("--__OwningControllerProcess")
+        .arg(std::process::id().to_string())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .kill_on_drop(true)
         .spawn()
         .map_err(|e| anyhow!("failed to start dedicated tor: {}", e))?;
 
-    // Wait for bootstrap: Tor writes the hostname file once the hidden
-    // service descriptor is set up (bootstrap timeout from config, default 3m)
+    // 1. Wait for a COMPLETE "PORT=127.0.0.1:{port}" line (startup_timeout, default 60s)
+    let startup_timeout = std::time::Duration::from_secs(cfg.startup_timeout as u64);
+    let control_addr = match wait_control_port(&mut child, &control_port_file, startup_timeout).await {
+        Ok(addr) => addr,
+        Err(e) => {
+            stop_tor(&mut child, None).await;
+            return Err(anyhow!("tor control port: {}", e));
+        }
+    };
+
+    // 2. Wait for Bootstrapped 100% via the control port (bootstrap_timeout, default 3m)
     let bootstrap_timeout = std::time::Duration::from_secs(cfg.bootstrap_timeout as u64);
-    let service_id = tokio::time::timeout(bootstrap_timeout, wait_for_hostname(&hostname_path))
-        .await
-        .map_err(|_| anyhow!("tor bootstrap timeout"))??;
+    if let Err(e) = tokio::time::timeout(
+        bootstrap_timeout,
+        wait_bootstrapped(&tor_data_dir, &control_addr),
+    )
+    .await
+    .map_err(|_| anyhow!("tor bootstrap timeout"))
+    .and_then(|r| r)
+    {
+        stop_tor(&mut child, Some((&tor_data_dir, &control_addr))).await;
+        return Err(e);
+    }
+
+    // 3. Tor writes the hostname file at startup; it exists by now, but never read it once without a wait
+    let service_id = match tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        wait_for_hostname(&hostname_path),
+    )
+    .await
+    {
+        Ok(Ok(id)) => id,
+        _ => {
+            stop_tor(&mut child, Some((&tor_data_dir, &control_addr))).await;
+            return Err(anyhow!("tor hostname file missing after bootstrap"));
+        }
+    };
 
     let mut svc = TorService {
         child,
+        control_addr: control_addr.clone(),
+        data_dir: tor_data_dir.clone(),
         service_id: service_id.clone(),
         tor_backend_port,
         socks_addr: None,
@@ -41383,7 +41433,7 @@ pub async fn start_dedicated_tor(cfg: &TorConfig) -> anyhow::Result<TorService> 
 
     // Discover the runtime SOCKS listener if outbound is enabled
     if cfg.use_network {
-        match query_socks_addr(&tor_data_dir).await {
+        match query_socks_addr(&tor_data_dir, &control_addr).await {
             Ok(addr) => {
                 svc.socks_addr = Some(addr);
                 tracing::info!("Tor outbound connections enabled");
@@ -41421,25 +41471,54 @@ async fn wait_for_hostname(path: &std::path::Path) -> anyhow::Result<String> {
     }
 }
 
-// query_socks_addr reads the control port file (ControlPortWriteToFile),
-// authenticates with the control cookie, and asks Tor for the runtime
-// SOCKS listener address via GETINFO net/listeners/socks
-async fn query_socks_addr(tor_data_dir: &std::path::Path) -> anyhow::Result<String> {
+// parse_control_port matches ONLY a complete control_port file line (Tor writes it
+// non-atomically, so an empty or partial file is normal during startup)
+fn parse_control_port(contents: &str) -> Option<String> {
+    let addr = contents.strip_suffix('\n')?.strip_prefix("PORT=127.0.0.1:")?;
+    match addr.parse::<u16>() {
+        Ok(port) if port > 0 => Some(format!("127.0.0.1:{}", port)),
+        _ => None,
+    }
+}
+
+// wait_control_port polls the control_port file every 250 ms until a COMPLETE valid
+// line appears, the timeout elapses, or the tor child exits
+async fn wait_control_port(
+    child: &mut tokio::process::Child,
+    file: &std::path::Path,
+    timeout: std::time::Duration,
+) -> anyhow::Result<String> {
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        if let Some(status) = child.try_wait()? {
+            return Err(anyhow!("tor exited before opening the control port: {}", status));
+        }
+        // Missing, empty, or partial file is NOT an error: keep polling
+        if let Ok(contents) = tokio::fs::read_to_string(file).await {
+            if let Some(addr) = parse_control_port(&contents) {
+                return Ok(addr);
+            }
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(anyhow!("control_port file not ready after {:?}", timeout));
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    }
+}
+
+// control_command authenticates with the control cookie (CookieAuthentication 1),
+// sends one command, and returns the reply lines up to and including the final "250 " line
+async fn control_command(
+    tor_data_dir: &std::path::Path,
+    control_addr: &str,
+    command: &str,
+) -> anyhow::Result<Vec<String>> {
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
-    // Control port file content: "PORT=127.0.0.1:{port}\n"
-    let port_line = tokio::fs::read_to_string(tor_data_dir.join("control_port")).await?;
-    let control_addr = port_line
-        .trim()
-        .strip_prefix("PORT=")
-        .ok_or_else(|| anyhow!("unexpected control port file format"))?
-        .to_string();
-
-    // Cookie authentication (CookieAuthentication 1 in torrc)
     let cookie = tokio::fs::read(tor_data_dir.join("control_auth_cookie")).await?;
     let cookie_hex: String = cookie.iter().map(|b| format!("{:02x}", b)).collect();
 
-    let stream = tokio::net::TcpStream::connect(&control_addr).await?;
+    let stream = tokio::net::TcpStream::connect(control_addr).await?;
     let (read_half, mut write_half) = stream.into_split();
     let mut reader = BufReader::new(read_half).lines();
 
@@ -41449,19 +41528,53 @@ async fn query_socks_addr(tor_data_dir: &std::path::Path) -> anyhow::Result<Stri
         return Err(anyhow!("control auth failed: {}", line));
     }
 
-    write_half.write_all(b"GETINFO net/listeners/socks\r\n").await?;
-    // Reply: 250-net/listeners/socks="127.0.0.1:{port}"
-    let mut socks_addr = String::new();
+    write_half.write_all(format!("{}\r\n", command).as_bytes()).await?;
+    let mut lines = Vec::new();
     while let Some(line) = reader.next_line().await? {
-        if let Some(value) = line.strip_prefix("250-net/listeners/socks=") {
-            socks_addr = value.trim_matches('"').to_string();
-        }
-        if line.starts_with("250 ") {
+        let done = line.starts_with("250 ") || line.starts_with('5');
+        lines.push(line);
+        if done {
             break;
         }
     }
     write_half.write_all(b"QUIT\r\n").await?;
+    Ok(lines)
+}
 
+// wait_bootstrapped polls GETINFO status/bootstrap-phase every second until PROGRESS=100;
+// transient control errors are retried until the caller's timeout fires
+async fn wait_bootstrapped(tor_data_dir: &std::path::Path, control_addr: &str) -> anyhow::Result<()> {
+    loop {
+        if let Ok(lines) = control_command(tor_data_dir, control_addr, "GETINFO status/bootstrap-phase").await {
+            if lines.iter().any(|l| l.contains("PROGRESS=100")) {
+                return Ok(());
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
+}
+
+// stop_tor asks Tor to shut down (SIGNAL SHUTDOWN), WAITS up to 10 s for exit,
+// then escalates to kill
+async fn stop_tor(child: &mut tokio::process::Child, control: Option<(&std::path::Path, &str)>) {
+    if let Some((dir, addr)) = control {
+        let _ = control_command(dir, addr, "SIGNAL SHUTDOWN").await;
+    }
+    if tokio::time::timeout(std::time::Duration::from_secs(10), child.wait()).await.is_err() {
+        let _ = child.kill().await;
+    }
+}
+
+// query_socks_addr asks Tor for the runtime SOCKS listener address via
+// GETINFO net/listeners/socks (control port already discovered and bootstrapped)
+async fn query_socks_addr(tor_data_dir: &std::path::Path, control_addr: &str) -> anyhow::Result<String> {
+    let lines = control_command(tor_data_dir, control_addr, "GETINFO net/listeners/socks").await?;
+    // Reply: 250-net/listeners/socks="127.0.0.1:{port}"
+    let socks_addr = lines
+        .iter()
+        .find_map(|l| l.strip_prefix("250-net/listeners/socks="))
+        .map(|v| v.trim_matches('"').to_string())
+        .unwrap_or_default();
     if socks_addr.is_empty() {
         return Err(anyhow!("tor reported no SOCKS listener"));
     }
@@ -41504,10 +41617,56 @@ impl TorService {
 
     // close shuts down the Tor process
     pub async fn close(mut self) -> anyhow::Result<()> {
-        self.child.kill().await.map_err(|e| anyhow!("{}", e))
+        stop_tor(&mut self.child, Some((&self.data_dir, &self.control_addr))).await;
+        Ok(())
     }
 }
 ```
+
+### Control Port & Startup Sequence
+
+**The server spawns `tor` itself and talks to it over the control port. It never uses default ports, and it never reads the hostname or control files once without a wait.**
+
+**torrc / command-line settings REQUIRED by this sequence:**
+
+| Setting | Why |
+|---------|-----|
+| `--DataDirectory {data_dir}/tor` | Isolated from system Tor; dir pre-created `0700`, owned by the server user |
+| `ControlPort 127.0.0.1:auto` | Runtime-selected loopback port, never saved |
+| `ControlPortWriteToFile {data_dir}/tor/control_port` | Tor writes `PORT=127.0.0.1:{port}` here once the listener is open |
+| `CookieAuthentication 1` | Cookie file `{data_dir}/tor/control_auth_cookie`; no password stored anywhere |
+| `--__OwningControllerProcess {server_pid}` | Tor exits by itself if the server dies (crash, SIGKILL) |
+| `SocksPort auto` / `SocksPort 0` | Per `server.tor.use_network` |
+| `HiddenServiceDir` block | Per existing torrc generation |
+
+**Sequence (each step bounded; any failure = WARN + Tor disabled, server keeps running):**
+
+| # | Step | Bound | Rule |
+|---|------|-------|------|
+| 1 | Remove stale `control_port` file; spawn `tor -f {torrc}` as a child | - | A leftover file from a previous run MUST NOT be trusted |
+| 2 | Poll `control_port` every 250 ms | `server.tor.startup_timeout` (default 60 s) | Missing, empty, or partial file = keep polling. Accept ONLY a complete line `PORT=127.0.0.1:{port}\n` with port 1-65535. Abort immediately if the child exits |
+| 3 | `AUTHENTICATE {cookie_hex}` over the control connection | 10 s | Cookie read from `control_auth_cookie` (32 bytes); reply must start with `250` |
+| 4 | Poll `GETINFO status/bootstrap-phase` every 1 s until `PROGRESS=100` | `server.tor.bootstrap_timeout` | Transient control errors are retried; only the timeout is fatal |
+| 5 | Wait for `{data_dir}/tor/site/hostname` to hold a valid `*.onion` line | 30 s | Tor writes it at startup; never read it once without a wait |
+| 6 | `GETINFO net/listeners/socks` (only when `use_network`) | - | Failure = outbound disabled, hidden service still works |
+
+**Error handling:**
+
+| Failure | Detection | Action |
+|---------|-----------|--------|
+| `control_port` file never appears | Step 2 timeout | Kill child, WARN with torrc path; check `DataDirectory` permissions and for a stale process holding the lock |
+| File present but empty/partial | Parse fails | Keep polling (Tor writes it non-atomically); never fatal before the timeout |
+| Port is 0 or not loopback | Parse check | Reject, keep polling until timeout |
+| Child exits before port file | `try_wait` | Fail immediately with the exit status (bad torrc, port in use, `DataDirectory` locked) |
+| `515 Authentication failed` | Step 3 reply | Cookie unreadable or stale: kill child, delete `control_auth_cookie`, restart once; second failure = WARN |
+| `DataDirectory` lock held | Child exits at once | Another Tor uses this dir: kill only the PID in `{data_dir}/tor/tor.pid` if it is a `tor` process we started, then restart once |
+| Bootstrap timeout | Step 4 timeout | Kill child, WARN `Tor bootstrap timeout, hidden service unavailable`, retry per Restart rules |
+| `hostname` missing after bootstrap | Step 5 timeout | Kill child, WARN; check `HiddenServiceDir` mode `0700` and ownership |
+| Control connection drops at runtime | Read error | WARN `Tor control connection lost, restarting` (existing Restart rules) |
+
+**Shutdown:** send `SIGNAL SHUTDOWN` on the control connection, then wait for the process to exit up to 10 s; on timeout kill it. A bare `kill()` is never the first step. `--__OwningControllerProcess` is the backstop if the server dies without running shutdown.
+
+**Test checklist (REQUIRED):** control_port file written late (delay 5 s) still succeeds; partial/empty file tolerated; stale file ignored; wrong cookie recovers via one restart; child killed during startup fails fast; bootstrap-timeout path leaves no `tor` process behind; server SIGKILL leaves no `tor` process behind.
 
 ### Port Allocation
 
@@ -41613,8 +41772,7 @@ pub fn get_tor_config(cfg: &TorConfig, tor_backend_port: u16) -> String {
     format!(r#"
 # ============================================================
 # Tor Configuration - Generated by server binary
-# This file is PERSISTENT - it is not regenerated on normal restarts
-# It IS regenerated when the operator saves Tor config changes - manual edits are lost then
+# This file is regenerated on EVERY startup - manual edits are overwritten
 # ============================================================
 
 # SOCKS port for outbound connections (0 = disabled, auto = runtime port)
