@@ -2262,41 +2262,41 @@ server:
 
 | PART | Line | Topic | When to Read |
 |------|------|-------|--------------|
-| 0 | ~2396 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
-| 1 | ~4211 | Critical Rules | **ALWAYS READ FIRST** |
-| 2 | ~5475 | License & Attribution | License requirements |
-| 3 | ~5810 | Project Structure | Setting up new project, **CI/CD badge detection** |
-| 4 | ~6734 | OS-Specific Paths | Path handling |
-| 5 | ~6930 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
-| 6 | ~8697 | Application Modes | Mode handling, debug endpoints |
-| 7 | ~9213 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~9897 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags**, **Resource Owner Tokens** |
-| 9 | ~12904 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~13406 | Database | Database work |
-| 11 | ~13821 | Security & Logging | Security features, **Context Detection** |
-| 12 | ~15887 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~17342 | Health & Versioning | Health endpoints |
-| 14 | ~18064 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~19834 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~20786 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~27627 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~28206 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~28634 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~28787 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~30125 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~30625 | Update Command | Update feature |
-| 23 | ~31153 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~31775 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~32100 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~32930 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~33902 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~37159 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~38997 | ReadTheDocs Documentation | Documentation |
-| 30 | ~39791 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~41185 | Overlay Networks (Tor & I2P) | Tor (required) + I2P eepsite (opt-in) |
-| 32 | ~43381 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~46537 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | ~46774 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 0 | ~2391 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
+| 1 | ~4219 | Critical Rules | **ALWAYS READ FIRST** |
+| 2 | ~5483 | License & Attribution | License requirements |
+| 3 | ~5818 | Project Structure | Setting up new project, **CI/CD badge detection** |
+| 4 | ~6746 | OS-Specific Paths | Path handling |
+| 5 | ~6942 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
+| 6 | ~8731 | Application Modes | Mode handling, debug endpoints |
+| 7 | ~9279 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
+| 8 | ~9966 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags**, **Resource Owner Tokens** |
+| 9 | ~13061 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~13572 | Database | Database work |
+| 11 | ~13987 | Security & Logging | Security features, **Context Detection** |
+| 12 | ~16115 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~17588 | Health & Versioning | Health endpoints |
+| 14 | ~18312 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~20093 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~21045 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~28161 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~28821 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~29264 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~29417 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~30755 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~31306 | Update Command | Update feature |
+| 23 | ~31842 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~32464 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~32791 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~33621 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~34593 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~37855 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~39693 | ReadTheDocs Documentation | Documentation |
+| 30 | ~40487 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~41896 | Overlay Networks (Tor & I2P) | Tor (required) + I2P eepsite (opt-in) |
+| 32 | ~44512 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~47671 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~47908 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File
 
@@ -7818,6 +7818,7 @@ impl CreateResourceRequest {
 | `TERM` | Terminal type; `TERM=dumb` disables ALL ANSI escapes and forces CLI mode (see PART 7) |
 | `DOMAIN` | FQDN override (highest priority for hostname resolution) |
 | `MODE` | `production` (default; shortcut `prod`) · `development` (shortcuts `dev`, `devel`) · `debug` (explicit opt-in only — see MODE vs DEBUG in PART 26) |
+| `DEBUG` | Truthy value turns the debug flag on (`--debug` wins; precedence and the `/debug/*` endpoints are defined in PART 6 → Debug Flag). Independent of `MODE`: `MODE=debug` only defaults the flag on |
 | `DATABASE_DRIVER` | `sqlite` (+ `sqlite2`, `sqlite3`), `libsql` (+ `turso`) |
 | `DATABASE_URL` | Database connection string |
 | `SMTP_HOST` | SMTP server hostname (if set, skips autodetect) |
@@ -15857,7 +15858,7 @@ When GDPR/CCPA (right to erasure) conflicts with HIPAA/SOC2 (retention requireme
 | `/server/privacy` | GET | Privacy policy |
 | `/server/dpo` | GET | Data Protection Officer contact (GDPR) |
 
-**DPO contact source:** `server.contact.dpo.email` (with optional `server.contact.dpo.name`), part of the Contact Configuration tree (PART 12). When `dpo.email` is empty the page shows `server.contact.general.email`; when that is empty too it renders only a link to the contact form (`/server/contact`). It never invents an address and never shows the admin address. The JSON mirror is `GET /api/{api_version}/server/dpo` (`name`, `email`, `privacy_url`).
+**DPO contact source:** `server.contact.dpo.email` (with optional `server.contact.dpo.name`), part of the Contact Configuration tree (PART 12). When `dpo.email` is empty the page shows `server.contact.general.email`; when that is empty too it renders only a link to the contact form (`/server/contact`). It never invents an address and never shows the admin address. The JSON mirror is `GET /api/{api_version}/server/dpo` (`name`, `email`, `privacy_url`) and follows the same fallback chain for `email`; when no address resolves it still answers `200` with `email` = `""` (and `name` = `""` when unset), never `404`; `privacy_url` is always `/server/privacy`. The HTML page shows the DPO name when set, the address as a `mailto:` link when one resolves, and always links to `/server/privacy` and `/server/contact`.
 
 **Compliance is configured entirely in `server.yml`. Consent state is stored client-side in the `consent` cookie (server-readable on every request) — there is no server-side user consent table. Operators run `{project_name} compliance report` for a compliance summary.**
 
@@ -28022,7 +28023,7 @@ When `server.mcp.enabled` is `false`, both routes return `404` and no link to th
 | `#limits` | Behavior and limits | `POST` only; no sessions; the same rate limits and audit as the API; `Origin` validated; the supported MCP protocol versions |
 | `#troubleshooting` | Troubleshooting | A table of `400` (protocol-version or header mismatch), `401` (missing, invalid or expired token — `WWW-Authenticate: Bearer`), `403` (bad `Origin` or insufficient scope), `404` (MCP disabled), `405` (GET or DELETE; the endpoint is POST-only) with the fix for each |
 
-**Project expansion (required content):** the project appends its own section, `#project`, after the base sections. The text comes from IDEA.md `## Business logic` and is stored as Markdown in `pages.help.mcp` (editable in the admin panel's Pages → Help editor where an admin panel exists). It MUST use the project's real tool names and real data — example prompts a user can paste into an assistant, per-tool tips and limits, and documentation of any MCP resources or prompts the project exposes. It never repeats or contradicts the base sections, and generic placeholder text is forbidden (same rule as `/server/help`).
+**Project expansion (required content):** the project appends its own section, `#project`, after the base sections. The text comes from IDEA.md `## Business logic` and is stored as Markdown in `pages.help.mcp` (canonical storage is `server.yml` `pages.help.mcp`, edited there by the operator and applied on config reload; a project that has an admin panel also exposes it in Pages → Help. API projects have no admin panel or web editor, so `server.yml` is the only editing path). It MUST use the project's real tool names and real data — example prompts a user can paste into an assistant, per-tool tips and limits, and documentation of any MCP resources or prompts the project exposes. It never repeats or contradicts the base sections, and generic placeholder text is forbidden (same rule as `/server/help`).
 
 **JSON body (`GET /api/{api_version}/server/help/mcp`, envelope `{ "ok": true, "data": ... }`; field names are fixed):**
 ```json
@@ -49698,41 +49699,41 @@ When stuck:
 
 | PART | Line | Topic | When to Read |
 |------|------|-------|--------------|
-| 0 | ~2396 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
-| 1 | ~4211 | Critical Rules | **ALWAYS READ FIRST** |
-| 2 | ~5475 | License & Attribution | License requirements |
-| 3 | ~5810 | Project Structure | Setting up new project, **CI/CD badge detection** |
-| 4 | ~6734 | OS-Specific Paths | Path handling |
-| 5 | ~6930 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
-| 6 | ~8697 | Application Modes | Mode handling, debug endpoints |
-| 7 | ~9213 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
-| 8 | ~9897 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags**, **Resource Owner Tokens** |
-| 9 | ~12904 | Error Handling & Caching | Error/cache patterns |
-| 10 | ~13406 | Database | Database work |
-| 11 | ~13821 | Security & Logging | Security features, **Context Detection** |
-| 12 | ~15887 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
-| 13 | ~17342 | Health & Versioning | Health endpoints |
-| 14 | ~18064 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
-| 15 | ~19834 | SSL/TLS & Let's Encrypt | SSL certificates |
-| 16 | ~20786 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
-| 17 | ~27627 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
-| 18 | ~28206 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
-| 19 | ~28634 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
-| 20 | ~28787 | Metrics | Prometheus metrics, **INTERNAL only** |
-| 21 | ~30125 | Backup & Restore | Backup features, **Compliance encryption** |
-| 22 | ~30625 | Update Command | Update feature |
-| 23 | ~31153 | Privilege Escalation & Service | Service/privilege work |
-| 24 | ~31775 | Service Support | Systemd/runit/rc.d/launchd templates |
-| 25 | ~32100 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
-| 26 | ~32930 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
-| 27 | ~33902 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
-| 28 | ~37159 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
-| 29 | ~38997 | ReadTheDocs Documentation | Documentation |
-| 30 | ~39791 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
-| 31 | ~41185 | Overlay Networks (Tor & I2P) | Tor (required) + I2P eepsite (opt-in) |
-| 32 | ~43381 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
-| 33 | ~46537 | IDEA.md Reference | **Examples only** - NEVER modify |
-| FINAL | ~46774 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
+| 0 | ~2391 | AI Assistant Rules | **ALWAYS READ FIRST**, **AI Behavior Rules**, **Host System Safety Rule**, **Translation Rule** |
+| 1 | ~4219 | Critical Rules | **ALWAYS READ FIRST** |
+| 2 | ~5483 | License & Attribution | License requirements |
+| 3 | ~5818 | Project Structure | Setting up new project, **CI/CD badge detection** |
+| 4 | ~6746 | OS-Specific Paths | Path handling |
+| 5 | ~6942 | Configuration | Config file work, **Path Security**, **Privileged Ports**, **Escalation** |
+| 6 | ~8731 | Application Modes | Mode handling, debug endpoints |
+| 7 | ~9279 | Binary Requirements | Binary building, **Display detection**, **TERM=dumb**, **NO_COLOR** |
+| 8 | ~9966 | Server Binary CLI | CLI flags/commands, **NO_COLOR Support**, **--color/--lang flags**, **Resource Owner Tokens** |
+| 9 | ~13061 | Error Handling & Caching | Error/cache patterns |
+| 10 | ~13572 | Database | Database work |
+| 11 | ~13987 | Security & Logging | Security features, **Context Detection** |
+| 12 | ~16115 | Server Configuration | Server settings, **Allowlist**, **Blocklists**, **GeoIP** |
+| 13 | ~17588 | Health & Versioning | Health endpoints |
+| 14 | ~18312 | API Structure | REST/GraphQL/Route Compliance, **Non-Interactive Text Output** |
+| 15 | ~20093 | SSL/TLS & Let's Encrypt | SSL certificates |
+| 16 | ~21045 | Web Frontend | Frontend/UI, **Sitemap**, **Site Verification**, **Branding/SEO** |
+| 17 | ~28161 | Email & Notifications | Email/SMTP, **SMTP Auto-Detection** |
+| 18 | ~28821 | Scheduler | Background tasks, **NO external schedulers**, **Backup tasks** |
+| 19 | ~29264 | GeoIP | GeoIP features, **Country blocking (deny/allow)** |
+| 20 | ~29417 | Metrics | Prometheus metrics, **INTERNAL only** |
+| 21 | ~30755 | Backup & Restore | Backup features, **Compliance encryption** |
+| 22 | ~31306 | Update Command | Update feature |
+| 23 | ~31842 | Privilege Escalation & Service | Service/privilege work |
+| 24 | ~32464 | Service Support | Systemd/runit/rc.d/launchd templates |
+| 25 | ~32791 | Makefile | Local dev/tests/debug only, **NOT used in CI/CD** |
+| 26 | ~33621 | Docker | Docker/containers, **NEVER copy/symlink binaries** |
+| 27 | ~34593 | CI/CD Workflows | GitHub/GitLab/Gitea Actions |
+| 28 | ~37855 | Testing & Development | Testing/dev workflow, **Host Safety in tests**, **AI Docker Compose Rules**, **Content Negotiation Testing** |
+| 29 | ~39693 | ReadTheDocs Documentation | Documentation |
+| 30 | ~40487 | I18N & A11Y | Internationalization, **Translation parity (both binaries)**, **--lang flag** |
+| 31 | ~41896 | Overlay Networks (Tor & I2P) | Tor (required) + I2P eepsite (opt-in) |
+| 32 | ~44512 | Client | Client **REQUIRED** — CLI/TUI/GUI, **Resource Owner Tokens**, **Smart Context**, **First-Run Wizard** |
+| 33 | ~47671 | IDEA.md Reference | **Examples only** - NEVER modify |
+| FINAL | ~47908 | Compliance Checklist | Final verification, **AI Quick Reference Rules**, **Console/Banner Checklist**, **I18N Checklist**, **Host Safety Checklist** |
 
 ### How to Read This File
 
