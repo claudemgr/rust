@@ -10704,7 +10704,7 @@ PHASE 5: Server startup (actual server start)
     ├─ server.i2p.enabled false (default) → skip entirely (no port, no config)
     ├─ enabled, resolve provider:
     │   ├─ i2pd binary found → Model A: create {config_dir}/i2p/, {data_dir}/i2p/site/;
-    │   │   allocate backend port; regenerate {config_dir}/i2p/tunnels.conf; start i2pd
+    │   │   allocate backend port; regenerate {config_dir}/i2p/i2pd.conf; start i2pd; SAM session + forward
     │   ├─ else SAM (127.0.0.1:7656) reachable → Model B: SAM SESSION CREATE + STREAM FORWARD
     │   └─ neither → log WARN "no I2P provider", continue without I2P (non-fatal)
     └─ Wait for destination, log .b32.i2p address
@@ -16406,7 +16406,7 @@ Expires: {expiry_date}
 
 > **Full Tor implementation:** The above covers request detection, `build_url` integration, and privacy rules only. For Tor binary lifecycle, hidden service setup, outbound routing, and external tor binary integration, see **PART 31.1 → "Tor Hidden Service"**.
 
-> **Full I2P implementation:** the same overlay HTTP semantics apply to `.b32.i2p` (always `http://`, no cert, no HSTS, no upgrade). For the opt-in eepsite provider lifecycle (i2pd process or SAM bridge), `tunnels.conf` generation, and destination-key persistence, see **PART 31.2 → "I2P Eepsite"**.
+> **Full I2P implementation:** the same overlay HTTP semantics apply to `.b32.i2p` (always `http://`, no cert, no HSTS, no upgrade). For the opt-in eepsite provider lifecycle (i2pd process or SAM bridge), `i2pd.conf` generation, and destination-key persistence, see **PART 31.2 → "I2P Eepsite"**.
 
 ## Rate Limiting
 
@@ -43418,15 +43418,15 @@ Tor Hidden Service: Connected
 - SOCKS/HTTP client proxying through I2P.
 
 **Two providers (i2pd preferred, SAM fallback).** When enabled, `start_dedicated_i2p` selects a provider in this order:
-1. **Model A — i2pd (preferred).** If an `i2pd` binary resolves, the app spawns and manages a **dedicated i2pd process** and regenerates its `tunnels.conf` server-tunnel on every startup (the exact parallel to torrc regeneration). i2pd persists the destination keyfile; the `.b32.i2p` address derives from it.
+1. **Model A — i2pd (preferred).** If an `i2pd` binary resolves, the app spawns and manages a **dedicated i2pd process** (its own `i2pd.conf`, SAM on a private loopback port, every other i2pd service disabled) and drives it through the SAME SAMv3 code path as Model B. The app owns the destination key; i2pd is only the router. See "I2P Provider Contract".
 2. **Model B — external SAM bridge.** Else, if a SAMv3 bridge is reachable (`127.0.0.1:7656` by default — an already-running i2pd or Java I2P router), the app talks raw SAMv3 over TCP (no new dependency): it creates a `STREAM` session from a persisted destination and issues `STREAM FORWARD` so the router forwards incoming eepsite connections to the app's backend port.
 3. **Neither available → log a warning and skip** (mirrors Tor's "binary not found → disabled, not an error").
 
 **Key Architecture Points:**
-- **Opt-in, default off** — no eepsite, no port, no `tunnels.conf`, no SAM session unless enabled.
+- **Opt-in, default off** — no eepsite, no port, no `i2pd.conf`, no SAM session unless enabled.
 - **Server binary owns the provider** — Model A: full i2pd process lifecycle; Model B: the SAM session lifecycle.
 - **Dedicated backend port** — the eepsite maps `.b32.i2p:{virtual_port}` → `127.0.0.1:{i2p_backend_port}`, a random-unused loopback port. **Unlike Tor, there is no PROXY-protocol header** (SAM/i2pd do not prepend one), so the backend is a **plain loopback listener**, separate from the clearnet port.
-- **Destination identity persists** — the key lives under `{data_dir}/i2p/site/`; the `.b32.i2p` address survives restarts. `tunnels.conf` is derived state, regenerated each run.
+- **Destination identity persists** — the key lives under `{data_dir}/i2p/site/` (one SAM `PRIV` line, written by the app for both models); the `.b32.i2p` address survives restarts. `i2pd.conf` is derived state, regenerated each run.
 - **Server enforces permissions** — creates all dirs/files with correct owner/group/perms (0700 dirs, 0600 keys).
 
 ### Configuration
@@ -43471,7 +43471,7 @@ server:
 - **Opt-in only** — never auto-enabled; selecting it requires an explicit config/flag/env.
 - Model A uses the external `i2pd` binary (not embedded), keeping the single static binary dependency-free.
 - Model B needs no dependency — SAMv3 is spoken over a plain `tokio::net::TcpStream`.
-- **App handles EVERYTHING** for Model A — directory creation, permissions, `tunnels.conf` generation, i2pd process management. For Model B the external router owns tunnels; the app owns only the SAM session and the persisted destination key.
+- **App handles EVERYTHING** for Model A — directory creation, permissions, `i2pd.conf` generation, i2pd process management, the destination key. For Model B the external router owns tunnels; the app owns only the SAM session and the persisted destination key.
 - **I2P directories are NOT configurable** — always derived: config `{config_dir}/i2p/`, data `{data_dir}/i2p/`, log `{log_dir}/i2pd.log` (Model A only).
 
 ### Provider Model
@@ -43483,15 +43483,16 @@ server:
 
 2. Resolve provider:
    ├─ Find i2pd binary (cfg.binary → common locations → $PATH)
-   │    └─ FOUND → Model A (spawn i2pd + tunnels.conf)
+   │    └─ FOUND → Model A (spawn i2pd + i2pd.conf, SAM on a private port)
    ├─ Else probe SAM (cfg.sam_address, default 127.0.0.1:7656)
    │    └─ REACHABLE → Model B (external SAM bridge)
    └─ NEITHER → log WARN, disable I2P, continue (not an error)
 
 3. Allocate dedicated backend port (only now that a provider is confirmed)
 4. Load/persist destination key under {data_dir}/i2p/site/
-5. Model A: write {config_dir}/i2p/tunnels.conf, start i2pd
-   Model B: SAM SESSION CREATE + STREAM FORWARD → backend port
+5. Model A: write {config_dir}/i2p/i2pd.conf, start i2pd, wait for its SAM port
+   Both models: SESSION CREATE (control socket), then STREAM FORWARD SILENT=true (second socket)
+   Model B: use cfg.SAMAddress (the router is already running; nothing to spawn)
 6. Derive/read .b32.i2p address
 ```
 
@@ -43505,6 +43506,90 @@ server:
 | Security | Backend port loopback-only; keys 0600 under `{data_dir}/i2p/site/` |
 
 **Note:** Unlike Tor, the eepsite backend is a plain loopback listener — I2P provides no per-connection PROXY-protocol header, so no PROXY-protocol parser is used for I2P.
+
+### I2P Provider Contract
+
+**Both providers are driven through ONE protocol path: SAMv3. Model A is "spawn a private i2pd, then talk SAM to it"; Model B is "talk SAM to the router that is already running". The app owns the destination key in both cases.**
+
+| Topic | Rule |
+|-------|------|
+| **Model A router config** | The app writes `{config_dir}/i2p/i2pd.conf` on every start (derived state) and passes it with `--conf`. Every i2pd service the app does not use is disabled, so a default i2pd cannot open 7070/4444/4447/7654 or collide with a system i2pd. `--tunconf` points at an EMPTY `{config_dir}/i2p/tunnels.conf` and `--tunnelsdir` at an EMPTY `{config_dir}/i2p/tunnels.d/`, so no tunnel from any other location is ever loaded. There is no server tunnel: the eepsite is a SAM session |
+| **Model A SAM port** | A random-unused loopback port allocated after the provider is confirmed (same detection as the backend port); never `7656`. Never persisted |
+| **Model B SAM** | `server.i2p.sam_address`. The router's SAM bridge must be enabled by its operator (`[sam] enabled = true` in i2pd, "SAM application bridge" in Java I2P). SAM 3.1 or newer is required (`HELLO VERSION MIN=3.1 MAX=3.3`) |
+| **One socket per job** | Every SAM socket needs its own `HELLO`. The session control socket carries `SESSION CREATE` only; `STREAM FORWARD` is sent on a SECOND, new socket. SAM ends the session when its control socket closes and stops forwarding when the forward socket closes, so both stay open for the life of the eepsite |
+| **`SILENT=true` is mandatory** | Without it SAM writes the connecting peer's destination as the first line of every forwarded connection, which corrupts the HTTP request. Command: `STREAM FORWARD ID={id} PORT={i2p_backend_port} HOST=127.0.0.1 SILENT=true`. The reply `STREAM STATUS RESULT=OK` is sent either way |
+| **Key file** | `{data_dir}/i2p/site/site-keys.dat` holds ONE line: the SAM `PRIV` value (I2P base64 of destination + private keys). Written by the app (0600) for both models. If missing: `DEST GENERATE SIGNATURE_TYPE={signature_type}`, then write temp file + fsync + rename BEFORE `SESSION CREATE`, so a crash never loses a published identity. If present but unparsable: fail with an error naming the file; NEVER regenerate silently |
+| **I2P base64** | Alphabet `A-Za-z0-9-~` (`-` and `~` replace `+` and `/`), `=` padding. Standard base64 decoders MUST NOT be used |
+| **Address derivation** | Decode `PRIV`. The destination is its first `387 + certlen` bytes, where `certlen` is the big-endian uint16 at byte offsets 385-386 (Ed25519 + X25519 key certificates give 391). Address = lowercase base32 without padding of `SHA-256(destination)` + `.b32.i2p` (52 characters + suffix). Computed locally, no router round trip |
+| **Session options** | `SESSION CREATE STYLE=STREAM ID={id} DESTINATION={PRIV} i2cp.leaseSetEncType=4 inbound.length=.. outbound.length=.. inbound.quantity=.. outbound.quantity=..`. `ID` is unique per start (`site-{pid}`); `DUPLICATED_ID` retries once with a new suffix |
+| **Reply timing** | `SESSION STATUS` arrives only AFTER the router has built tunnels (seconds, or minutes on a first start that must reseed). Wait up to `server.i2p.bootstrap_timeout`; NEVER abandon the socket and retry while a build is in progress. The first start of a fresh i2pd data directory may need more than 300 s: raise `bootstrap_timeout` (max 600) on slow links |
+| **Secrets in logs** | `PRIV` is a private key. SAM command lines are never logged or put in error text; errors name the command word only (`SESSION CREATE`) |
+| **Backend listener** | The plain loopback listener on `i2p_backend_port` MUST be accepting before `STREAM FORWARD` is sent. SAM must connect to it within 3 s per incoming stream, so the accept loop never blocks |
+| **No client identity** | With `SILENT=true` every stream arrives from `127.0.0.1`. The dedicated I2P listener is therefore treated as ONE client for rate limiting and bans (a separate global I2P bucket); per-IP rules MUST NOT ban `127.0.0.1` on this listener. Any `X-I2P-*` request header is stripped at the edge and never logged |
+| **Host header** | The request `Host` is the eepsite's `.b32.i2p` or any `.i2p` alias the visitor used; the I2P listener accepts all of them and builds URLs from the app's own `.b32.i2p` |
+
+**Model A `i2pd.conf` (generated; `{sam_port}` and `{log_dir}` filled in):**
+
+```ini
+daemon = false
+ipv4 = true
+ipv6 = false
+notransit = true
+floodfill = false
+log = file
+logfile = {log_dir}/i2pd.log
+loglevel = warn
+
+[http]
+enabled = false
+[httpproxy]
+enabled = false
+[socksproxy]
+enabled = false
+[sam]
+enabled = true
+address = 127.0.0.1
+port = {sam_port}
+[bob]
+enabled = false
+[i2cp]
+enabled = false
+[i2pcontrol]
+enabled = false
+[upnp]
+enabled = false
+```
+
+`notransit = true` and `floodfill = false` keep the router a pure client (no relay or floodfill duty, as already required above). Launch: `i2pd --conf {config_dir}/i2p/i2pd.conf --tunconf {config_dir}/i2p/tunnels.conf --tunnelsdir {config_dir}/i2p/tunnels.d --datadir {data_dir}/i2p --pidfile {data_dir}/i2p/i2pd.pid`. Option names are validated against the installed i2pd in the startup self-test (below).
+
+**Startup sequence (each step bounded; any failure = WARN + I2P disabled, server keeps running):**
+
+| # | Step | Bound |
+|---|------|-------|
+| 1 | Model A only: reap a stale i2pd (pid file names a live `i2pd` process we started: terminate it), write `i2pd.conf`, spawn i2pd | - |
+| 2 | Model A only: wait for the SAM port to accept a TCP connection and answer `HELLO`; abort at once if the child exits | 60 s |
+| 3 | Open the control socket: `HELLO`, load or create the key, compute the address | 10 s |
+| 4 | `SESSION CREATE` (status `building`) | `bootstrap_timeout` |
+| 5 | Open the forward socket: `HELLO`, `STREAM FORWARD ... SILENT=true` (status `running`) | 10 s |
+
+**Status values** (CLI `--status`, health output): `disabled`, `no_provider`, `starting` (steps 1-3), `building` (step 4), `running`, `error`.
+
+**Error handling:**
+
+| Failure | Detection | Action |
+|---------|-----------|--------|
+| No i2pd and SAM unreachable | Provider resolution | `no_provider`, INFO/WARN, continue (not an error) |
+| `HELLO` returns `NOVERSION` | Step 3 | `error`: router too old, SAM 3.1+ required |
+| SAM port never opens (Model A) | Step 2 timeout | Stop i2pd, WARN with the i2pd.log path, retry per restart rules |
+| i2pd exits during startup | Child exit | Fail at once with exit status; check ports and `{data_dir}/i2p` ownership |
+| `SESSION STATUS RESULT=DUPLICATED_DEST` | Step 4 | `error`: another session already uses this key (a second instance or an old session still alive); do not retry in a tight loop, back off 60 s |
+| `RESULT=INVALID_KEY` | Step 4 | `error`: key file corrupt; the operator regenerates the address (never automatic) |
+| Step 4 timeout | `bootstrap_timeout` | Close the socket, WARN `I2P tunnels not ready`, retry per restart rules |
+| Control or forward socket closes | Read error / EOF | Session lost: `error`, recreate both sockets with backoff (5 s -> 300 s) using the SAME key |
+
+**Shutdown (Model A):** close the forward socket, then the control socket (this destroys the session), then terminate i2pd: SIGTERM where the platform has it (kill on Windows), wait up to 10 s, then kill. On Linux the child is started with a parent-death signal so a crashed server does not leave i2pd running; the pid file is the backstop for every platform. Model B only closes its two sockets and never touches the router.
+
+**Test checklist (REQUIRED):** `site-keys.dat` created before `SESSION CREATE` and reused on the next start (same address); I2P base64 round trip with `-` and `~`; address matches a known destination vector; forwarded stream carries NO leading destination line (`SILENT=true`); forward uses a second socket; `DUPLICATED_ID` retry; `INVALID_KEY` does not regenerate; i2pd never opens 7070/4444/4447/7654 (Model A); slow `SESSION CREATE` (60 s) succeeds; server SIGKILL leaves no i2pd process; `PRIV` never appears in logs.
 
 ### I2P Process Management
 
@@ -43525,7 +43610,7 @@ Find i2pd binary:
 
 **i2pd logging:** i2pd logs to `{log_dir}/i2pd.log` at `warn` level by default (configurable). Model B logging is owned by the external router.
 
-**Model B liveness (safe monitoring):** the app NEVER writes to the control connection that owns its SAM session. SAM destroys a session when its control socket closes, and extra commands on it can corrupt the stream-forward state. Liveness uses a separate short-lived probe connection every 30 seconds: open a new TCP connection to `sam_address`, send `HELLO VERSION MIN=3.0 MAX=3.3`, accept `HELLO REPLY RESULT=OK`, then send `QUIT` and close. The probe issues no `SESSION`, `STREAM` or `NAMING` command. Three consecutive probe failures (5-second timeout each) set the status to `error`. Separately, if the session's own control connection closes or errors, the session is lost: set the status to `error` and recreate it (a new `SESSION CREATE` with the same persisted destination key) with backoff.
+**Model B liveness (safe monitoring):** the app NEVER writes to the control connection that owns its SAM session. SAM destroys a session when its control socket closes, and extra commands on it can corrupt the stream-forward state. Liveness uses a separate short-lived probe connection every 30 seconds: open a new TCP connection to `sam_address`, send `HELLO VERSION MIN=3.1 MAX=3.3`, accept `HELLO REPLY RESULT=OK`, then send `QUIT` and close. The probe issues no `SESSION`, `STREAM` or `NAMING` command. Three consecutive probe failures (5-second timeout each) set the status to `error`. Separately, if the session's own control connection closes or errors, the session is lost: set the status to `error` and recreate it (a new `SESSION CREATE` with the same persisted destination key) with backoff.
 
 **Process ownership:** the server binary creates all Model-A directories/files with the current uid/gid and enforces 0700/0600 permissions before starting i2pd.
 
@@ -43540,7 +43625,7 @@ use std::fs;
 use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command};
+use tokio::process::{Child, Command};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -43569,8 +43654,10 @@ pub struct I2PService {
     i2p_backend_port: u16,
     /// Model A: the managed i2pd process (None for Model B)
     i2pd: Option<Child>,
-    /// Model B: the live SAM control connection (None for Model A)
-    sam_conn: Option<TcpStream>,
+    /// The live SAM control connection that owns the session (both models)
+    sam_conn: Option<tokio::io::BufReader<TcpStream>>,
+    /// The STREAM FORWARD socket; closing it stops forwarding (both models)
+    forward_conn: Option<tokio::io::BufReader<TcpStream>>,
 }
 
 /// I2P-related configuration from server config.
@@ -43666,16 +43753,10 @@ fn resolve_i2pd_binary(cfg: &I2PConfig) -> Result<PathBuf, AppError> {
     which::which("i2pd").map_err(|_| AppError::Internal("i2pd binary not found".into()))
 }
 
-/// Reports whether a SAMv3 bridge is accepting connections at `addr`.
-fn sam_reachable(addr: &str) -> bool {
-    use std::net::ToSocketAddrs;
-    let Ok(mut addrs) = addr.to_socket_addrs() else {
-        return false;
-    };
-    let Some(sock) = addrs.next() else {
-        return false;
-    };
-    std::net::TcpStream::connect_timeout(&sock, Duration::from_secs(3)).is_ok()
+/// Reports whether a SAMv3 bridge at `addr` accepts connections AND completes
+/// HELLO (a bare TCP connect also succeeds against unrelated services).
+async fn sam_reachable(addr: &str) -> bool {
+    sam_dial(addr).await.is_ok()
 }
 
 /// Creates the eepsite when I2P is enabled AND a provider is available.
@@ -43703,7 +43784,7 @@ pub async fn start_dedicated_i2p(
     // writing any files (mirrors the Tor smart-port gate).
     let (provider, i2pd_binary) = match resolve_i2pd_binary(cfg) {
         Ok(bin) => (I2PProvider::I2pd, Some(bin)),
-        Err(_) if sam_reachable(&cfg.sam_address) => (I2PProvider::Sam, None),
+        Err(_) if sam_reachable(&cfg.sam_address).await => (I2PProvider::Sam, None),
         Err(_) => {
             return Err(AppError::Internal(format!(
                 "i2p enabled but no provider available (no i2pd binary, SAM {} unreachable)",
@@ -43728,24 +43809,18 @@ pub async fn start_dedicated_i2p(
         i2p_backend_port,
         i2pd: None,
         sam_conn: None,
+        forward_conn: None,
     };
 
-    match provider {
-        // Model A: regenerate tunnels.conf every startup (derived state), then
-        // start a dedicated i2pd. i2pd persists the destination in keys_path.
-        I2PProvider::I2pd => {
-            let binary = i2pd_binary.expect("i2pd binary resolved above");
-            let addr = start_i2pd(cfg, &binary, config_dir, data_dir, log_dir, &keys_path, i2p_backend_port, &mut svc).await?;
-            svc.eepsite_address = addr;
+    // Both models end in the same SAM session. Model A first spawns a dedicated
+    // i2pd and uses its private SAM port; Model B uses cfg.sam_address.
+    let sam_addr = match (provider, i2pd_binary) {
+        (I2PProvider::I2pd, Some(binary)) => {
+            start_i2pd(&binary, config_dir, data_dir, log_dir, &mut svc).await?
         }
-        // Model B: create a STREAM session from the persisted destination and
-        // STREAM FORWARD incoming connections to the backend port.
-        I2PProvider::Sam => {
-            let addr = start_sam_eepsite(cfg, &keys_path, i2p_backend_port, &mut svc).await?;
-            svc.eepsite_address = addr;
-        }
-        I2PProvider::None => unreachable!("provider resolved to None"),
-    }
+        _ => cfg.sam_address.clone(),
+    };
+    svc.eepsite_address = start_sam_eepsite(cfg, &sam_addr, &keys_path, i2p_backend_port, &mut svc).await?;
 
     info!(
         "I2P eepsite started ({}): {}:{} → 127.0.0.1:{}",
@@ -43765,12 +43840,20 @@ impl I2PService {
         self.provider
     }
 
-    /// Shuts down the provider (i2pd process or SAM session).
+    /// Synchronous shutdown: forward socket, then control socket (this destroys the
+    /// session), then - Model A only - SIGTERM + start_kill on the managed i2pd.
+    /// The graceful path (SIGTERM, wait up to 10 s, then kill) is
+    /// `stop_i2pd(child).await`, which the manager calls first when it can await.
     pub fn close(&mut self) -> io::Result<()> {
-        // Dropping the SAM control connection tears down the STREAM session.
+        self.forward_conn = None;
         self.sam_conn = None;
         if let Some(ref mut child) = self.i2pd {
-            child.kill()?;
+            #[cfg(unix)]
+            if let Some(pid) = child.id() {
+                // SAFETY: plain signal send to a child PID we own
+                unsafe { libc::kill(pid as i32, libc::SIGTERM) };
+            }
+            child.start_kill()?;
         }
         self.i2pd = None;
         Ok(())
@@ -43786,8 +43869,8 @@ fn provider_name(p: I2PProvider) -> &'static str {
     }
 }
 
-// The destination key is generated once and persisted under {data_dir}/i2p/site/
-// (i2pd writes site-keys.dat; the SAM path writes the DEST PRIV there) — the
+// The destination key is generated once by SAM (DEST GENERATE) and persisted by
+// the app under {data_dir}/i2p/site/site-keys.dat for BOTH models — the
 // .b32.i2p address is stable across restarts.
 ```
 
@@ -43795,7 +43878,7 @@ fn provider_name(p: I2PProvider) -> &'static str {
 
 | Resource | Model A (i2pd) | Model B (SAM) |
 |----------|----------------|---------------|
-| Control | i2pd child process | SAMv3 TCP `sam_address` |
+| Control | i2pd child process; SAMv3 TCP on a private random loopback port | SAMv3 TCP `sam_address` |
 | Eepsite backend | `127.0.0.1:{i2p_backend_port}` (plain) | `127.0.0.1:{i2p_backend_port}` (plain) |
 | Destination key | `{data_dir}/i2p/site/site-keys.dat` | `{data_dir}/i2p/site/site-keys.dat` |
 
@@ -43826,135 +43909,269 @@ fn provider_name(p: I2PProvider) -> &'static str {
 - **Backend port is loopback-only** and receives plain HTTP (no PROXY header to parse).
 - **Same backend port model as Tor** — dedicated, random-unused, never the clearnet port — but without a PROXY-protocol parser.
 
-#### tunnels.conf Generation (Model A)
+#### i2pd.conf Generation and Launch (Model A)
 
-`tunnels.conf` is derived state, regenerated on every startup from `I2PConfig` + the current backend port. The destination identity persists via `keys` (`site-keys.dat`), NOT via `tunnels.conf`, so overwriting it is always safe.
+`i2pd.conf` is derived state, regenerated on every startup. The destination identity persists in `site-keys.dat` (written by the app), NOT in `i2pd.conf`, so overwriting it is always safe. Content: see "I2P Provider Contract".
 
 ```rust
-/// Generates the i2pd server-tunnel definition. The eepsite is declared here via
-/// a [site] server tunnel pointing at the dedicated backend port; i2pd persists
-/// the destination in `keys_path` and derives the .b32.i2p.
-pub fn get_i2p_tunnels_conf(cfg: &I2PConfig, keys_path: &Path, i2p_backend_port: u16) -> String {
+/// Renders the dedicated i2pd.conf: SAM on a private loopback port, every other
+/// service disabled, no transit, no floodfill.
+pub fn get_i2pd_conf(sam_port: u16, log_path: &Path) -> String {
     format!(
-        "[site]\n\
-         type = server\n\
-         host = 127.0.0.1\n\
-         port = {port}\n\
-         keys = {keys}\n\
-         inbound.length = {inb_len}\n\
-         outbound.length = {out_len}\n\
-         inbound.quantity = {inb_qty}\n\
-         outbound.quantity = {out_qty}\n\
-         signaturetype = {sigtype}\n",
-        port = i2p_backend_port,
-        keys = keys_path.display(),
-        inb_len = cfg.inbound_length,
-        out_len = cfg.outbound_length,
-        inb_qty = cfg.inbound_quantity,
-        out_qty = cfg.outbound_quantity,
-        sigtype = cfg.signature_type,
+        "daemon = false\n\
+         ipv4 = true\n\
+         ipv6 = false\n\
+         notransit = true\n\
+         floodfill = false\n\
+         log = file\n\
+         logfile = {log}\n\
+         loglevel = warn\n\
+         \n\
+         [http]\nenabled = false\n\
+         [httpproxy]\nenabled = false\n\
+         [socksproxy]\nenabled = false\n\
+         [sam]\nenabled = true\naddress = 127.0.0.1\nport = {port}\n\
+         [bob]\nenabled = false\n\
+         [i2cp]\nenabled = false\n\
+         [i2pcontrol]\nenabled = false\n\
+         [upnp]\nenabled = false\n",
+        log = log_path.display(),
+        port = sam_port,
     )
 }
 
-/// Writes tunnels.conf (regenerated each run) and starts a dedicated i2pd child
-/// process, then reads the .b32.i2p once the destination is ready. i2pd
-/// creates/persists site-keys.dat at `keys_path`.
-#[allow(clippy::too_many_arguments)]
+/// Writes i2pd.conf (regenerated each run), starts a dedicated i2pd and waits
+/// until its SAM port answers HELLO. Returns the SAM address.
 async fn start_i2pd(
-    cfg: &I2PConfig,
     binary: &Path,
     config_dir: &Path,
     data_dir: &Path,
     log_dir: &Path,
-    keys_path: &Path,
-    i2p_backend_port: u16,
     svc: &mut I2PService,
 ) -> Result<String, AppError> {
-    let tunnels_path = config_dir.join("i2p").join("tunnels.conf");
+    let conf_dir = config_dir.join("i2p");
     let i2p_data_dir = data_dir.join("i2p");
-    let log_path = log_dir.join("i2pd.log");
+    let conf_path = conf_dir.join("i2pd.conf");
+    let tun_conf = conf_dir.join("tunnels.conf");
+    let tun_dir = conf_dir.join("tunnels.d");
+    let pid_path = i2p_data_dir.join("i2pd.pid");
 
-    let conf = get_i2p_tunnels_conf(cfg, keys_path, i2p_backend_port);
-    // Regenerate every startup (derived state); identity lives in keys_path.
-    update_i2p_tunnels(&tunnels_path, conf.as_bytes())?;
-    info!("Regenerated tunnels.conf at {} (backend port {})", tunnels_path.display(), i2p_backend_port);
+    // A previous server run may have left its i2pd behind (SIGKILL, power loss)
+    reap_stale_i2pd(&pid_path, binary)?;
 
-    let child = Command::new(binary)
+    let sam_port = get_random_available_port();
+    update_i2p_conf(&conf_path, get_i2pd_conf(sam_port, &log_dir.join("i2pd.log")).as_bytes())?;
+    // Empty tunnel definitions: nothing but our SAM session may exist
+    update_i2p_conf(&tun_conf, b"")?;
+    fs::create_dir_all(&tun_dir)?;
+    info!("Regenerated i2pd.conf at {} (SAM port {})", conf_path.display(), sam_port);
+
+    // kill_on_drop: a dropped service never leaves i2pd running
+    let mut child = Command::new(binary)
+        .arg("--conf").arg(&conf_path)
+        .arg("--tunconf").arg(&tun_conf)
+        .arg("--tunnelsdir").arg(&tun_dir)
         .arg("--datadir").arg(&i2p_data_dir)
-        .arg("--tunconf").arg(&tunnels_path)
-        .arg("--log").arg("file")
-        .arg("--logfile").arg(&log_path)
+        .arg("--pidfile").arg(&pid_path)
+        .kill_on_drop(true)
         .spawn()
         .map_err(|e| AppError::Internal(format!("failed to start i2pd: {e}")))?;
-    svc.i2pd = Some(child);
 
-    // Wait for i2pd to publish the destination, then derive the address.
-    let timeout = Duration::from_secs(cfg.bootstrap_timeout);
-    match wait_for_i2pd_address(keys_path, timeout).await {
-        Ok(addr) => Ok(addr),
-        Err(e) => {
-            if let Some(ref mut c) = svc.i2pd {
-                let _ = c.kill();
-            }
-            Err(e)
+    let sam_addr = format!("127.0.0.1:{sam_port}");
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(60);
+    loop {
+        if let Some(status) = child.try_wait()? {
+            return Err(AppError::Internal(format!("i2pd exited before its SAM port opened: {status}")));
         }
+        if sam_dial(&sam_addr).await.is_ok() {
+            svc.i2pd = Some(child);
+            return Ok(sam_addr);
+        }
+        if tokio::time::Instant::now() >= deadline {
+            let _ = child.start_kill();
+            return Err(AppError::Internal("i2pd SAM port not ready after 60s (see i2pd.log)".into()));
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+}
+
+/// Terminates the managed i2pd: SIGTERM where available, then kill after 10 s
+/// (the caller has already closed both SAM sockets).
+async fn stop_i2pd(child: &mut Child) {
+    #[cfg(unix)]
+    if let Some(pid) = child.id() {
+        // SAFETY: plain signal send to a child PID we own
+        unsafe { libc::kill(pid as i32, libc::SIGTERM) };
+    }
+    if tokio::time::timeout(Duration::from_secs(10), child.wait()).await.is_err() {
+        let _ = child.kill().await;
     }
 }
 ```
 
-#### SAM Session (Model B)
+#### SAM Session (both models)
 
-Raw SAMv3 over a `tokio::net::TcpStream` — no new dependency. The destination is generated once and persisted; the session issues `STREAM FORWARD` so the router delivers incoming eepsite connections to the backend port.
+Raw SAMv3 over `tokio::net::TcpStream`, no new dependency beyond `base64`. Every socket gets its own `HELLO`; the session socket creates the session; a second socket forwards streams. See "I2P Provider Contract" for the rules behind each line.
 
 ```rust
-/// Opens a SAMv3 control connection, loads (or generates and persists) the
-/// destination, creates a STREAM session, and forwards incoming streams to the
-/// dedicated backend port. Returns the .b32.i2p address.
+use std::collections::HashMap;
+use base64::Engine;
+use tokio::io::{AsyncBufReadExt, BufReader};
+
+type SamConn = BufReader<TcpStream>;
+
+/// I2P base64 ('-' and '~' instead of '+' and '/').
+fn i2p_b64() -> base64::engine::GeneralPurpose {
+    let alphabet = base64::alphabet::Alphabet::new(
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-~",
+    )
+    .expect("invariant: 64 distinct characters");
+    base64::engine::GeneralPurpose::new(&alphabet, base64::engine::general_purpose::PAD)
+}
+
+/// One parsed SAM reply line, e.g. "SESSION STATUS RESULT=OK".
+struct SamReply {
+    kv: HashMap<String, String>,
+}
+
+fn parse_sam_reply(line: &str) -> SamReply {
+    let mut line = line.trim().to_string();
+    let mut kv = HashMap::new();
+    // MESSAGE="..." may contain spaces: take it first, then split the rest
+    if let Some(i) = line.find("MESSAGE=\"") {
+        kv.insert("MESSAGE".to_string(), line[i + 8..].trim_matches('"').to_string());
+        line.truncate(i);
+    }
+    for tok in line.split_whitespace().skip(2) {
+        if let Some((k, v)) = tok.split_once('=') {
+            kv.insert(k.to_string(), v.to_string());
+        }
+    }
+    SamReply { kv }
+}
+
+/// Sends one command and reads exactly one reply line within `timeout`.
+/// The command may hold a private key: it is never logged or put in errors.
+async fn sam_cmd(conn: &mut SamConn, timeout: Duration, cmd: &str) -> Result<SamReply, AppError> {
+    let word = cmd.split(' ').next().unwrap_or("SAM").to_string();
+    let io = async {
+        conn.get_mut().write_all(format!("{cmd}\n").as_bytes()).await?;
+        let mut line = String::new();
+        if conn.read_line(&mut line).await? == 0 {
+            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "SAM closed the socket"));
+        }
+        Ok(parse_sam_reply(&line))
+    };
+    tokio::time::timeout(timeout, io)
+        .await
+        .map_err(|_| AppError::Internal(format!("SAM {word}: timed out")))?
+        .map_err(|e| AppError::Internal(format!("SAM {word}: {e}")))
+}
+
+/// Opens a SAM socket and completes HELLO (required on every socket).
+async fn sam_dial(addr: &str) -> Result<SamConn, AppError> {
+    let stream = tokio::time::timeout(Duration::from_secs(5), TcpStream::connect(addr))
+        .await
+        .map_err(|_| AppError::Internal(format!("SAM {addr}: connect timed out")))?
+        .map_err(|e| AppError::Internal(format!("SAM {addr}: {e}")))?;
+    let mut conn = BufReader::new(stream);
+    let rep = sam_cmd(&mut conn, Duration::from_secs(10), "HELLO VERSION MIN=3.1 MAX=3.3").await?;
+    if rep.kv.get("RESULT").map(String::as_str) != Some("OK") {
+        return Err(AppError::Internal(format!(
+            "SAM HELLO: {}",
+            rep.kv.get("RESULT").cloned().unwrap_or_default()
+        )));
+    }
+    Ok(conn)
+}
+
+/// Destination part of a PRIV value: 387 + certificate length, the length being
+/// the big-endian u16 at offsets 385-386.
+fn destination_bytes(priv_key: &str) -> Result<Vec<u8>, AppError> {
+    let raw = i2p_b64()
+        .decode(priv_key)
+        .map_err(|_| AppError::Internal("invalid destination key".into()))?;
+    if raw.len() < 387 {
+        return Err(AppError::Internal("invalid destination key".into()));
+    }
+    let n = 387 + u16::from_be_bytes([raw[385], raw[386]]) as usize;
+    if raw.len() < n {
+        return Err(AppError::Internal("truncated destination key".into()));
+    }
+    Ok(raw[..n].to_vec())
+}
+
+/// Returns the persisted PRIV, generating and persisting one first (temp file +
+/// rename) when none exists. A corrupt file is an error, never regenerated.
+async fn load_or_create_destination(
+    conn: &mut SamConn,
+    keys_path: &Path,
+    signature_type: u32,
+) -> Result<String, AppError> {
+    match fs::read_to_string(keys_path) {
+        Ok(s) => {
+            let priv_key = s.trim().to_string();
+            destination_bytes(&priv_key).map_err(|e| {
+                AppError::Internal(format!("corrupt destination key file {}: {e}", keys_path.display()))
+            })?;
+            return Ok(priv_key);
+        }
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.into()),
+    }
+    let rep = sam_cmd(conn, Duration::from_secs(10), &format!("DEST GENERATE SIGNATURE_TYPE={signature_type}")).await?;
+    let priv_key = rep.kv.get("PRIV").cloned().unwrap_or_default();
+    destination_bytes(&priv_key).map_err(|_| AppError::Internal("DEST GENERATE returned an unusable key".into()))?;
+    let tmp = keys_path.with_extension("dat.tmp");
+    fs::write(&tmp, format!("{priv_key}\n"))?;
+    fs::set_permissions(&tmp, fs::Permissions::from_mode(0o600))?;
+    fs::rename(&tmp, keys_path)?;
+    Ok(priv_key)
+}
+
+/// Creates the STREAM session on the control socket, then forwards streams to the
+/// backend port on a SECOND socket (SILENT=true). Returns the .b32.i2p address.
+/// `sam_addr` is the Model A private SAM port or `cfg.sam_address`.
 async fn start_sam_eepsite(
     cfg: &I2PConfig,
+    sam_addr: &str,
     keys_path: &Path,
     i2p_backend_port: u16,
     svc: &mut I2PService,
 ) -> Result<String, AppError> {
-    let mut conn = TcpStream::connect(&cfg.sam_address)
-        .await
-        .map_err(|e| AppError::Internal(format!("failed to dial SAM {}: {e}", cfg.sam_address)))?;
+    let mut conn = sam_dial(sam_addr).await?;
+    let priv_key = load_or_create_destination(&mut conn, keys_path, cfg.signature_type).await?;
+    let addr = b32_address(&destination_bytes(&priv_key)?);
 
-    // 1. Handshake
-    conn.write_all(b"HELLO VERSION MIN=3.0 MAX=3.3\n")
-        .await
-        .map_err(|e| AppError::Internal(format!("SAM HELLO failed: {e}")))?;
-    read_sam_reply(&mut conn, "HELLO REPLY").await?;
-
-    // 2. Load persisted destination or generate + persist a new one.
-    let dest = load_or_create_sam_destination(&mut conn, keys_path, cfg.signature_type).await?;
-
-    // 3. Create the STREAM session bound to that destination.
+    // The reply comes only after tunnels are built: wait the full bootstrap_timeout,
+    // never abandon the socket and retry mid-build
+    let id = format!("site-{}", std::process::id());
     let session = format!(
-        "SESSION CREATE STYLE=STREAM ID=site DESTINATION={dest} \
-         inbound.length={inb_len} outbound.length={out_len} \
-         inbound.quantity={inb_qty} outbound.quantity={out_qty}\n",
-        dest = dest.priv_key,
-        inb_len = cfg.inbound_length,
-        out_len = cfg.outbound_length,
-        inb_qty = cfg.inbound_quantity,
-        out_qty = cfg.outbound_quantity,
+        "SESSION CREATE STYLE=STREAM ID={id} DESTINATION={priv_key} i2cp.leaseSetEncType=4 \
+         inbound.length={} outbound.length={} inbound.quantity={} outbound.quantity={}",
+        cfg.inbound_length, cfg.outbound_length, cfg.inbound_quantity, cfg.outbound_quantity,
     );
-    conn.write_all(session.as_bytes())
-        .await
-        .map_err(|e| AppError::Internal(format!("SAM SESSION CREATE failed: {e}")))?;
-    read_sam_reply(&mut conn, "SESSION STATUS").await?;
+    let rep = sam_cmd(&mut conn, Duration::from_secs(cfg.bootstrap_timeout), &session).await?;
+    if rep.kv.get("RESULT").map(String::as_str) != Some("OK") {
+        return Err(AppError::Internal(format!(
+            "SESSION CREATE: {} {}",
+            rep.kv.get("RESULT").cloned().unwrap_or_default(),
+            rep.kv.get("MESSAGE").cloned().unwrap_or_default()
+        )));
+    }
 
-    // 4. Forward incoming eepsite streams to the backend port.
-    let forward = format!("STREAM FORWARD ID=site PORT={i2p_backend_port} HOST=127.0.0.1\n");
-    conn.write_all(forward.as_bytes())
-        .await
-        .map_err(|e| AppError::Internal(format!("SAM STREAM FORWARD failed: {e}")))?;
-    read_sam_reply(&mut conn, "STREAM STATUS").await?;
+    // STREAM FORWARD goes on a NEW socket; SILENT=true stops SAM prepending the
+    // peer destination line to every forwarded connection
+    let mut fconn = sam_dial(sam_addr).await?;
+    let fwd = format!("STREAM FORWARD ID={id} PORT={i2p_backend_port} HOST=127.0.0.1 SILENT=true");
+    let rep = sam_cmd(&mut fconn, Duration::from_secs(10), &fwd).await?;
+    if rep.kv.get("RESULT").map(String::as_str) != Some("OK") {
+        return Err(AppError::Internal("STREAM FORWARD failed".into()));
+    }
 
-    let addr = b32_address(&dest.public_key);
-    // Keep the control connection open for the session lifetime.
+    // Both sockets stay open for the life of the eepsite
     svc.sam_conn = Some(conn);
+    svc.forward_conn = Some(fconn);
     Ok(addr)
 }
 
@@ -43975,7 +44192,7 @@ pub fn b32_address(dest_binary: &[u8]) -> String {
 | **App Start** | (if enabled) resolve provider → start eepsite → derive address | No-op when disabled |
 | **App Running** | Monitor provider, restart if it dies | Model A: watch i2pd; Model B: watch SAM conn |
 | **App Shutdown** | Stop i2pd / close SAM session, then exit | Server owns the lifecycle |
-| **Config change** | Stop → Start with new config (regenerates tunnels.conf) | |
+| **Config change** | Stop → Start with new config (regenerates i2pd.conf) | |
 | **Regenerate address** | Stop → delete `{data_dir}/i2p/site/` → Start | New destination |
 
 #### Restart Implementation
@@ -44026,7 +44243,7 @@ impl I2PManager {
     }
 
     /// Applies new settings and restarts I2P. `start` → `start_dedicated_i2p`
-    /// regenerates tunnels.conf (with a freshly allocated backend port) from the
+    /// regenerates i2pd.conf (with a freshly allocated backend port) from the
     /// new config. If the new config disables I2P, the eepsite stays down.
     pub async fn update_config(&self, new_config: I2PConfig, config_dir: &Path) -> Result<(), AppError> {
         {
@@ -44173,13 +44390,14 @@ pub async fn monitor_i2p(
 | Data | Location | Notes |
 |------|----------|-------|
 | I2P config directory | `{config_dir}/i2p/` | Server creates with 0700 |
-| I2P tunnels file | `{config_dir}/i2p/tunnels.conf` | Server generates with 0600 (Model A) |
+| I2P router config | `{config_dir}/i2p/i2pd.conf` | Server generates with 0600 (Model A) |
+| Empty tunnel definitions | `{config_dir}/i2p/tunnels.conf`, `{config_dir}/i2p/tunnels.d/` | Server creates empty (0600 / 0700) so no other tunnel is ever loaded (Model A) |
 | I2P data directory | `{data_dir}/i2p/` | Server creates with 0700 (Model A) |
-| Destination key | `{data_dir}/i2p/site/site-keys.dat` | Server creates with 0600 |
+| Destination key | `{data_dir}/i2p/site/site-keys.dat` | App creates with 0600; one line, SAM `PRIV` in I2P base64 (both models) |
 | i2pd process PID | `{data_dir}/i2p/i2pd.pid` | Model A only |
 | i2pd log file | `{log_dir}/i2pd.log` | Model A only |
 
-**Model B** owns no i2pd files — only `{data_dir}/i2p/site/site-keys.dat` (the persisted destination) is written by the app.
+**Model B** owns no i2pd files — only `{data_dir}/i2p/site/site-keys.dat` (the persisted destination) is written by the app. Model A additionally owns `i2pd.conf`, `tunnels.conf`/`tunnels.d/` (empty), `i2pd.pid` and `i2pd.log`.
 
 #### Runtime Directory Handling
 
@@ -44209,11 +44427,10 @@ pub fn ensure_i2p_dirs(config_dir: &Path, data_dir: &Path) -> Result<(), AppErro
     Ok(())
 }
 
-/// (Over)writes tunnels.conf with the given content. Called at every startup to
-/// regenerate it from config (the backend port changes each run) and whenever
-/// the admin saves new I2P settings. Identity lives in site-keys.dat, so
-/// overwriting tunnels.conf is always safe.
-pub fn update_i2p_tunnels(path: &Path, content: &[u8]) -> Result<(), AppError> {
+/// (Over)writes i2pd.conf (or the empty tunnels.conf) with the given content.
+/// Called at every startup to regenerate it from config (the SAM port changes
+/// each run). Identity lives in site-keys.dat, so overwriting is always safe.
+pub fn update_i2p_conf(path: &Path, content: &[u8]) -> Result<(), AppError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -44226,7 +44443,7 @@ pub fn update_i2p_tunnels(path: &Path, content: &[u8]) -> Result<(), AppError> {
         let uid = unsafe { libc::getuid() };
         let gid = unsafe { libc::getgid() };
         std::os::unix::fs::chown(path, Some(uid), Some(gid))
-            .map_err(|e| AppError::Internal(format!("chown tunnels.conf: {e}")))?;
+            .map_err(|e| AppError::Internal(format!("chown i2p conf: {e}")))?;
     }
 
     Ok(())
@@ -44248,7 +44465,7 @@ pub fn update_i2p_tunnels(path: &Path, content: &[u8]) -> Result<(), AppError> {
 | Scenario | Behavior |
 |----------|----------|
 | I2P disabled (default) | No provider contacted, no port, no config — eepsite off |
-| Enabled, i2pd found | Model A: i2pd spawned, tunnels.conf regenerated, `.b32.i2p` derived from `site-keys.dat` |
+| Enabled, i2pd found | Model A: i2pd spawned with its own `i2pd.conf`, SAM session + `STREAM FORWARD`, `.b32.i2p` derived from `site-keys.dat` |
 | Enabled, no i2pd, SAM reachable | Model B: SAM session + STREAM FORWARD to backend port |
 | Enabled, no provider | Log WARN, continue without I2P (not an error) |
 | Subsequent runs | Same `.b32.i2p` (destination key persists in `{data_dir}/i2p/site/`) |
@@ -48223,8 +48440,8 @@ make docker
 - [ ] Provider resolution: i2pd binary preferred, external SAM bridge fallback
 - [ ] Dedicated i2pd process (Model A, not a system router) when i2pd found
 - [ ] `.b32.i2p` address generation from persisted destination key
-- [ ] `tunnels.conf` regenerated each startup (Model A); key persists at `{data_dir}/i2p/site/`
-- [ ] I2P config in `{config_dir}/i2p/tunnels.conf`
+- [ ] `i2pd.conf` regenerated each startup (Model A); key persists at `{data_dir}/i2p/site/`
+- [ ] I2P router config in `{config_dir}/i2p/i2pd.conf`; `tunnels.conf` and `tunnels.d/` stay empty
 - [ ] I2P data in `{data_dir}/i2p/`
 - [ ] I2P fields in `/api/{api_version}/server/healthz`:
   - [ ] `features.i2p.enabled` (yes/no)
