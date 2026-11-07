@@ -17182,7 +17182,8 @@ server:
     # Tracking/Site ID (format depends on type)
     id: ""
     # Self-hosted URL (required for: matomo, piwik, owa, umami)
-    # Not used for: google, fathom, plausible, simple, cloudflare
+    # Optional for: fathom (Fathom Lite), plausible (self-hosted)
+    # Not used for: google, simple, cloudflare
     url: ""
 ```
 
@@ -17397,8 +17398,9 @@ pub fn tracker_for(cfg: &TrackingConfig) -> Option<Tracker> {
         }
         "umami" => tags_only(format!(r#"<script defer src="{}/script.js" data-website-id="{id}"></script>"#, html_attr(&base))),
         // Needs scripts.simpleanalyticscdn.com in script-src and queue.simpleanalyticscdn.com in img-src
+        // (the <noscript> pixel is tracking_noscript(), rendered in <body>)
         "simple" => tags_only(
-            r#"<script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script><noscript><img src="https://queue.simpleanalyticscdn.com/noscript.gif" alt="" referrerpolicy="no-referrer-when-downgrade" /></noscript>"#.to_string(),
+            r#"<script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script>"#.to_string(),
         ),
         "cloudflare" => tags_only(format!(
             r#"<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{{"token": "{id}"}}'></script>"#
@@ -17428,6 +17430,17 @@ pub fn tracking_script(cfg: &TrackingConfig) -> String {
 pub fn tracking_script_body(cfg: &TrackingConfig) -> String {
     tracker_for(cfg).map(|t| t.body).unwrap_or_default()
 }
+
+/// Returns the <noscript> pixel for providers that have one (only "simple"). It is
+/// NOT valid <head> content: render it as the first child of <body>, under the same
+/// consent / non-overlay conditions as tracking_script().
+pub fn tracking_noscript(cfg: &TrackingConfig) -> String {
+    if cfg.tracking_type == "simple" {
+        r#"<noscript><img src="https://queue.simpleanalyticscdn.com/noscript.gif" alt="" referrerpolicy="no-referrer-when-downgrade" /></noscript>"#.to_string()
+    } else {
+        String::new()
+    }
+}
 ```
 
 ### Template Usage
@@ -17435,6 +17448,9 @@ pub fn tracking_script_body(cfg: &TrackingConfig) -> String {
 ```html
 <!-- In base template <head> section -->
 {{ trackingScript }}
+
+<!-- First child of <body> (the simple provider's <noscript> pixel is invalid in <head>) -->
+{{ tracking_noscript|safe }}
 ```
 
 ### Analytics Tracking Configuration (config file)
