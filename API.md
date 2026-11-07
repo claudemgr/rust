@@ -10007,7 +10007,7 @@ $ myapp --help
 Usage: myapp [options]              # Shows actual name
 
 $ myapp --version
-myapp 1.0.0 (abc123)                # Shows actual name
+myapp 1.0.0 (abc123)                # First line shows the actual name; build metadata lines follow
 
 # But internally:
 User-Agent: jokes/1.0.0             # Hardcoded project name
@@ -10236,7 +10236,7 @@ Information:
 Shell Integration:
 --shell completions [SHELL]            - Print shell completions
 --shell init [SHELL]                   - Print shell init command
---shell help                           - Show shell help
+--shell --help                         - Show shell help
 
 Server Configuration:
 --mode {production|development|debug}  - Application mode (default: production)
@@ -10256,10 +10256,10 @@ Server Configuration:
 
 Service Management:
 --service CMD                          - Service management (run --service --help for details)
---maintenance CMD                      - Maintenance operations (run --maintenance help for details)
---update [CMD]                         - Check/perform updates (run --update help for details)
+--maintenance CMD                      - Maintenance operations (run --maintenance --help for details)
+--update [CMD]                         - Check/perform updates (run --update --help for details)
 
-Run '{project_name} <command> help' for detailed help on any command.
+Run '{project_name} <flag> --help' (for example `--service --help`) for detailed help on any command flag.
 ```
 
 ## Directory Flags
@@ -18283,11 +18283,13 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 ### --version Output
 
 ```
-{project_name} {project_version}
+{project_name} {project_version} ({short_commit})
 Built: {build_date}
 Rust: {rust_version}
 OS/Arch: {target}
 ```
+
+Plain text, no color. The first line is always `{project_name} {project_version} ({short_commit})` so scripts can parse it; the build metadata lines follow it.
 
 ---
 
@@ -43294,6 +43296,8 @@ Find i2pd binary:
 
 **i2pd logging:** i2pd logs to `{log_dir}/i2pd.log` at `warn` level by default (configurable). Model B logging is owned by the external router.
 
+**Model B liveness (safe monitoring):** the app NEVER writes to the control connection that owns its SAM session. SAM destroys a session when its control socket closes, and extra commands on it can corrupt the stream-forward state. Liveness uses a separate short-lived probe connection every 30 seconds: open a new TCP connection to `sam_address`, send `HELLO VERSION MIN=3.0 MAX=3.3`, accept `HELLO REPLY RESULT=OK`, then send `QUIT` and close. The probe issues no `SESSION`, `STREAM` or `NAMING` command. Three consecutive probe failures (5-second timeout each) set the status to `error`. Separately, if the session's own control connection closes or errors, the session is lost: set the status to `error` and recreate it (a new `SESSION CREATE` with the same persisted destination key) with backoff.
+
 **Process ownership:** the server binary creates all Model-A directories/files with the current uid/gid and enforces 0700/0600 permissions before starting i2pd.
 
 ### Implementation
@@ -46207,7 +46211,7 @@ Flags:
 -v, --version                          - Show version
 --shell completions [SHELL]            - Print shell completions (auto-detect if SHELL omitted)
 --shell init [SHELL]                   - Print shell init command (auto-detect if SHELL omitted)
---shell help                           - Show shell integration help
+--shell --help                         - Show shell integration help
 
 --server URL                           - Server URL (default: from config)
 --token TOKEN                          - API token for authentication
@@ -46222,7 +46226,7 @@ Flags:
 Shells: bash, zsh, fish, sh, dash, ksh, powershell, pwsh
 
 Run without arguments for interactive TUI mode.
-Run '{project_name}-cli <command> help' for detailed help on any command.
+Run '{project_name}-cli <flag> --help' (for example `--shell --help`) for detailed help on any command flag.
 ```
 
 **If user renames binary:**
@@ -48519,7 +48523,7 @@ make docker
 - [ ] Log output: ALWAYS plain text (no icons, no colors, no box drawing)
 - [ ] `--status` output: Pretty to console, exit code for scripts (0=healthy, 1=unhealthy)
 - [ ] `--help` output: Plain text, no colors (works in all terminals)
-- [ ] `--version` output: Plain text, single line
+- [ ] `--version` output: Plain text, no color; the first line is `{project_name} {project_version} ({short_commit})`, followed by the build metadata lines (see PART 8 → "--version Output")
 
 ---
 

@@ -7078,7 +7078,7 @@ $ myapp --help
 Usage: myapp [options]              # Shows actual name
 
 $ myapp --version
-myapp 1.0.0 (abc123)                # Shows actual name
+myapp 1.0.0 (abc123)                # First line shows the actual name; build metadata lines follow
 
 # But internally:
 User-Agent: jokes/1.0.0             # Hardcoded project name
@@ -7307,7 +7307,7 @@ Information:
 Shell Integration:
 --shell completions [SHELL]            - Print shell completions
 --shell init [SHELL]                   - Print shell init command
---shell help                           - Show shell help
+--shell --help                         - Show shell help
 
 Server Configuration:
 --mode {production|development|debug}  - Application mode (default: production)
@@ -7327,10 +7327,10 @@ Server Configuration:
 
 Service Management:
 --service CMD                          - Service management (run --service --help for details)
---maintenance CMD                      - Maintenance operations (run --maintenance help for details)
---update [CMD]                         - Check/perform updates (run --update help for details)
+--maintenance CMD                      - Maintenance operations (run --maintenance --help for details)
+--update [CMD]                         - Check/perform updates (run --update --help for details)
 
-Run '{project_name} <command> help' for detailed help on any command.
+Run '{project_name} <flag> --help' (for example `--service --help`) for detailed help on any command flag.
 ```
 
 ## Directory Flags
@@ -12495,7 +12495,7 @@ Flags:
 -v, --version                          - Show version
 --shell completions [SHELL]            - Print shell completions (auto-detect if SHELL omitted)
 --shell init [SHELL]                   - Print shell init command (auto-detect if SHELL omitted)
---shell help                           - Show shell integration help
+--shell --help                         - Show shell integration help
 
 --server URL                           - Server URL (default: from config)
 --token TOKEN                          - API token for authentication
@@ -12510,7 +12510,7 @@ Flags:
 Shells: bash, zsh, fish, sh, dash, ksh, powershell, pwsh
 
 Run without arguments for interactive TUI mode.
-Run '{project_name}-cli <command> help' for detailed help on any command.
+Run '{project_name}-cli <flag> --help' (for example `--shell --help`) for detailed help on any command flag.
 ```
 
 **If user renames binary:**
@@ -18819,11 +18819,13 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 ### --version Output
 
 ```
-{project_name} {project_version}
+{project_name} {project_version} ({short_commit})
 Built: {build_date}
 Rust: {rust_version}
 OS/Arch: {target}
 ```
+
+Plain text, no color. The first line is always `{project_name} {project_version} ({short_commit})` so scripts can parse it; the build metadata lines follow it.
 
 ---
 
