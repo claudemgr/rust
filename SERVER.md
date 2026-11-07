@@ -19296,136 +19296,99 @@ server:
 - **Tor and I2P:** tracking is never rendered for requests served through the onion or I2P address — provider scripts are clearnet endpoints and calling them leaks the request off Tor — and `/server/tracking.js` returns `404` there.
 
 ```rust
-use askama::Template;
+/// What one provider contributes: external tags for the page and an optional
+/// JavaScript body that is served from /server/tracking.js - a body is NEVER
+/// written inline into HTML (see "Tracking and CSP").
+pub struct Tracker {
+    pub tags: String,
+    pub body: String,
+}
 
-/// Returns the tracker markup. Inline script bodies are not emitted into pages: they are served from /server/tracking.js (see "Tracking and CSP").
-/// Returns an empty string when tracking is disabled.
-pub fn tracking_script(cfg: &TrackingConfig) -> String {
-    if cfg.tracking_type.is_empty() || cfg.tracking_type == "none" {
-        return String::new();
-    }
+/// Quotes a config value as a JavaScript string literal; config text is never
+/// concatenated raw into JavaScript.
+fn js_string(v: &str) -> String {
+    serde_json::to_string(v).unwrap_or_else(|_| "\"\"".to_string())
+}
 
+/// Escapes a config value for use inside an HTML attribute.
+fn html_attr(v: &str) -> String {
+    v.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;").replace('\'', "&#39;")
+}
+
+/// Maps the server.tracking config to its tags and script body.
+pub fn tracker_for(cfg: &TrackingConfig) -> Option<Tracker> {
+    let id = html_attr(&cfg.id);
+    let base = cfg.url.trim_end_matches('/').to_string();
+    let tags_only = |tags: String| Some(Tracker { tags, body: String::new() });
     match cfg.tracking_type.as_str() {
-        "google" => {
-            if cfg.id.starts_with("G-") {
-                // GA4
-                format!(
-                    r#"<script async src="https://www.googletagmanager.com/gtag/js?id={id}"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){{dataLayer.push(arguments);}}
-  gtag('js', new Date());
-  gtag('config', '{id}');
-</script>"#,
-                    id = cfg.id
-                )
-            } else {
-                // Universal Analytics (legacy)
-                format!(
-                    r#"<script async src="https://www.google-analytics.com/analytics.js"></script>
-<script>
-  window.ga=window.ga||function(){{(ga.q=ga.q||[]).push(arguments)}};ga.l=+new Date;
-  ga('create', '{id}', 'auto');
-  ga('send', 'pageview');
-</script>"#,
-                    id = cfg.id
-                )
-            }
-        }
-
-        "matomo" | "piwik" => {
-            let base = cfg.url.trim_end_matches('/');
-            format!(
-                r#"<script>
-  var _paq = window._paq = window._paq || [];
-  _paq.push(['trackPageView']);
-  _paq.push(['enableLinkTracking']);
-  (function() {{
-    var u="{base}/";
-    _paq.push(['setTrackerUrl', u+'matomo.php']);
-    _paq.push(['setSiteId', '{id}']);
-    var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
-    g.async=true; g.src=u+'matomo.js'; s.parentNode.insertBefore(g,s);
-  }})();
-</script>"#,
-                base = base,
-                id = cfg.id
-            )
-        }
-
-        "owa" => {
-            let base = cfg.url.trim_end_matches('/');
-            format!(
-                r#"<script>
-  var owa_baseUrl = '{base}/';
-  var owa_cmds = owa_cmds || [];
-  owa_cmds.push(['setSiteId', '{id}']);
-  owa_cmds.push(['trackPageView']);
-  owa_cmds.push(['trackClicks']);
-  (function() {{
-    var _owa = document.createElement('script'); _owa.type = 'text/javascript'; _owa.async = true;
-    _owa.src = owa_baseUrl + 'modules/base/js/owa.tracker-combined-min.js';
-    var _owa_s = document.getElementsByTagName('script')[0]; _owa_s.parentNode.insertBefore(_owa, _owa_s);
-  }})();
-</script>"#,
-                base = base,
-                id = cfg.id
-            )
-        }
-
+        "" | "none" => None,
+        "google" if cfg.id.starts_with("G-") => Some(Tracker {
+            // GA4
+            tags: format!(r#"<script async src="https://www.googletagmanager.com/gtag/js?id={}"></script>"#, urlencoding::encode(&cfg.id)),
+            body: "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config',".to_string()
+                + &js_string(&cfg.id) + ");",
+        }),
+        "google" => Some(Tracker {
+            // Universal Analytics (legacy)
+            tags: r#"<script async src="https://www.google-analytics.com/analytics.js"></script>"#.to_string(),
+            body: "window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;ga('create',".to_string()
+                + &js_string(&cfg.id) + ",'auto');ga('send','pageview');",
+        }),
+        "matomo" | "piwik" => Some(Tracker {
+            tags: String::new(),
+            body: "var _paq=window._paq=window._paq||[];_paq.push(['trackPageView']);_paq.push(['enableLinkTracking']);_paq.push(['setTrackerUrl',".to_string()
+                + &js_string(&format!("{base}/matomo.php")) + "]);_paq.push(['setSiteId'," + &js_string(&cfg.id)
+                + "]);var g=document.createElement('script');g.async=true;g.src=" + &js_string(&format!("{base}/matomo.js"))
+                + ";document.head.appendChild(g);",
+        }),
+        "owa" => Some(Tracker {
+            tags: String::new(),
+            body: "var owa_baseUrl=".to_string() + &js_string(&format!("{base}/"))
+                + ";var owa_cmds=window.owa_cmds=window.owa_cmds||[];owa_cmds.push(['setSiteId'," + &js_string(&cfg.id)
+                + "]);owa_cmds.push(['trackPageView']);owa_cmds.push(['trackClicks']);var o=document.createElement('script');o.async=true;"
+                + "o.src=owa_baseUrl+'modules/base/js/owa.tracker-combined-min.js';document.head.appendChild(o);",
+        }),
         "fathom" => {
-            let script_url = if cfg.url.is_empty() {
-                "https://cdn.usefathom.com/script.js".to_owned()
-            } else {
-                // Self-hosted Fathom Lite
-                format!("{}/tracker.js", cfg.url.trim_end_matches('/'))
-            };
-            format!(
-                r#"<script src="{script_url}" data-site="{id}" defer></script>"#,
-                script_url = script_url,
-                id = cfg.id
-            )
+            // Self-hosted Fathom Lite when a URL is set
+            let src = if cfg.url.is_empty() { "https://cdn.usefathom.com/script.js".to_string() } else { format!("{base}/tracker.js") };
+            tags_only(format!(r#"<script src="{}" data-site="{id}" defer></script>"#, html_attr(&src)))
         }
-
         "plausible" => {
-            let script_url = if cfg.url.is_empty() {
-                "https://plausible.io/js/script.js".to_owned()
-            } else {
-                format!("{}/js/script.js", cfg.url.trim_end_matches('/'))
-            };
-            format!(
-                r#"<script defer data-domain="{domain}" src="{script_url}"></script>"#,
-                domain = cfg.id,
-                script_url = script_url
-            )
+            let src = if cfg.url.is_empty() { "https://plausible.io/js/script.js".to_string() } else { format!("{base}/js/script.js") };
+            tags_only(format!(r#"<script defer data-domain="{id}" src="{}"></script>"#, html_attr(&src)))
         }
-
-        "umami" => {
-            format!(
-                r#"<script defer src="{base}/script.js" data-website-id="{id}"></script>"#,
-                base = cfg.url.trim_end_matches('/'),
-                id = cfg.id
-            )
-        }
-
-        "simple" => {
-            r#"<script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
-<noscript><img src="https://queue.simpleanalyticscdn.com/noscript.gif" alt="" referrerpolicy="no-referrer-when-downgrade" /></noscript>"#
-                .to_owned()
-        }
-
-        "cloudflare" => {
-            format!(
-                r#"<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{{"token": "{id}"}}'></script>"#,
-                id = cfg.id
-            )
-        }
-
-        unknown => {
-            tracing::warn!(tracking_type = unknown, "unknown tracking type");
-            String::new()
+        "umami" => tags_only(format!(r#"<script defer src="{}/script.js" data-website-id="{id}"></script>"#, html_attr(&base))),
+        // Needs scripts.simpleanalyticscdn.com in script-src and queue.simpleanalyticscdn.com in img-src
+        "simple" => tags_only(
+            r#"<script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script><noscript><img src="https://queue.simpleanalyticscdn.com/noscript.gif" alt="" referrerpolicy="no-referrer-when-downgrade" /></noscript>"#.to_string(),
+        ),
+        "cloudflare" => tags_only(format!(
+            r#"<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{{"token": "{id}"}}'></script>"#
+        )),
+        other => {
+            tracing::warn!("unknown tracking type: {}", other);
+            None
         }
     }
+}
+
+/// Returns the page markup: external tags only, plus the same-origin
+/// /server/tracking.js tag when the provider has a script body. The caller
+/// renders it only when tracking is configured AND consent is given.
+pub fn tracking_script(cfg: &TrackingConfig) -> String {
+    match tracker_for(cfg) {
+        None => String::new(),
+        Some(t) if t.body.is_empty() => t.tags,
+        Some(t) => t.tags + r#"<script async src="/server/tracking.js"></script>"#,
+    }
+}
+
+/// What GET /server/tracking.js serves (Content-Type application/javascript,
+/// Cache-Control: no-cache). The handler answers 404 when this is empty,
+/// tracking is disabled, consent is missing, or the request came through the
+/// onion or I2P address.
+pub fn tracking_script_body(cfg: &TrackingConfig) -> String {
+    tracker_for(cfg).map(|t| t.body).unwrap_or_default()
 }
 ```
 
@@ -30344,7 +30307,7 @@ pub fn tracking_script(headers: &HeaderMap, cfg: &Config) -> askama::MarkupDispl
     if !check_tracking_allowed(headers, cfg) {
         return askama::MarkupDisplay::new_safe(String::new());
     }
-    generate_tracking_script(cfg)
+    tracking_script(cfg)
 }
 ```
 
