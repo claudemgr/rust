@@ -701,7 +701,7 @@ let cache_size = (avail_mem / 10)
 | **Unsafe PR triggers forbidden by default** | Do NOT use `pull_request_target` for untrusted code execution, build, test, or artifact upload paths |
 | **Secrets never exposed to forks** | Fork PR workflows run without repo secrets, write tokens, publish steps, or deployment credentials |
 | **Dependency updates are automated** | Public repos include dependency update automation for every ecosystem in use |
-| **Secret scanning is mandatory** | Public repos run `truffleHog` (`trufflesecurity/trufflehog`, Apache-2.0, no license key) on push/PR via `ci.yml`; findings are blockers. Never use `gitleaks` — requires a commercial license for org repos |
+| **Secret scanning is mandatory** | Public repos run `truffleHog` (`trufflesecurity/trufflehog`, Apache-2.0, no license key) on push/PR via `ci.yml`; blocking statuses: `verified` always; `unknown` (unverified) only in push/PR range scans, never in a full-history scan (scheduled runs and new-branch pushes), where unverified noise is reported but does not fail the run. Every `unknown` finding is reviewed and true false positives are allowlisted. Never use `gitleaks` — requires a commercial license for org repos |
 | **Release outputs are verifiable** | Releases publish checksums, SBOM, release notes, and provenance/attestation when the host platform supports it |
 
 ### Workflow Permissions
@@ -5226,7 +5226,7 @@ curl -q -LSsf {official_site}/api/autoconfig
 
 **{fqdn} - Embedded Code URLs (Rust, JavaScript, templates)**
 
-For code that runs in the application, NEVER use bare `/path`. Always use `{fqdn}/path`.
+For code that runs in the application, NEVER use bare `/path` where an ABSOLUTE URL is needed (emails, notifications, JSON fields, redirects, Swagger, `security.txt`, canonical and `og:*` tags, links shown as text). Always use `{fqdn}/path` there, built per request with `BuildURL(r, ...)`. Same-origin links, form actions and asset URLs inside a rendered HTML page are the one exception: they are ORIGIN-RELATIVE paths produced by the `path` template helper (`{baseurl}` + path, where `{baseurl}` is the detected or configured prefix, empty for `/`), so they stay correct on the clearnet, `.onion` and `.i2p` origins and behind a reverse-proxy prefix. Examples in this spec write `href="/server/x"` as shorthand for `{{ path "/server/x" }}` when `{baseurl}` is `/`.
 
 | Context | ❌ Wrong | ✅ Correct |
 |---------|----------|------------|
@@ -5278,7 +5278,7 @@ fetch(`${config.apiBaseUrl}/api/${apiVersion}/users`)
 **HTML template examples (Askama):**
 
 ```html
-<!-- ❌ WRONG - Bare path (breaks in emails, notifications) -->
+<!-- ❌ WRONG in emails and notifications - a bare path has no origin -->
 <a href="/verify?token={{ token }}">Verify Email</a>
 
 <!-- ❌ WRONG — hardcodes https; ignores proxy headers; breaks behind a proxy -->
@@ -6301,7 +6301,7 @@ PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+
 │   └── e2e.sh              # Browser E2E beta testing, headless Chromium (REQUIRED — PART 29)
 ├── docker/                 # Docker files
 │   ├── Dockerfile          # Production Dockerfile
-│   ├── Dockerfile.dev      # devel image — same as release but binary runs in debug mode; tagged :devel (project-specific)
+│   ├── Dockerfile.dev      # devel image — same as release but baked with `MODE=development`; tagged :devel (project-specific)
 │   ├── docker-compose.yml  # Production compose (NO debug)
 │   ├── docker-compose.dev.yml  # Development compose
 │   ├── docker-compose.test.yml # Test compose (:devel image, DEBUG: true, MODE: development)
@@ -6464,12 +6464,17 @@ volumes/
 *.swp
 *.swo
 
-# AI config directories (regenerated from AI.md rules, not committed)
-.claude/
-.cursor/
+# AI config: team config (rules, settings.json, agents, commands, mcp.json) is COMMITTED;
+# only personal and runtime files are ignored
+.claude/settings.local.json
+.claude/*.lock
+.claude/backups/
+.claude/cache/
+.claude/history.jsonl
+.cursor/settings.json
+.windsurf/settings.json
 .aider/
 .ai/
-.windsurf/
 
 # Claude Code personal files (always gitignored)
 CLAUDE.local.md
@@ -6504,6 +6509,8 @@ tests/
 # Documentation (not needed in container)
 docs/
 *.md
+# Builds and embedded tests read the root README, so keep it
+!README.md
 
 # Build files (not needed - build happens inside Docker)
 Makefile
@@ -6531,7 +6538,7 @@ Makefile
 | **Runtime** | `volumes/` | Runtime volumes, not build-time |
 | **Build output** | `binaries/`, `releases/`, `target/` | Container builds from source |
 | **Tests** | `tests/` | Test scripts not needed in production |
-| **Docs** | `docs/`, `*.md` | Documentation not needed in container |
+| **Docs** | `docs/`, `*.md`, then re-include `!README.md` | Documentation is not needed in the container, but the root README stays: builds and embedded tests may read it |
 | **Build files** | `Makefile` | Build happens inside Docker, not needed |
 | **IDE** | `.idea/`, `.vscode/`, `*.swp` | Editor files |
 | **AI config** | `.claude/`, `.cursor/`, etc. | AI assistant config |
@@ -7493,7 +7500,7 @@ use std::path::{Component, Path, PathBuf};
 
 // safe_dir_path validates a filesystem directory override and preserves absolute paths
 pub fn safe_dir_path(input: &str) -> anyhow::Result<PathBuf> {
-    if input.is_empty() || input.chars().any(|c| c == '\0' || c == '\r' || c == '\n') {
+    if input.is_empty() || input.chars().any(|c| c.is_control()) {
         anyhow::bail!("invalid characters");
     }
     let path = Path::new(input);
@@ -10752,7 +10759,7 @@ NO_COLOR=1 {project_name} --status | cat -v
 NO_COLOR=1 {project_name} --status | grep -E '✅|❌|⚠️|🚀'
 ```
 
-**THESE SERVER COMMANDS CANNOT BE CHANGED. This is the complete command set.**
+**THESE TOP-LEVEL SERVER COMMANDS CANNOT BE CHANGED. This is the complete top-level set:** a project never adds, renames or removes a top-level flag, and an unlisted flag (for example `--header`) is not allowed. **Modifiers** belong to the command they modify and do not extend the top-level set: `--include-ssl` and `--include-data` modify `--maintenance backup` (PART 21), and `--maintenance`, `--service` and `--update` take the subcommands and options shown in their own `--help`.
 
 ## Server Binary Commands
 
@@ -10792,6 +10799,8 @@ NO_COLOR=1 {project_name} --status | grep -E '✅|❌|⚠️|🚀'
 --daemon
 # Enable debug mode (verbose logging, debug endpoints)
 --debug
+# Enable the I2P eepsite (opt-in, PART 31.2)
+--i2p
 # Color output (default: auto, respects NO_COLOR)
 --color {auto|yes|no}
 # Language for output (default: auto, from LANG env)
@@ -10835,6 +10844,7 @@ Server Configuration:
 --baseurl PATH                         - URL path prefix (default: /)
 --daemon                               - Run as daemon (detach from terminal)
 --debug                                - Enable debug mode
+--i2p                                  - Enable the I2P eepsite (opt-in)
 --color {auto|yes|no}                  - Color output (default: auto)
 --lang CODE                            - Language for output (default: auto)
 
@@ -12420,41 +12430,7 @@ async fn open_database(cfg: &Config) -> Result<Database> {
 -- SERVER.DB - Server state and operations
 -- ============================================================================
 
--- Config key-value storage (mirrors YAML structure as flat keys)
-CREATE TABLE IF NOT EXISTS config (
-    -- Dot notation: "server.port", "ssl.enabled"
-    key         TEXT PRIMARY KEY,
-    -- JSON-encoded value (string, number, bool, array)
-    value       TEXT NOT NULL,
-    -- string, number, bool, array, object
-    type        TEXT NOT NULL DEFAULT 'string',
-    updated_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-);
-
--- Config metadata for change detection
-CREATE TABLE IF NOT EXISTS config_meta (
-    -- Single row
-    id          INTEGER PRIMARY KEY CHECK (id = 1),
-    -- Incremented on any change
-    version     INTEGER NOT NULL DEFAULT 1,
-    updated_at  INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-);
-
--- Initialize metadata row
-INSERT OR IGNORE INTO config_meta (id, version) VALUES (1, 1);
-
--- Trigger to auto-increment version on config change
-CREATE TRIGGER IF NOT EXISTS config_version_bump
-AFTER INSERT OR UPDATE OR DELETE ON config
-BEGIN
-    UPDATE config_meta SET
-        version = version + 1,
-        updated_at = strftime('%s', 'now')
-    WHERE id = 1;
-END;
-
--- Index for fast lookups by prefix (e.g., all "ssl.*" settings)
-CREATE INDEX IF NOT EXISTS idx_config_key_prefix ON config(key);
+-- There is NO config table: configuration lives only in server.yml (PART 5)
 
 -- ----------------------------------------------------------------------------
 -- Admin Sessions (admin WebUI login sessions)
@@ -20915,6 +20891,7 @@ features.tor.hostname: abc123xyz456abcdef789xyz456abcdef789xyz456abcdef789xyz.on
 features.i2p.enabled: false
 features.i2p.running: false
 features.i2p.status: disabled
+features.i2p.state: disabled
 features.i2p.hostname:
 features.i2p.provider: none
 features.geoip: true
@@ -21031,7 +21008,8 @@ When not in cluster mode:
 | `features.tor.hostname` | Onion address (if running) |
 | `features.i2p.enabled` | I2P eepsite enabled (OPT-IN; false by default) |
 | `features.i2p.running` | I2P provider currently running |
-| `features.i2p.status` | disabled, healthy, error:{short message} |
+| `features.i2p.status` | Normalized: `disabled`, `starting`, `healthy`, `error:{short message}` (mapped from `features.i2p.state`: `disabled` and `no_provider` -> `disabled`; `starting` and `building` -> `starting`; `running` -> `healthy`; `error` -> `error:{short message}`) |
+| `features.i2p.state` | Full lifecycle: `disabled`, `no_provider`, `starting`, `building`, `running`, `error` (the same values as CLI `--status`, PART 31.2) |
 | `features.i2p.hostname` | `.b32.i2p` address (if running) |
 | `features.i2p.provider` | i2pd, sam, or none |
 | `checks.*` | Service health (ok/error only - no details) |
@@ -40260,17 +40238,18 @@ release: build
 		-czf $(RELDIR)/$(PROJECT_NAME)-$(VERSION)-source.tar.gz .
 
 	# Delete existing release/tag if exists
-	@gh release delete $(VERSION) --yes 2>/dev/null || true
-	@git tag -d $(VERSION) 2>/dev/null || true
-	@git push origin :refs/tags/$(VERSION) 2>/dev/null || true
+	# Tag and release name are v{version}; version.txt stays unprefixed (numeric SemVer)
+	@gh release delete v$(VERSION) --yes 2>/dev/null || true
+	@git tag -d v$(VERSION) 2>/dev/null || true
+	@git push origin :refs/tags/v$(VERSION) 2>/dev/null || true
 
 	# Create new release (stable)
-	@gh release create $(VERSION) $(RELDIR)/* \
-		--title "$(PROJECT_NAME) $(VERSION)" \
-		--notes "Release $(VERSION)" \
+	@gh release create v$(VERSION) $(RELDIR)/* \
+		--title "v$(VERSION)" \
+		--notes "Release v$(VERSION)" \
 		--latest
 
-	@echo "Release complete: $(VERSION)"
+	@echo "Release complete: v$(VERSION)"
 
 # =============================================================================
 # DOCKER - Build container image (no push — pushing is CI/CD's responsibility)
@@ -40567,7 +40546,7 @@ make build
 | **Symlink to PATH** | `ln -s binaries/app /usr/local/bin/app` | Creates maintenance nightmare |
 | **Copy to system dirs** | `cp binaries/app /usr/local/bin/` | Stale binaries, version confusion |
 | **Symlink for testing** | `ln -s ../binaries/app test/app` | Use full path instead |
-| **Copy between dirs** | `cp binaries/app releases/app` | Use CI/CD release process |
+| **Copy between dirs** | `cp binaries/app releases/app` | Use the CI/CD release process (or the `make release` staging below) |
 | **Install locally** | Any form of "installing" the binary | Run from `binaries/` directly |
 
 ### Correct Usage
@@ -40576,7 +40555,7 @@ make build
 |------|-------|---------|
 | **Run binary** | `ln -s binaries/app ~/bin/app && app` | `./binaries/app` or `binaries/app` |
 | **Test binary** | `cp binaries/app /tmp/ && /tmp/app` | `./binaries/app --test` |
-| **Release** | `cp binaries/* releases/` | CI/CD handles release artifacts |
+| **Release** | `cp binaries/* releases/` by hand | CI/CD handles release artifacts; `make release` stages them for a manual local release |
 | **Deploy** | Copy binary to server | Use container or package manager |
 
 ### Why This Rule Exists
@@ -40589,9 +40568,9 @@ make build
 | **Path pollution** | Binaries scattered across system |
 | **No cleanup** | Copies left behind, consuming space |
 
-### The Only Exception: CI/CD Release
+### The Only Exceptions: CI/CD Release and `make release`
 
-The **only** time binaries are copied is during CI/CD release process, where they are:
+The **only** times binaries are copied are the CI/CD release process and the `make release` target (manual local stable release), which stages stripped copies of `binaries/` into `releases/` before uploading. In CI/CD they are:
 1. Built fresh by CI/CD
 2. Stripped (debug symbols removed)
 3. Uploaded directly to release (GitHub Releases, registry, etc.)
@@ -40736,7 +40715,7 @@ Docker build/runtime definitions are split between `docker/` and runtime `./volu
 ```
 docker/
 ├── Dockerfile              # Production Dockerfile
-├── Dockerfile.dev          # devel image — same as release but binary runs in debug mode; tagged :devel (project-specific)
+├── Dockerfile.dev          # devel image — same as release but baked with `MODE=development`; tagged :devel (project-specific)
 ├── docker-compose.yml      # Production compose - HUMAN USE ONLY
 ├── docker-compose.dev.yml  # Development compose - HUMAN USE ONLY
 ├── docker-compose.test.yml # Test compose - AI/AUTOMATED TESTING ONLY (:devel image, DEBUG: true, MODE: development)
@@ -40777,7 +40756,7 @@ docker/
 | Entrypoint script | `/usr/local/bin/entrypoint.sh` |
 | Init system | **tini** |
 | Internal port | **80** |
-| **ENV MODE** | **not set** — binary defaults to production; compose files set `MODE` explicitly (`production` / `development`) |
+| **ENV MODE** | **not set** — binary defaults to production; compose files set `MODE` explicitly (`production` / `development`). Only the `:devel` image (`Dockerfile.dev`) bakes `ENV MODE=development` |
 
 ### Container Paths
 
@@ -41187,7 +41166,7 @@ exec $APP_BIN $FLAGS "$@"
 | `version:` | **NEVER include** |
 | `image:` tag | `:latest` in `docker-compose.yml` (production) · `:devel` in `docker-compose.dev.yml` and `docker-compose.test.yml` |
 | `name:` | `{project_name}` (top-level) |
-| `container_name:` | **Always set**, one fixed name per service, the same in production, dev, and test: `{project_name}-app`, `{project_name}-db`, `{project_name}-cache` (only the services that file includes). Dev and test never run on a production host, so a clash fails `docker compose up` instead of replacing production; their compose `name:` and network keep the `-dev` / `-test` suffix so it fails rather than adopting production's project |
+| `container_name:` | **Always set**, one fixed name per service, the same in production, dev, and test: `{project_name}-app`, `{project_name}-db`, `{project_name}-cache` (only the services that file includes). Dev and test never run on a production host, so a clash fails `docker compose up` instead of replacing production; their compose `name:` and network stay identical to production (no `-dev` / `-test` suffix); the fixed container names are what make a clash fail |
 | Main service name | `{project_name}` (matches project name) |
 | `pull_policy:` | `always` |
 | `restart:` | `always` |
@@ -53707,7 +53686,7 @@ enabled = false
 | 4 | `SESSION CREATE` (status `building`) | `bootstrap_timeout` |
 | 5 | Open the forward socket: `HELLO`, `STREAM FORWARD ... SILENT=true` (status `running`) | 10 s |
 
-**Status values** (CLI `--status`, health output): `disabled`, `no_provider`, `starting` (steps 1-3), `building` (step 4), `running`, `error`.
+**Status values** (CLI `--status` and the health field `features.i2p.state`; `features.i2p.status` is the normalized mapping in PART 13): `disabled`, `no_provider`, `starting` (steps 1-3), `building` (step 4), `running`, `error`.
 
 **Error handling:**
 
@@ -58881,6 +58860,7 @@ Flags:
 
 --mode {production|development|debug}  - Application mode
 --debug                                - Enable debug mode
+--i2p                                  - Enable the I2P eepsite (opt-in)
 --color {auto|yes|no}                  - Color output (default: auto)
 --lang CODE                            - Language for output (default: auto)
 --status                               - Show agent health
