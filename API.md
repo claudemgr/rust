@@ -83,7 +83,7 @@ AI reads AI.md for the first time
 │   │   ├─► 3. Create IDEA.md if it doesn't exist
 │   │   │   - If a long-form/project-specific `CLAUDE.md` or `.claude/CLAUDE.md` already exists, MIGRATE its valid project description, project variables, and business logic into IDEA.md first
 │   │   │   - Do NOT copy loader-only instructions, duplicated AI.md rules, or stale implementation text into IDEA.md
-│   │   │   - On creation, write `internal_name: <project_name>` to `## Project variables` and warn the user it is stable
+│   │   │   - On creation, write `internal_name: <project_name>` and `internal_org: <project_org>` to `## Project variables` and warn the user both are stable
 │   │   │
 │   │   └─► 4. Create or update IDEA.md `## Project variables`:
 │   │       - project_name  → actual project name (lowercase)
@@ -47916,6 +47916,7 @@ project_name:    {project_name}
 project_org:     {project_org}
 # STABLE — equals project_name on first install; change only on an explicit rename or fork reset
 internal_name:   {project_name}
+internal_org:    {project_org}
 # STABLE — equals project_org on first install; change only on an explicit rename or fork reset
 internal_org:    {project_org}
 app_name:        {project_name}
