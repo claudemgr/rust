@@ -34,7 +34,7 @@ have_internal=$(grep -cE '^internal_name:[[:space:]]*.+$' IDEA.md 2>/dev/null ||
 | `{project_org}` | IDEA.md `## Project variables` | Existing long-form `CLAUDE.md` / `.claude/CLAUDE.md` project details, then `basename "$(dirname "$PWD")"` |
 | `{internal_name}` | IDEA.md `## Project variables` (always — set at first run; reset only on an explicit rename or fork) | Existing long-form `CLAUDE.md` / `.claude/CLAUDE.md` project details, then first-time setup: copy from `{project_name}` |
 | `{internal_org}` | IDEA.md `## Project variables` (always — set at first run; reset only on an explicit rename or fork) | Existing long-form `CLAUDE.md` / `.claude/CLAUDE.md` project details, then first-time setup: copy from `{project_org}` |
-| `{plist_name}` | **Derived (not stored)**: `io.github.{project_org}.{internal_name}` | — |
+| `{plist_name}` | **Derived (not stored)**: `io.github.{internal_org}.{internal_name}` | — |
 
 **Detection commands (use commands — never guess):**
 ```bash
@@ -50,8 +50,8 @@ internal_name="$project_name"
 # Internal org: same as project_org on first run, stable after
 internal_org="$project_org"
 
-# Plist name: derived from project_org and internal_name (macOS Bundle ID convention)
-plist_name="io.github.${project_org}.${internal_name}"
+# Plist name: derived from internal_org and internal_name (macOS Bundle ID convention)
+plist_name="io.github.${internal_org}.${internal_name}"
 
 # Example: /home/user/github/myorg/myproject
 #   project_name  = myproject
@@ -91,7 +91,7 @@ AI reads AI.md for the first time
 │   │       - internal_name → on first run = project_name; afterwards read from IDEA.md, STABLE (reset only on an explicit rename or fork)
 │   │       - internal_org  → on first run = project_org; afterwards read from IDEA.md, STABLE (reset only on an explicit rename or fork)
 │   │       - Derived UPPERCASE placeholders are computed from these values when referenced
-│   │       - {plist_name} is derived as io.github.{project_org}.{internal_name} and is NOT stored
+│   │       - {plist_name} is derived as io.github.{internal_org}.{internal_name} and is NOT stored
 │   │
 │   └─► YES (already configured)
 │       └─► Proceed with normal operation - read PART 0 first and resolve placeholders from IDEA.md as needed
@@ -111,7 +111,7 @@ AI reads AI.md for the first time
 | `{INTERNAL_NAME}` | UPPERCASE | **Stable** | `MYAPP` |
 | `{internal_org}` | lowercase | **Stable** at first-time setup | `myorg` |
 | `{INTERNAL_ORG}` | UPPERCASE | **Stable** | `MYORG` |
-| `{plist_name}` | derived | Derived from `{project_org}` + `{internal_name}` | `io.github.myorg.myapp` |
+| `{plist_name}` | derived | Derived from `{internal_org}` + `{internal_name}` (frozen identifiers, so a rename never changes the launchd label) | `io.github.myorg.myapp` |
 
 **`{internal_name}` rule:** set ONCE on first run (initial value = `{project_name}`), then stable across ordinary renames (reset only on an explicit org/repo rename with path migration, or at a fork's first setup). Used for every on-disk identifier (`{config_dir}`, `{data_dir}`, `{log_dir}`, `{cache_dir}`, systemd unit, `{plist_name}`) so a project rename does not orphan paths or services.
 
@@ -187,7 +187,7 @@ Example:
 **Resource labels (optional):** `resource_label` (singular) and `resource_label_plural` name what the product's users own or create ("paste"/"pastes", "search"/"searches"); defaults `item` / `items`. UI copy that needs the noun uses these (the header's `{{ .ResourceLabel }}` is `resource_label_plural`); a product noun is never hardcoded in the spec's templates.
 
 **`{plist_name}` is NOT stored** — it is derived at substitution time as
-`io.github.{project_org}.{internal_name}`.
+`io.github.{internal_org}.{internal_name}`.
 
 **`internal_name` rules:**
 
@@ -1269,7 +1269,7 @@ PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+
 | `{INTERNAL_NAME}` | UPPERCASE, **stable** | env vars referring to the stable identity | `INTERNAL_NAME=jokes` |
 | `{internal_org}` | lowercase, **stable** | every on-disk org segment: the org component of `{config_dir}`, `{data_dir}`, `{log_dir}`, `{cache_dir}`, Bundle ID org segment | `casjay` (even after an org rename) |
 | `{INTERNAL_ORG}` | UPPERCASE, **stable** | env vars referring to the stable org identity | `INTERNAL_ORG=casjay` |
-| `{plist_name}` | derived | macOS LaunchAgent/LaunchDaemon Bundle ID — always `io.github.{project_org}.{internal_name}` | `io.github.casjay.jokes` |
+| `{plist_name}` | derived | macOS LaunchAgent/LaunchDaemon Bundle ID — always `io.github.{internal_org}.{internal_name}` | `io.github.casjay.jokes` |
 
 **Note:** camelCase (Rust variables) and PascalCase (Rust types) are NOT template placeholders. Write them directly in code using the actual project name (e.g., `jokes_server`, `struct JokesServer`).
 
@@ -4482,6 +4482,7 @@ ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]
 | `--maintenance setup` | 🔐 Auth | Only first-run OR root | N/A |
 | `--maintenance mode` | 🔐 Auth | Requires `server.token` OR root | N/A |
 | `--maintenance pgp <action>` | 🔐 Auth | Requires `server.token` OR root | N/A |
+| `--maintenance security <action>` | 🔐 Auth | Requires `server.token` OR root | N/A |
 | `--maintenance secret rotate <name>` | 🔐 Auth | Requires `server.token` OR root | N/A |
 | (normal start) | ❌ No | Adapts paths to current user | N/A |
 
@@ -6115,7 +6116,7 @@ trap cleanup SIGTERM SIGINT SIGQUIT
 log "Starting ${APP_NAME}..."
 
 # Build flags from environment
-FLAGS="--address ${ADDRESS:-0.0.0.0} --port ${PORT:-80}"
+FLAGS="--address ${LISTEN:-0.0.0.0} --port ${PORT:-80}"
 [ "${DEBUG:-false}" = "true" ] && FLAGS="$FLAGS --debug"
 
 # Start binary (binary handles ALL setup: dirs, perms, user/group, Tor, etc.)
@@ -6125,7 +6126,7 @@ exec $APP_BIN $FLAGS "$@"
 | Feature | Description |
 |---------|--------------|
 | **Environment defaults** | Sets `TZ`, `CONFIG_DIR`, `DATA_DIR` |
-| **Flag building** | Constructs CLI flags from env vars (`ADDRESS`, `PORT`, `DEBUG`) |
+| **Flag building** | Constructs CLI flags from env vars (`LISTEN`, `PORT`, `DEBUG`) |
 | **Signal handling** | Graceful shutdown on SIGTERM/SIGINT/SIGQUIT |
 | **Service startup** | Optional: pre-flight checks before binary exec |
 | **Binary exec** | Runs binary with `exec` (replaces shell) |
@@ -6141,7 +6142,7 @@ exec $APP_BIN $FLAGS "$@"
 | `TZ` | `America/New_York` | Timezone for app and scheduler |
 | `MODE` | `development` | `production` (`prod`) strict · `development` (`dev`/`devel`) relaxed · `debug` explicit-only |
 | `DEBUG` | `false` | Enable ALL debug features (debug endpoints, detailed logging) |
-| `ADDRESS` | `0.0.0.0` | Listen address |
+| `LISTEN` | `0.0.0.0` | Listen address |
 | `PORT` | `80` | Listen port (update docker-compose ports: to match) |
 
 **MODE vs DEBUG:** `MODE=production` (shortcut `prod` — the default) is strict: minimal logging, full output/log sanitization. `MODE=development` (shortcuts `dev` / `devel`) sits between production and debug: relaxed security, verbose logging, sanitization still fully enforced. `MODE=debug` is explicit opt-in only — NEVER implied or auto-enabled — with minimal sanitization (internals, dumps, stack traces may be exposed); credentials (keys, tokens, passwords, secrets) are ALWAYS redacted in every mode, no exceptions. `DEBUG=truthy` enables the debug endpoints (`/debug/*`) regardless of MODE; nothing else may auto-enable debug. Every mode uses the cache when one is configured — cache use is config-driven, not mode-driven. Boolean env vars accept all truthy/falsy values (see Boolean Values table in PART 5). Tor is auto-enabled if the `tor` binary is installed — no `ENABLE_TOR` flag needed; the Docker image always includes Tor.
@@ -7139,6 +7140,35 @@ fn main() -> anyhow::Result<()> {
 ```
 
 `env::args()` usage elsewhere in this PART (e.g. daemon flag filtering for re-exec) operates on the raw args slice for process re-spawning, not as a substitute for this parser.
+
+## Command-Flag Help (`--shell --help`)
+
+**The command flags (`--shell`, `--service`, `--maintenance`, `--update`) take a value (`--shell completions`), so the parser would consume a following `--help` as that value. Help for a command flag is therefore routed BEFORE the main flag parse. Both forms are valid and print that flag's help, then exit 0:**
+
+| Form | Example |
+|------|---------|
+| `<flag> --help` or `<flag> -h` | `{project_name} --shell --help` |
+| `<flag> help` | `{project_name} --shell help` |
+
+```rust
+// command_help returns the command flag whose help was requested, matching both "--shell --help" and "--shell help"; it runs before clap parses
+fn command_help<'a>(args: &[String], commands: &[&'a str]) -> Option<&'a str> {
+    args.windows(2).find_map(|w| {
+        if !matches!(w[1].as_str(), "--help" | "-h" | "help") {
+            return None;
+        }
+        commands.iter().copied().find(|c| w[0] == format!("--{c}"))
+    })
+}
+
+// in main, before the parser runs:
+if let Some(name) = command_help(&args, &["shell", "service", "maintenance", "update"]) {
+    print_command_help(name);
+    std::process::exit(0);
+}
+```
+
+The client binary applies the same pre-scan to its own command flags (PART 32). Plain `--help` / `-h` with no command flag still prints the main help.
 
 ## NO_COLOR Support (ALL Binaries)
 
@@ -12595,18 +12625,23 @@ Usage:
 
 ```bash
 $ {project_name}-cli --version
-{project_name}-cli {project_version} ({commit_sha}) built {build_date}
+{project_name}-cli {project_version} ({short_commit})
+Built: {build_date}
+Rust: {rust_version}
+OS/Arch: {target}
 
-# If renamed:
+# If renamed, the first line shows the actual name and the other lines are unchanged:
 $ mypaste --version
-# Shows actual name
-mypaste {project_version} ({commit_sha}) built {build_date}
+mypaste {project_version} ({short_commit})
 ```
 
 Same format as server:
 ```bash
 $ pastebin --version
-pastebin {project_version} ({commit_sha}) built {build_date}
+pastebin {project_version} ({short_commit})
+Built: {build_date}
+Rust: {rust_version}
+OS/Arch: {target}
 ```
 
 ### Commands
@@ -13446,14 +13481,13 @@ When server is reachable, `--version` can show extended info:
 
 ```bash
 $ {project_name}-cli --version
-{project_name}-cli {project_version} ({commit_sha}) built {build_date}
+{project_name}-cli {project_version} ({short_commit})
+Built: {build_date}
+Rust: {rust_version}
+OS/Arch: {target}
 
 Server: https://{project_name}.example.com
 Server Version: {project_version} (compatible)
-
-Build Info:
-  Rust: {rust_version}
-  OS/Arch: {os}/{arch}
 ```
 
 **Version compatibility check:** CLI queries server `/api/{api_version}/version` and warns if versions differ significantly.
@@ -15124,7 +15158,7 @@ report-uri /api/{api_version}/server/reports/csp
 |-----------|---------|--------|
 | `default-src` | `'self'` | Strict baseline; all unset directives fall back here. |
 | `script-src` | `'self'` | All JS lives in `static/js/app.js` — no inline scripts, no inline handlers — so `'self'` costs nothing and blocks every injected `<script>`, inline or cross-origin. |
-| `style-src` | `'self' 'unsafe-inline'` | Inline `style=""` attributes and `<style>` blocks are unavoidable in many templates and component frameworks. |
+| `style-src` | `'self' 'unsafe-inline'` | Application code NEVER emits inline `style=""` attributes or `<style>` blocks (all CSS lives in static files, PART 16). `'unsafe-inline'` stays in `style-src` only as a tolerance for styles injected by third parties (browser extensions, embedded widgets); it is not permission for application code, and the frontend tests assert that rendered pages contain no inline styles. |
 | `img-src` | `'self' data: blob: https:` | `data:` for inline icons/SVG, `blob:` for client-side generated previews, `https:` so user avatars / CDN images / OG embeds work without per-host config. (HTTP images explicitly excluded — TLS only.) |
 | `font-src` | `'self' https:` | Web fonts (Google Fonts, FontAwesome CDN, custom CDNs) work without per-host config. HTTPS only. |
 | `connect-src` | `'self' {learned_origins}` | XHR/fetch/EventSource/WebSocket. `{learned_origins}` = DOMAIN env entries + reverse-proxy-detected hosts (same source as CORS — see PART 15 → "CORS Allow-list Resolution Order"). |
@@ -15636,12 +15670,57 @@ Repo-level (source-code) vulnerabilities are reported primarily via GitHub priva
 ### Submission Flow (POST `/api/{api_version}/server/contact` with `security_id` set)
 
 1. Server re-validates the `security_id` server-side (form value can be tampered with).
-2. Allocates a `tracking_id` — `sec_` prefix + 16 random hex chars. Stored in the security-reports table.
+2. Allocates a `tracking_id` — `sec_` prefix + 16 random hex chars. Stored in the `security_reports` table (see "Security Report Storage & Operator Workflow").
 3. **Encryption at rest:** the report body is encrypted with the project's PGP key if one exists; otherwise AES-256-GCM with `server.security.encryption_key` (the spec's canonical at-rest AES key — see PART 11 → "Cryptographic Keys"). Plaintext is NEVER persisted to disk.
 4. **Maintainer notification:** PGP-encrypted email to the configured operator contact (see `server.security.contact_email`); falls back to AES-encrypted attachment + warning if no PGP key is configured.
 5. **Researcher acknowledgment:** email to the researcher's submitted address, containing only the `tracking_id` and the URL `/server/security/report/{tracking_id}` (with a one-shot token only the researcher can use) — never any report content. If the researcher submitted a pubkey, the email is PGP-encrypted to it. If not, it is sent unencrypted: it carries no vulnerability details, and the status page it links to shows only the triage state. A pubkey is never required, and the project key is never used for this email (the researcher cannot decrypt it). Without working SMTP the acknowledgment is skipped and the `tracking_id` appears only in the form response.
 6. **Response to the form POST:** canonical success body — `{"ok": true, "data": {"tracking_id": "sec_..."}}` — with a clear "we received your report; check your email for confirmation" message rendered server-side.
 7. **Logging:** one entry to `security.log` as `security.report_received` — `tracking_id`, severity, sanitized affected-component, NO researcher PII, NO vulnerability content. Maintainers see full content only via the encrypted email (no web tracker — there is no admin web UI).
+
+### Security Report Storage & Operator Workflow
+
+**Table `security_reports`** lives in the application database (created by the schema migration that ships with this feature, PART 10 → "Migrations"). It is the only place report state is kept.
+
+```sql
+CREATE TABLE IF NOT EXISTS security_reports (
+    tracking_id        VARCHAR(32) PRIMARY KEY,
+    security_id        VARCHAR(64) NOT NULL,
+    severity           VARCHAR(16) NOT NULL,
+    component          VARCHAR(255) NOT NULL,
+    status             VARCHAR(16) NOT NULL DEFAULT 'received',
+    body_enc           BLOB NOT NULL,
+    body_alg           VARCHAR(16) NOT NULL,
+    contact_enc        BLOB,
+    researcher_comment TEXT NOT NULL DEFAULT '',
+    disclosure_date    DATE,
+    cve_requested      BOOLEAN NOT NULL DEFAULT FALSE,
+    token_hash         VARCHAR(64) NOT NULL,
+    token_last_used    DATE,
+    created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    closed_at          TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_security_reports_status ON security_reports(status, created_at);
+```
+
+| Field | Rule |
+|-------|------|
+| `tracking_id` | `sec_` + 16 random hex chars (Submission Flow step 2) |
+| `status` | `received` (default), `triaged`, `confirmed`, `patching`, `disclosed`, `wont_fix`. Shown to the researcher as Received / Triaged / Confirmed / Patching / Disclosed / Won't Fix. Moves forward, or to `wont_fix`, never backward; `disclosed` and `wont_fix` set `closed_at` |
+| `body_enc`, `body_alg`, `contact_enc` | The report body and the researcher's contact (email and optional pubkey) are encrypted exactly as Submission Flow step 3 says (PGP, or AES-256-GCM with `server.security.encryption_key`); `body_alg` is `pgp` or `aes-256-gcm`. Plaintext is never stored. `BLOB` is `BYTEA` on PostgreSQL |
+| `researcher_comment` | Plain text, at most 2000 characters, shown on the researcher status page. Never contains report content. Output-escaped when rendered |
+| `disclosure_date` | Optional expected disclosure date (ISO 8601 date), shown on the researcher status page |
+| `token_hash`, `token_last_used` | SHA-256 of the one-shot status token, compared in constant time; `token_last_used` enforces single use per day |
+| Retention | The daily cleanup task deletes a report row, including `body_enc` and `contact_enc`, `server.security.reports.retention_days` (default `365`) after `closed_at`. Open reports are never purged. The status link stops working 30 days after `closed_at` |
+| Backup | The table lives in the database, so every backup and restore includes it |
+
+**Operator workflow (no admin web UI, no HTTP route changes these fields).** Maintainers manage reports with `{project_name} --maintenance security <action>`, authorized like every other `--maintenance` action: `server.token` OR root.
+
+| Command | Effect |
+|---------|--------|
+| `--maintenance security list [--status STATUS]` | Lists `tracking_id`, status, severity, component, `created_at`, `updated_at`. Never prints report content |
+| `--maintenance security show TRACKING_ID` | Prints the metadata, the researcher comment and the disclosure date. NEVER prints the report body: maintainers read it only in the encrypted notification email (or by decrypting it with the project PGP key) |
+| `--maintenance security update TRACKING_ID [--status STATUS] [--comment TEXT] [--disclosure-date YYYY-MM-DD]` | Sets the given fields, bumps `updated_at`, logs `security.report_updated` (`tracking_id`, old and new status, no content) to `security.log`, and, when SMTP works and `contact_enc` exists, emails the researcher a status-change notice that carries no report content |
 
 ### Public Pages
 
@@ -19492,7 +19571,7 @@ tail -c 2 file.txt | od -An -tx1
 | `Accept: application/json` header (beats non-interactive detection) | JSON |
 | `Accept: text/plain` header | Plain text (raw data) |
 
-**API routes return raw data as plain text (NOT HTML2TextConverter) because there's no HTML to convert.**
+**API routes return raw data as plain text (NOT HTML2TextConverter) because there's no HTML to convert.** The exact mapping from a response model to text is the Text Serializer under "Text Response Format".
 
 **API vs Frontend Text Output:**
 
@@ -19601,6 +19680,8 @@ fn get_api_response_format(req: &Request) -> &'static str {
 | **6** | Default | Any request | HTML |
 
 **Health endpoints (`/server/healthz`, `/healthz`) are ordinary frontend routes:** `Accept: application/json` returns the bare health JSON, byte-identical to `/api/{api_version}/server/healthz`. There is no healthz-specific negotiation.
+
+**HTML variant:** once the format is HTML, the User-Agent picks the variant. Text browsers (lynx, w3m, links) advertise `text/html` but cannot run JavaScript, so they get the no-JS HTML even with an explicit `Accept: text/html`; every other client gets the full HTML.
 
 **Summary:**
 - API routes: Support .txt extension + Accept headers + smart defaults
@@ -19981,39 +20062,45 @@ pub async fn handle_frontend_request(
 ) -> impl IntoResponse {
     let data = get_data(&req).await;
 
-    // 1. Our client - INTERACTIVE, receives JSON, renders own TUI/GUI
-    if is_our_cli_client(&req) {
-        return (
-            [(axum::http::header::CONTENT_TYPE, "application/json; charset=utf-8")],
-            serde_json::to_string(&data).unwrap_or_default(),
-        ).into_response();
+    // 1. Format: explicit Accept preference first, then client class (see detect_client_type above)
+    match detect_client_type(&req) {
+        // Accept: application/json, or our own client - INTERACTIVE, renders its own TUI/GUI
+        "json" => {
+            return (
+                [(axum::http::header::CONTENT_TYPE, "application/json; charset=utf-8")],
+                serde_json::to_string(&data).unwrap_or_default(),
+            )
+                .into_response();
+        }
+        // Accept: text/plain, or an HTTP tool (curl, wget) - NON-INTERACTIVE, receives pre-formatted text
+        "text" => {
+            let html = render_html(&data);
+            let text = html2text_converter(&html, 80);
+            return (
+                [(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+                text,
+            )
+                .into_response();
+        }
+        _ => {}
     }
 
-    // 2. Text browsers (lynx, w3m, links) - INTERACTIVE, NO JavaScript
-    //    Receive server-rendered HTML that works without JS
+    // 2. HTML variant: text browsers (lynx, w3m, links) send Accept: text/html but cannot run JavaScript,
+    //    so the User-Agent selects the no-JS variant even when Accept explicitly asks for HTML
     if is_text_browser(&req) {
         return (
             [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
             render_no_js_html(&data),
-        ).into_response();
+        )
+            .into_response();
     }
 
-    // 3. HTTP tools (curl, wget) - NON-INTERACTIVE, just dump output
-    //    Receive pre-formatted text via html2text_converter
-    if is_http_tool(&req) {
-        let html = render_html(&data);
-        let text = html2text_converter(&html, 80);
-        return (
-            [(axum::http::header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-            text,
-        ).into_response();
-    }
-
-    // 4. Regular browsers (Chrome, Firefox) - full HTML with JavaScript
+    // 3. Regular browsers (Chrome, Firefox) - full HTML with JavaScript
     (
         [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
         render_html_response(&data),
-    ).into_response()
+    )
+        .into_response()
 }
 
 // render_no_js_html renders HTML that works without JavaScript
@@ -25286,6 +25373,22 @@ ERROR: NOT_FOUND: Resource not found
 ERROR: VALIDATION_FAILED: email must be valid
 ```
 
+### Text Serializer (maps a response model to text)
+
+**`.txt`, `Accept: text/plain` and non-interactive clients on `/api/**` all use this one mapping, so every endpoint answers the same way:**
+
+| Response data | Text output |
+|---------------|-------------|
+| One primary value (the route declares its primary field once, for example a joke's `text`) | The bare value, no `OK:` line. This is the "raw data" case in the content-negotiation rules |
+| Object | `OK: {message}`, then `key: value` lines in the model's declared field order. Nested objects flatten with dot notation (`stats.requests_24h: 45678`); a list of scalars joins with `, ` on one line |
+| List of scalars | `OK: {n} items found`, then one item per line |
+| List of objects | `OK: {n} items found`, then each object as `key: value` lines, objects separated by one blank line |
+| No data (create, update, delete, empty success) | `OK: {message}` only |
+| Error | `ERROR: {code}: {message}`, with the same HTTP status as the JSON error |
+| Health (`/api/{api_version}/server/healthz`) | The flat `key: value` layout defined with the health endpoint, no `OK:` line (its JSON is the bare health object) |
+
+A route opts into bare-value output only by declaring a primary value; there is no per-request switch. Clients that need the structure use JSON.
+
 ## Server Response Rules
 
 **These rules apply SERVER-WIDE to ALL responses (API, frontend AJAX, CLI, webhooks).**
@@ -28242,7 +28345,7 @@ pub fn tracking_script(headers: &HeaderMap, cfg: &Config) -> askama::MarkupDispl
 | Description | From branding config or project-specific |
 | Features | Key features list (project-specific) |
 | Links | GitHub, documentation, etc. |
-| Third-party attribution | GeoIP (DB-IP / NRO CC BY 4.0 notices — see PART 18: GEOIP), plus any other license-required attribution |
+| Third-party attribution | GeoIP (DB-IP CC BY 4.0 notice, iptoasn PDDL sources — see PART 18: GEOIP), plus any other license-required attribution |
 
 **⚠️ CRITICAL: Content MUST come from IDEA.md - NEVER use generic placeholders.**
 
@@ -28299,7 +28402,6 @@ pub fn tracking_script(headers: &HeaderMap, cfg: &Config) -> askama::MarkupDispl
   <section class="attribution">
     <h2>Third-Party Attribution</h2>
     <p><a href="https://db-ip.com/">IP Geolocation by DB-IP</a></p>
-    <p>Country and ASN data licensed CC BY 4.0 by the Number Resource Organization (NRO).</p>
   </section>
 </article>
 ```
@@ -30123,29 +30225,29 @@ GeoIP databases are NEVER embedded in the binary — they are downloaded on firs
 
 ## Database Sources (ip-location-db) — Canonical, Single Source Per Category
 
-All databases come from [sapics/ip-location-db](https://github.com/sapics/ip-location-db), distributed via the jsDelivr CDN under the `@ip-location-db` npm scope — no API key, account, or license agreement required at download time.
+All databases come from [sapics/ip-location-db](https://github.com/sapics/ip-location-db), distributed as GitHub Release assets (`https://github.com/sapics/ip-location-db/releases/download/latest/{file}`; upstream moved distribution there on June 18, 2026) — no API key, account, or license agreement required at download time. The old jsDelivr `@ip-location-db/*` npm packages stopped updating on June 17, 2026 and MUST NOT be used. Every file has a checksum at `https://github.com/sapics/ip-location-db/releases/download/checksum/{file}.sha256`; the downloader MUST verify it before replacing a live database.
 
 **Rust crate:** use `maxminddb` — NOT `geoip2`. ip-location-db embeds custom `database_type` strings (`asn ipv4`, `city ipv6`, `country ipvAll`, etc.) that GeoIP2-shaped wrapper crates reject. Decode into project-defined structs matching the field tables below.
 
 | Category | Package / File | CDN URL | Fields |
 |----------|-----------------|---------|--------|
-| ASN | `@ip-location-db/asn-mmdb` → `asn.mmdb` | `https://cdn.jsdelivr.net/npm/@ip-location-db/asn-mmdb/asn.mmdb` | `autonomous_system_number`, `autonomous_system_organization` |
-| Country | `@ip-location-db/geo-whois-asn-country-mmdb` → `geo-whois-asn-country.mmdb` | `https://cdn.jsdelivr.net/npm/@ip-location-db/geo-whois-asn-country-mmdb/geo-whois-asn-country.mmdb` | `country_code` |
-| City (IPv4) | `@ip-location-db/dbip-city-mmdb` → `dbip-city-ipv4.mmdb` | `https://github.com/sapics/ip-location-db/releases/download/latest/dbip-city-ipv4.mmdb` | `city`, `country_code`, `state1`, `state2`, `postcode`, `latitude`, `longitude`, `timezone` |
-| City (IPv6) | `@ip-location-db/dbip-city-mmdb` → `dbip-city-ipv6.mmdb` | `https://github.com/sapics/ip-location-db/releases/download/latest/dbip-city-ipv6.mmdb` | (same fields as City IPv4) |
+| ASN | `iptoasn-asn` → `iptoasn-asn.mmdb` | `https://github.com/sapics/ip-location-db/releases/download/latest/iptoasn-asn.mmdb` | `autonomous_system_number`, `autonomous_system_organization` |
+| Country | `iptoasn-country` → `iptoasn-country.mmdb` | `https://github.com/sapics/ip-location-db/releases/download/latest/iptoasn-country.mmdb` | `country_code` |
+| City (IPv4) | `dbip-city` → `dbip-city-ipv4.mmdb` | `https://github.com/sapics/ip-location-db/releases/download/latest/dbip-city-ipv4.mmdb` | `city`, `country_code`, `state1`, `state2`, `postcode`, `latitude`, `longitude`, `timezone` |
+| City (IPv6) | `dbip-city` → `dbip-city-ipv6.mmdb` | `https://github.com/sapics/ip-location-db/releases/download/latest/dbip-city-ipv6.mmdb` | (same fields as City IPv4) |
 
-**No separate "WHOIS" database.** Earlier drafts of this spec described a combined WHOIS lookup exposing a `registrant_org` field — no such dataset exists in ip-location-db. The `geo-whois-asn-country` package name is misleading: despite the name, it exposes only `country_code` (merged from RIR geofeed, whois, and ASN data at the NRO's publishing layer — the merge happens upstream, not in the file this project consumes). Organization-name data available to this project comes solely from the ASN database's `autonomous_system_organization` field (a BGP/RIR-derived AS holder name, not an RDAP/WHOIS registrant record) — use that field directly and do not label it "WHOIS" anywhere in code, config, or docs.
+**No separate "WHOIS" database.** Earlier drafts of this spec described a combined WHOIS lookup exposing a `registrant_org` field — no such dataset exists in ip-location-db. The Country file (`iptoasn-country`) exposes only `country_code`, derived upstream from iptoasn.com's IP-to-ASN data. Organization-name data available to this project comes solely from the ASN database's `autonomous_system_organization` field (a BGP/RIR-derived AS holder name, not an RDAP/WHOIS registrant record) — use that field directly and do not label it "WHOIS" anywhere in code, config, or docs.
 
-**Do not use MaxMind GeoLite2 as an alternative or fallback.** GeoLite2 requires acceptance of the MaxMind GeoLite2 EULA in addition to CC BY-SA 4.0 attribution — stricter terms (e.g. redistribution and update-frequency restrictions) than the CC BY 4.0 sources above. It is not zero-config-compatible with this project's "first run works with zero config, no account required" rule.
+**Do not use MaxMind GeoLite2 as an alternative or fallback.** GeoLite2 requires acceptance of the MaxMind GeoLite2 EULA in addition to CC BY-SA 4.0 attribution — stricter terms (e.g. redistribution and update-frequency restrictions) than the DB-IP and iptoasn sources above. It is not zero-config-compatible with this project's "first run works with zero config, no account required" rule.
 
 ## License & Attribution (NON-NEGOTIABLE)
 
-**All three databases above are licensed CC BY 4.0. Attribution is a license condition, not an optional courtesy.**
+**Licenses differ per database. CC BY 4.0 attribution (City) is a license condition, not an optional courtesy; PDDL data (ASN, Country) needs none.**
 
 | Database | License | Underlying Source(s) |
 |----------|---------|-----------------------|
-| ASN | CC BY 4.0 | RouteViews, NRO, DB-IP (merged) |
-| Country | CC BY 4.0 | NRO (RIR whois + geofeed + ASN data, merged) |
+| ASN | PDDL | iptoasn.com (RouteViews / RIR data) |
+| Country | PDDL | iptoasn.com (RIR data) |
 | City | CC BY 4.0 | DB-IP |
 
 **Required, verbatim, on `/server/about` (see "Standard Pages" → /server/about) AND in `LICENSE.md`'s third-party attribution section (see PART 2):**
@@ -30154,12 +30256,8 @@ All databases come from [sapics/ip-location-db](https://github.com/sapics/ip-loc
 <a href="https://db-ip.com/">IP Geolocation by DB-IP</a>
 ```
 
-```text
-Country and ASN data licensed CC BY 4.0 by the Number Resource Organization (NRO).
-```
-
 - Attribution MUST be visible on the page — not hidden behind a click-through, tooltip, or collapsed section
-- Both notices are required together; the DB-IP notice alone does not cover the NRO-sourced country data, and vice versa
+- The DB-IP notice is required whenever `geoip.databases.city` is enabled (the default); PDDL databases need no notice, though `LICENSE.md`'s third-party table still lists their source and license
 - If a future database swap changes the license (e.g. adding a PDDL-only source), update this section — do not carry stale attribution for a database no longer in use, and do not drop attribution for one still in use
 
 ## Configuration
@@ -30189,8 +30287,8 @@ server:
     # below for why no preset is bundled by default.
     presets: {}
 
-    # Which databases to download and use - all three are CC BY 4.0 and
-    # require the attribution above whenever their data is used
+    # Which databases to download and use - the City database is CC BY 4.0 and
+    # requires the attribution above whenever its data is used (ASN and Country are PDDL)
     databases:
       # autonomous_system_number, autonomous_system_organization
       asn: true
