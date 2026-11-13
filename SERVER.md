@@ -16440,39 +16440,45 @@ pub fn extract_context_from_path(
     path: &str,
     config: &AppConfig,
 ) -> Result<TargetContext, AppError> {
+    // /api/{api_version}/ → Public (project root)
+    // /api/{api_version}/server/auth/* → Auth flows
+    // /api/{api_version}/server/{admin_path}/ and /{admin_username}/* → Admin dashboard and the admin's own area
+    // /api/{api_version}/server/{admin_path}/{section}/* → Server management (first segment is in valid_admin_root_paths())
+    // /api/{api_version}/server/* → Server pages (about, help, contact, privacy)
+    // /api/{api_version}/users/* → Current user, or {username}
+    // /api/{api_version}/orgs/{slug}/* → Org context
+    // /api/{api_version}/{resource}/* → Public routes (project-specific)
     let api_base = format!("/api/{}/", config.api_version);
     let stripped = path.strip_prefix(&api_base).unwrap_or(path);
-    let parts: Vec<&str> = stripped.splitn(3, '/').collect();
+    let parts: Vec<&str> = stripped.split('/').collect();
 
-    let ctx = match parts.first().copied().unwrap_or("") {
+    let ctx = match parts[0] {
         "" => TargetContext { target_type: TargetType::Public, name: None },
-        "server" => TargetContext { target_type: TargetType::ServerPages, name: None },
-        "auth" => TargetContext { target_type: TargetType::Auth, name: None },
-        "users" => {
-            if parts.get(1).copied().unwrap_or("").is_empty() {
-                TargetContext { target_type: TargetType::CurrentUser, name: None }
-            } else {
-                TargetContext {
-                    target_type: TargetType::User,
-                    name: parts.get(1).map(|s| s.to_string()),
+        "server" => match parts.get(1).copied() {
+            Some("auth") => TargetContext { target_type: TargetType::Auth, name: None },
+            Some(seg) if seg == config.admin_path => {
+                if parts.get(2).is_some_and(|sec| valid_admin_root_paths().contains(sec)) {
+                    TargetContext { target_type: TargetType::AdminServer, name: None }
+                } else {
+                    TargetContext { target_type: TargetType::Admin, name: None }
                 }
             }
-        }
-        "orgs" => {
-            let slug = parts.get(1).copied().unwrap_or("");
-            if slug.is_empty() {
-                return Err(AppError::BadRequest("org slug required in path".into()));
-            }
-            TargetContext { target_type: TargetType::Org, name: Some(slug.to_string()) }
-        }
-        seg if seg == config.admin_path => {
-            // a first segment in valid_admin_root_paths() is server management; anything else is the dashboard or the admin's own area
-            if parts.get(1).is_some_and(|seg| valid_admin_root_paths().contains(seg)) {
-                TargetContext { target_type: TargetType::AdminServer, name: None }
-            } else {
-                TargetContext { target_type: TargetType::Admin, name: None }
-            }
-        }
+            _ => TargetContext { target_type: TargetType::ServerPages, name: None },
+        },
+        "users" => match parts.get(1).copied() {
+            Some(name) if !name.is_empty() => TargetContext {
+                target_type: TargetType::User,
+                name: Some(name.to_string()),
+            },
+            _ => TargetContext { target_type: TargetType::CurrentUser, name: None },
+        },
+        "orgs" => match parts.get(1).copied() {
+            Some(slug) if !slug.is_empty() => TargetContext {
+                target_type: TargetType::Org,
+                name: Some(slug.to_string()),
+            },
+            _ => return Err(AppError::BadRequest("org slug required in path".into())),
+        },
         _ => TargetContext { target_type: TargetType::Public, name: None },
     };
 
