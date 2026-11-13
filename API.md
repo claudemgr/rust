@@ -26774,14 +26774,14 @@ async fn sitemap_handler(State(state): State<AppState>) -> impl axum::response::
 **Dynamic Content:**
 - Project resource pages: Include only if public/published
 
+**Scope (always on, public frontend pages only):** `/sitemap.xml` is ALWAYS served; there is no setting that turns it off. It lists only public frontend pages: HTML `GET` routes an anonymous visitor can open, and only those that `robots.txt` allows (`web.robots.allow` minus `web.robots.deny`). A URL that `robots.txt` disallows is never in the sitemap, so the two files can never disagree. It never lists `/api/*`, `/server/{admin_path}/*`, auth or account pages, feeds, files, or anything behind authentication or a token.
+
 **Sitemap Configuration:**
 
 ```yaml
 server:
   seo:
     sitemap:
-      # Default: true
-      enabled: true
       # Sitemap protocol limit
       max_urls: 50000
       # Include image URLs
@@ -49237,6 +49237,7 @@ make docker
 ### Sitemap.xml
 
 - [ ] `/sitemap.xml` dynamically generated
+- [ ] `/sitemap.xml` is always served (no enable/disable setting) and lists only public frontend pages that `robots.txt` allows
 - [ ] Homepage included with priority 1.0
 - [ ] Public pages included with appropriate priority
 - [ ] Documentation pages included
