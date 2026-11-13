@@ -19192,6 +19192,7 @@ fn is_text_browser(req: &Request) -> bool {
 
 // is_http_tool detects HTTP tools (curl, wget, httpie, etc.)
 // HTTP tools are NON-INTERACTIVE - they just dump output
+// Detection is a denylist: any User-Agent not matched here is treated as a browser (HTML on frontend routes, JSON on /api/**)
 fn is_http_tool(req: &Request) -> bool {
     let ua = req.headers()
         .get("User-Agent")
@@ -19200,9 +19201,18 @@ fn is_http_tool(req: &Request) -> bool {
         .to_lowercase();
 
     let http_tools = [
-        "curl/", "wget/", "httpie/",
-        "libcurl/", "python-requests/",
-        "rust-http-client/", "axios/", "node-fetch/",
+        // Command-line tools
+        "curl/", "wget/", "httpie/", "xh/", "hurl/", "libcurl/",
+        // Python
+        "python-requests/", "python-urllib/", "python-httpx/", "aiohttp/", "urllib3/",
+        // Go and Rust
+        "go-http-client/", "go-resty/", "fasthttp", "reqwest/", "ureq/", "hyper/",
+        // JavaScript runtimes and libraries
+        "axios/", "node-fetch/", "undici", "superagent/", "deno/", "bun/",
+        // JVM, PHP, Perl, Ruby, Dart, PowerShell
+        "okhttp/", "apache-httpclient/", "java/", "guzzlehttp/", "libwww-perl/", "lwp-trivial/", "faraday", "dart/", "windowspowershell/",
+        // API clients and load tools
+        "postmanruntime/", "insomnia/", "bruno-runtime/", "k6/",
     ];
     if http_tools.iter().any(|t| ua.contains(t)) {
         return true;
@@ -21396,35 +21406,40 @@ async fn url_normalize_middleware(
 **ALL frontend routes with CRUD operations MUST work in BOTH modes:**
 
 ```rust
-fn detect_client_type(headers: &axum::http::HeaderMap) -> &'static str {
-    // 1. Check Accept header first (explicit preference)
-    let accept = headers.get("accept").and_then(|v| v.to_str().ok()).unwrap_or("");
-
-    if accept.contains("text/html") { return "html"; }
-    if accept.contains("text/plain") { return "text"; }
-    // Rare for frontend, but support it
-    if accept.contains("application/json") { return "json"; }
-
-    // 2. Check User-Agent for browser detection
-    let ua = headers.get("user-agent").and_then(|v| v.to_str().ok()).unwrap_or("");
-
-    // Browser User-Agents (common patterns)
-    let browsers = ["Mozilla/", "Chrome/", "Safari/", "Edge/", "Firefox/", "Opera/", "MSIE", "Trident/"];
-    for browser in &browsers {
-        if ua.contains(browser) { return "html"; }
+fn detect_client_type(req: &Request) -> &'static str {
+    // 1. Explicit Accept header preference (JSON first, matching the frontend priority table)
+    let accept = req
+        .headers()
+        .get("accept")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if accept.contains("application/json") {
+        return "json";
+    }
+    if accept.contains("text/html") {
+        return "html";
+    }
+    if accept.contains("text/plain") {
+        return "text";
     }
 
-    // 3. CLI tools (curl, wget, httpie, etc.)
-    let cli_tools = ["curl/", "Wget/", "HTTPie/", "python-requests/", "reqwest/", "node-fetch/"];
-    for tool in &cli_tools {
-        if ua.contains(tool) { return "text"; }
+    // 2. Our own CLI client is INTERACTIVE - receives JSON (see is_our_cli_client)
+    if is_our_cli_client(req) {
+        return "json";
     }
 
-    // 4. Empty or unknown User-Agent
-    // Default to text for programmatic access
-    if ua.is_empty() { return "text"; }
+    // 3. Text-mode browsers (lynx, w3m, links, ...) are a browser class -
+    // they receive the no-JS HTML alternative (see is_text_browser)
+    if is_text_browser(req) {
+        return "html";
+    }
 
-    // 5. Default: HTML (safest fallback)
+    // 4. Known HTTP tools and an empty User-Agent get formatted text (see is_http_tool)
+    if is_http_tool(req) {
+        return "text";
+    }
+
+    // 5. Default: every other client, including unrecognized ones, is treated as a browser (HTML)
     "html"
 }
 ```
