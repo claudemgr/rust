@@ -5961,7 +5961,7 @@ CI workflows reference this image directly: `container: image: casjaysdev/rust:l
 | Builder stage | `casjaysdev/rust:latest` |
 | Runtime stage | `alpine:latest` |
 | Meta labels | All OCI annotations (see below) — never Dockerfile `LABEL` blocks |
-| Required packages | git, curl, bash, tini, tor |
+| Required packages | git, curl, bash, tini, tor, i2pd |
 | Tor handling | Installed but **binary controls** it (see PART 27) |
 | Binary location | `/usr/local/bin/{project_name}` |
 | Entrypoint script | `/usr/local/bin/entrypoint.sh` |
@@ -6033,7 +6033,8 @@ RUN apk add --no-cache \
     curl \
     bash \
     tini \
-    tor
+    tor \
+    i2pd
 
 # NO directory creation - binary handles ALL setup based on env vars
 # This allows users to override CONFIG_DIR, DATA_DIR, etc.
@@ -9181,7 +9182,7 @@ async fn build_health_response(state: &AppState) -> HealthResponse {
                 // OPT-IN: false unless server.i2p.enabled
                 enabled: state.config.server.i2p.enabled,
                 running: state.i2p_manager.is_running().await,
-                // "healthy", "disabled", "error:..."
+                // "disabled", "starting", "healthy" or "unavailable"
                 status: state.i2p_manager.status().await,
                 // "abc...uv.b32.i2p" (empty when disabled)
                 hostname: state.i2p_manager.eepsite_address().await,
@@ -18435,11 +18436,11 @@ pub struct FeaturesInfo {
 // TorInfo - from Tor manager (PART 27.1)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TorInfo {
-    // Tor binary found and running
+    // Tor binary found (the hidden service is active on this instance)
     pub enabled: bool,
     // Hidden service active
     pub running: bool,
-    // "healthy", "starting", "error"
+    // "disabled", "starting", "healthy" or "unavailable" - never free text
     pub status: String,
     // "abc123...xyz.onion" (56 chars, v3)
     pub hostname: String,
@@ -18452,7 +18453,7 @@ pub struct I2PInfo {
     pub enabled: bool,
     // Eepsite active
     pub running: bool,
-    // "healthy", "disabled", "starting", "error"
+    // "disabled", "starting", "healthy" or "unavailable" - never free text
     pub status: String,
     // "abc...uv.b32.i2p" (empty when disabled)
     pub hostname: String,
@@ -18543,6 +18544,7 @@ pub struct StatsInfo {
 | **Values** | `ok` = loaded, parsed, non-empty, and within its maximum age · `degraded` = loaded but stale (update failing, past its max age) or running on the last known good copy · `error` = missing, empty, or unparseable with no usable copy |
 | **Disabled features** | A data set whose feature is disabled is OMITTED from `checks` (never reported as `ok` or `error`) |
 | **Aggregation** | `error` on `database` or `disk` → `unhealthy`. A dataset check at `degraded` or `error` → `degraded`, unless it was registered `critical` (the app cannot do its core job without it) → `unhealthy` |
+| **Overlay networks** | A Tor or I2P check at `degraded` → overall `degraded`. It is never `critical` and never makes the overall status `unhealthy` (see "Overlay Network Health") |
 | **Stable keys** | `{kind}_{id}` is a stable snake_case identifier — NEVER a file path, URL, or filename (public-safe; see Security) |
 | **Order** | Core checks first (`database`, `cache`, `disk`, `scheduler`), then `tor`, `i2p`, then dataset checks in registration order. JSON emits keys in exactly this order (custom marshaller — never an unordered map) |
 | **Cost** | `/server/healthz` reads CACHED results. The scheduler re-runs dataset checks at most every 60 seconds and after every data-set reload/update; a request NEVER triggers a disk scan, parse, or network fetch |
@@ -19023,13 +19025,13 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 | `build.commit` | Git commit hash (short) |
 | `build.date` | Build timestamp |
 | `features.*` | Enabled features (bool or object) |
-| `features.tor.enabled` | Tor hidden service enabled (auto-detected or `server.yml` setting) |
-| `features.tor.running` | Tor process currently running |
-| `features.tor.status` | healthy, starting, error |
+| `features.tor.enabled` | The `tor` binary was found, so the hidden service is active on this instance (there is no toggle) |
+| `features.tor.running` | The hidden service is serving |
+| `features.tor.status` | `disabled`, `starting`, `healthy` or `unavailable`; never free text (see "Overlay Network Health") |
 | `features.tor.hostname` | Onion address (if running) |
-| `features.i2p.enabled` | I2P eepsite enabled (OPT-IN; false by default) |
-| `features.i2p.running` | I2P provider currently running |
-| `features.i2p.status` | Normalized: `disabled`, `starting`, `healthy`, `error:{short message}` (mapped from `features.i2p.state`: `disabled` and `no_provider` -> `disabled`; `starting` and `building` -> `starting`; `running` -> `healthy`; `error` -> `error:{short message}`) |
+| `features.i2p.enabled` | I2P is opted in AND a provider was found (OPT-IN; false by default) |
+| `features.i2p.running` | The eepsite is serving |
+| `features.i2p.status` | `disabled`, `starting`, `healthy` or `unavailable`; never free text (mapped from `features.i2p.state`, see "Overlay Network Health") |
 | `features.i2p.state` | Full lifecycle: `disabled`, `no_provider`, `starting`, `building`, `running`, `error` (the same values as CLI `--status`, PART 27.2) |
 | `features.i2p.hostname` | `.b32.i2p` address (if running) |
 | `features.i2p.provider` | i2pd, sam, or none |
@@ -19050,6 +19052,25 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 | `unhealthy` | Critical checks failing | 503 |
 | `maintenance` | Maintenance mode active | 503 |
 | `shutting_down` | Graceful shutdown in progress | 503 |
+
+### Overlay Network Health (Tor & I2P)
+
+**Tor and I2P report through ONE fixed contract. `features.tor.status` and `features.i2p.status` are ALWAYS exactly one of four words. They are never free text: no error message, path, exit code or library error ever appears in a health response (details go to the log and to `--status` only).**
+
+| `status` | `enabled` | `running` | `hostname` | `checks.tor` / `checks.i2p` | Meaning |
+|----------|-----------|-----------|------------|-----------------------------|---------|
+| `disabled` | `false` | `false` | empty | omitted | The network is not active on this instance: no `tor` binary (Tor), or I2P not opted in or no provider found (I2P) |
+| `starting` | `true` | `false` | empty | `ok` | The provider was launched and is bootstrapping or building tunnels |
+| `healthy` | `true` | `true` | the address | `ok` | Serving at `hostname` |
+| `unavailable` | `true` | `false` | empty | `degraded` | Active and the provider exists, but it is not serving: failed to start, bootstrap timeout, a directory permission problem, or the provider exited |
+
+- **`enabled` means "active on this instance", not "currently running".** Tor: a `tor` binary was found (there is no toggle). I2P: `server.i2p.enabled` is true AND a provider was found.
+- **A missing binary is `disabled`, never `unavailable`.** Not having Tor is a normal state (PART 31.1: "missing Tor is NOT an error"), so it never produces an `error` or `degraded` anywhere.
+- **Invariants:** `enabled: false` always comes with `running: false`, `status: "disabled"`, an empty `hostname` and NO `checks.tor` / `checks.i2p` key. `running: true` implies `status: "healthy"`. All fields are always present, with the same shape on every project.
+- **Overall status:** `unavailable` makes the check `degraded`, which makes the overall `status` `degraded` (HTTP 200). It never makes the overall status `unhealthy`, and it is never ignored (an `unavailable` network with an overall `healthy` is a bug).
+- **I2P mapping:** the lifecycle `state` maps to `status` as `disabled` and `no_provider` to `disabled`, `starting` and `building` to `starting`, `running` to `healthy`, `error` to `unavailable`.
+- **Text format:** `features.tor: unavailable` and `features.i2p: disabled` (the status word, then the hostname when there is one).
+- **Tests:** one table-driven test per network covers all four states and asserts the invariants above, and a failing provider test asserts that no path or error text reaches the response body.
 
 **Who uses health endpoints:**
 - Browsers, curl, and uptime checks use `/server/healthz`
@@ -41781,6 +41802,7 @@ This prevents conflicts with any existing Tor installation on the system.
 **Rules:**
 - Tor not detected = **INFO** (not an error - Tor is optional)
 - Tor startup/runtime errors = **WARN** (server continues without Tor)
+- Tor health reporting follows PART 13 → "Overlay Network Health (Tor & I2P)": a startup failure of any kind (including a directory permission problem) sets `unavailable` and logs the detail; it never crashes the server and never puts error text in the health response
 - Server NEVER fails to start due to Tor issues
 - All Tor operations are best-effort, non-blocking
 
@@ -42778,13 +42800,9 @@ pub async fn ensure_tor_dirs() -> anyhow::Result<()> {
         // Create directory
         tokio::fs::create_dir_all(dir).await
             .map_err(|e| anyhow!("create tor dir {:?}: {}", dir, e))?;
-        // Enforce permissions even if dir already existed
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            tokio::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700)).await
-                .map_err(|e| anyhow!("chmod tor dir {:?}: {}", dir, e))?;
-        }
+        // Enforce private permissions even if dir already existed
+        enforce_private(dir, 0o700)
+            .map_err(|e| anyhow!("tor dir {:?}: {}", dir, e))?;
     }
 
     Ok(())
@@ -42804,15 +42822,7 @@ pub async fn update_torrc(path: &std::path::Path, content: &[u8]) -> anyhow::Res
     tokio::fs::write(path, content).await
         .map_err(|e| anyhow!("write file: {}", e))?;
 
-    // Enforce permissions
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        tokio::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).await
-            .map_err(|e| anyhow!("chmod file: {}", e))?;
-    }
-
-    Ok(())
+    enforce_private(path, 0o600)
 }
 
 // ensure_tor_file creates/updates a generic Tor file with correct permissions
@@ -42829,13 +42839,40 @@ pub async fn ensure_tor_file(path: &std::path::Path, content: &[u8]) -> anyhow::
         .map_err(|e| anyhow!("write file: {}", e))?;
 
     // Enforce permissions (in case file existed with wrong perms)
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        tokio::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).await
-            .map_err(|e| anyhow!("chmod file: {}", e))?;
-    }
+    enforce_private(path, 0o600)
+}
 
+/// Makes a Tor or I2P directory (mode 0o700) or file (mode 0o600) private to the server.
+/// A chmod that fails with a permission error is tolerated ONLY when the path is already
+/// private (no group or other bits): that is a container volume owned by another uid and
+/// it must not disable Tor. The path must then be usable by the server.
+#[cfg(unix)]
+pub fn enforce_private(path: &std::path::Path, mode: u32) -> anyhow::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let meta = std::fs::metadata(path)?;
+    let current = meta.permissions().mode() & 0o777;
+    if current != mode {
+        if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)) {
+            if e.kind() != std::io::ErrorKind::PermissionDenied || current & 0o077 != 0 {
+                return Err(anyhow!("chmod {:?}: {}", path, e));
+            }
+        }
+    }
+    if meta.is_dir() {
+        let probe = path.join(format!(".probe-{}", std::process::id()));
+        std::fs::File::create(&probe)
+            .map_err(|e| anyhow!("{:?} is not writable by the server: {}", path, e))?;
+        let _ = std::fs::remove_file(&probe);
+    } else {
+        std::fs::OpenOptions::new().read(true).write(true).open(path)
+            .map_err(|e| anyhow!("{:?} is not usable by the server: {}", path, e))?;
+    }
+    Ok(())
+}
+
+// Windows uses inherited ACLs from the user profile; nothing to enforce.
+#[cfg(not(unix))]
+pub fn enforce_private(_path: &std::path::Path, _mode: u32) -> anyhow::Result<()> {
     Ok(())
 }
 ```
@@ -42845,8 +42882,8 @@ pub async fn ensure_tor_file(path: &std::path::Path, content: &[u8]) -> anyhow::
 | **Create before write** | Dirs must exist before creating torrc or keys |
 | **Permissions: 0700** | Tor directories are private (Unix: `rwx------`) |
 | **Permissions: 0600** | Tor files are private (Unix: `rw-------`) |
-| **Ownership** | Current user/group (NOT tor user, app owns everything) |
-| **Enforce on exist** | Always chmod/chown even if dir/file already exists (Unix only) |
+| **Ownership** | Set once by startup (as root: `chown -R` to the service user, step 8c; as a normal user: the running user creates the directories). `enforcePrivate` never chowns and never fails because of ownership alone |
+| **Enforce on exist** | Call `enforcePrivate` on every Tor directory and file at every start. It runs `chmod` only when the mode differs. A permission error from `chmod` is tolerated ONLY when the path is already private (no group or other bits), which is the normal case for a container volume owned by another uid. It then verifies the server can write there. A path that is neither private nor fixable is a hard error with an actionable log message (never in the health response) |
 | **Idempotent** | Safe to call multiple times |
 | **Windows** | chmod/chown skipped; Windows uses inherited ACLs from user profile |
 
@@ -43154,7 +43191,7 @@ enabled = false
 | 4 | `SESSION CREATE` (status `building`) | `bootstrap_timeout` |
 | 5 | Open the forward socket: `HELLO`, `STREAM FORWARD ... SILENT=true` (status `running`) | 10 s |
 
-**Status values** (CLI `--status` and the health field `features.i2p.state`; `features.i2p.status` is the normalized mapping in PART 13): `disabled`, `no_provider`, `starting` (steps 1-3), `building` (step 4), `running`, `error`.
+**Status values** (CLI `--status` and the health field `features.i2p.state`; `features.i2p.status` is the normalized mapping in PART 13, where `error` becomes `unavailable`): `disabled`, `no_provider`, `starting` (steps 1-3), `building` (step 4), `running`, `error`.
 
 **Error handling:**
 
