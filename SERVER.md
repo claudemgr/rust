@@ -17032,7 +17032,7 @@ The server enforces exactly what it publishes: the same descriptors drive the HT
 
 ### Security Report Storage & Operator Workflow
 
-**Table `security_reports`** lives in the application database (created by the schema migration that ships with this feature, PART 10 → "Migrations"). It is the only place report state is kept.
+**Table `security_reports`** lives in the application database (created by the idempotent startup schema, PART 10 → "Schema Updates (Idempotent Approach)"). It is the only place report state is kept.
 
 ```sql
 CREATE TABLE IF NOT EXISTS security_reports (
@@ -33189,7 +33189,6 @@ Admin Panel Header:
 
 | Setting | Control | Default | Restart | Description |
 |---------|---------|---------|---------|-------------|
-| `tor.enabled` | Toggle | (auto) | No | Enable hidden service |
 | `tor.onion_address` | Readonly | - | - | `.onion` address |
 | `tor.status` | Readonly | - | - | Running/Stopped |
 | `[Copy Address]` | Button | - | - | Copy onion to clipboard |
@@ -36723,7 +36722,7 @@ server:
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `tor_enabled` | Gauge | - | 1 if Tor is enabled, 0 otherwise |
+| `tor_enabled` | Gauge | - | 1 if a `tor` binary was found (the hidden service is active on this instance), 0 otherwise |
 | `tor_running` | Gauge | - | 1 if Tor process is running, 0 otherwise |
 | `tor_circuit_established` | Gauge | - | 1 if circuit established, 0 otherwise |
 | `tor_requests_total` | Counter | - | Total requests via Tor hidden service |
@@ -36862,7 +36861,7 @@ server:
 # TYPE {project_name}_cluster_is_primary gauge
 {project_name}_cluster_is_primary 1
 
-# HELP {project_name}_tor_enabled 1 if Tor is enabled
+# HELP {project_name}_tor_enabled 1 if a tor binary was found
 # TYPE {project_name}_tor_enabled gauge
 {project_name}_tor_enabled 1
 
@@ -54028,7 +54027,7 @@ pub fn validate_tor_config(config: &TorConfig) -> Vec<ValidationError> {
 
 **Search algorithm:** the built-in search brute-forces v3 onion keypairs in-process — the same approach as `mkp224o`, with no external tool dependency: each worker generates a random ed25519 keypair, derives the v3 onion address per rend-spec-v3 (`base32(pubkey ‖ checksum ‖ 0x03)` where `checksum = SHA3-256(".onion checksum" ‖ pubkey ‖ 0x03)[0:2]`), compares the prefix, and repeats until a worker finds a match. A vanity key is an ordinary random ed25519 keypair merely *selected* by its address — the search does not weaken key security.
 
-**Parameters** (JSON body of POST `…/config/network/tor/vanity`):
+**Parameters** (JSON body of POST `…/network/tor/vanity`):
 
 | Field | Default | Rules |
 |-------|---------|-------|
@@ -54037,9 +54036,9 @@ pub fn validate_tor_config(config: &TorConfig) -> Vec<ValidationError> {
 
 - **One search at a time** — POST while a search is running returns 409 naming the running search's prefix
 - A running search does NOT survive a server restart; found candidates on disk do
-- DELETE `…/config/network/tor/vanity` cancels the running search; candidates already written to disk are kept
+- DELETE `…/network/tor/vanity` cancels the running search; candidates already written to disk are kept
 
-**Status** (GET `…/config/network/tor/vanity`):
+**Status** (GET `…/network/tor/vanity`):
 
 ```json
 {
@@ -62982,7 +62981,7 @@ pub async fn autodiscover_handler(
             },
             "features": {
                 "clustering": state.cfg.cluster.enabled,
-                "tor":        state.cfg.tor.enabled,
+                "tor":        state.tor_manager.enabled(),
                 "webauthn":   state.cfg.auth.webauthn.enabled,
                 "oauth":      state.cfg.auth.oauth.enabled_providers(),
             },
