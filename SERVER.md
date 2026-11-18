@@ -6818,6 +6818,7 @@ edition = "2021"
 | **Tor** | `arti-client` | Pure Rust Tor client |
 | **WebSocket** | `axum` | Built-in WebSocket support via `extract::ws` |
 | **CORS** | `tower-http` | `CorsLayer` middleware |
+| **Sockets** | `socket2` | Dual-stack listener (`set_only_v6(false)`, feature `all`) |
 
 ### Utilities
 
@@ -7064,6 +7065,8 @@ tower-sessions = "*"
 axum = { version = "*", features = ["ws", "multipart"] }
 tower = "*"
 tower-http = { version = "*", features = ["cors", "trace", "compression-full", "timeout"] }
+# Dual-stack listener socket
+socket2 = { version = "*", features = ["all"] }
 tokio = { version = "*", features = ["full"] }
 # Tor controller
 arti-client = "*"
@@ -8907,10 +8910,16 @@ ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]
 
 5. **Bind privileged ports before dropping privileges (Unix only):**
    ```rust
-   // Unix: bind privileged port while still root, then drop privileges; listen_addr is the resolved --address/LISTEN/peek IpAddr
+   // Unix: bind privileged port while still root, then drop privileges; listen_addr is the resolved --address/LISTEN/peek IpAddr, brackets stripped before parsing
    #[cfg(unix)]
    if is_elevated() && port < 1024 {
-       let listener = std::net::TcpListener::bind(std::net::SocketAddr::new(listen_addr, port))?;
+       let sa = std::net::SocketAddr::new(listen_addr, port);
+       let sock = socket2::Socket::new(socket2::Domain::for_address(sa), socket2::Type::STREAM, None)?;
+       if sa.is_ipv6() { sock.set_only_v6(false)?; }
+       sock.set_reuse_address(true)?;
+       sock.bind(&sa.into())?;
+       sock.listen(1024)?;
+       let listener: std::net::TcpListener = sock.into();
        // Store listener, drop privileges later
    }
    ```
@@ -11367,7 +11376,7 @@ PHASE 5: Server startup (actual server start)
       ├─ No --port? → check PORT env var (same format)
       ├─ No env var? → EARLY CONFIG PEEK: read ONLY `server.port` and `server.address` from {config_dir}/server.yml (read-only, as root, after the step 8d permission fix; no other key is read or validated here; the full load is step 13)
       └─ No file, or no `server.port` in it? → random port in 64000-64999 range (single, HTTP); step 13 writes it to the new config
-      Listen address (resolved in the same early step): `--address` flag > `LISTEN` env > the early peek of `server.address` > default `[::]` (IPv4 `0.0.0.0` fallback when the kernel has no IPv6, logged once as a warning). Privileged sockets are bound to THIS address and never to a broader one; step 13 never rebinds (`server.address` needs a restart, PART 12)
+      Listen address (resolved in the same early step): `--address` flag > `LISTEN` env > the early peek of `server.address` > default `[::]` (IPv4 `0.0.0.0` fallback when the kernel has no IPv6, logged once as a warning). `[::]` and `::` are both accepted for `--address`, `LISTEN` and `server.address`; the brackets are stripped before the value is parsed as an IP. Privileged sockets are bound to THIS address and never to a broader one; step 13 never rebinds (`server.address` needs a restart, PART 12)
    f. Bind ALL privileged ports (< 1024) NOW while still root:
       ├─ For each port < 1024: create and bind a socket on the resolved listen address, store fd
       ├─ If ANY privileged port fails: exit with error
@@ -14287,7 +14296,7 @@ The resolved client IP feeds access logs, rate limiting, blocklists, and GeoIP �
 
 **Memory bound:** the IPv6 address space is effectively unbounded, so per-IP rate-limit state MUST be a bounded, expiring structure (a fixed-size LRU or a time-windowed map) whose entries are dropped when their window ends. A host that holds a large IPv6 prefix can rotate source addresses; the defense is the per-identifier and global limits plus explicit operator CIDR bans, never silent prefix grouping.
 
-**Dual-stack:** the default listen address `[::]` serves IPv4 and IPv6 on one socket (`IPV6_V6ONLY` off, set explicitly so a `net.ipv6.bindv6only=1` host does not break IPv4). If the kernel has no IPv6 (socket creation fails with "address family not supported"), the server falls back to `0.0.0.0` and logs one warning; an explicit `0.0.0.0` is an IPv4-only choice and is never widened. Any URL or log field that embeds an IPv6 literal with a port uses brackets (`[2001:db8::1]:443`).
+**Dual-stack:** the default listen address `[::]` serves IPv4 and IPv6 on one socket (`IPV6_V6ONLY` off, set explicitly with `socket2` `set_only_v6(false)` because `std` does not, so a `net.ipv6.bindv6only=1` host does not break IPv4). If the kernel has no IPv6 (socket creation fails with "address family not supported"), the server falls back to `0.0.0.0` and logs one warning; an explicit `0.0.0.0` is an IPv4-only choice and is never widened. Any URL or log field that embeds an IPv6 literal with a port uses brackets (`[2001:db8::1]:443`).
 
 **Test vectors (REQUIRED):**
 
