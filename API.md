@@ -27629,7 +27629,7 @@ server:
 | `header.html` | **Extends** | Inserted inside `<header>` of every public page, after the built-in logo and navigation. It replaces nothing |
 | `about.{html,md,txt}` | **Extends** | Appended after the built-in About content |
 | `privacy.{html,md,txt}` | **Extends** | Appended after the built-in privacy sections (after "Your Rights" and the consent controls) and before the Contact section. The built-in sections are never replaced, because they must stay in step with `server.privacy.*` |
-| `footer.html` | **Overrides** | Replaces the custom branding block above the Application Footer ("Footer Customization"). No file: the built-in branding. A file that holds only whitespace: no branding. The Default Application Footer is always shown |
+| `footer.html` | **Overrides** | Replaces the custom branding block above the Application Footer ("Footer Customization"). No file: the built-in branding. An empty or whitespace-only file: no branding. The Default Application Footer is always shown |
 | `terms.{html,md,txt}` | **Overrides** | Replaces the built-in terms of service entirely. No file: the built-in terms |
 
 | Rule | Behavior |
@@ -27657,7 +27657,7 @@ server:
 **There is no `server.yml` key for the footer.** The custom branding block above the Application Footer is the file `{config_dir}/html/footer.html` ("Operator Content Files"):
 
 - No file: use the default branding (built-in)
-- A file holding only whitespace: disable branding, show only the Application Footer
+- An empty or whitespace-only file: disable branding, show only the Application Footer
 - Custom HTML: use your own branding (SANITIZED, no scripts)
 
 ### Custom HTML Validation
@@ -27668,7 +27668,7 @@ server:
 use ammonia::Builder;
 
 pub fn sanitize_footer_html(html: &str) -> String {
-    if html.is_empty() || html == " " { return html.to_string(); }
+    if html.trim().is_empty() { return html.to_string(); }
     Builder::new()
         .tags(["p", "br", "span", "div", "strong", "b", "em", "i", "u", "s", "small",
                "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "a", "img"]
@@ -27681,7 +27681,7 @@ pub fn validate_footer_html(html: &str) -> Result<String> {
     if !html.is_empty() && sanitized.is_empty() {
         return Err(anyhow::anyhow!("custom HTML contained only disallowed elements"));
     }
-    if html != sanitized && !html.is_empty() && html != " " {
+    if html != sanitized && !html.trim().is_empty() {
         tracing::warn!("footer.html was sanitized: removed potentially dangerous content");
     }
     Ok(sanitized)

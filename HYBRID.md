@@ -8819,7 +8819,7 @@ async fn open_database(cfg: &Config) -> anyhow::Result<Database> {
 -- ============================================================================
 
 -- Single-instance SQLite server.db has NO config table: configuration lives only in server.yml (PART 5).
--- Cluster Mode ONLY (remote PostgreSQL/MySQL): the remote database is the configuration source of truth (PART 5), so these two tables exist there (srv_ prefix) and server.yml is a synced cache.
+-- Cluster Mode ONLY (remote PostgreSQL/MySQL): the remote database is the configuration source of truth (PART 5), so these two tables exist there (srv_ prefix) and server.yml is a synced cache (it never holds a secret key: `secrets.yml` is node-local).
 CREATE TABLE IF NOT EXISTS srv_config (
     key        VARCHAR(255) PRIMARY KEY,
     value      TEXT NOT NULL,
@@ -28117,7 +28117,7 @@ web:
 | `header.html` | **Extends** | Inserted inside `<header>` of every public page, after the built-in logo and navigation. It replaces nothing |
 | `about.{html,md,txt}` | **Extends** | Appended after the built-in About content |
 | `privacy.{html,md,txt}` | **Extends** | Appended after the built-in privacy sections (after "Your Rights" and the consent controls) and before the Contact section. The built-in sections are never replaced, because they must stay in step with `server.privacy.*` |
-| `footer.html` | **Overrides** | Replaces the custom branding block above the Application Footer ("Footer Customization"). No file: the built-in branding. A file that holds only whitespace: no branding. The Default Application Footer is always shown |
+| `footer.html` | **Overrides** | Replaces the custom branding block above the Application Footer ("Footer Customization"). No file: the built-in branding. An empty or whitespace-only file: no branding. The Default Application Footer is always shown |
 | `terms.{html,md,txt}` | **Overrides** | Replaces the built-in terms of service entirely. No file: the built-in terms |
 
 | Rule | Behavior |
@@ -28147,7 +28147,7 @@ web:
 **There is no `server.yml` key for the footer.** The custom branding block above the Application Footer is the file `{config_dir}/html/footer.html` ("Operator Content Files"):
 
 - No file: use the default branding (built-in)
-- A file holding only whitespace: disable branding, show only the Application Footer
+- An empty or whitespace-only file: disable branding, show only the Application Footer
 - Custom HTML: use your own branding (SANITIZED, no scripts)
 
 ### Custom HTML Validation
@@ -28161,7 +28161,7 @@ use ammonia::Builder;
 /// Sanitize custom footer HTML.
 /// Only allows safe formatting tags — NO scripts, NO event handlers.
 pub fn sanitize_footer_html(html: &str) -> String {
-    if html.is_empty() || html == " " {
+    if html.trim().is_empty() {
         return html.to_string();
     }
 
@@ -28191,7 +28191,7 @@ pub fn validate_footer_html(html: &str) -> Result<String, anyhow::Error> {
         anyhow::bail!("custom HTML contained only disallowed elements");
     }
 
-    if html != sanitized && !html.is_empty() && html != " " {
+    if html != sanitized && !html.trim().is_empty() {
         tracing::warn!("footer.html was sanitized: removed potentially dangerous content");
     }
 
