@@ -26283,10 +26283,10 @@ dismissAllToasts();
 <div class="header-actions">
   <a href="/server/preferences" class="header-link" aria-label="Preferences">⚙️</a>
   <form action="/server/preferences" method="POST" class="theme-toggle-form">
-    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-    <input type="hidden" name="theme" value="{{ nextTheme .Theme }}">
-    <button type="submit" class="theme-button" aria-label="Switch theme (currently {{ .Theme }})" title="Switch theme">
-      <svg class="icon-theme"><!-- reflects .Theme: moon/sun/circle-half --></svg>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="theme" value="{{ next_theme(theme) }}">
+    <button type="submit" class="theme-button" aria-label="Switch theme (currently {{ theme }})" title="Switch theme">
+      <svg class="icon-theme"><!-- reflects theme: moon/sun/circle-half --></svg>
     </button>
   </form>
 </div>
@@ -31480,7 +31480,7 @@ pub fn tracking_script(headers: &HeaderMap, cfg: &Config) -> askama::MarkupDispl
   {% endif %}
 
   <!-- Operator extension (html/privacy.*): sanitized, appended before Contact -->
-  {% if extension %}<section id="operator-extension">{{ extension|safe }}</section>{% endif %}
+  {% if !extension.is_empty() %}<section id="operator-extension">{{ extension|safe }}</section>{% endif %}
 
   <!-- Contact -->
   <section id="contact">
@@ -31826,7 +31826,7 @@ curl -H "Accept: application/xml" https://jokes.example.com/api/v1/joke</code></
   <ul>
     <li><a href="/server/docs/swagger">Swagger UI</a> - Interactive REST API explorer</li>
     <li><a href="/server/docs/graphql">GraphiQL</a> - Interactive GraphQL explorer</li>
-    {{ if .MCPEnabled }}<li><a href="/server/help/mcp">MCP server</a> - Use this application from an AI assistant</li>{{ end }}
+    <li><a href="/server/help/mcp">MCP server</a> - Use this application from an AI assistant</li>
   </ul>
 </div>
 ```
