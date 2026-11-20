@@ -16632,7 +16632,10 @@ CREATE TABLE tokens (
     token_hash    TEXT NOT NULL,
     token_prefix  TEXT NOT NULL,
 
+    -- 'global', 'read-write', 'read', 'agent'
     scope         TEXT NOT NULL DEFAULT 'global',
+    -- agents.id, set only when scope = 'agent'
+    agent_id      TEXT,
     expires_at    TIMESTAMP,
 
     last_used_at  TIMESTAMP,
