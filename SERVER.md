@@ -707,7 +707,7 @@ let cache_size = (avail_mem / 10)
 |------|-------------|
 | **NEVER use Makefile in CI** | Workflows have explicit commands with all env vars |
 | **GitHub/Gitea/Jenkins must match** | Same platforms, same env vars, same logic |
-| **VERSION precedence** | `release.txt` wins when present; otherwise use the workflow/build-specific fallback (tag, beta timestamp, etc.) |
+| **VERSION precedence** | `VERSION` env var (user override, AI never sets it) > channel (devel = short commit id, beta = `YYYYMMDDHHMMSS-beta`; `release.txt` ignored) > `release.txt` > `devel` |
 | **RUSTFLAGS** | `-C strip=symbols -C link-arg=-s` (rustc flags only); `--release --target {target}` go on the cargo command line, not in RUSTFLAGS |
 | **Docker builds on EVERY push** | Any branch push triggers Docker image build |
 | **Docker tags** | Any push → `{commit_id}`; beta → adds `beta`; tag → `{version}`, `latest`, `{yymm}`, `{commit_id}`; `devel` is built by the `build-devel` job inside the same `docker.yml` workflow (schedule + non-tag push, gated by `if:`) — never a separate file |
@@ -21820,9 +21820,10 @@ When not in cluster mode:
 
 ### Sources (Priority Order)
 
-1. `release.txt` in project root
-2. Git tag (if available)
-3. Fallback: `dev`
+1. `VERSION` environment variable, only when explicitly set by the user (local/manual builds; CI workflows never read it); AI agents never set it
+2. Channel rule (CI): devel = `git rev-parse --short=7 HEAD`, beta = `YYYYMMDDHHMMSS-beta`; `release.txt` is never consulted for these channels
+3. `release.txt` in project root (stable releases and local builds); release workflows fall back to the pushed tag with `v` stripped only when `release.txt` is absent
+4. Fallback: `devel` — create `release.txt` with `0.1.0` before the first release
 
 ### --version Output
 
@@ -41203,7 +41204,7 @@ fn run_service() -> anyhow::Result<()> {
 
 - Canonical single-line version source (see PART 13)
 - Semantic versioning: `MAJOR.MINOR.PATCH` (e.g., `1.2.3`)
-- If `release.txt` exists, it wins over derived/tag/env defaults
+- Used for stable releases and local builds; devel and beta CI builds derive their own version and ignore it; an explicitly set `VERSION` env var overrides it (user only, AI never sets it)
 
 ### Official Site File: `site.txt` (Optional)
 
@@ -41238,8 +41239,8 @@ https://api.example.com
 
 **When extracting VERSION variable from tag:**
 - Git tag `v1.2.3` → VERSION=`1.2.3` (strip v for internal use)
-- Git tag `dev` → VERSION=`dev` (no v to strip)
-- Git tag `beta` → VERSION=`beta` (no v to strip)
+- Git tag `devel` (rolling) → VERSION=short commit id of the built commit, not the tag name
+- Git tag `YYYYMMDDHHMMSS-beta` → VERSION=`YYYYMMDDHHMMSS-beta` (same string, no v to strip)
 
 | Tag Input | Type | Add `v`? | Display As | Why |
 |-----------|------|----------|------------|-----|
@@ -41299,9 +41300,10 @@ format_version_tag() {
 
 ### Version Priority
 
-1. `release.txt` file (if exists) — always wins
-2. `VERSION` environment variable (fallback when no `release.txt`)
-3. Create `release.txt` with `0.1.0` (first release)
+1. `VERSION` environment variable, only when explicitly set by the user (local/manual builds; CI workflows never read it); AI agents never set it
+2. Channel rule (CI): devel = `git rev-parse --short=7 HEAD`, beta = `YYYYMMDDHHMMSS-beta`; `release.txt` is never consulted for these channels
+3. `release.txt` in project root (stable releases and local builds); release workflows fall back to the pushed tag with `v` stripped only when `release.txt` is absent
+4. Fallback: `devel` — create `release.txt` with `0.1.0` before the first release
 
 ## Binary Naming
 
@@ -41369,8 +41371,8 @@ binaries/
 PROJECT_NAME := $(shell git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)(\.git)?$$|\1|' || basename "$$(pwd)")
 PROJECT_ORG := $(shell git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+(\.git)?$$|\1|' || basename "$$(dirname "$$(pwd)")")
 
-# Version precedence: release.txt > env/default fallback
-VERSION := $(shell [ -f release.txt ] && cat release.txt || echo "$${VERSION:-devel}")
+# Version precedence: VERSION env (user override, AI never sets it) > release.txt > "devel" fallback
+VERSION ?= $(shell cat release.txt 2>/dev/null || echo "devel")
 
 # Build info — BUILD_EPOCH is the single captured time source; BUILD_DATE is
 # derived from it (ISO 8601 / RFC 3339 UTC per version_conventions.md)
@@ -42264,7 +42266,7 @@ FROM casjaysdev/rust:latest AS builder
 RUN apk add --no-cache git bash
 
 ARG TARGETARCH
-ARG VERSION=dev
+ARG VERSION=devel
 ARG BUILD_DATE
 ARG BUILD_EPOCH
 ARG COMMIT_ID
@@ -42301,7 +42303,7 @@ RUN VERSION="${VERSION}" \
 FROM alpine:latest
 
 # ARGs for build-time values (set by docker build --build-arg)
-ARG VERSION=dev
+ARG VERSION=devel
 ARG BUILD_DATE
 ARG BUILD_EPOCH
 ARG COMMIT_ID
@@ -42853,7 +42855,7 @@ COPY src/ ./src/
 # crate (danielkov/saml) is pure Rust with no C-library dependency, so a
 # --features saml build is STILL fully static — no extra builder headers or
 # runtime packages required. See PART 3 § SAML crate maturity note.
-ARG VERSION=dev
+ARG VERSION=devel
 ARG COMMIT_ID=unknown
 ARG BUILD_DATE=unknown
 ARG BUILD_EPOCH=0
@@ -44223,11 +44225,7 @@ jobs:
         id: v
         run: |
           STAMP="$(date -u +%Y%m%d%H%M%S)"
-          if [ -f release.txt ]; then
-            VERSION="$(cat release.txt)"
-          else
-            VERSION="${STAMP}-beta"
-          fi
+          VERSION="${STAMP}-beta"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           # Release tag is always the timestamped beta form - the update channel matches the -beta suffix
           echo "tag=${STAMP}-beta" >> "$GITHUB_OUTPUT"
@@ -44839,7 +44837,7 @@ jobs:
           provenance: false
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:devel
           build-args: |
-            VERSION=devel
+            VERSION=${{ env.COMMIT_ID }}
             BUILD_DATE=${{ env.BUILD_DATE }}
             BUILD_EPOCH=${{ env.BUILD_EPOCH }}
             COMMIT_ID=${{ env.COMMIT_ID }}
@@ -44849,7 +44847,7 @@ jobs:
             org.opencontainers.image.title=${{ env.PROJECT_NAME }}-devel
             org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
             org.opencontainers.image.description=${{ env.PROJECT_NAME }} - development image (alpine, debug mode)
-            org.opencontainers.image.version=devel
+            org.opencontainers.image.version=${{ env.COMMIT_ID }}
             org.opencontainers.image.created=${{ env.BUILD_DATE }}
             org.opencontainers.image.revision=${{ env.COMMIT_ID }}
             org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
@@ -44862,7 +44860,7 @@ jobs:
             manifest:org.opencontainers.image.title=${{ env.PROJECT_NAME }}-devel
             manifest:org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
             manifest:org.opencontainers.image.description=${{ env.PROJECT_NAME }} - development image (alpine, debug mode)
-            manifest:org.opencontainers.image.version=devel
+            manifest:org.opencontainers.image.version=${{ env.COMMIT_ID }}
             manifest:org.opencontainers.image.created=${{ env.BUILD_DATE }}
             manifest:org.opencontainers.image.revision=${{ env.COMMIT_ID }}
             manifest:org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
@@ -45450,11 +45448,7 @@ jobs:
         id: v
         run: |
           STAMP="$(date -u +%Y%m%d%H%M%S)"
-          if [ -f release.txt ]; then
-            VERSION="$(cat release.txt)"
-          else
-            VERSION="${STAMP}-beta"
-          fi
+          VERSION="${STAMP}-beta"
           echo "version=$VERSION" >> "$GITEA_OUTPUT"
           # Release tag is always the timestamped beta form - the update channel matches the -beta suffix
           echo "tag=${STAMP}-beta" >> "$GITEA_OUTPUT"
@@ -46038,7 +46032,7 @@ jobs:
           provenance: false
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:devel
           build-args: |
-            VERSION=devel
+            VERSION=${{ env.COMMIT_ID }}
             BUILD_DATE=${{ env.BUILD_DATE }}
             BUILD_EPOCH=${{ env.BUILD_EPOCH }}
             COMMIT_ID=${{ env.COMMIT_ID }}
@@ -46048,7 +46042,7 @@ jobs:
             org.opencontainers.image.title=${{ env.PROJECT_NAME }}-devel
             org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
             org.opencontainers.image.description=${{ env.PROJECT_NAME }} - development image (alpine, debug mode)
-            org.opencontainers.image.version=devel
+            org.opencontainers.image.version=${{ env.COMMIT_ID }}
             org.opencontainers.image.created=${{ env.BUILD_DATE }}
             org.opencontainers.image.revision=${{ env.COMMIT_ID }}
             org.opencontainers.image.url=${{ gitea.server_url }}/${{ gitea.repository }}
@@ -46061,7 +46055,7 @@ jobs:
             manifest:org.opencontainers.image.title=${{ env.PROJECT_NAME }}-devel
             manifest:org.opencontainers.image.base.name=${{ env.PROJECT_NAME }}
             manifest:org.opencontainers.image.description=${{ env.PROJECT_NAME }} - development image (alpine, debug mode)
-            manifest:org.opencontainers.image.version=devel
+            manifest:org.opencontainers.image.version=${{ env.COMMIT_ID }}
             manifest:org.opencontainers.image.created=${{ env.BUILD_DATE }}
             manifest:org.opencontainers.image.revision=${{ env.COMMIT_ID }}
             manifest:org.opencontainers.image.url=${{ gitea.server_url }}/${{ gitea.repository }}
@@ -46779,7 +46773,7 @@ docker:build:
         YYMM=$(date +%y%m)
         TAGS="-t $CI_REGISTRY_IMAGE:$VERSION -t $CI_REGISTRY_IMAGE:latest -t $CI_REGISTRY_IMAGE:$YYMM -t $CI_REGISTRY_IMAGE:${CI_COMMIT_SHA:0:7}"
       elif [ "$CI_COMMIT_BRANCH" = "beta" ]; then
-        VERSION="beta-${CI_COMMIT_SHA:0:7}"
+        VERSION="$(date -u +%Y%m%d%H%M%S)-beta"
         TAGS="-t $CI_REGISTRY_IMAGE:beta -t $CI_REGISTRY_IMAGE:${CI_COMMIT_SHA:0:7}"
       else
         VERSION="${CI_COMMIT_SHA:0:7}"
@@ -46850,7 +46844,7 @@ docker:build-aio:
         YYMM=$(date +%y%m)
         TAGS="-t ${IMAGE}:${VERSION}-aio -t ${IMAGE}:latest-aio -t ${IMAGE}:${YYMM}-aio -t ${IMAGE}:${CI_COMMIT_SHA:0:7}-aio"
       elif [ "$CI_COMMIT_BRANCH" = "beta" ]; then
-        VERSION="beta-${CI_COMMIT_SHA:0:7}"
+        VERSION="$(date -u +%Y%m%d%H%M%S)-beta"
         TAGS="-t ${IMAGE}:beta-aio -t ${IMAGE}:${CI_COMMIT_SHA:0:7}-aio"
       else
         VERSION="${CI_COMMIT_SHA:0:7}"
