@@ -8799,7 +8799,7 @@ sudo {project_name} --service --install
 
 **Default:** service starts with elevated privileges only when needed, then drops to dedicated service user after privileged setup/port binding.
 
-**Drop timing — the privilege drop is the FINAL root-phase action.** It happens only after ALL root-requiring initialization completes: service user/group creation, directory and file creation, ownership and permission setup, privileged port binding (<1024), and spawning managed child processes (e.g. Tor) with setuid/setgid service-user credentials, and applying a staged update (step 7b, before everything else). Nothing after the drop may require root — anything that does is an init-ordering bug. Immediately after dropping, verify with getuid() != 0.
+**Drop timing — the privilege drop is the FINAL root-phase action.** It happens only after ALL root-requiring initialization completes: service user/group creation, directory and file creation, ownership and permission setup, privileged port binding (<1024), and applying a staged update (step 7b, before everything else). Nothing after the drop may require root — anything that does is an init-ordering bug. Immediately after dropping, verify with getuid() != 0.
 
 **Permanent-root exception:** allowed only for project-defined cases such as firewall control, packet capture, TUN/TAP/VPN, mount/filesystem management, package/service management, or other ongoing kernel/device operations.
 
@@ -8809,7 +8809,7 @@ sudo {project_name} --service --install
 | 2 | **root** | Create system user `{project_name}` (if needed) |
 | 3 | **root** | Create directories, set ownership |
 | 4 | **root** | Bind configured ports (any port works) |
-| 5 | **root** | Spawn managed children (e.g. Tor) with setuid/setgid service-user credentials |
+| 5 | **root** | (no child process starts while root: Tor and I2P start after the drop) |
 | 6 | **root→user** | **DROP PRIVILEGES** to `{internal_name}` user |
 | 7 | **user** | Initialize config, database, etc. |
 | 8 | **user** | Start serving requests |
@@ -11534,10 +11534,7 @@ PHASE 5: Server startup (actual server start)
       ├─ For each port < 1024: create and bind a socket on the resolved listen address, store fd
       ├─ If ANY privileged port fails: exit with error
       └─ Unprivileged ports (>= 1024) bound later in step 18
-   g. Start managed child processes (Tor, if tor binary available) while still root:
-      ├─ Write child config first (e.g. {config_dir}/tor/torrc) with service-user ownership
-      ├─ Spawn with setuid/setgid credentials set to {internal_name}:{internal_name}
-      └─ Children NEVER run as root — credentials are applied at spawn time
+   g. (reserved) No child process is started while root. Tor and I2P start in step 17 as the service user, after the drop; their directories were created and chowned in steps 8b-8c
    h. DROP PRIVILEGES to {project_name} user
    i. Verify privilege drop succeeded (getuid() != 0)
 
@@ -11606,8 +11603,7 @@ PHASE 5: Server startup (actual server start)
 
 17. Start overlay networks - see PART 32:
 
-    17a. Start Tor (if tor binary available and not already spawned in step 8g) - see PART 32.1:
-    ├─ Root mode → Tor already running (spawned in step 8g with {internal_name}:{internal_name} setuid credentials before the drop); skip
+    17a. Start Tor (if the tor binary is available) - see PART 32.1:
     ├─ tor not found in PATH → log INFO "Tor not available", skip
     ├─ tor found:
     │   ├─ Create directories: {config_dir}/tor/, {data_dir}/tor/, {data_dir}/tor/site/
@@ -11688,7 +11684,7 @@ PHASE 5: Server startup (actual server start)
 | 8d. Set permissions | **root** | Easier while root, ensures correct perms |
 | 8e. Determine ports | **root** | Need to know before binding |
 | 8f. Bind privileged ports | **root** | Only root can bind port < 1024 |
-| 8g. Spawn children (Tor) | **root** | Children spawned with setuid/setgid {internal_name} credentials — never run as root |
+| 8g. (reserved) | — | No child process starts while root: Tor and I2P start in step 17 as the service user |
 | **8h. DROP PRIVILEGES** | **root→user** | Security: minimize time running as root |
 | **IF USER (step 9):** | | |
 | 9. Setup user directories | **user** | Create ~/.config/, ~/.local/share/, etc. |
@@ -11699,7 +11695,6 @@ PHASE 5: Server startup (actual server start)
 1. Creating the service user/group
 2. Creating directories/files and setting ownership + permissions
 3. Binding any privileged ports (< 1024)
-4. Spawning managed child processes (e.g. Tor) with service-user setuid/setgid credentials
 
 **What REQUIRES root (steps 8a-8g):**
 - Creating system directories (/etc/, /var/lib/, /var/log/, /var/cache/, /var/backups/)
@@ -11707,13 +11702,12 @@ PHASE 5: Server startup (actual server start)
 - chown directories to app user
 - Setting permissions on system directories
 - Binding to privileged ports (80, 443, etc.)
-- Spawning managed child processes (Tor) with setuid/setgid service-user credentials
 
 **What does NOT require root (steps 10-21):**
 - Writing files to directories owned by app user (logging, config, database, PID)
 - Binding to unprivileged ports (>= 1024)
 - Accepting connections on pre-bound privileged sockets
-- Starting the scheduler and other in-process tasks (in root mode, Tor is spawned in step 8g before the drop)
+- Starting child processes (tor, i2pd) and the scheduler, as the service user after the drop
 - Signal handling
 
 **Port binding examples (see PART 5 for full rules):**
@@ -14030,7 +14024,7 @@ All templates, Swagger/OpenAPI, GraphQL, email links, etc. MUST use these resolv
 | `{i2p_address}` | I2P address (if enabled) | `abc...xyz.b32.i2p` |
 | `{smtp_address}` | SMTP server address (if configured) | `172.17.0.1` |
 | `{smtp_port}` | SMTP server port | `25` |
-| `{startup_datetime}` | Server start timestamp | `Wed Jan 15, 2025 at 09:00:00 EST` |
+| `{startup_datetime}` | Server start timestamp, ALWAYS UTC (the one user-facing timestamp that is not in the server's local timezone: a console banner must read the same on every host and in every container) | `January 15, 2025 at 09:00:00 UTC` |
 | `{setup_token}` | First-run setup token (shown ONCE) | `a1b2c3d4e5f67890abcdef1234567890` |
 
 **URL Format:** `{proto}://{fqdn}/path` or `{proto}://{fqdn}:{port}/path`
@@ -24496,7 +24490,7 @@ format_url(host, 8443, true);
 ├───────────────────────────────────────────────────────────┤
 │  🌐 HTTP:  {proto}://{address}:{port}                     │
 ├───────────────────────────────────────────────────────────┤
-│  📡 Listening on {proto}://{address}:{port}               │
+│  📡 Listening on {proto}://{fqdn}:{port}                  │
 │  ✅ Server started on {startup_datetime}                  │
 ╰───────────────────────────────────────────────────────────╯
 ```
@@ -24510,7 +24504,7 @@ format_url(host, 8443, true);
 ├───────────────────────────────────────────────────────────┤
 │  🌍 IPv6:  {proto}://[{address}]:{port}                   │
 ├───────────────────────────────────────────────────────────┤
-│  📡 Listening on {proto}://[{address}]:{port}             │
+│  📡 Listening on {proto}://[{fqdn}]:{port}                │
 │  ✅ Server started on {startup_datetime}                  │
 ╰───────────────────────────────────────────────────────────╯
 ```
@@ -24548,7 +24542,7 @@ format_url(host, 8443, true);
 ├───────────────────────────────────────────────────────────┤
 │  🌐 HTTP:  {proto}://{address}:{port}                     │
 ├───────────────────────────────────────────────────────────┤
-│  📡 Listening on {proto}://{address}:{port}               │
+│  📡 Listening on {proto}://{fqdn}:{port}                  │
 │  ✅ Server started on {startup_datetime}                  │
 ╰───────────────────────────────────────────────────────────╯
 
@@ -33059,7 +33053,7 @@ pub fn register_admin_routes(cfg: &Config) -> axum::Router<Arc<AppState>> {
 ├───────────────────────────────────────────────────────────┤
 │  🌐 HTTP:  {proto}://{fqdn}:{port}                        │
 ├───────────────────────────────────────────────────────────┤
-│  📡 Listening on {proto}://{address}:{port}               │
+│  📡 Listening on {proto}://{fqdn}:{port}                  │
 │  ✅ Server started on {startup_datetime}                  │
 ╰───────────────────────────────────────────────────────────╯
 
@@ -53601,7 +53595,7 @@ This prevents conflicts with any existing Tor installation on the system.
    ├─ TorrcFile: `{config_dir}/tor/torrc`
    ├─ DataDir: `{data_dir}/tor/`
    ├─ Control connection: localhost TCP via `127.0.0.1:auto`
-   ├─ SocksPort: auto (if outbound enabled) or 0 (hidden service only)
+   ├─ SocksPort: 127.0.0.1:auto (if outbound enabled) or 0 (hidden service only)
    ├─ Completely isolated from system Tor
    ├─ Wait for bootstrap completion
    ├─ Hidden service declared in torrc (HiddenServiceDir); read .onion from hostname file
@@ -54106,7 +54100,7 @@ async fn read_onion_hostname(hs_dir: &Path) -> Result<String, AppError> {
 
 | Resource | System Tor | Our Tor |
 |----------|------------|---------|
-| SocksPort | 9050 | 0 (disabled) or `auto` |
+| SocksPort | 9050 | 0 (disabled) or `127.0.0.1:auto` (loopback only, mandatory) |
 | ControlPort | 9051 | `127.0.0.1:auto` |
 | DataDir | `/var/lib/tor` | `{data_dir}/tor/` |
 
@@ -54279,7 +54273,7 @@ HiddenServiceExportCircuitID haproxy
 
 | Setting | Value | Reason |
 |---------|-------|--------|
-| `SocksPort` | `0` / `auto` | `0` = hidden service only; `auto` = runtime port for outbound |
+| `SocksPort` | `0` / `127.0.0.1:auto` | `0` = hidden service only; `127.0.0.1:auto` = runtime port on loopback for outbound (binding loopback is mandatory, never `0.0.0.0`) |
 | `ControlPort` | `127.0.0.1:auto` | Runtime localhost TCP control port on all OSes |
 | `SafeLogging 1` | Enabled | Scrubs sensitive info from Tor logs |
 | `AccountingStart` | `month 1 00:00` | Reset bandwidth counter on 1st of each month |
@@ -69005,7 +68999,7 @@ make docker
 - [ ] `{fqdn}` - Fully qualified domain name
 - [ ] `{baseurl}` - URL path prefix (auto-detected from reverse proxy)
 - [ ] `{port}` - Port number (stripped if 80/443)
-- [ ] `{address}` - Listen IP address
+- [ ] `{address}` - Listen IP address (logs only; the banner always shows the resolved `{fqdn}`)
 - [ ] `{app_mode}` - Application mode (production/development/debug)
 - [ ] `{onion_address}` - Tor .onion address (if enabled)
 - [ ] `{i2p_address}` - I2P address (if enabled)
