@@ -8739,7 +8739,7 @@ sudo {project_name} --service --install
 
 **Default:** service starts with elevated privileges only when needed, then drops to dedicated service user after privileged setup/port binding.
 
-**Drop timing — the privilege drop is the FINAL root-phase action.** It happens only after ALL root-requiring initialization completes: service user/group creation, directory and file creation, ownership and permission setup, privileged port binding (<1024), and spawning managed child processes (e.g. Tor) with setuid/setgid service-user credentials. Nothing after the drop may require root — anything that does is an init-ordering bug. Immediately after dropping, verify with getuid() != 0.
+**Drop timing — the privilege drop is the FINAL root-phase action.** It happens only after ALL root-requiring initialization completes: service user/group creation, directory and file creation, ownership and permission setup, privileged port binding (<1024), and spawning managed child processes (e.g. Tor) with setuid/setgid service-user credentials, and applying a staged update (step 7b, before everything else). Nothing after the drop may require root — anything that does is an init-ordering bug. Immediately after dropping, verify with getuid() != 0.
 
 **Permanent-root exception:** allowed only for project-defined cases such as firewall control, packet capture, TUN/TAP/VPN, mount/filesystem management, package/service management, or other ongoing kernel/device operations.
 
@@ -11443,6 +11443,8 @@ PHASE 5: Server startup (actual server start)
    ├─ {backup_dir}  (see PART 8 get_backup_dir - /mnt/Backups/... if writable, else {data_dir}/backup/ in system mode)
    └─ Never resolve ~/$HOME again after step 8h — the service account's HOME is {data_dir}
 
+7b. IF ROOT AND {data_dir}/update/ holds a staged update: verify and apply it NOW, before any other root-phase work, then re-execute the new binary (see "Update Privileges")
+
 8. IF RUNNING AS ROOT - setup system resources BEFORE dropping privileges:
    a. Check/create system user:
       ├─ User {project_name} exists → use it
@@ -11619,6 +11621,7 @@ PHASE 5: Server startup (actual server start)
 |------|---------|-----|
 | 6. Determine context | any | First thing - detect if root, container, etc. |
 | 7. Resolve paths | any | Resolved ONCE and cached — mode locked from start EUID; never re-derived after 8h |
+| 7b. Apply staged update | **root** | Only root may replace the installed binary ("Update Privileges") |
 | **IF ROOT (step 8):** | | |
 | 8a. Create system user | **root** | Only root can create system users |
 | 8b. Create directories | **root** | Only root can create /etc/, /var/lib/, etc. |
@@ -36175,46 +36178,48 @@ User Notification Preferences (/users/settings/notifications)
 
 ## Configuration
 
-```toml
-[server.notifications]
+```yaml
+server:
+  notifications:
 
-[server.notifications.webui]
-# top-right, top-left, bottom-right, bottom-left
-position = "top-right"
-# seconds (0 = manual dismiss)
-duration = 5
+    webui:
+      # top-right, top-left, bottom-right, bottom-left
+      position: "top-right"
+      # seconds (0 = manual dismiss)
+      duration: 5
 
-[server.notifications.email.smtp]
-# If empty: autodetect local SMTP on startup
-# If set: test connection on startup
-host = ""
-port = 587
-username = ""
-password = ""
-# TLS mode: auto, starttls, tls, none
-tls = "auto"
+    email:
+      smtp:
+        # If empty: autodetect local SMTP on startup
+        # If set: test connection on startup
+        host: ""
+        port: 587
+        username: ""
+        password: ""
+        # TLS mode: auto, starttls, tls, none
+        tls: "auto"
 
-[server.notifications.email.from]
-# Default: app title
-name = ""
-# Default: no-reply@{fqdn}
-email = ""
+      from:
+        # Default: app title
+        name: ""
+        # Default: no-reply@{fqdn}
+        email: ""
 
-[server.notifications.email.events]
-startup = false
-shutdown = false
-backup_complete = false
-backup_failed = true
-ssl_expiring = true
-ssl_renewed = false
-ssl_renewal_failed = true
-login_alert = true
-security_alert = true
-scheduler_error = true
-password_changed = true
-token_regenerated = true
-update_available = false
-update_installed = true
+      events:
+        startup: false
+        shutdown: false
+        backup_complete: false
+        backup_failed: true
+        ssl_expiring: true
+        ssl_renewed: false
+        ssl_renewal_failed: true
+        login_alert: true
+        security_alert: true
+        scheduler_error: true
+        password_changed: true
+        token_regenerated: true
+        update_available: false
+        update_installed: true
 ```
 
 ---
@@ -36319,7 +36324,7 @@ Every project MUST include these scheduled tasks:
 | `geoip_update` | Weekly (Sunday 03:00) | Download/update ip-location-db GeoIP databases | Yes |
 | `blocklist_update` | Daily at 04:00 | Download/update IP/domain blocklists | Yes |
 | `cve_update` | Daily at 05:00 | Download/update CVE (NVD) and Trivy vulnerability databases — trivy has no separate scheduled task despite its own directory/config; this task owns it too | Yes |
-| `update_check` | Daily at 06:00 | Check release channel for a newer version — notify-only unless `update.auto_install = true` (default false); honors `update.defer_days` | Yes |
+| `update_check` | Daily at 06:00 | Check release channel for a newer version — notify-only unless `update.auto_install: true` (default false); honors `update.defer_days` | Yes |
 | `session_cleanup` | Every 15 minutes | Remove expired sessions | No |
 | `token_cleanup` | Every 15 minutes | Remove expired tokens, and used or expired simple-captcha challenges | No |
 | `log_rotation` | Daily at 00:00 | Rotate and compress old logs | No |
@@ -36332,106 +36337,106 @@ Every project MUST include these scheduled tasks:
 
 ### Task Configuration
 
-```toml
-[server.scheduler]
-# Scheduler is ALWAYS running - no enable/disable setting
-# Individual tasks can be enabled/disabled below
+```yaml
+server:
+  scheduler:
+    # Scheduler is ALWAYS running - no enable/disable setting
+    # Individual tasks can be enabled/disabled below
+    # Timezone for scheduled tasks (default: America/New_York)
+    timezone: "America/New_York"
+    # Catch-up window: run missed tasks if within this duration
+    catch_up_window: "1h"
 
-# Timezone for scheduled tasks (default: America/New_York)
-timezone = "America/New_York"
+    tasks:
+      ssl_renewal:
+        # Daily at 03:00 (after backup at 02:00)
+        schedule: "0 3 * * *"
+        enabled: true
 
-# Catch-up window: run missed tasks if within this duration
-catch_up_window = "1h"
+      geoip_update:
+        # Weekly Sunday at 03:00
+        schedule: "0 3 * * 0"
+        enabled: true
 
-[server.scheduler.tasks.ssl_renewal]
-# Daily at 03:00 (after backup at 02:00)
-schedule = "0 3 * * *"
-enabled = true
+      blocklist_update:
+        # Daily at 04:00
+        schedule: "0 4 * * *"
+        enabled: true
+        retry_on_fail: true
+        retry_delay: "1h"
 
-[server.scheduler.tasks.geoip_update]
-# Weekly Sunday at 03:00
-schedule = "0 3 * * 0"
-enabled = true
+      cve_update:
+        # Daily at 05:00
+        schedule: "0 5 * * *"
+        enabled: true
+        retry_on_fail: true
+        retry_delay: "1h"
 
-[server.scheduler.tasks.blocklist_update]
-# Daily at 04:00
-schedule = "0 4 * * *"
-enabled = true
-retry_on_fail = true
-retry_delay = "1h"
+      update_check:
+        # Daily at 06:00 (after cve_update at 05:00) - check-only unless update.auto_install is true
+        schedule: "0 6 * * *"
+        enabled: true
 
-[server.scheduler.tasks.cve_update]
-# Daily at 05:00
-schedule = "0 5 * * *"
-enabled = true
-retry_on_fail = true
-retry_delay = "1h"
+      session_cleanup:
+        # Every 15 minutes
+        schedule: "@every 15m"
+        enabled: true
 
-[server.scheduler.tasks.update_check]
-# Daily at 06:00 (after cve_update at 05:00) - check-only unless update.auto_install is true
-schedule = "0 6 * * *"
-enabled = true
+      token_cleanup:
+        # Every 15 minutes
+        schedule: "@every 15m"
+        enabled: true
 
-[server.scheduler.tasks.session_cleanup]
-# Every 15 minutes
-schedule = "@every 15m"
-enabled = true
+      log_rotation:
+        # Daily at midnight
+        schedule: "0 0 * * *"
+        enabled: true
+        # Delete logs older than 30 days
+        max_age: "30d"
+        # Rotate when log exceeds 100MB
+        max_size: "100MB"
+        compress: true
 
-[server.scheduler.tasks.token_cleanup]
-# Every 15 minutes
-schedule = "@every 15m"
-enabled = true
+      backup_daily:
+        # Daily backup at 02:00 (admin can disable)
+        schedule: "0 2 * * *"
+        enabled: true
+        # Verify after creation (all checks must pass)
+        verify: true
 
-[server.scheduler.tasks.log_rotation]
-# Daily at midnight
-schedule = "0 0 * * *"
-enabled = true
-# Delete logs older than 30 days
-max_age = "30d"
-# Rotate when log exceeds 100MB
-max_size = "100MB"
-compress = true
+        # Creates: {project_name}_backup_YYYY-MM-DD.tar.gz[.enc] (full)
+        #          {project_name}_backup_YYYY-MM-DD_HHMMSS.tar.gz[.enc] (manual/timestamped)
+        #          {project_name}-daily.tar.gz[.enc] (incremental)
+        retention:
+          # 1-365: daily full backups to keep
+          max_backups: 1
+          # 0-52: Sunday backups (0 = disabled)
+          keep_weekly: 0
+          # 0-12: 1st of month backups (0 = disabled)
+          keep_monthly: 0
+          # 0-10: January 1st backups (0 = disabled)
+          keep_yearly: 0
+          # Percent of backup volume (e.g., "10%") or absolute (e.g., "50G"); "0" = disabled
+          max_total_size: "10%"
 
-[server.scheduler.tasks.backup_daily]
-# Daily backup at 02:00 (admin can disable)
-schedule = "0 2 * * *"
-enabled = true
-# Verify after creation (all checks must pass)
-verify = true
-# Creates: {project_name}_backup_YYYY-MM-DD.tar.gz[.enc] (full)
-#          {project_name}_backup_YYYY-MM-DD_HHMMSS.tar.gz[.enc] (manual/timestamped)
-#          {project_name}-daily.tar.gz[.enc] (incremental)
+      backup_hourly:
+        # Hourly incremental backup (disabled by default)
+        schedule: "@hourly"
+        enabled: false
 
-[server.scheduler.tasks.backup_daily.retention]
-# 1-365: daily full backups to keep
-max_backups = 1
-# 0-52: Sunday backups (0 = disabled)
-keep_weekly = 0
-# 0-12: 1st of month backups (0 = disabled)
-keep_monthly = 0
-# 0-10: January 1st backups (0 = disabled)
-keep_yearly = 0
-# Percent of backup volume (e.g., "10%") or absolute (e.g., "50G"); "0" = disabled
-max_total_size = "10%"
+        # Creates: {project_name}-hourly.tar.gz[.enc] (incremental since daily)
+        # Always 1 file (replaced each hour)
+      healthcheck_self:
+        # Every 5 minutes
+        schedule: "@every 5m"
+        enabled: true
 
-[server.scheduler.tasks.backup_hourly]
-# Hourly incremental backup (disabled by default)
-schedule = "@hourly"
-enabled = false
-# Creates: {project_name}-hourly.tar.gz[.enc] (incremental since daily)
-# Always 1 file (replaced each hour)
-
-[server.scheduler.tasks.healthcheck_self]
-# Every 5 minutes
-schedule = "@every 5m"
-enabled = true
-
-[server.scheduler.tasks.tor_health]
-# Every 10 minutes (only runs if Tor installed)
-schedule = "@every 10m"
-enabled = true
-# Auto-restart if unhealthy
-restart_on_fail = true
+      tor_health:
+        # Every 10 minutes (only runs if Tor installed)
+        schedule: "@every 10m"
+        enabled: true
+        # Auto-restart if unhealthy
+        restart_on_fail: true
 ```
 
 ### Schedule Format
@@ -36506,7 +36511,7 @@ In cluster mode, tasks are distributed to prevent duplicate execution:
 - `geoip_update`
 - `blocklist_update`
 - `cve_update`
-- `update_check` (the check and notification run once; with `auto_install = true` the install is rolled out node-by-node — never all nodes at once, so the cluster stays available)
+- `update_check` (the check and notification run once; with `auto_install: true` the install is rolled out node-by-node — never all nodes at once, so the cluster stays available)
 
 **Local Tasks (run on each node — every node maintains its own valid backups per the Cluster Backup Rules below):**
 - `session_cleanup`
@@ -39123,18 +39128,17 @@ POST /api/{api_version}/server/{admin_path}/backup/restore
 
 ## Update Configuration
 
-```toml
-[server.update]
-# Release channel: stable | beta | devel (also settable via --update branch)
-branch = "stable"
-
-# Auto-install updates found by the update_check task
-# Default OFF: the task only notifies; installing is always an explicit operator decision
-auto_install = false
-
-# Defer window in days (0-365): a release is only eligible once it is this many days old
-# 30 = adopt releases only after they have been public for 30 days; 0 = immediately
-defer_days = 0
+```yaml
+server:
+  update:
+    # Release channel: stable | beta | devel (also settable via --update branch)
+    branch: "stable"
+    # Auto-install updates found by the update_check task
+    # Default OFF: the task only notifies; installing is always an explicit operator decision
+    auto_install: false
+    # Defer window in days (0-365): a release is only eligible once it is this many days old
+    # 30 = adopt releases only after they have been public for 30 days; 0 = immediately
+    defer_days: 0
 ```
 
 **`--update branch {name}` writes `update.branch` to the config file — the config is the single source of truth; there is no separate CLI-side state.**
@@ -39168,8 +39172,8 @@ defer_days = 0
 
 | Setting | Behavior |
 |---------|----------|
-| `auto_install = false` (default) | Notify only — fires the "Update available" event; never touches the binary |
-| `auto_install = true` | Runs the full `--update yes` flow during the task run — eligible releases only |
+| `auto_install: false` (default) | Notify only — fires the "Update available" event; never touches the binary |
+| `auto_install: true` | Stages an eligible release; a root-started server restarts and installs it as root, any other server only notifies ("Update Privileges") |
 
 **Surfacing rules:**
 
@@ -39191,6 +39195,25 @@ defer_days = 0
 4. Replace running binary (PLATFORM-SPECIFIC)
 5. Restart service or re-exec
 ```
+
+### Update Privileges
+
+**Who may install an update is decided by how the process STARTED, not by what it is now: `startedElevated` (PART 8 → `GetBackupDir`) is captured before the privilege drop and never re-evaluated. The binary is only ever replaced by a root process, never by the dropped service user.**
+
+| Server started as | What `auto_install: true` does |
+|-------------------|--------------------------------|
+| root / Administrator (Unix) | Stage, restart, swap as root (below) |
+| A normal user (user mode, user service) | Installs nothing: behaves as `auto_install: false`. It fires the "Update available" event to the Server Admins with the manual command (`{project_name} --update yes`, with `sudo` for a system install) and records `update.install_skipped` (reason `not_elevated`, version only) in `audit.log` |
+| Windows service | Installs nothing (the service account cannot write the install directory): notify only, with the manual command run from an elevated prompt |
+
+**Stage, restart, swap (started as root):**
+
+1. The `update_check` task, running as the service user, performs steps 1 to 3 of the Update Flow into `{data_dir}/update/` (`{project_name}.new` and its SHA256) and records `update.staged` (version only).
+2. The server shuts down gracefully (PART 8 → shutdown) and exits with code `75` (`EX_TEMPFAIL`), a failure exit, so the supervisor restarts it.
+3. The restart runs as root. Startup step 7b verifies the SHA256 again, checks that the staged version is newer than the running one, runs `replaceBinary()` (step 4), deletes `{data_dir}/update/` and re-executes the new binary (step 5), which continues at step 6 as the new version.
+4. Any failure (bad checksum, rename error): the staged files are deleted, the old binary keeps running, `update.failed` is recorded and the Server Admins get the "Update failed" notification. The same version is not staged again until the next release.
+
+**Restart support:** systemd (`Restart=on-failure`), launchd (`KeepAlive`), runit and s6 restart the service after exit `75`. OpenRC, SysV and rc.d do not supervise it: the staged update waits for the next start (boot or `--service restart`) and the Server Admins get "Update staged: restart to apply". In a cluster the rollout stays node-by-node.
 
 ### Platform-Specific Binary Replacement
 
@@ -40608,6 +40631,7 @@ Wants=network-online.target
 Type=simple
 ExecStart=/usr/local/bin/{project_name}
 Restart=on-failure
+# Exit code 75 after a staged update is a failure exit, so on-failure restarts the service (as root, which applies the update)
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
