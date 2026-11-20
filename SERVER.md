@@ -16220,13 +16220,13 @@ Clear-Site-Data: "cache", "cookies", "storage"
 
 | Set | Features | Value |
 |-----|----------|-------|
-| **Locked** (default) | `accelerometer`, `ambient-light-sensor`, `battery`, `camera`, `display-capture`, `geolocation`, `gyroscope`, `hid`, `idle-detection`, `magnetometer`, `microphone`, `midi`, `screen-wake-lock`, `serial`, `usb`, `xr-spatial-tracking` | `()` |
-| **Tracking proposals** | `attribution-reporting`, `browsing-topics`, `interest-cohort` | `()` ALWAYS, even if `IDEA.md` asks for them (PART 11 → "Public Endpoint Safety Principle") |
-| **Used by the spec itself** | `autoplay`, `encrypted-media`, `fullscreen`, `payment`, `picture-in-picture`, `publickey-credentials-get` (WebAuthn and Passkeys), `storage-access`, `web-share` | `(self)` |
+| **Locked** (default) | `accelerometer`, `camera`, `display-capture`, `geolocation`, `gyroscope`, `hid`, `idle-detection`, `magnetometer`, `microphone`, `midi`, `screen-wake-lock`, `serial`, `usb`, `xr-spatial-tracking` | `()` |
+| **Tracking proposals** | `attribution-reporting`, `browsing-topics` | `()` ALWAYS, even if `IDEA.md` asks for them (PART 11 → "Public Endpoint Safety Principle") |
+| **Used by the spec itself** | `autoplay`, `encrypted-media`, `fullscreen`, `payment`, `picture-in-picture`, `publickey-credentials-get` (WebAuthn and Passkeys), `storage-access` | `(self)` |
 
 **Project declaration:** a locked feature becomes `(self)` only when the project's `IDEA.md` declares that it uses it, with one flag per feature named `uses_{feature}` (hyphens become underscores): `"uses_geolocation": true`, `uses_camera`, `uses_microphone`, `uses_display_capture`, and so on. A declared feature is therefore always enabled, and an undeclared one is always locked; an operator cannot flip either.
 
-**Generation rule:** the binary joins the features into one `feature1=value1, feature2=value2, …` string. Unknown feature names (a browser that does not support them yet) are emitted anyway, because non-supporting browsers ignore them harmlessly.
+**Generation rule:** the binary joins the features into one `feature1=value1, feature2=value2, …` string. Only feature names that current Chromium, Firefox and Safari recognize are emitted: a name Chromium does not recognize (`ambient-light-sensor`, `battery`, `web-share`, `interest-cohort`) makes it log `Unrecognized feature` in the console on every page, so those four are never in the header (a feature omitted from `Permissions-Policy` keeps the browser default, which for these is already restricted or unavailable). A test loads a page in headless Chromium and fails on any `Unrecognized feature` console message.
 
 **In development mode, headers are issued unchanged — but CSP runs in `Content-Security-Policy-Report-Only` mode (see below) so violations are logged without breaking the app.**
 
@@ -31956,7 +31956,7 @@ pub fn tracking_script(headers: &HeaderMap, cfg: &Config) -> askama::MarkupDispl
 | Accuracy statement | Checkbox | No, but required when Type is `dmca` | "The information is accurate and, under penalty of perjury, I am the owner or authorized to act for the owner" | null |
 | Signature | Text | No, but required when Type is `dmca` | Typed full legal name, which acts as the electronic signature | 100 |
 | Request kind | Dropdown | No, but required when Type is `privacy` | `access`, `export`, `deletion`, `correction`, `opt_out`, `other` | null |
-| Captcha | Captcha | Yes | Spam prevention - rendered on the initial form and required on EVERY submission (anonymous form: no failed-attempt state exists). Single-use; a new challenge is issued after each submit, failed or not | null |
+| Captcha | Captcha | Yes | Spam prevention - rendered on the initial form and required on EVERY `submit` (step 1; anonymous form: no failed-attempt state exists). The `confirm` step (step 2) does NOT repeat it: the signed `review_token` is issued only after the captcha passed. Single-use; a new challenge is issued after each submit, failed or not | null |
 | Website (honeypot) | Text, hidden | No, must stay EMPTY | Antispam trap, see "Contact antispam" below. Never shown to a person; a filled value is dropped silently | 200 |
 | Form token | Hidden | Yes | Signed, single-use token (render time plus nonce), see "Contact antispam" below; the API `GET` returns it and the `POST` echoes it | 128 |
 | Step | Hidden | No (default `submit`) | `submit`, `confirm` or `edit`: the review flow in "Contact antispam" | 10 |
@@ -32049,7 +32049,7 @@ CREATE INDEX IF NOT EXISTS idx_captcha_challenges_expires ON captcha_challenges(
 | Step | What happens |
 |------|--------------|
 | **1. `submit`** | Layers 1 to 4 and 6 run. Layer 5 is CHECKED here (an IP already over its limit gets `429`) but not counted. On success nothing is delivered: the server renders the review (below) and issues a `review_token` |
-| **2. `confirm`** | The client repeats every field with `step=confirm`, the `review_token` and `confirmed` checked. The server verifies the token, then layers 1 and 5 (counted now) and 7, and only then delivers |
+| **2. `confirm`** | The client repeats every field with `step=confirm`, the `review_token` and `confirmed` checked. The server verifies the token, then layers 1 and 5 (counted now) and 7, and only then delivers. Layer 4 is NOT repeated: a valid `review_token` proves the captcha passed at step 1 |
 | **`edit`** | The review's Edit button posts `step=edit` and gets the form back with its values and a fresh `form_token` |
 
 **Review token:** `{issued_at}.{nonce}.{flags}.{hex HMAC-SHA256}` over `contact-review\|{issued_at}\|{nonce}\|{flags}\|{SHA-256 of the normalized fields}` keyed with `installation_secret`. It is stateless, so any node can verify it, and because it covers a hash of every field, nothing can be changed between the two steps. It is accepted only when its age is between `review_min_seconds` and `review_max_seconds`, its nonce is unused (single-use, same bounded in-memory set), and `confirmed` is true; anything else re-renders the review with a fresh token and the message "Please read the details and confirm". `flags` carries `d` when step 1 hit the honeypot: the review still renders exactly as normal, and step 2 returns the normal success response and delivers nothing.
@@ -33884,7 +33884,6 @@ Admin Panel Header:
 
 | Setting | Control | Default | Restart | Description |
 |---------|---------|---------|---------|-------------|
-| `scheduler.enabled` | Toggle | On | No | Enable scheduler |
 | Task rows with: | | | | |
 | - Task name | Readonly | - | - | Task identifier |
 | - Enabled | Toggle | varies | No | Enable/disable task |
@@ -33918,10 +33917,9 @@ Admin Panel Header:
 | Setting | Control | Default | Restart | Description |
 |---------|---------|---------|---------|-------------|
 | `geoip.enabled` | Toggle | On | No | Enable GeoIP lookups |
-| `geoip.auto_update` | Toggle | On | No | Auto-update databases |
-| `geoip.update_schedule` | Text | `0 3 * * *` | No | Update cron schedule |
 | `geoip.deny_countries` | Tags | (empty) | No | Block these countries (ISO 3166-1 alpha-2) |
 | `geoip.allow_countries` | Tags | (empty) | No | Allow ONLY these countries (overrides deny) |
+| Update schedule | Readonly | - | - | Shown from the `geoip_update` scheduler task; it is changed on the Scheduler page, never here |
 | Database status | Readonly | - | - | Last update, size |
 
 #### Blocklists Section (`/server/{admin_path}/network/blocklists`)
@@ -42070,7 +42068,7 @@ docker/
 | Meta labels | All OCI labels (see below) |
 | Required packages | git, curl, bash, tini, tor, i2pd, tzdata, ca-certificates |
 | Image contract | EVERY image the project ships (release, `:devel`, the all-in-one Debian image, any variant) installs `bash`, `curl`, `tor`, `i2pd`, `tini`, `tzdata` and `ca-certificates` in its FINAL stage. `tor` and `i2pd` are installed even though I2P is opt-in: a missing package is an image bug, never a runtime fallback. A project may ADD packages and never remove these |
-| Image check | After every build, CI and `tests/docker.sh` run `docker run --rm --entrypoint sh {image} -c 'for c in bash curl tor i2pd tini; do command -v "$c" || exit 1; done'` and fail on any missing command; the container's `/server/healthz` must then report `features.tor.status` `healthy` (never `unavailable`) within `server.tor.startup_timeout` |
+| Image check | After every build, CI and `tests/docker.sh` run `docker run --rm --entrypoint sh {image} -c 'for c in bash curl tor i2pd tini; do command -v "$c" || exit 1; done'` and fail on any missing command; the container's `/server/healthz` must then report `features.tor.status` `healthy` (never `unavailable`) within `server.tor.bootstrap_timeout` (default 180 seconds): it is `starting` while Tor bootstraps and becomes `healthy` only once the hidden service address exists, so the check waits for the bootstrap timeout, not the shorter `startup_timeout` |
 | Tor handling | Installed but **binary controls** (see PART 32) |
 | Binary location | `/usr/local/bin/{project_name}` |
 | Entrypoint script | `/usr/local/bin/entrypoint.sh` |
@@ -53487,7 +53485,7 @@ impl Service {
 
 ### torrc Configuration for Outbound
 
-When `use_network` or `allow_user_preference` is enabled, the torrc includes `SocksPort auto` for outbound connections. Otherwise `SocksPort 0` disables outbound.
+When `use_network` or `allow_user_preference` is enabled, the torrc includes `SocksPort 127.0.0.1:auto` for outbound connections. Otherwise `SocksPort 0` disables outbound.
 
 **See full `get_tor_config()` implementation in the Implementation section below.**
 
@@ -54033,7 +54031,7 @@ async fn wait_for_bootstrap(control_port_path: &Path, timeout: Duration) -> Resu
 }
 
 /// Reads the live SOCKS listener address via `GETINFO net/listeners/socks`.
-/// Used instead of a hardcoded port because `SocksPort auto` picks a random
+/// Used instead of a hardcoded port because `SocksPort 127.0.0.1:auto` picks a random
 /// available port at startup.
 async fn read_socks_addr(control_port_path: &Path) -> Result<String, AppError> {
     let mut stream = open_control_conn(control_port_path, Duration::from_secs(10)).await?;
@@ -54125,7 +54123,7 @@ async fn read_onion_hostname(hs_dir: &Path) -> Result<String, AppError> {
 
 **SocksPort configuration:**
 - `SocksPort 0` - hidden service only (no outbound)
-- `SocksPort auto` - enable outbound connections via SOCKS5 proxy
+- `SocksPort 127.0.0.1:auto` - enable outbound connections via SOCKS5 proxy
 
 ### Tor Configuration Optimizations
 
@@ -54145,7 +54143,7 @@ async fn read_onion_hostname(hs_dir: &Path) -> Result<String, AppError> {
 /// carrying the per-rendezvous-circuit ID to each backend connection.
 ///
 /// PORT DETECTION: All ports use runtime detection via "auto" — never saved/hardcoded.
-/// - `SocksPort auto`: Tor picks an available high port at startup
+/// - `SocksPort 127.0.0.1:auto`: Tor picks an available high port at startup
 /// - `ControlPort 127.0.0.1:auto`: Tor picks an available high port on all OSes
 /// - `ControlPortWriteToFile {data_dir}/tor/control_port`: Tor writes the chosen
 ///   `127.0.0.1:{port}` address there; helpers read this file to connect
@@ -54167,7 +54165,7 @@ pub fn get_tor_config(cfg: &TorConfig, data_dir: &Path, tor_backend_port: u16, v
 
     // SocksPort: enabled for outbound connections, disabled for hidden service only
     let socks_config = if cfg.use_network || cfg.allow_user_preference {
-        "SocksPort auto"
+        "SocksPort 127.0.0.1:auto"
     } else {
         "SocksPort 0"
     };
@@ -54271,7 +54269,7 @@ HiddenServiceExportCircuitID haproxy
 
 **Runtime Port Detection:**
 - Ports are NEVER hardcoded or saved - always detected at runtime
-- `SocksPort auto` → Tor picks available high port, read from control connection after startup
+- `SocksPort 127.0.0.1:auto` → Tor picks available high port, read from control connection after startup
 - `ControlPort 127.0.0.1:auto` → Tor picks available high port on localhost
 - `ControlPortWriteToFile {data_dir}/tor/control_port` → Tor writes the chosen control address; server reads this file before connecting
 
@@ -55401,7 +55399,7 @@ Find i2pd binary:
    └─ NOT FOUND: fall back to SAM (Model B); if SAM unreachable, disable I2P
 ```
 
-**Why a dedicated i2pd process (Model A)?** Same rationale as Tor: isolation from any system I2P router, app-owned lifecycle (i2pd starts/stops with the server), and full control over the server-tunnel definition and key location.
+**Why a dedicated i2pd process (Model A)?** Same rationale as Tor: isolation from any system I2P router, app-owned lifecycle (i2pd starts/stops with the server), and full control over the SAM session and forward definition (there is no i2pd server tunnel: `tunnels.conf` and `tunnels.d/` stay empty) and key location.
 
 **i2pd logging:** i2pd logs to `{log_dir}/i2pd.log` at `warn` level by default (configurable). Model B logging is owned by the external router.
 
@@ -55690,7 +55688,7 @@ fn provider_name(p: I2PProvider) -> &'static str {
 ┌─────────────────────────────────────────────────────────────────────┐
 │ I2P Network                                                         │
 └─────────────┬───────────────────────────────────────────────────────┘
-              │ forwards to (via server tunnel / SAM STREAM FORWARD)
+              │ forwards to (via SAM STREAM FORWARD)
               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ Provider:  Model A i2pd process   |   Model B external SAM router   │
