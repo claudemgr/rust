@@ -708,6 +708,7 @@ let cache_size = (avail_mem / 10)
 | **NEVER use Makefile in CI** | Workflows have explicit commands with all env vars |
 | **GitHub/Gitea/Jenkins must match** | Same platforms, same env vars, same logic |
 | **VERSION precedence** | CI release = pushed tag with `v` stripped; CI devel = short commit id; CI beta = `YYYYMMDDHHMMSS-beta`; CI never reads `release.txt`; local Makefile builds = `VERSION` env (user override, AI never sets it) > non-empty `release.txt` > devel rule (short commit id, `devel` outside git) |
+| **Generated text is fully expanded** | Release notes, release names and descriptions, asset names and links, labels and any other text a workflow generates MUST contain real values, never a literal `${VAR}`, `${{ … }}` or a spec placeholder such as `{project_name}`. Shell: build a file with an unquoted heredoc or `printf` (a quoted heredoc is only for text that must stay literal). GitHub/Gitea/Forgejo YAML values use `${{ env.X }}`; shell `${X}` is not expanded there. GitLab keywords outside `script:` (`release:` name, description and assets, `artifacts:paths`) expand only `$VAR` / `${VAR}`, never `${VAR:0:7}` or `${VAR#v}`: compute the value in an upstream job and pass it with a dotenv report. Jenkins: Groovy `"…"` strings interpolate, `'…'` strings do not. Any workflow that builds its own notes or description file runs the guard step below before publishing |
 | **RUSTFLAGS** | `-C strip=symbols -C link-arg=-s` (rustc flags only); `--release --target {target}` go on the cargo command line, not in RUSTFLAGS |
 | **Docker builds on EVERY push** | Any branch push triggers Docker image build |
 | **Docker tags** | Any push → `{commit_id}`; beta → adds `beta`; tag → `{version}`, `latest`, `{yymm}`, `{commit_id}`; `devel` is built by the `build-devel` job inside the same `docker.yml` workflow (schedule + push to `main`/`master`, gated by `if:`) — never a separate file |
@@ -866,6 +867,17 @@ echo "::error file=.github/workflows/release.yml,line=12::message tied to a sour
 ```
 
 Always write messages so a developer reading only the step name + message understands what failed and what to do next.
+
+**Generated-text guard.** A workflow that builds its own notes or description file checks it before publishing, so an unexpanded variable can never reach a release:
+
+```yaml
+- name: Guard generated text
+  run: |
+    if grep -nE '\$\{|\{\{|\{(project_name|project_org|version)\}' RELEASE_NOTES.md; then
+      echo "::error::RELEASE_NOTES.md still contains an unexpanded variable or placeholder. Build it with an unquoted heredoc or printf so shell variables expand."
+      exit 1
+    fi
+```
 
 ### Release Pre-flight Validation
 
@@ -46702,6 +46714,7 @@ build:devel:
     # Devel identity is the commit, not a timestamp - a devel build IS its commit
     - export VERSION="${CI_COMMIT_SHA:0:7}"
     - export COMMIT_ID="${CI_COMMIT_SHA:0:7}"
+    - echo "RELEASE_VERSION=${COMMIT_ID}" > release.env
     # BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
     - export BUILD_EPOCH="$(date -u +%s)"
     - export BUILD_DATE="$(date -u -d @${BUILD_EPOCH} +"%Y-%m-%dT%H:%M:%SZ")"
@@ -46735,6 +46748,8 @@ build:devel:
   artifacts:
     paths:
       - ${PROJECT_NAME}-*
+    reports:
+      dotenv: release.env
     expire_in: 1 day
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
@@ -46777,8 +46792,8 @@ release:devel:
     expire_in: 1 day
   release:
     tag_name: "devel"
-    name: "Devel Build ${CI_COMMIT_SHA:0:7}"
-    description: "Devel build: ${CI_COMMIT_SHA:0:7}"
+    name: "Devel Build ${RELEASE_VERSION}"
+    description: "Devel build: ${RELEASE_VERSION}"
     assets:
       links:
         - name: "${PROJECT_NAME}-linux-amd64"
@@ -46797,8 +46812,8 @@ release:devel:
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/${PROJECT_NAME}-freebsd-amd64?job=build:devel"
         - name: "${PROJECT_NAME}-sbom.cdx.json"
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/${PROJECT_NAME}-sbom.cdx.json?job=build:devel"
-        - name: "${PROJECT_NAME}-${CI_COMMIT_SHA:0:7}-source.tar.gz"
-          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/${PROJECT_NAME}-${CI_COMMIT_SHA:0:7}-source.tar.gz?job=release:devel"
+        - name: "${PROJECT_NAME}-${RELEASE_VERSION}-source.tar.gz"
+          url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/${PROJECT_NAME}-${RELEASE_VERSION}-source.tar.gz?job=release:devel"
         - name: "sha256.txt"
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_SHA}/raw/sha256.txt?job=release:devel"
         - name: "sha512.txt"
