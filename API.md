@@ -3064,7 +3064,7 @@ Getting code correct on the first try is much harder than iterating with feedbac
 
 **Title Format:**
 ```
-all todo items have been completed
+✅ all todo items have been completed ✅
 ```
 
 **Body Format:**
@@ -3080,7 +3080,7 @@ All tasks from TODO.AI.md have been completed.
 
 **Example:**
 ```
-all todo items have been completed
+✅ all todo items have been completed ✅
 
 All tasks from TODO.AI.md have been completed.
 
@@ -3093,18 +3093,19 @@ Implemented core server functionality and API.
 ```
 
 **TODO Completion Rules:**
-- Title is EXACTLY: `all todo items have been completed`
+- The ✅ emoji MUST be used for todo completion commits
+- Title is EXACTLY: `✅ all todo items have been completed ✅`
 - Body MUST summarize what was accomplished
 - **Commit sequence (one order, no alternatives):** (1) implement a task and commit it normally; its item is still in TODO.AI.md. (2) After that commit succeeds, delete the item from TODO.AI.md. (3) The deletion is committed together with the next task. (4) The commit that deletes the LAST item uses the ✅ title and body above, so the file is empty only in that commit and an item never disappears before the commit that resolved it
 
 **Format Rules:**
-- Title line: max 64 characters
+- Title line: max 64 characters (including emojis)
 - Blank line after title
 - Detailed description follows
 - Use bullet points for multiple changes
 - Be specific about what changed and why
 
-**This completion ritual applies ONLY to TODO.AI.md.** The human-owned `TODO.md` is never emptied or truncated by AI — AI may only mark individual items done in place.
+**This completion ritual applies ONLY to TODO.AI.md.** The human-owned `TODO.md` is never emptied or truncated by AI — AI may only mark individual items done in place. The ✅ commit format is also reserved for TODO.AI.md completion.
 
 ## Where Findings Are Tracked
 
