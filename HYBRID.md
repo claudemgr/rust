@@ -167,7 +167,7 @@ Free-form prose. This is the human-readable elevator pitch.)
 
 (All project variables in `key: value` form. Values are the canonical source used to
 resolve placeholders referenced in AI.md. Required keys at minimum: `project_name`, `project_org`,
-`internal_name`, `internal_org`. Add more as the project needs — `app_name`, `official_site`,
+`internal_name`, `internal_org`. Add more as the project needs — `app_name`, `official_site` (only when the user supplies it — never invented),
 `maintainer_name`, `maintainer_email`, etc. Use lower_snake_case for keys.)
 
 Example:
@@ -179,7 +179,7 @@ Example:
     # STABLE — set at first-time setup; change only on an explicit rename or fork reset
     internal_org:  casjay
     app_name:      jokes
-    official_site: https://jokes.example.com
+    # official_site is OPTIONAL: add it only when the user gives the real URL; omit the key otherwise
     # Optional UI labels (defaults: item / items)
     resource_label: joke
     resource_label_plural: jokes
@@ -1271,7 +1271,7 @@ There is deliberately no application-level multi-user account system, no organiz
 |-------|-------|
 | **Name** | {project_name} |
 | **Organization** | {project_org} |
-| **Official Site** | `{official_site}` (e.g. `https://{project_name}.example.com`) |
+| **Official Site** | `{official_site}` when defined; omitted otherwise |
 | **Repository** | {PLATFORM_REPO_URL} |
 | **README** | README.md |
 | **License** | MIT > LICENSE.md |
@@ -5636,7 +5636,7 @@ COMMIT_ID := $(shell git rev-parse --short=7 HEAD 2>/dev/null || echo "N/A")
 # Official site URL (OPTIONAL - never guess or assume)
 # Sources (in order of precedence):
 #   1. File: site.txt in project root (single line, URL only)
-#   2. Environment variable: OFFICIAL_SITE=https://example.com
+#   2. Environment variable: OFFICIAL_SITE=<url>
 #   3. Empty (self-hosted projects - users must use --server flag)
 OFFICIAL_SITE := $(shell [ -f site.txt ] && cat site.txt || echo "${OFFICIAL_SITE:-}")
 
@@ -7193,12 +7193,12 @@ jobs:
 
 - Optional single-line URL file in project root
 - Use it for the official site, homepage, docs root, support page, or update landing page
-- Never guess it — if not present, client/CLI users must always specify a `--server` flag
+- Never guess it — if not present, client/CLI users must always specify a `--server` flag; never derive it from the project name, org, FQDN or a git remote, and never write an `example.com` or placeholder host into it or into `official_site`. Unset means unset: no key, no file, empty `OFFICIAL_SITE`, empty embedded `OfficialSite`
 - If `site.txt` exists, it wins over `IDEA.md`, README, environment variables, and CI secrets
 - If `site.txt` and `IDEA.md` disagree, `site.txt` wins; update IDEA.md to match or remove the stale variable
 - Sources checked in order: (1) `site.txt` in project root, (2) environment variable `OFFICIAL_SITE=https://example.com`, (3) CI/CD secrets (repository secrets), (4) empty (self-hosted projects)
 
-**Example:**
+**Illustration only** (`example.com` is a reserved documentation domain; never write it into a project):
 ```
 https://api.example.com
 ```
@@ -7275,7 +7275,7 @@ Every binary MUST have these values embedded at build time:
 | `CommitID` | `a1b2c3d` | Git short commit hash |
 | `BUILD_EPOCH` | `1765112713` | Unix build timestamp (seconds, UTC) — the single captured time source; used by the updater's devel-channel check |
 | `BuildDate` | `2025-12-04T13:05:13Z` | Build timestamp (ISO 8601 / RFC 3339 UTC) — derived from `BUILD_EPOCH` by build systems (`date -u -d @$BUILD_EPOCH ...`) or in-app via `build_date()`; never embedded as its own `APP_*` value |
-| `OfficialSite` | `https://api.example.com` | Default server URL (empty if self-hosted) |
+| `OfficialSite` | the user's URL, or empty | Default server URL (empty when no official site is defined) |
 
 **Rust code requirement** (in `src/main.rs` or `src/version.rs`):
 
@@ -47129,7 +47129,7 @@ internal_org:     {project_org}
 app_name:         {App/Server Display Name}
 # omit if same as project_name
 crate_name:       {project_name}
-official_site:    {full URL with scheme, e.g., https://example.com — or empty}
+official_site:    {full URL with scheme as the user gave it — or empty (the default; never invented)}
 maintainer_name:  {Maintainer Name — defaults to {project_org} if unset}
 maintainer_email: {maintainer@example.com — or empty; used only if set}
 
