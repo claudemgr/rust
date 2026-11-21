@@ -36856,6 +36856,8 @@ If signing or attestation is required but keys/permissions are unavailable, stop
 
 **Tag release auto-cancel policy:** Tag-only release workflows like `release.yml` MUST also use workflow concurrency, but only per exact tag ref. A newer run for `refs/tags/v1.2.3` should cancel the older `refs/tags/v1.2.3` run. A run for `v1.2.4` must NOT cancel `v1.2.3`.
 
+**Pull requests and merges:** a pull request runs `ci.yml` only (build, test, lint, coverage, secret scan, workflow policy) — it never publishes an image or a release, and a fork PR receives no secrets. Merging into `main`/`master` is simply a push to that branch, so the merge triggers `ci.yml`, `devel.yml` (the rolling `devel` release) and `docker.yml` (the `{commit_id}` image and the `:devel` image). Merging into `beta` triggers `beta.yml`; a stable release is a tag push, never a merge. A PR and its target branch have different refs, so their concurrency groups never cancel each other.
+
 ## Build Info Variables
 
 All workflows MUST set these environment variables:
@@ -37679,7 +37681,7 @@ jobs:
 | Push to beta branch | `beta`, `{commit_id}` |
 | Version tag (`v*`, `*.*.*`) | `{version}`, `latest`, `{yymm}` |
 
-> **Note:** `:devel` is not tagged by `build-standard`. It is built by the `build-devel` job in the same `docker.yml` workflow (below) from `docker/Dockerfile.dev`, triggered on every non-tag push and on a daily schedule.
+> **Note:** `:devel` is not tagged by `build-standard`. It is built by the `build-devel` job in the same `docker.yml` workflow (below) from `docker/Dockerfile.dev`, triggered on every push to `main`/`master` and on a daily schedule.
 
 **Notes:**
 - `{commit_id}` = short SHA (7 characters) from `git rev-parse --short=7 HEAD`
@@ -37816,7 +37818,7 @@ jobs:
             manifest:org.opencontainers.image.licenses=MIT
 
   build-devel:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'push') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -37889,7 +37891,7 @@ jobs:
 
 ```
 
-The `:devel` image is built from `docker/Dockerfile.dev` (debug tooling, alpine base) by the `build-devel` job in this same `docker.yml` workflow. It runs on every non-tag push to any branch, on a daily schedule, and on manual dispatch, so `:devel` always reflects both the latest commit and stays fresh even without new pushes. `Dockerfile.dev` sets `MODE=devel` via `ENV`; the app treats `dev`, `devel`, and `development` as synonymous valid `MODE` values. The static `:devel` tag is always overwritten — no commit-SHA or dated tags are produced by this job.
+The `:devel` image is built from `docker/Dockerfile.dev` (debug tooling, alpine base) by the `build-devel` job in this same `docker.yml` workflow. It runs on every push to `main`/`master`, on a daily schedule, and on manual dispatch from `main`/`master`, so `:devel` always reflects both the latest commit and stays fresh even without new pushes. `Dockerfile.dev` sets `MODE=devel` via `ENV`; the app treats `dev`, `devel`, and `development` as synonymous valid `MODE` values. The static `:devel` tag is always overwritten — no commit-SHA or dated tags are produced by this job.
 
 **Image Tag Summary:**
 
@@ -38839,7 +38841,7 @@ jobs:
             manifest:org.opencontainers.image.licenses=MIT
 
   build-devel:
-    if: gitea.event_name == 'schedule' || gitea.event_name == 'workflow_dispatch' || (gitea.event_name == 'push' && !startsWith(gitea.ref, 'refs/tags/'))
+    if: (gitea.event_name == 'schedule' || gitea.event_name == 'workflow_dispatch' || gitea.event_name == 'push') && (gitea.ref == 'refs/heads/main' || gitea.ref == 'refs/heads/master')
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -38916,7 +38918,7 @@ jobs:
 
 ```
 
-The `:devel` image is built by the `build-devel` job in this same `docker.yml` workflow, from `docker/Dockerfile.dev`, on every non-tag push, on a daily schedule, and on manual dispatch — mirroring the GitHub Actions design above.
+The `:devel` image is built by the `build-devel` job in this same `docker.yml` workflow, from `docker/Dockerfile.dev`, on every push to `main`/`master`, on a daily schedule, and on manual dispatch from `main`/`master` — mirroring the GitHub Actions design above.
 
 ## Variable Mapping (GitHub → Gitea → Forgejo)
 
@@ -39501,7 +39503,7 @@ docker:build:
     - if: $CI_COMMIT_BRANCH == "beta"
 
 # =============================================================================
-# DOCKER DEVEL BUILD (dedicated job — every push + daily schedule, never folded
+# DOCKER DEVEL BUILD (dedicated job — main/master push + daily schedule, never folded
 # into docker:build; builds docker/Dockerfile.dev, static :devel tag)
 # =============================================================================
 
@@ -39553,8 +39555,9 @@ docker:build:devel:
         --push \
         .
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-    - if: $CI_COMMIT_BRANCH && $CI_COMMIT_TAG == null
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
 
 ```
 
@@ -39581,7 +39584,7 @@ Create in GitLab Project → Build → Pipeline schedules:
 | Target Branch | `main` or `master` |
 | Activated | Yes |
 
-Add a second schedule (Description: `Devel Docker Build`, Interval Pattern: `0 4 * * *`, Target Branch: any push-tracked branch) so `docker:build:devel` also runs daily in addition to every push.
+Add a second schedule (Description: `Devel Docker Build`, Interval Pattern: `0 4 * * *`, Target Branch: `main`) so `docker:build:devel` also runs daily in addition to every push to `main`/`master`.
 
 ## Variable Mapping
 
@@ -40193,15 +40196,12 @@ pipeline {
         }
 
         // Docker Devel - dedicated stage, never folded into the Docker stage above;
-        // runs on every push (all branches) plus the daily cron trigger, builds
+        // runs on every push to main/master plus the daily cron trigger, builds
         // docker/Dockerfile.dev, always overwrites the static :devel tag
         stage('Docker Devel') {
             agent { label 'amd64' }
             when {
-                anyOf {
-                    expression { env.BUILD_TYPE == 'devel' }
-                    not { buildingTag() }
-                }
+                anyOf { branch 'main'; branch 'master' }
             }
             steps {
                 script {

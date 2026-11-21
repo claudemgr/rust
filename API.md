@@ -689,7 +689,7 @@ let cache_size = (avail_mem / 10)
 | **VERSION precedence** | CI release = pushed tag with `v` stripped; CI devel = short commit id; CI beta = `YYYYMMDDHHMMSS-beta`; CI never reads `release.txt`; local Makefile builds = `VERSION` env (user override, AI never sets it) > non-empty `release.txt` > devel rule (short commit id, `devel` outside git) |
 | **Build metadata** | Passed as env vars (VERSION, COMMIT_ID, BUILD_EPOCH, OFFICIAL_SITE) and embedded via `build.rs` → `option_env!("APP_*")`: version, commit ID, build epoch, official site; `BUILD_DATE` is derived from `BUILD_EPOCH` (build systems for the Docker OCI label, `build_date()` in-app) — never independently captured |
 | **Docker builds on EVERY push** | Any branch push triggers Docker image build |
-| **Docker tags** | Any push → `{commit_id}`; beta → adds `beta`; tag → `{version}`, `latest`, `{yymm}`, `{commit_id}`; `devel` = built by the `build-devel` job in `docker.yml` from `docker/Dockerfile.dev`, on every non-tag push and on a daily schedule |
+| **Docker tags** | Any push → `{commit_id}`; beta → adds `beta`; tag → `{version}`, `latest`, `{yymm}`, `{commit_id}`; `devel` = built by the `build-devel` job in `docker.yml` from `docker/Dockerfile.dev`, on every push to `main`/`master` and on a daily schedule |
 | **Workflow permissions** | Default to read-only / least privilege; grant write only to the specific release/publish job that needs it |
 | **Third-party action pinning** | External actions MUST be pinned to a full commit SHA — never float on `@main`, `@master`, or broad tags; verify runtime and maintenance status on every SHA update |
 | **Unsafe PR triggers forbidden by default** | Do NOT use `pull_request_target` for untrusted code execution, build, test, or artifact upload paths |
@@ -36071,12 +36071,14 @@ rm -rf "$TEMP_DIR"
 | `release.yml` | Tag push (`v*`, `*.*.*`) | Production releases |
 | `beta.yml` | Push to `beta` branch | Beta releases |
 | `devel.yml` | Daily at 3am UTC + push to main/master | Devel builds |
-| `docker.yml` | Version tag + any push, all branches (`build-standard` job); all branch pushes (excluding version tags) + daily cron (`build-devel` job) | Docker images (`:latest`/`:{version}`/etc. and `:devel`) |
+| `docker.yml` | Version tag + any push, all branches (`build-standard` job); pushes to `main`/`master` + daily cron (`build-devel` job) | Docker images (`:latest`/`:{version}`/etc. and `:devel`) |
 > **Note:** `ci.yml` and `release.yml` are required on every project. Rust projects never have `build-toolchain.yml` — `casjaysdev/rust:latest` is maintained externally. `beta.yml`, `devel.yml`, and `docker.yml` are project-specific optional workflows — include only when the project requires them.
 
 **Branch push auto-cancel policy:** Any workflow triggered by pushes to `main`, `master`, or `beta` MUST use workflow concurrency to cancel older in-progress runs for the same ref. This applies to branch-based CI (for example `beta.yml`, `devel.yml`, `docker.yml`, and any project-specific branch-push workflow).
 
 **Tag release auto-cancel policy:** Tag-only release workflows like `release.yml` MUST also use workflow concurrency, but only per exact tag ref. A newer run for `refs/tags/v1.2.3` should cancel the older `refs/tags/v1.2.3` run. A run for `v1.2.4` must NOT cancel `v1.2.3`.
+
+**Pull requests and merges:** a pull request runs `ci.yml` only (build, test, lint, coverage, secret scan, workflow policy) — it never publishes an image or a release, and a fork PR receives no secrets. Merging into `main`/`master` is simply a push to that branch, so the merge triggers `ci.yml`, `devel.yml` (the rolling `devel` release) and `docker.yml` (the `{commit_id}` image and the `:devel` image). Merging into `beta` triggers `beta.yml`; a stable release is a tag push, never a merge. A PR and its target branch have different refs, so their concurrency groups never cancel each other.
 
 ## Build Info Variables
 
@@ -36841,7 +36843,7 @@ jobs:
 | Push to beta branch | `beta`, `{commit_id}` |
 | Version tag (`v*`, `*.*.*`) | `{version}`, `latest`, `{yymm}` |
 
-> **Note:** `docker.yml` tags `:devel` via its `build-devel` job, built from `docker/Dockerfile.dev`, on every push (all branches, excluding version tags) and on a daily schedule — as a second job in the same workflow file as the standard-image build above.
+> **Note:** `docker.yml` tags `:devel` via its `build-devel` job, built from `docker/Dockerfile.dev`, on every push to `main`/`master` and on a daily schedule — as a second job in the same workflow file as the standard-image build above.
 
 **Notes:**
 - `{commit_id}` = short SHA (7 characters) from `git rev-parse --short=7 HEAD`
@@ -36974,7 +36976,7 @@ jobs:
 
   build-devel:
     runs-on: ubuntu-26.04
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'push') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     permissions:
       contents: read
       packages: write
@@ -37107,7 +37109,7 @@ For self-hosted runners, change `runs-on: ubuntu-26.04` to your runner label.
 | `release.yml` | Tag push (`v*`, `*.*.*`) | Production releases |
 | `beta.yml` | Push to `beta` branch | Beta releases |
 | `devel.yml` | Daily at 3am UTC + push to main/master | Devel builds |
-| `docker.yml` | Version tag + any push, all branches (`build-standard` job); all branch pushes (excluding version tags) + daily schedule (`build-devel` job) | Docker images (standard tags and `:devel`, from `Dockerfile.dev`) |
+| `docker.yml` | Version tag + any push, all branches (`build-standard` job); pushes to `main`/`master` + daily schedule (`build-devel` job) | Docker images (standard tags and `:devel`, from `Dockerfile.dev`) |
 
 ## CI Workflow (Gitea/Forgejo Actions)
 
@@ -37929,7 +37931,7 @@ jobs:
 
   build-devel:
     runs-on: ubuntu-26.04
-    if: gitea.event_name == 'schedule' || gitea.event_name == 'workflow_dispatch' || (gitea.event_name == 'push' && !startsWith(gitea.ref, 'refs/tags/'))
+    if: (gitea.event_name == 'schedule' || gitea.event_name == 'workflow_dispatch' || gitea.event_name == 'push') && (gitea.ref == 'refs/heads/main' || gitea.ref == 'refs/heads/master')
     permissions:
       contents: read
       packages: write
@@ -38006,7 +38008,7 @@ jobs:
 
 ```
 
-> **Note:** `:devel` is built by the `build-devel` job in this same `docker.yml` file, triggered on every push (all branches, excluding version tags) and on a daily schedule — mirroring the GitHub Actions `docker.yml` shown above, adapted to Gitea/Forgejo context variables.
+> **Note:** `:devel` is built by the `build-devel` job in this same `docker.yml` file, triggered on every push to `main`/`master` and on a daily schedule — mirroring the GitHub Actions `docker.yml` shown above, adapted to Gitea/Forgejo context variables.
 
 ## Variable Mapping (GitHub → Gitea → Forgejo)
 
@@ -38599,7 +38601,7 @@ docker:build:
     - if: $CI_COMMIT_BRANCH == "beta"
 
 # =============================================================================
-# DOCKER DEVEL BUILD (every push + daily schedule, from Dockerfile.dev)
+# DOCKER DEVEL BUILD (main/master push + daily schedule, from Dockerfile.dev)
 # =============================================================================
 
 docker:build-devel:
@@ -38654,8 +38656,9 @@ docker:build-devel:
         --push \
         .
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-    - if: $CI_COMMIT_BRANCH && $CI_COMMIT_TAG == null
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
 
 ```
 
@@ -39284,10 +39287,13 @@ pipeline {
             }
         }
 
-        // Docker Devel - matches docker.yml build-devel job (every push, all branches, plus daily cron above)
+        // Docker Devel - matches docker.yml build-devel job (main/master push, plus daily cron above)
         // :devel is a static tag, always built from Dockerfile.dev — never folded into the "Docker" stage above
         stage('Docker: Devel') {
             agent { label 'amd64' }
+            when {
+                anyOf { branch 'main'; branch 'master' }
+            }
             steps {
                 script {
                     // Login to container registry
@@ -39408,7 +39414,7 @@ REGISTRY = "ghcr.io/${PROJECT_ORG}/${INTERNAL_NAME}"
 | Beta | `beta.yml` (beta branch) | `BUILD_TYPE == 'beta'` (beta branch) |
 | Devel | `devel.yml` (schedule + main) | `BUILD_TYPE == 'devel'` (cron + main/master) |
 | Docker | `docker.yml` (all branches) | Docker stage (always runs) |
-| Docker Devel | `docker.yml` `build-devel` job (all branches + daily schedule) | Docker: Devel stage (always runs + 4am cron) |
+| Docker Devel | `docker.yml` `build-devel` job (`main`/`master` + daily schedule) | Docker: Devel stage (`main`/`master` only + 4am cron) |
 
 ---
 
