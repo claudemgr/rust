@@ -1285,7 +1285,7 @@ All machine-dependent settings MUST be detected at runtime on the target machine
 | OS / architecture | `std::env::consts`, target info | hardcode dev machine values |
 | Home/config/data dirs | platform APIs / env vars | hardcode absolute dev paths |
 | Locale | `LANG`, platform locale APIs | assume English-only unless documented |
-| Theme preference | OS theme APIs / config | assume dark/light universally |
+| Theme preference | `theme` config key (default `dark`); OS theme APIs only when it is `auto` | assume dark/light universally |
 | Terminal capability | TTY + TERM + negotiated features | assume ANSI/alt-screen support |
 | Display stack | X11 (`DISPLAY`) **and** Wayland (`WAYLAND_DISPLAY`) detection — both backends supported, runtime-selected | assume GUI exists; ship X11-only or Wayland-only |
 | CPU / memory | runtime detection if needed | tune only for dev hardware |
@@ -1455,20 +1455,61 @@ fall back to `Style::default()` (no `fg`/`bg`) when it returns `false`.
 Raw ANSI escapes in the CLI path are likewise not NO_COLOR-aware by
 themselves and must check `color_enabled()` explicitly.
 
-## Color Palette (TUI/CLI/GUI)
+## Theme System (GUI / TUI / CLI)
 
-**This is a single native binary — there is no Web CSS palette. TUI/CLI
-and GUI theming are defined separately, and neither uses literal hex:**
+**Default: dark. Always.** Every GUI and TUI supports three modes:
 
-### TUI/CLI — ANSI-mapped
+| Mode | Behaviour |
+|------|-----------|
+| `dark` | Dark background, light text — the default |
+| `light` | Light background, dark text |
+| `auto` | Follows the OS preference |
 
-Terminals render a fixed, user-configured 16/256-color set, so TUI/CLI
-map semantic roles to the nearest ANSI color instead of literal hex:
+Rules:
+
+- The mode is the config key `theme` (`dark` default, `light`, `auto`) in the user config file. The GUI/TUI settings screen has one theme control that cycles dark, light, auto and writes the key. There is no `--theme` flag: the standard flag set (see "Standard CLI Flags") is unchanged, and `--color` controls color output only (`auto`/`yes`/`no`), never light versus dark.
+- The user's choice always wins over OS detection and persists across restarts.
+- `auto` resolves through OS theme detection (see "Theme detection") and re-resolves on live OS changes without a restart where the OS API supports it. Where no preference can be read (most terminals, BSD without a GUI), `auto` resolves to dark.
+- The mode is resolved once into a single `Theme` value that is passed down the UI tree. Widgets never read the OS theme and never hold color values themselves.
+- `NO_COLOR`, `TERM=dumb`, `--color no` or a non-TTY stream strip all color: output is plain text, the theme has no visual effect, and the `theme` setting is left untouched.
+- Colors come only from the design tokens (`~/.claude/memory/ui_ux_conventions.md` → Design Token System) and only in the pre-checked token pairings (WCAG 2.1 AA, 4.5:1 minimum). The OS or toolkit high-contrast mode is honored where it exposes one.
+
+### Theme struct (GUI and true-color TUI)
+
+```rust
+// Theme is built once from the design tokens for the resolved mode and passed through the UI tree.
+// It is the only place hex values live; widgets read fields, never literals.
+pub struct Theme {
+    pub bg: Color, pub bg_subtle: Color, pub bg_elevated: Color,
+    pub bg_overlay: Color, pub bg_inset: Color,
+    pub fg: Color, pub fg_muted: Color, pub fg_subtle: Color,
+    pub fg_disabled: Color, pub fg_on_accent: Color, pub fg_link: Color,
+    pub border_subtle: Color, pub border: Color, pub border_strong: Color,
+    pub accent: Color, pub accent_hover: Color, pub accent_pressed: Color,
+    pub accent_subtle: Color, pub accent_fg: Color,
+    pub success: StatusColors, pub warning: StatusColors,
+    pub error: StatusColors, pub info: StatusColors,
+}
+
+// StatusColors carries the three token roles every status color needs.
+pub struct StatusColors { pub fg: Color, pub bg: Color, pub border: Color }
+```
+
+How each surface uses it:
+
+- **GUI:** the toolkit theme is built from the resolved `Theme`, never from the toolkit's own OS-driven default; the accent and the light/dark mode come from the resolved mode.
+- **TUI:** true-color terminals (`COLORTERM` = `truecolor` or `24bit`) use the `Theme`; any other terminal uses the 16-color ANSI mapping below. Plain CLI output uses the ANSI mapping only.
+
+## Color Palette (TUI/CLI)
+
+**This is a single native binary — there is no Web CSS palette. Hex values exist only in the `Theme` built from the design tokens; 16-color terminals and CLI output map the same roles to ANSI indices instead:**
 
 | Role | Dark ANSI | Light ANSI |
 |------|-----------|------------|
 | `foreground` | `BrightWhite` | `Black` |
 | `muted` | `White` | `DarkGray` |
+| `subtle` / `disabled` | `BrightBlack` | `BrightBlack` |
+| `on_accent` | `Black` | `White` |
 | `primary` / `accent` | `BrightMagenta` | `Blue` |
 | `secondary` / `success` | `BrightGreen` | `Green` |
 | `warning` | `BrightYellow` | `Yellow` |
@@ -1483,6 +1524,9 @@ map semantic roles to the nearest ANSI color instead of literal hex:
 pub struct TerminalPalette {
     pub foreground: String,
     pub muted: String,
+    pub subtle: String,
+    pub disabled: String,
+    pub on_accent: String,
     pub primary: String,
     pub success: String,
     pub warning: String,
@@ -1493,7 +1537,8 @@ pub struct TerminalPalette {
 
 pub fn terminal_palette_dark() -> TerminalPalette {
     TerminalPalette {
-        foreground: "15".into(), muted: "7".into(), primary: "13".into(),
+        foreground: "15".into(), muted: "7".into(), subtle: "8".into(),
+        disabled: "8".into(), on_accent: "0".into(), primary: "13".into(),
         success: "10".into(), warning: "11".into(), error: "9".into(),
         info: "12".into(), border: "13".into(),
     }
@@ -1501,19 +1546,13 @@ pub fn terminal_palette_dark() -> TerminalPalette {
 
 pub fn terminal_palette_light() -> TerminalPalette {
     TerminalPalette {
-        foreground: "0".into(), muted: "8".into(), primary: "4".into(),
+        foreground: "0".into(), muted: "8".into(), subtle: "8".into(),
+        disabled: "8".into(), on_accent: "15".into(), primary: "4".into(),
         success: "2".into(), warning: "3".into(), error: "1".into(),
         info: "4".into(), border: "4".into(),
     }
 }
 ```
-
-### GUI — native theming only
-
-GUI never consumes `TerminalPalette` or any literal hex palette. It
-detects light/dark only (the `dark-light` crate / OS theme APIs — see
-"Theme detection" above) and lets the native toolkit apply its own
-light/dark widget theme.
 
 ---
 
@@ -1537,8 +1576,8 @@ Before building a new TUI view, GUI widget, or CLI output helper, check for an e
 
 **This is a single native binary — there is no Web CSS to reuse.** Styling reuse instead means: never invent a second color palette, a second set of semantic role names, or a second theme-detection mechanism alongside the ones already defined above.
 
-- **TUI/CLI:** always style through the existing `TerminalPalette` struct and its semantic fields (`foreground`, `muted`, `primary`, `success`, `warning`, `error`, `info`, `border`) and the existing `terminal_palette_dark()`/`terminal_palette_light()` functions — never a new hardcoded ANSI index or a second palette struct. New TUI/CLI output reuses `ratatui::style::Color::Indexed()` built from the palette; a genuinely new style still derives from a `TerminalPalette` field, never a literal color value.
-- **GUI:** never invent a custom color palette or literal hex values. Reuse the existing native-theming path (the `dark-light` crate for OS light/dark detection, the project's chosen GUI toolkit's native theming) so widgets automatically match the user's OS theme — the same "no literal hex, detect and defer to the platform" rule already established in Color Palette (TUI/CLI/GUI) above.
+- **TUI/CLI:** always style through the existing `Theme` (true-color) or `TerminalPalette` struct (16-color/CLI) and its semantic fields (`foreground`, `muted`, `subtle`, `disabled`, `on_accent`, `primary`, `success`, `warning`, `error`, `info`, `border`) and the existing `terminal_palette_dark()`/`terminal_palette_light()` functions — never a new hardcoded ANSI index or a second palette struct. New TUI/CLI output reuses `ratatui::style::Color::Indexed()` built from the palette; a genuinely new style still derives from a `TerminalPalette` field, never a literal color value.
+- **GUI:** never invent a custom color palette or a literal hex value at a widget call site: read the `Theme` passed down the UI tree (hex values live only in the `Theme` built from the design tokens, see Theme System above). A genuinely new semantic color is added to the token-built `Theme`, not inlined.
 
 ```rust
 // CORRECT — new TUI element styled from the existing palette, no new
