@@ -953,7 +953,7 @@ Structure (PART 3) · Core app + server features (PART 2, 4, 8, 9, 10, 12–21 a
 | `PLAN.md` | Human-owned | Human implementation plan |
 | `README.md` | AI-maintained | Public-facing project documentation (PART 25) |
 | `LICENSE.md` | AI-maintained | MIT license text + embedded-dependency attribution (see below) |
-| `release.txt` | AI-maintained | Current release version stamp |
+| `release.txt` | Optional | Local-build version (Makefile only) |
 | `site.txt` | AI-maintained | Official site / FQDN reference (PART 7) |
 | `deny.toml` | AI-maintained | `cargo-deny` license / advisory / bans / sources policy |
 | `about.toml` | AI-maintained | `cargo-about` configuration (accepted-licenses allowlist) |
@@ -5593,8 +5593,8 @@ The Makefile wraps every `cargo`/`cross` invocation in a Docker run against `cas
 PROJECT_NAME := $(shell git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)(\.git)?$$|\1|' || basename "$$(pwd)")
 PROJECT_ORG := $(shell git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+(\.git)?$$|\1|' || basename "$$(dirname "$$(pwd)")")
 
-# Version precedence: VERSION env (user override, AI never sets it) > release.txt > "devel" fallback
-VERSION ?= $(shell cat release.txt 2>/dev/null || echo "devel")
+# Local builds only: VERSION env (user override, AI never sets it) > non-empty release.txt > devel rule (short commit id, "devel" outside git)
+VERSION ?= $(shell v=; [ -r release.txt ] && v=$$(tr -d '[:space:]' < release.txt); if [ -n "$$v" ]; then echo "$$v"; else git rev-parse --short=7 HEAD 2>/dev/null || echo devel; fi)
 
 # Build info - BUILD_EPOCH is the single captured time source; BUILD_DATE is derived from it
 # Unix build timestamp (seconds, UTC) - used by the updater's devel-channel check
@@ -6083,22 +6083,22 @@ format_version_tag() {
 
 | File | Purpose | When Updated |
 |------|---------|--------------|
-| `release.txt` | Source of truth for stable version | Manual |
+| `release.txt` | Local-build version (Makefile only) | Manual |
 | `releases/version.txt` | Included in release archive | During release build |
 
 ### Version Priority
 
-**CI/CD** (workflows never read the `VERSION` env var):
+**CI/CD** (workflows never read `release.txt` or the `VERSION` env var):
 
-1. Release (tag push): the tag with a leading `v` stripped — `v1.2.3` and `1.2.3` both give `1.2.3`; the workflow fails if `release.txt` exists and differs
-2. Devel: `git rev-parse --short=7 HEAD` (the rolling `devel` tag carries no identity); `release.txt` is ignored
-3. Beta: the `YYYYMMDDHHMMSS-beta` tag version; `release.txt` is ignored
+1. Release (tag push): the tag with a leading `v` stripped — `v1.2.3` and `1.2.3` both give `1.2.3`
+2. Devel: `git rev-parse --short=7 HEAD` (the rolling `devel` tag carries no identity)
+3. Beta: the `YYYYMMDDHHMMSS-beta` tag version
 
-**Local builds** (Makefile):
+**Local builds** (Makefile only — testing and debugging):
 
 1. `VERSION` environment variable, only when explicitly set by the user; AI agents never set it
-2. `release.txt` in project root
-3. Fallback: `devel` — create `release.txt` with `0.1.0` before the first release
+2. `release.txt` in project root, when present and non-empty
+3. Otherwise the devel rule: `git rev-parse --short=7 HEAD`, or `devel` outside a git checkout
 
 ### Release Summary
 
@@ -7151,13 +7151,13 @@ jobs:
 
 # PART 7: VERSION, SITE & BUILD METADATA
 
-## `release.txt` (Canonical Version When Present)
+## `release.txt` (Local-Build Version, Optional)
 
-- `release.txt` is a single-line canonical version source when present
-- It overrides derived/tag-based defaults and should stay in sync with package metadata
+- `release.txt` is a single-line version for local Makefile builds when present and non-empty
+- It overrides the devel rule for local builds and should stay in sync with package metadata
 - Use semantic versions unless the project intentionally uses another documented scheme
-- Release workflows take VERSION from the pushed tag (leading `v` stripped) and fail when `release.txt` differs; devel and beta builds derive their own version
-- Consumed by the Makefile (`VERSION ?= $(shell cat release.txt 2>/dev/null || echo "devel")`) and by every CI workflow's version-resolution step (PART 6 → "Makefile" and "Version Priority")
+- Only the Makefile reads it, for local builds; CI/CD workflows derive VERSION from the tag (release), the commit id (devel) or the timestamp (beta)
+- Consumed only by the Makefile (`VERSION ?=` rule in PART 6 → "Makefile") for local builds; CI workflows never read it (PART 6 → "Makefile" and "Version Priority")
 
 ## `site.txt` (Optional Official Site)
 
@@ -7176,9 +7176,9 @@ https://api.example.com
 ## Metadata Priority Rules
 
 ### Version
-1. CI release: pushed tag with leading `v` stripped (must match `release.txt` when present); CI devel: short commit id; CI beta: `YYYYMMDDHHMMSS-beta`
+1. CI release: pushed tag with leading `v` stripped; CI devel: short commit id; CI beta: `YYYYMMDDHHMMSS-beta` (CI never reads `release.txt`)
 2. Local builds: `VERSION` environment variable (user override only; AI never sets it)
-3. `release.txt` (when present)
+3. `release.txt` (Makefile only, when present and non-empty)
 4. `Cargo.toml` package version
 5. explicit documented fallback (`devel`) for bootstrap/dev builds
 
@@ -19561,17 +19561,17 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 
 ### Sources (Priority Order)
 
-**CI/CD** (workflows never read the `VERSION` env var):
+**CI/CD** (workflows never read `release.txt` or the `VERSION` env var):
 
-1. Release (tag push): the tag with a leading `v` stripped — `v1.2.3` and `1.2.3` both give `1.2.3`; the workflow fails if `release.txt` exists and differs
-2. Devel: `git rev-parse --short=7 HEAD` (the rolling `devel` tag carries no identity); `release.txt` is ignored
-3. Beta: the `YYYYMMDDHHMMSS-beta` tag version; `release.txt` is ignored
+1. Release (tag push): the tag with a leading `v` stripped — `v1.2.3` and `1.2.3` both give `1.2.3`
+2. Devel: `git rev-parse --short=7 HEAD` (the rolling `devel` tag carries no identity)
+3. Beta: the `YYYYMMDDHHMMSS-beta` tag version
 
-**Local builds** (Makefile):
+**Local builds** (Makefile only — testing and debugging):
 
 1. `VERSION` environment variable, only when explicitly set by the user; AI agents never set it
-2. `release.txt` in project root
-3. Fallback: `devel` — create `release.txt` with `0.1.0` before the first release
+2. `release.txt` in project root, when present and non-empty
+3. Otherwise the devel rule: `git rev-parse --short=7 HEAD`, or `devel` outside a git checkout
 
 ### --version Output
 
@@ -36363,7 +36363,7 @@ The release job MUST NOT publish the Docker image (server-mode artifact) unless 
 | Least privilege | CI tokens/permissions default to read-only |
 | Pinned actions | Third-party actions pinned to full commit SHAs; verify runtime and maintenance status on every SHA update |
 | No unsafe fork secrets | Fork PRs do not receive secrets or publish permissions |
-| Version precedence | CI release = pushed tag with `v` stripped (fails if `release.txt` differs); CI devel = short commit id; CI beta = `YYYYMMDDHHMMSS-beta`; local builds = `VERSION` env (user override, AI never sets it) > `release.txt` > `devel` |
+| Version precedence | CI release = pushed tag with `v` stripped; CI devel = short commit id; CI beta = `YYYYMMDDHHMMSS-beta`; CI never reads `release.txt`; local Makefile builds = `VERSION` env (user override, AI never sets it) > non-empty `release.txt` > devel rule (short commit id, `devel` outside git) |
 | Site precedence | `site.txt` wins when present |
 | Verifiable outputs | Releases publish checksums and an SBOM (always); provenance/attestation when the platform supports it |
 | No Makefile in CI | Workflow `run:` steps invoke explicit commands with all environment variables inlined — never `make {target}`. The Makefile is for local developer convenience only. CI MUST NOT depend on Makefile targets that could drift silently. |
@@ -36833,7 +36833,7 @@ All workflows MUST set these environment variables:
 
 ```yaml
 # Set in "Set build info" step, NOT as static env:
-#   if [ -f release.txt ]; then echo "VERSION=$(cat release.txt)" >> $GITHUB_ENV; else echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV; fi
+#   VERSION per channel: release = "${GITHUB_REF_NAME#v}", devel = "$(git rev-parse --short=7 HEAD)", beta = "$(date -u +%Y%m%d%H%M%S)-beta" (never release.txt)
 #   echo "COMMIT_ID=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
 #   BUILD_EPOCH=$(date -u +%s)
 #   echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITHUB_ENV
@@ -37079,12 +37079,7 @@ jobs:
 
       - name: Set build info
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          if [ -f release.txt ] && [ "$(tr -d '[:space:]' < release.txt)" != "$VERSION" ]; then
-            echo "release.txt ($(cat release.txt)) does not match tag $GITHUB_REF_NAME" >&2
-            exit 1
-          fi
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
           echo "COMMIT_ID=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
           BUILD_EPOCH=$(date -u +%s)
           echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITHUB_ENV
@@ -38144,12 +38139,7 @@ jobs:
 
       - name: Set build info
         run: |
-          VERSION="${GITEA_REF_NAME#v}"
-          if [ -f release.txt ] && [ "$(tr -d '[:space:]' < release.txt)" != "$VERSION" ]; then
-            echo "release.txt ($(cat release.txt)) does not match tag $GITEA_REF_NAME" >&2
-            exit 1
-          fi
-          echo "VERSION=${VERSION}" >> $GITEA_ENV
+          echo "VERSION=${GITEA_REF_NAME#v}" >> $GITEA_ENV
           echo "COMMIT_ID=$(git rev-parse --short=7 HEAD)" >> $GITEA_ENV
           BUILD_EPOCH=$(date -u +%s)
           echo "BUILD_EPOCH=$BUILD_EPOCH" >> $GITEA_ENV
@@ -38985,7 +38975,6 @@ stages:
     # NOTE: all tooling (git, bash, cargo-audit, cargo-cyclonedx, cargo-zigbuild, etc.) is pre-installed
     # in casjaysdev/rust:latest — never `apk add` or `cargo install` inside a CI job.
     - export VERSION="${CI_COMMIT_TAG#v}"
-    - if [ -f release.txt ] && [ "$(tr -d '[:space:]' < release.txt)" != "$VERSION" ]; then echo "release.txt does not match tag $CI_COMMIT_TAG" >&2; exit 1; fi
     - export COMMIT_ID="${CI_COMMIT_SHA:0:7}"
     - export BUILD_EPOCH="$(date -u +%s)"
     - export BUILD_DATE="$(date -u -d @$BUILD_EPOCH +"%Y-%m-%dT%H:%M:%SZ")"
@@ -39668,9 +39657,6 @@ pipeline {
                         // Release build (tag push) - matches release.yml
                         env.BUILD_TYPE = 'release'
                         env.VERSION = env.TAG_NAME.replaceFirst('^v', '')
-                        if (fileExists('release.txt') && readFile('release.txt').trim() != env.VERSION) {
-                            error("release.txt does not match tag ${env.TAG_NAME}")
-                        }
                     } else if (env.BRANCH_NAME == 'beta') {
                         // Beta build - matches beta.yml
                         env.BUILD_TYPE = 'beta'
@@ -46942,7 +46928,7 @@ See **PART 8 → "Flag-to-Config Save Rules"** — flags only update `cli.yml` w
 - [ ] If a pre-existing `CLAUDE.md` or `.claude/CLAUDE.md` existed, project-specific content was migrated into IDEA.md
 - [ ] `CLAUDE.md` / `.claude/CLAUDE.md` are short loaders, not duplicate specs
 - [ ] `AGENTS.md` exists at project root as an exact copy of `CLAUDE.md` (real file, not a symlink)
-- [ ] `release.txt` exists if the project is using explicit release versioning
+- [ ] `release.txt` is read only by the Makefile for local builds
 - [ ] `site.txt` exists only if there is a real official site URL
 - [ ] `docker/Dockerfile` (always, when project ships a container), `docker/Dockerfile.dev` (project-specific — when a debug-mode image is shipped), `docker/docker-compose.yml`, `docker/docker-compose.dev.yml`, `docker/docker-compose.test.yml`, and `docker/rootfs/usr/local/bin/entrypoint.sh` exist as needed; `Dockerfile` is the runtime image
 - [ ] `.dockerignore` exists at project root with Rust-specific entries (`target/`, plus the standard exclusions from `dockerfile_conventions.md` → ".dockerignore")
@@ -47022,7 +47008,7 @@ All gates run inside the project Docker image — never on the host.
 
 ## Release Checklist
 
-- [ ] Release version comes from the pushed tag (`v` stripped) and matches `release.txt` when present; devel = commit id, beta = timestamp
+- [ ] CI version comes from the pushed tag (`v` stripped), commit id (devel) or timestamp (beta); only the Makefile reads `release.txt`
 - [ ] Official site comes from `site.txt` when present
 - [ ] Release notes match actual changes
 - [ ] Checksums (SHA-256) are published for every artifact
