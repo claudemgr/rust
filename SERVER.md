@@ -1244,7 +1244,7 @@ Quick reference: Accept `yes/no`, `true/false`, `1/0`, `on/off`, `enable/disable
 | `Cargo.toml` | ✓ | Rust workspace/package manifest |
 | `Cargo.lock` | ✓ | Exact dependency versions (committed for binaries) |
 | `rust-toolchain.toml` | ✓ | Pinned stable toolchain channel |
-| `release.txt` | ✓ | Local-build version (Makefile only) |
+| `release.txt` | Optional | Local-build version (Makefile only) |
 | `site.txt` | Optional | Official site URL (single line, never guess) |
 | `.gitignore` | ✓ | Git ignore rules |
 | `.dockerignore` | ✓ | Docker ignore rules |
@@ -6396,7 +6396,7 @@ PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+
 ├── Cargo.lock              # Locked dependency versions (always committed for binaries)
 ├── rust-toolchain.toml     # Toolchain pin: channel = "stable"
 ├── Jenkinsfile             # Jenkins pipeline
-├── release.txt             # Version tracking
+├── release.txt             # Local-build version (optional)
 └── site.txt                # Official site URL (optional)
 ```
 

@@ -1226,7 +1226,7 @@ Quick reference: Accept `yes/no`, `true/false`, `1/0`, `on/off`, `enable/disable
 | `Makefile` | ✓ | Build targets |
 | `Cargo.toml` | ✓ | Rust package manifest |
 | `Cargo.lock` | ✓ | Rust dependency lockfile |
-| `release.txt` | ✓ | Local-build version (Makefile only) |
+| `release.txt` | Optional | Local-build version (Makefile only) |
 | `site.txt` | Optional | Official site URL (single line, never guess) |
 | `.gitignore` | ✓ | Git ignore rules |
 | `.dockerignore` | ✓ | Docker ignore rules |
@@ -6133,7 +6133,7 @@ PROJECT_ORG=$(git remote get-url origin 2>/dev/null | sed -E 's|.*/([^/]+)/[^/]+
 ├── PLAN.AI.md              # Implementation plan (AI-owned, optional)
 ├── PLAN.md                 # Implementation plan (human-owned, optional - AI marks items done only)
 ├── Jenkinsfile             # Jenkins pipeline
-├── release.txt             # Version tracking
+├── release.txt             # Local-build version (optional)
 └── site.txt                # Official site URL (optional)
 ```
 
