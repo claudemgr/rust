@@ -43811,7 +43811,7 @@ networks:
 - Use CI-native caching (NOT local host paths)
 - Set VERSION, COMMIT_ID, BUILD_EPOCH explicitly via environment variables passed to the build (BUILD_DATE is derived from BUILD_EPOCH at runtime, not passed to cargo build)
 - Build all platforms in matrix
-- Auto-cancel older in-progress runs for the same ref on push workflows targeting `main`, `master`, `devel`, `dev`, or `beta`
+- Auto-cancel older in-progress runs for the same ref on push workflows targeting `main`, `master`, or `beta`
 
 **CI/CD workflows MUST NOT:**
 - Reference local user paths like `~/.cargo` (use `/tmp/` or CI-native caching)
@@ -43847,7 +43847,7 @@ networks:
 
 **Note:** By default Rust projects have no `build-toolchain.yml` or `docker/Dockerfile.build`. CI jobs use `container: image: casjaysdev/rust:latest` directly — no `ensure-build-image` gate, no toolchain image build step. A genuine custom need is the only exception, and then `Dockerfile.build` MUST be `FROM casjaysdev/rust:latest` with the standard toolchain workflow pattern.
 
-**Branch push auto-cancel policy:** Any workflow triggered by pushes to `main`, `master`, `devel`, `dev`, or `beta` MUST use workflow concurrency to cancel older in-progress runs for the same ref. This applies to branch-based CI (for example `beta.yml`, `devel.yml`, `docker.yml`, and any project-specific branch-push workflow).
+**Branch push auto-cancel policy:** Any workflow triggered by pushes to `main`, `master`, or `beta` MUST use workflow concurrency to cancel older in-progress runs for the same ref. This applies to branch-based CI (for example `beta.yml`, `devel.yml`, `docker.yml`, and any project-specific branch-push workflow).
 
 **Tag release auto-cancel policy:** Tag-only release workflows like `release.yml` MUST also use workflow concurrency, but only per exact tag ref. A newer run for `refs/tags/v1.2.3` should cancel the older `refs/tags/v1.2.3` run. A run for `v1.2.4` must NOT cancel `v1.2.3`.
 
@@ -44484,7 +44484,7 @@ on:
 
 concurrency:
   group: devel-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/devel' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/beta' }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta' }}
 
 permissions:
   contents: read
@@ -44741,7 +44741,7 @@ on:
 
 concurrency:
   group: docker-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/devel' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/beta' }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta' }}
 
 env:
   PROJECT_NAME: {project_name}
@@ -44953,7 +44953,7 @@ on:
 
 concurrency:
   group: docker-aio-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/devel' || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/beta' }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/beta' }}
 
 env:
   PROJECT_NAME: {project_name}
@@ -45693,7 +45693,7 @@ on:
 
 concurrency:
   group: devel-${{ gitea.ref }}-${{ gitea.event_name }}
-  cancel-in-progress: ${{ gitea.ref == 'refs/heads/main' || gitea.ref == 'refs/heads/master' || gitea.ref == 'refs/heads/devel' || gitea.ref == 'refs/heads/dev' || gitea.ref == 'refs/heads/beta' }}
+  cancel-in-progress: ${{ gitea.ref == 'refs/heads/main' || gitea.ref == 'refs/heads/master' || gitea.ref == 'refs/heads/beta' }}
 
 permissions:
   contents: read
@@ -45913,7 +45913,7 @@ on:
 
 concurrency:
   group: docker-${{ gitea.ref }}-${{ gitea.event_name }}
-  cancel-in-progress: ${{ gitea.ref == 'refs/heads/main' || gitea.ref == 'refs/heads/master' || gitea.ref == 'refs/heads/devel' || gitea.ref == 'refs/heads/dev' || gitea.ref == 'refs/heads/beta' }}
+  cancel-in-progress: ${{ gitea.ref == 'refs/heads/main' || gitea.ref == 'refs/heads/master' || gitea.ref == 'refs/heads/beta' }}
 
 env:
   PROJECT_NAME: {project_name}
@@ -46144,7 +46144,7 @@ on:
 
 concurrency:
   group: docker-aio-${{ gitea.ref }}
-  cancel-in-progress: ${{ gitea.ref == 'refs/heads/main' || gitea.ref == 'refs/heads/master' || gitea.ref == 'refs/heads/devel' || gitea.ref == 'refs/heads/dev' || gitea.ref == 'refs/heads/beta' }}
+  cancel-in-progress: ${{ gitea.ref == 'refs/heads/main' || gitea.ref == 'refs/heads/master' || gitea.ref == 'refs/heads/beta' }}
 
 env:
   PROJECT_NAME: {project_name}
