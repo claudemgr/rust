@@ -7179,8 +7179,7 @@ https://api.example.com
 1. CI release: pushed tag with leading `v` stripped; CI devel: short commit id; CI beta: `YYYYMMDDHHMMSS-beta` (CI never reads `release.txt`)
 2. Local builds: `VERSION` environment variable (user override only; AI never sets it)
 3. `release.txt` (Makefile only, when present and non-empty)
-4. `Cargo.toml` package version
-5. explicit documented fallback (`devel`) for bootstrap/dev builds
+4. explicit documented fallback (`devel`: short commit id locally, `devel` outside git)
 
 ### Official Site
 1. `site.txt` (when present)
@@ -7201,13 +7200,13 @@ Embed at build time when practical:
 use std::{fs, path::Path};
 
 fn main() {
-    // Re-run this build script when either metadata file changes, otherwise
-    // bumping release.txt / site.txt would not invalidate the embedded constants.
-    println!("cargo:rerun-if-changed=release.txt");
+    // Re-run this build script when site.txt changes, otherwise bumping it
+    // would not invalidate the embedded constant.
     println!("cargo:rerun-if-changed=site.txt");
 
-    if Path::new("release.txt").exists() {
-        let version = fs::read_to_string("release.txt").unwrap();
+    // VERSION is exported by the build environment (CI: per the version rule; local: the Makefile).
+    println!("cargo:rerun-if-env-changed=VERSION");
+    if let Ok(version) = std::env::var("VERSION") {
         println!("cargo:rustc-env=APP_VERSION={}", version.trim());
     }
 
@@ -7220,7 +7219,7 @@ fn main() {
 
 **Example runtime constants:**
 ```rust
-pub const VERSION: &str = option_env!("APP_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"));
+pub const VERSION: &str = option_env!("APP_VERSION").unwrap_or("devel");
 pub const OFFICIAL_SITE: &str = option_env!("APP_OFFICIAL_SITE").unwrap_or("");
 pub const COMMIT_ID: &str = option_env!("APP_COMMIT_ID").unwrap_or("N/A");
 // Unix build timestamp (seconds, UTC) - used by the updater's devel-channel check

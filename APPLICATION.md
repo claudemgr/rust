@@ -261,7 +261,7 @@ The single binary contains **everything the app needs to function**. The user is
 | **PLAN.md** | Implementation plan (human-owned) | AI may mark done; never rewrite wholesale |
 | **README.md** | User-facing install/usage docs | Usage changes |
 | **LICENSE.md** | Project + dependency licenses | Dependency set changes |
-| **release.txt** | Canonical release version when present | Release version changes |
+| **release.txt** | Optional local-build version (Makefile only; empty or missing = devel rule) | Local-build version changes |
 | **site.txt** | Optional official site/homepage URL | Official site changes |
 | **deny.toml** | `cargo-deny` license / advisory / bans / sources policy (PART 11 → "License Compliance") | Policy or allow/deny set changes |
 | **about.toml** | `cargo-about` configuration (allowlist of accepted licenses for attribution generation) | Accepted-licenses set changes |
@@ -763,13 +763,15 @@ rustflags = ["-C", "target-feature=+crt-static"]
 
 ## Build Metadata
 
-Build metadata (version, commit ID, build epoch, official site) is embedded at compile time by `build.rs`, which maps the `COMMIT_ID` and `BUILD_EPOCH` build-environment variables (plus `release.txt` / `site.txt`) to the `APP_*` constants `option_env!()` reads. The build date is never embedded — `build_date()` derives it from the embedded epoch at runtime (see PART 6 → "Build Metadata" for the full `build.rs` pattern and runtime constants).
+Build metadata (version, commit ID, build epoch, official site) is embedded at compile time by `build.rs`, which maps the `VERSION`, `COMMIT_ID` and `BUILD_EPOCH` build-environment variables (plus `site.txt`) to the `APP_*` constants `option_env!()` reads. The build date is never embedded — `build_date()` derives it from the embedded epoch at runtime (see PART 6 → "Build Metadata" for the full `build.rs` pattern and runtime constants).
 
 **Full release build command (logical form — run inside the Docker container, not on the host):**
 ```bash
 # BUILD_EPOCH is the single captured time source - captured once per build
 BUILD_EPOCH="$(date -u +%s)"
 
+# VERSION comes from the version rule (CI release = pushed tag with leading v stripped; local = Makefile)
+VERSION="${VERSION}" \
 COMMIT_ID="$(git rev-parse --short=7 HEAD)" \
 BUILD_EPOCH="${BUILD_EPOCH}" \
 cargo build --release --target x86_64-unknown-linux-musl
@@ -910,13 +912,14 @@ See `dockerfile_conventions.md` → "OCI Annotations" for the full required anno
 
 ### Build-Time Metadata Args
 
-`docker/Dockerfile` declares `ARG BUILD_EPOCH` in the builder stage and exports it as an environment variable for the `cargo build` step, so `build.rs` embeds it (PART 6 → "Build Metadata"). `ARG BUILD_DATE` is declared only where it feeds the `org.opencontainers.image.created` value — it is never passed to the cargo build. The caller captures `BUILD_EPOCH` once, derives `BUILD_DATE` from it, and passes both:
+`docker/Dockerfile` declares `ARG VERSION` (default `devel`) and `ARG BUILD_EPOCH` in the builder stage and exports them as environment variables for the `cargo build` step, so `build.rs` embeds them (PART 6 → "Build Metadata"). `ARG BUILD_DATE` is declared only where it feeds the `org.opencontainers.image.created` value — it is never passed to the cargo build. The caller captures `BUILD_EPOCH` once, derives `BUILD_DATE` from it, and passes both:
 
 ```bash
 # Captured ONCE; BUILD_DATE is derived from it, never independently captured
 BUILD_EPOCH="$(date -u +%s)"
 BUILD_DATE="$(date -u -d "@${BUILD_EPOCH}" +%Y-%m-%dT%H:%M:%SZ)"
 docker build -f docker/Dockerfile \
+  --build-arg VERSION="$VERSION" \
   --build-arg BUILD_EPOCH="$BUILD_EPOCH" \
   --build-arg BUILD_DATE="$BUILD_DATE" \
   ...
@@ -1058,12 +1061,13 @@ docker run --rm \
 
 # PART 6: VERSION, SITE, AND BUILD METADATA
 
-## `release.txt` (Canonical Version When Present)
+## `release.txt` (Local-Build Version, Optional)
 
-- `release.txt` is a single-line canonical version source when present
-- It overrides derived/tag-based defaults and should stay in sync with package metadata
+- `release.txt` is a single-line version for local Makefile builds when present and non-empty
+- It overrides the devel rule for local builds and should stay in sync with package metadata
 - Use semantic versions unless the project intentionally uses another documented scheme
-- If `release.txt` exists, CI/CD and release scripts must use it rather than inventing a version
+- Only the Makefile reads it, for local builds; CI/CD workflows derive VERSION from the pushed tag (leading `v` stripped) and never read it
+- If missing or empty, the Makefile uses the devel rule (short commit id)
 
 ## `site.txt` (Optional Official Site)
 
@@ -1076,9 +1080,10 @@ docker run --rm \
 ## Metadata Priority Rules
 
 ### Version
-1. `release.txt` (when present)
-2. `Cargo.toml` package version
-3. explicit documented fallback for bootstrap/dev builds
+1. CI release: pushed tag with leading `v` stripped (CI never reads `release.txt`)
+2. Local builds: `VERSION` environment variable (user override only; AI never sets it)
+3. `release.txt` (Makefile only, when present and non-empty)
+4. explicit documented fallback (`devel`)
 
 ### Official Site
 1. `site.txt` (when present)
@@ -1110,7 +1115,8 @@ BINDIR      := binaries
 RELDIR      := releases
 TARGET      ?= x86_64-unknown-linux-musl
 
-VERSION     ?= $(shell cat release.txt 2>/dev/null || echo "devel")
+# Local builds only: VERSION env (user override, AI never sets it) > non-empty release.txt > devel rule (short commit id, "devel" outside git)
+VERSION     ?= $(shell v=; [ -r release.txt ] && v=$$(tr -d '[:space:]' < release.txt); if [ -n "$$v" ]; then echo "$$v"; else git rev-parse --short=7 HEAD 2>/dev/null || echo devel; fi)
 COMMIT_ID   := $(shell git rev-parse --short=7 HEAD 2>/dev/null || echo "N/A")
 # BUILD_EPOCH is the single captured time source - captured once per build
 BUILD_EPOCH := $(shell date -u +%s)
@@ -1131,6 +1137,7 @@ CARGO_DOCKER := docker run --rm \
 	-v $(CARGO_CACHE):/usr/local/cargo/registry \
 	-v $(CARGO_GIT):/usr/local/cargo/git \
 	-w /app \
+	-e VERSION=$(VERSION) \
 	-e COMMIT_ID=$(COMMIT_ID) \
 	-e BUILD_EPOCH=$(BUILD_EPOCH) \
 	casjaysdev/rust:latest
@@ -1197,21 +1204,15 @@ clean:
 
 `BUILD_DATE` is never independently captured — it exists only where a Docker build needs the `org.opencontainers.image.created` label (`--build-arg BUILD_DATE=`), derived as `BUILD_DATE="$(date -u -d "@${BUILD_EPOCH}" +%Y-%m-%dT%H:%M:%SZ)"`. The app itself never receives `BUILD_DATE`; it derives the date from the embedded epoch via `build_date()` below.
 
-**Example `build.rs` pattern** — the build environment exports `COMMIT_ID` and `BUILD_EPOCH`; `build.rs` maps them (plus the metadata files) to the `APP_*` variables `option_env!()` reads:
+**Example `build.rs` pattern** — the build environment exports `VERSION`, `COMMIT_ID` and `BUILD_EPOCH` (CI: per the version rule; local: the Makefile); `build.rs` maps them (plus `site.txt`) to the `APP_*` variables `option_env!()` reads:
 
 ```rust
 use std::{env, fs, path::Path};
 
 fn main() {
-    // Re-run this build script when either metadata file changes, otherwise
-    // bumping release.txt / site.txt would not invalidate the embedded constants.
-    println!("cargo:rerun-if-changed=release.txt");
+    // Re-run this build script when site.txt changes, otherwise bumping it
+    // would not invalidate the embedded constant.
     println!("cargo:rerun-if-changed=site.txt");
-
-    if Path::new("release.txt").exists() {
-        let version = fs::read_to_string("release.txt").unwrap();
-        println!("cargo:rustc-env=APP_VERSION={}", version.trim());
-    }
 
     if Path::new("site.txt").exists() {
         let site = fs::read_to_string("site.txt").unwrap();
@@ -1220,7 +1221,7 @@ fn main() {
 
     // Map build-environment variables to the APP_* names option_env!() reads.
     // BUILD_DATE is deliberately NOT mapped - the app derives it from BUILD_EPOCH.
-    for (src, dst) in [("COMMIT_ID", "APP_COMMIT_ID"), ("BUILD_EPOCH", "APP_BUILD_EPOCH")] {
+    for (src, dst) in [("VERSION", "APP_VERSION"), ("COMMIT_ID", "APP_COMMIT_ID"), ("BUILD_EPOCH", "APP_BUILD_EPOCH")] {
         println!("cargo:rerun-if-env-changed={}", src);
         if let Ok(val) = env::var(src) {
             println!("cargo:rustc-env={}={}", dst, val.trim());
@@ -1231,7 +1232,7 @@ fn main() {
 
 **Example runtime constants** (`build_date()` uses `chrono` — an approved pure-Rust date/time crate, PART 5 → "Pure-Rust Library Stack"; add `chrono = "0.4"` to `[dependencies]`):
 ```rust
-pub const VERSION: &str = option_env!("APP_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"));
+pub const VERSION: &str = option_env!("APP_VERSION").unwrap_or("devel");
 pub const OFFICIAL_SITE: &str = option_env!("APP_OFFICIAL_SITE").unwrap_or("");
 pub const COMMIT_ID: &str = option_env!("APP_COMMIT_ID").unwrap_or("N/A");
 pub const BUILD_EPOCH: &str = option_env!("APP_BUILD_EPOCH").unwrap_or("0");
@@ -1677,7 +1678,8 @@ No hidden telemetry. Any analytics, crash reporting, or update pings must be doc
 | Least privilege | CI tokens/permissions default to read-only |
 | Pinned actions | Third-party actions pinned to full commit SHAs; verify runtime and maintenance status on every SHA update |
 | No unsafe fork secrets | Fork PRs do not receive secrets or publish permissions |
-| Version precedence | `release.txt` wins when present |
+| Secret scanning | truffleHog on push, PR and weekly: `verified` and `unknown` block range scans, `verified` blocks full-history scans; exclusions only in `.github/trufflehog-exclude.txt`; doc examples use `{user}:{password}` placeholders (see Secret Scan Job) |
+| Version precedence | CI release = pushed tag with `v` stripped; CI never reads `release.txt`; local Makefile builds = `VERSION` env (user override, AI never sets it) > non-empty `release.txt` > devel rule (short commit id, `devel` outside git) |
 | Site precedence | `site.txt` wins when present |
 | Verifiable outputs | Releases publish aggregate `sha256.txt` / `sha512.txt` checksum files and an SBOM (always); provenance/attestation when the platform supports it |
 | Single build time source | Every build job — on every provider (GitHub Actions, Gitea/Forgejo, GitLab CI, Jenkins) — captures `BUILD_EPOCH="$(date -u +%s)"` exactly once and exports it to the build environment so `build.rs` embeds it (PART 6). `BUILD_DATE` is never independently captured; where a Docker build needs the OCI `image.created` label, derive it (`date -u -d "@${BUILD_EPOCH}" +%Y-%m-%dT%H:%M:%SZ`) and pass both via `--build-arg BUILD_EPOCH=` / `--build-arg BUILD_DATE=` |
@@ -1839,29 +1841,27 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          # required: truffleHog needs full history
           fetch-depth: 0
-
-      # Empty base/head = full-history scan (schedule runs and new-branch pushes)
-      - name: Determine scan range
-        id: range
+      - name: Pick the scan scope
+        id: scope
         run: |
-          BASE=""; HEAD=""
-          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-            BASE="${{ github.event.before }}"; HEAD="${{ github.sha }}"
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="${{ github.event.pull_request.base.sha }}"; HEAD="${{ github.event.pull_request.head.sha }}"
+          ZERO=0000000000000000000000000000000000000000
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "base=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+            echo "results=verified,unknown" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.event.before }}" != "$ZERO" ]; then
+            echo "base=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.event.after }}" >> "$GITHUB_OUTPUT"
+            echo "results=verified,unknown" >> "$GITHUB_OUTPUT"
+          else
+            echo "results=verified" >> "$GITHUB_OUTPUT"
           fi
-          echo "base=$BASE" >> "$GITHUB_OUTPUT"
-          echo "head=$HEAD" >> "$GITHUB_OUTPUT"
-
-      - name: TruffleHog secret scan
-        uses: trufflesecurity/trufflehog@b2b0a92070f206ab7b5a1105d82a7f2f48d92341  # v3.99.0
+      - uses: trufflesecurity/trufflehog@b2b0a92070f206ab7b5a1105d82a7f2f48d92341  # v3.99.0
         with:
-          # NEVER use default_branch — it resolves to HEAD post-push and skips the scan
-          base: ${{ steps.range.outputs.base }}
-          head: ${{ steps.range.outputs.head }}
-          extra_args: --results=verified,unknown
+          base: ${{ steps.scope.outputs.base }}
+          head: ${{ steps.scope.outputs.head }}
+          extra_args: --results=${{ steps.scope.outputs.results }} --exclude-paths=.github/trufflehog-exclude.txt
 
   workflow-policy:
     runs-on: ubuntu-26.04
@@ -1915,6 +1915,26 @@ jobs:
 - GitLab: `secret-scan` runs as a docker job using `image: trufflesecurity/trufflehog:latest` with `GIT_DEPTH: 0`; `image-scan` uses `image: aquasec/trivy:0.70.0`.
 - Jenkins: `Security` stage uses `parallel {}`; truffleHog and Trivy each run via `docker.image(...).inside { ... }`.
 - All providers: same gates, same severities, same exit conditions — no weaker subset on any provider.
+
+### Secret Scan Job (truffleHog)
+
+**`secret-scan` in `ci.yml` is a host-runner job (no `container:`, no `needs`) that runs `trufflesecurity/trufflehog`, pinned by SHA like every action, with `fetch-depth: 0` so the whole history is available. What it scans, and what blocks, depends on the event:**
+
+| Event | Scope | Results that FAIL the job |
+|-------|-------|---------------------------|
+| Pull request | `base.sha` to `head.sha` | `verified` and `unknown` |
+| Push to an existing branch | `event.before` to `event.after` | `verified` and `unknown` |
+| New-branch push (`before` is all zeros), weekly schedule, manual run | The full history | `verified` only |
+
+| Rule | Detail |
+|------|--------|
+| **Flag** | `--results=verified,unknown` or `--results=verified`, always with `--exclude-paths=.github/trufflehog-exclude.txt`. The old `--only-verified` flag is not used. `unknown` means verification was attempted and could not complete; `unverified` (checked and found inactive) is reported and does not fail the job |
+| **Never `default_branch`** | `base` is never `repository.default_branch`: after a push it equals the pushed commit and truffleHog skips the scan ("BASE and HEAD commits are the same") |
+| **Documentation examples** | `AI.md`, `IDEA.md`, `README.md` and `docs/` never contain a credential-shaped string. Connection strings use `{user}:{password}` placeholders; a flagged example is rewritten, not allowlisted, because a copied spec file is read-only in the projects that receive it |
+| **Excluded paths** | `.github/trufflehog-exclude.txt` (the same path on every provider), passed as `--exclude-paths=.github/trufflehog-exclude.txt`. One regex per line, no comments (it is a data file). It lists ONLY files that are not production code: `^Cargo\.lock$` (dependency hashes), `(^|/)tests/fixtures/` (test fixtures) and `^AI\.md$` (the read-only copy of this specification, which carries example values; the template repository scans the original itself). Source, test code, docs, configuration and the exclude file itself are never listed. Adding a path needs a reason in the commit message. Everything else is handled by the placeholder rule or the allowlist below |
+| **Test fixtures** | Fixtures live ONLY in `tests/fixtures/` (the one directory the exclude file lists). Their values are obviously fake (`EXAMPLE`, `xxxx`, `{placeholder}`) and never a real credential, because that directory is not scanned. A test that needs a credential-shaped string builds it at run time in the test code, which IS scanned |
+| **Allowlist** | Only a reviewed true false positive in project code or a test fixture, with truffleHog's inline `trufflehog:ignore` comment on that line. There is no root config file for it |
+| **Other providers** | GitLab and Jenkins run the same contract in Docker: `trufflehog git file://. --since-commit HEAD~1 --results=verified,unknown --exclude-paths=.github/trufflehog-exclude.txt --fail` for a range, `trufflehog git file://. --results=verified --exclude-paths=.github/trufflehog-exclude.txt --fail` for the full history |
 
 ## Post-Push CI Verification
 
@@ -1982,6 +2002,7 @@ docker run --rm --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -
 sed -n '/<!-- GENERATED:/,$p' LICENSE.md > LICENSE.committed-generated.md
 diff LICENSE.committed-generated.md LICENSE.generated.md
 
+# VERSION comes from the CI version rule (release = pushed tag with leading v stripped); never from release.txt
 # Build statically linked release binaries (one per supported target).
 # `cargo --target` keeps the full Rust target triple. The published artifact
 # is renamed to {project_name}-{platform}-{arch}{.ext} with -musl / vendor / ABI
@@ -1991,6 +2012,7 @@ for TARGET in x86_64-unknown-linux-musl aarch64-unknown-linux-musl \
               x86_64-apple-darwin aarch64-apple-darwin; do
   docker run --rm \
     --name "${PROJECT_NAME}-$(tr -dc 'a-z0-9' </dev/urandom | head -c8)" \
+    -e VERSION="$VERSION" \
     -e BUILD_EPOCH="$BUILD_EPOCH" \
     -v "$PWD":/work -w /work "$PROJECT_IMAGE" \
     cargo build --release --target "$TARGET"
@@ -2345,7 +2367,7 @@ Drift between `Cargo.lock` and the generated section of `LICENSE.md` is a CI fai
 - [ ] `CLAUDE.md` / `.claude/CLAUDE.md` are short loaders, not duplicate specs
 - [ ] `AGENTS.md` exists at project root as an exact copy of `CLAUDE.md` (real file, not a symlink)
 - [ ] `.claude/memory/` directory exists (with an empty `MEMORY.md` index if no entries yet) and is committed, not gitignored
-- [ ] `release.txt` exists if the project is using explicit release versioning
+- [ ] `release.txt` is read only by the Makefile for local builds
 - [ ] `site.txt` exists only if there is a real official site URL
 - [ ] `docker/Dockerfile` (always, when project ships a container), `docker/Dockerfile.dev` (project-specific — when a debug-mode image is shipped), `docker/docker-compose.yml`, `docker/docker-compose.dev.yml`, `docker/docker-compose.test.yml`, and `docker/rootfs/usr/local/bin/entrypoint.sh` exist as needed; `Dockerfile` is the runtime image
 - [ ] `.dockerignore` exists at project root with Rust-specific entries (`target/`, plus the standard exclusions from `dockerfile_conventions.md` → ".dockerignore")
@@ -2412,13 +2434,14 @@ itself reports a clean result. Invoke the `rust-lint` agent before running
 
 - [ ] No hidden telemetry
 - [ ] No secrets in logs
+- [ ] `.github/trufflehog-exclude.txt` exists and lists only `AI.md`, `Cargo.lock` and the fixtures directory `tests/fixtures/` (plus any other non-production file, with a reason in its commit)
 - [ ] No automatic privilege escalation
 - [ ] No unsafe downloaded-code execution
 - [ ] Dependency/license/security checks remain enabled
 
 ## Release Checklist
 
-- [ ] Version comes from `release.txt` when present
+- [ ] CI version comes from the pushed tag (`v` stripped); only the Makefile reads `release.txt`
 - [ ] Official site comes from `site.txt` when present
 - [ ] Release notes match actual changes
 - [ ] Aggregate `sha256.txt` and `sha512.txt` checksum files covering every artifact are published as release assets
