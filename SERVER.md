@@ -17267,7 +17267,7 @@ web:
 
 ### MCP Endpoint (Model Context Protocol)
 
-**Every project exposes an MCP endpoint so AI clients (Claude, IDE agents, other MCP clients) can use the API as tools. It is a second front door onto the existing API — it adds no new authentication, no new token type, and no new permissions.**
+**Every project exposes an MCP endpoint so AI clients (Claude, IDE agents, other MCP clients) can use the API as tools. It is a second front door onto the existing API — it reuses the API's Bearer authentication (a valid token is required on every MCP request) and adds no new authentication method, no new token type, and no new permissions.**
 
 | Aspect | Rule |
 |--------|------|
@@ -35519,12 +35519,19 @@ server:
 | `2fa_enabled` | 2FA activated on account | ✓ |
 | `2fa_disabled` | 2FA removed from account | ✓ |
 | `password_changed` | Password was changed | ✓ |
+| `token_regenerated` | API token regenerated | ✓ |
 | `backup_complete` | Backup finished successfully | ✗ |
 | `backup_failed` | Backup error | ✗ |
 | `ssl_expiring` | Certificate expiration warning | ✗ |
 | `ssl_renewed` | Certificate renewed successfully | ✗ |
 | `ssl_renewal_failed` | Certificate renewal failure | ✗ |
 | `scheduler_error` | Scheduled task failed | ✗ |
+| `startup` | Application started (`events.startup`) | ✗ |
+| `shutdown` | Application stopped (`events.shutdown`) | ✗ |
+| `disk_low` | Disk space low (PART 17 → "Disk Space Low") | ✗ |
+| `database_error` | Database connection problem | ✗ |
+| `update_available` | New eligible release detected (`update_check` task) | ✗ |
+| `update_installed` | Self-update completed (`auto_install: true`) | ✗ |
 | `breach_notification` | Data breach notification to affected users | ✓ |
 | `breach_admin_alert` | Breach detected alert to Server Admins | ✗ |
 | `test` | Test email | ✗ |
@@ -35546,12 +35553,19 @@ server:
 | `2fa_enabled` | `Two-Factor Authentication Enabled - {app_name}` | Confirmation of 2FA activation |
 | `2fa_disabled` | `Two-Factor Authentication Disabled - {app_name}` | Warning about 2FA removal |
 | `password_changed` | `Your Password Was Changed - {app_name}` | Confirmation of password change |
+| `token_regenerated` | `API Token Regenerated - {app_name}` | Confirmation of token regeneration |
 | `backup_complete` | `Backup Complete - {app_name}` | Includes filename and size |
 | `backup_failed` | `Backup Failed - {app_name}` | Includes error message |
 | `ssl_expiring` | `SSL Certificate Expiring - {app_name}` | Sent 30, 14, 7, 3, 1 days before expiry |
 | `ssl_renewed` | `SSL Certificate Renewed - {app_name}` | Confirmation of renewal |
 | `ssl_renewal_failed` | `SSL Renewal Failed - {app_name}` | Includes domain, error, days until expiry, next retry |
 | `scheduler_error` | `Scheduled Task Failed - {app_name}` | Includes task name and error |
+| `startup` | `Server Started - {app_name}` | Includes version and mode |
+| `shutdown` | `Server Stopped - {app_name}` | Includes version and reason |
+| `disk_low` | `Disk Space Low - {app_name}` | Includes path, used percentage, free space and threshold |
+| `database_error` | `Database Connection Problem - {app_name}` | Includes the error message, never credentials |
+| `update_available` | `Update Available - {app_name}` | Includes current version, new version, and channel |
+| `update_installed` | `Update Installed - {app_name}` | Includes previous version and new version |
 | `breach_notification` | `Important Security Notice - {app_name}` | Compliance-aware, includes breach details, recommended actions |
 | `breach_admin_alert` | `[{severity}] Security Breach Detected - {app_name}` | Immediate alert, includes detection details, action required |
 | `test` | `Test Email - {app_name}` | Simple test message |
@@ -36223,6 +36237,29 @@ Do not reply to this email.
 | `{next_retry}` | When renewal will be retried automatically |
 
 **Suppression:** When `ssl_renewal_failed` fires from a scheduled run, it suppresses the `scheduler_error` notification for the same execution. One notification, not two.
+
+### startup / shutdown
+| Variable | Description |
+|----------|-------------|
+| `{hostname}` | Host name |
+| `{version}` | Running version |
+| `{mode}` | Application mode |
+| `{timestamp}` | When the event happened |
+| `{reason}` | Why the server stopped: `signal`, `service stop` or `update restart` (shutdown only) |
+
+### disk_low
+| Variable | Description |
+|----------|-------------|
+| `{path}` | First of the data, log and backup directories on the volume |
+| `{used_percent}` | Used percentage of the volume |
+| `{free}` | Free space, human readable |
+| `{threshold_percent}` | Configured `threshold_percent` |
+
+### database_error
+| Variable | Description |
+|----------|-------------|
+| `{error}` | Error message (never contains credentials) |
+| `{since}` | When the connection problem began |
 
 ### scheduler_error
 | Variable | Description |
@@ -55567,7 +55604,7 @@ Tor Hidden Service: Connected
 3. **Neither available → log a warning and skip** (mirrors Tor's "binary not found → disabled, not an error").
 
 **Key Architecture Points:**
-- **Opt-in, default off** — no eepsite, no port, no `i2pd.conf`, no SAM session unless enabled.
+- **Opt-in outside containers, on by default in a container** — when disabled there is no eepsite, no port, no `i2pd.conf` and no SAM session.
 - **Server binary owns the provider** — Model A: full i2pd process lifecycle; Model B: the SAM session lifecycle.
 - **Dedicated backend port** — the eepsite maps `.b32.i2p:{virtual_port}` → `127.0.0.1:{i2p_backend_port}`, a random-unused loopback port. **Unlike Tor, there is no PROXY-protocol header** (SAM/i2pd do not prepend one), so the backend is a **plain loopback listener**, separate from the clearnet port.
 - **Destination identity persists** — the key lives under `{data_dir}/i2p/site/` (one SAM `PRIV` line, written by the app for both models); the `.b32.i2p` address survives restarts. `i2pd.conf` is derived state, regenerated each run.
