@@ -985,6 +985,7 @@ There is no opt-out. Unnamed or persistent build/test containers are a spec viol
 - Steps that belong together run in ONE container (`sh -c "a && b && c"`), never a container per step (format, then lint, then one package's tests)
 - The test gate (`make test`) runs ONCE per finished change set; a failure is fixed, then the full gate runs again
 - At most ONE toolchain container per repository at a time; sub-agents and forks never start containers
+- Every run is bounded: the Makefile prefix wraps `docker run` in `timeout -k 30 $(DOCKER_TIMEOUT)`, and a script or ad-hoc run does the same, so a hung step cannot hold a container for hours
 - Any script that starts a container, sidecar, network or volume removes it in a `trap cleanup EXIT INT TERM` handler registered before the first one starts, so a failed or interrupted run leaves nothing behind
 - A leftover container is found with `docker ps -a --filter "name=^${PROJECT_NAME}-"` and removed by its exact name, never by pattern and never with `prune`
 - Before reporting a task done, that listing is empty
@@ -1163,8 +1164,11 @@ CARGO_GIT   ?= $(HOME)/.cargo/git
 DOCKER_MEM  ?= 4g
 DOCKER_CPUS ?= 2
 
+# Hard ceiling in seconds for ONE container run, so a hung step can never hold a container for hours (raise it for a very long cross-compile)
+DOCKER_TIMEOUT ?= 3600
+
 # COMMIT_ID and BUILD_EPOCH are exported into the build environment so build.rs embeds them
-CARGO_DOCKER := docker run --rm --no-healthcheck \
+CARGO_DOCKER := timeout -k 30 $(DOCKER_TIMEOUT) docker run --rm --no-healthcheck \
 	--name $(PROJECTNAME)-$$(tr -dc 'a-z0-9' </dev/urandom | head -c8) \
 	--memory=$(DOCKER_MEM) --cpus=$(DOCKER_CPUS) \
 	-v $(PWD):/app \
