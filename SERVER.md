@@ -126,7 +126,7 @@ AI reads AI.md for the first time
 
 **See `IDEA.md` for features, data models, and business rules.**
 
-IDEA.md is the project PLAN. AI.md (this file) is the SOURCE OF TRUTH for the template baseline; only a SPEC.md override can differ from it.
+IDEA.md is the project PLAN. AI.md (this file) is the authoritative template baseline. The order of authority is: a project's SPEC.md (optional overrides) > AI.md > global CLAUDE.md; IDEA.md never overrides any of them.
 
 | File | Role | Update When |
 |------|------|-------------|
@@ -3919,7 +3919,7 @@ logging:
 
 ## The Three Laws of Migration
 
-1. **SPEC IS LAW** - The SPEC (AI.md) is the single source of truth. No exceptions.
+1. **SPEC IS LAW** - AI.md is the authority for the template baseline; the only thing that overrides it is a project's SPEC.md, and nothing else does (not IDEA.md, not CLAUDE.md, not a code comment).
 2. **NO INVENTION** - Never invent, assume, or hallucinate. If not in SPEC, don't add it.
 3. **VERIFY EVERYTHING** - Before every change, verify it matches SPEC exactly.
 
@@ -4445,7 +4445,7 @@ If blocked on current feature:
 ### Infrastructure
 ```
 □ Dockerfile matches SPEC multi-stage pattern
-□ docker-compose.yml, docker-compose.dev.yml, docker-compose.test.yml present
+□ docker/docker-compose.yml, docker/docker-compose.dev.yml, docker/docker-compose.test.yml present (never in the project root)
 □ entrypoint.sh matches SPEC exactly
 □ Makefile has all required targets
 □ CI/CD workflows in place
@@ -9849,7 +9849,7 @@ use crate::state::AppState;
 
 /// Build debug router — only mounted when debug mode is enabled
 pub fn debug_router(state: Arc<AppState>) -> Router {
-    if !state.config.is_debug() {
+    if !is_debug_enabled() {
         return Router::new();
     }
 
@@ -21173,20 +21173,24 @@ pub struct TorInfo {
     pub enabled: bool,
     /// Hidden service active
     pub running: bool,
-    /// "disabled", "starting", "healthy" or "unavailable" - never free text
+    /// Full lifecycle for operators: "disabled", "no_provider", "starting", "building", "running" or "error" (the CLI --status values)
+    pub state: String,
+    /// The normalized four-word contract for clients, mapped from state: "disabled", "starting", "healthy" or "unavailable" - never free text
     pub status: String,
     /// "abc123...xyz.onion" (56 chars, v3)
     pub hostname: String,
 }
 
-/// I2PInfo - from I2P manager (PART 32.2). Every field is always present; disabled means enabled false, running false, status "disabled", empty hostname and provider "none".
+/// I2PInfo - from I2P manager (PART 32.2). Every field is always present, `state` (the lifecycle, for operators) and `status` (the four-word contract, for clients, mapped from `state`) alike; clients branch on `status`, never on `state`; disabled means enabled false, running false, status "disabled", empty hostname and provider "none".
 #[derive(Debug, Serialize, Deserialize)]
 pub struct I2PInfo {
     /// features.i2p.enabled (true by default in a container, false elsewhere unless opted in)
     pub enabled: bool,
     /// Eepsite active
     pub running: bool,
-    /// "disabled", "starting", "healthy" or "unavailable" - never free text
+    /// Full lifecycle for operators: "disabled", "no_provider", "starting", "building", "running" or "error" (the CLI --status values)
+    pub state: String,
+    /// The normalized four-word contract for clients, mapped from state: "disabled", "starting", "healthy" or "unavailable" - never free text
     pub status: String,
     /// "abc...uv.b32.i2p" (empty when disabled)
     pub hostname: String,
@@ -23247,6 +23251,7 @@ fn render_no_js_html(data: &PageData) -> String {
 | **Auto-generated** | Both specs generated from code (annotations, comments, or schema) |
 | **Never manual** | NEVER manually edit OpenAPI JSON or GraphQL schema |
 | **Build-time generation** | Specs regenerated on every build |
+| **Optional routes** | The embedded build-time spec is the full SUPERSET of routes, and every route that depends on a flag or a setting (the `/debug/*` routes, `/metrics`, the root aliases, optional well-known files) carries `x-mounted-when` naming its condition (for example `--debug` or `server.metrics.root.enabled`). At startup the server derives the SERVED spec from the embedded one by removing every operation whose condition is false for this run, so the spec a client reads always matches the routes that are actually mounted. The drift test compares the superset with the route table |
 | **JSON only** | OpenAPI spec uses JSON format only (NO YAML) |
 | **Source of truth** | AI.md defines the TEMPLATE routes and the `### API routes` inventory in IDEA.md defines EVERY project-defined route, including any native or compatibility API of the project; together they are the API CONTRACT: routes, methods, auth and shapes. AI.md never enumerates project routes. The code and its annotations implement that contract, and the specs are GENERATED from the code, so they are artifacts, never edited by hand. Drift is detected by a test with three legs: the generated OpenAPI route and method list, the router's registered routes, and the union of the AI.md template routes and the IDEA.md `### API routes` inventory. A route present in one leg and missing from another fails the build, naming the route and the missing place; a project whose IDEA.md has no `### API routes` subsection fails with that message instead of passing vacuously. A deliberate change is made in AI.md or IDEA.md first, then the code, then the specs are regenerated |
 | **Match site theme** | Both UIs styled to match site theme (light/dark/auto) |
@@ -42537,7 +42542,7 @@ The **only** times binaries are copied are the CI/CD release process, the `make 
 
 ## Docker Directory Structure
 
-Docker build/runtime definitions are split between `docker/` and runtime `./volumes/` mounts:
+Docker build/runtime definitions are split between `docker/` and runtime `./volumes/` mounts. **ALL compose files live in `docker/`** (the paths in the tree below are relative to it); a compose file in the project root is a violation.
 
 ```
 docker/
@@ -44433,7 +44438,7 @@ jobs:
 |------|--------|
 | **Flag** | `--results=verified,unknown` or `--results=verified`, always with `--exclude-paths=.github/trufflehog-exclude.txt`. The old `--only-verified` flag is not used. `unknown` means verification was attempted and could not complete; `unverified` (checked and found inactive) is reported and does not fail the job |
 | **Never `default_branch`** | `base` is never `repository.default_branch`: after a push it equals the pushed commit and truffleHog skips the scan ("BASE and HEAD commits are the same") |
-| **Documentation examples** | `AI.md`, `IDEA.md`, `README.md` and `docs/` never contain a credential-shaped string. Connection strings use `{user}:{password}` placeholders; a flagged example is rewritten, not allowlisted, because a copied spec file is read-only in the projects that receive it |
+| **Documentation examples** | `AI.md`, `IDEA.md`, `README.md` and `docs/` never contain a credential-shaped string (the one identifier allowed to look random is the `owner_token` cookie-name suffix: 8 lowercase letters, PART 8). Connection strings use `{user}:{password}` placeholders; a flagged example is rewritten, not allowlisted, because a copied spec file is read-only in the projects that receive it |
 | **Excluded paths** | `.github/trufflehog-exclude.txt` (the same path on every provider), passed as `--exclude-paths=.github/trufflehog-exclude.txt`. One regex per line, no comments (it is a data file). It lists ONLY files that are not production code: `^Cargo\.lock$` (dependency hashes), `(^|/)tests/fixtures/` (test fixtures) and `^AI\.md$` (the read-only copy of this specification, which carries example values; the template repository scans the original itself). Source, test code, docs, configuration and the exclude file itself are never listed. Adding a path needs a reason in the commit message. Everything else is handled by the placeholder rule or the allowlist below |
 | **Test fixtures** | Fixtures live ONLY in `tests/fixtures/` (the one directory the exclude file lists). Their values are obviously fake (`EXAMPLE`, `xxxx`, `{placeholder}`) and never a real credential, because that directory is not scanned. A test that needs a credential-shaped string builds it at run time in the test code, which IS scanned |
 | **Allowlist** | Only a reviewed true false positive in project code or a test fixture, with truffleHog's inline `trufflehog:ignore` comment on that line. There is no root config file for it |
@@ -50691,7 +50696,7 @@ pub async fn admin_auth_middleware(
     next: Next,
 ) -> Response {
     // Debug mode adds verbose logging ONLY - auth is ALWAYS enforced
-    if state.config.is_debug() {
+    if is_debug_enabled() {
         tracing::debug!("Admin auth check: {}", request.uri().path());
     }
 
@@ -51215,6 +51220,7 @@ Documentation uses MkDocs Material theme with dark/light/auto switching.
 2. Organization accounts typically use `{project_org}-{project_name}`
 3. Standalone projects may use just `{project_name}`
 4. Custom domains require RTD paid plan or manual DNS setup
+5. **Before the RTD project exists:** set `site_url` to the predictable default `https://{project_org}-{project_name}.readthedocs.io` and create the RTD project under the name `{project_org}-{project_name}` so the two match. When the dashboard later shows a different URL (name taken, custom domain), correct `site_url`, the README badge and the links in ONE commit. Never commit an empty `site_url` or a placeholder such as `{RTD_URL}`
 
 ## Required Files
 
@@ -57493,11 +57499,17 @@ update:
 
 **Why CLI download default is unauthenticated:** the CLI is the entry point for new users. Forcing auth on the download means they need a token before they can install the tool that obtains the token. Operators who run a private deployment can flip `cli.binary_download.require_auth` to `true`.
 
+**Autodiscover response.** `/api/autodiscover` follows the standard envelope like every JSON route (it is unversioned, not unenveloped): `{"ok": true, "data": {...}}`. `data.api.current_version` is the API version prefix the server serves (for example `v1`); `data.cli_versions` and `data.cli_min_version` are described below; the rest of `data` carries the server settings, config schema and options the CLI needs. A client, and every test helper, reads these fields under `data`.
+
+**CLI binaries: where they come from.** The binaries the server distributes live in `{data_dir}/cli/` (override: `cli.binary_download.dir`) and are provisioned by the OPERATOR, or by the image or package build, by copying the files of a release into it: `{project_name}-cli-{os}-{arch}[.exe]`, `version.txt` and `sha256.txt` (the release already produces all three: "Release Artifacts"). The server never builds, downloads or edits them. At start, and whenever the directory changes, it derives what it publishes itself: the platforms are the `{os}-{arch}` of the files present, `version` is the line of `version.txt`, and `sha256` is read from `sha256.txt` AND recomputed from the file; a file whose hash does not match is not published and a WARN names it. An empty or missing directory publishes `cli_versions: {}`, `/cli/binaries/*` answers `404 NOT_FOUND`, and the CLI reports that no update is available. `cli_min_version` comes only from `update.cli_min_version`.
+
 **Configuration (server `server.yml`):**
 
 ```yaml
 cli:
   binary_download:
+    # Directory holding the release files the server distributes (default {data_dir}/cli)
+    dir: "{data_dir}/cli"
     # false (default): the CLI binary download is public; true: it needs an Authorization: Bearer token
     require_auth: false
 ```
