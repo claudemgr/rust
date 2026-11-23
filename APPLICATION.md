@@ -1662,7 +1662,7 @@ docker run --rm \
 - Panic/backtrace behavior must be intentional and documented
 - GUI/TUI debug tooling must not leak into normal production UX by default
 
-**Standard exit codes (MUST):** `0` success · `1` general/runtime error, returned via `fn main() -> std::process::ExitCode` (or an explicit `std::process::exit(1)`) · `2` usage error (bad flags/args — matches `clap`'s own default). `--help`/`--version` always exit `0`. Never invent additional exit codes without documenting them in `--help` output.
+**Output streams and exit codes (MUST):** data and requested output go to stdout; every error message, usage error, warning and `SKIP:` reason goes to stderr, never stdout, and every non-zero exit is preceded by one line on stderr saying what failed. Exit codes follow one standard set: `0` success (`--help`, `--version`, a graceful shutdown included) · `1` general/runtime error (includes a recovered panic and a failed check) · `2` usage error (bad flags/args, matches Go's own `flag` package and Rust's `clap`) · `65` bad input data (`EX_DATAERR`) · `66` input or resource not found (`EX_NOINPUT`) · `69` a required service or capability is unavailable (`EX_UNAVAILABLE`) · `74` I/O error (`EX_IOERR`) · `75` temporary failure (`EX_TEMPFAIL`) · `77` permission denied or authentication failed (`EX_NOPERM`) · `78` invalid configuration (`EX_CONFIG`). `126`, `127` and `128+n` belong to the shell and are never returned on purpose. Use the most specific code and document every code above `2` in `--help`; never invent another one.
 
 **Panic messaging under `panic = "abort"` (MUST):** this template's release profile sets `panic = "abort"` (see Build Rules) — correct for a short-lived CLI/GUI/TUI binary, but it means a panic terminates the process immediately via `abort()` and CANNOT be caught/continued with `catch_unwind`. To still avoid a raw Rust backtrace reaching a normal user, install a custom panic hook at the top of `main()` that prints a clean, user-facing message before the unavoidable abort happens:
 
@@ -2957,7 +2957,7 @@ Example:
 
 Signal handling uses `tokio::signal` (async runtimes) or `signal-hook` (sync daemons).
 
-**`--config-test` (`-t`) is REQUIRED:** parse and validate the full config, print errors to stderr, exit 0 (valid) or 1 (invalid) — mirrors `nginx -t`. It never touches sockets or running state.
+**`--config-test` (`-t`) is REQUIRED:** parse and validate the full config, print errors to stderr, exit 0 (valid) or 78 (invalid, `EX_CONFIG`) — mirrors `nginx -t`. It never touches sockets or running state.
 
 ## Sockets, Ports & Privileges
 
