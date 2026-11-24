@@ -18204,7 +18204,8 @@ pub struct ConsentState {
     pub timestamp: i64,
 }
 
-// Stored in the `cookie_consent` cookie as URL-encoded JSON (server-readable on every request):
+// Stored in the `cookie_consent` cookie as percent-encoded compact JSON (urlencoding::encode / decode; JS encodeURIComponent / decodeURIComponent).
+// A value that does not decode or parse is treated as no consent cookie (banner shown, categories off). Decoded value:
 // cookie_consent = {"essential":true,"preferences":true,"analytics":false,"timestamp":1704067200}
 ```
 
@@ -25075,7 +25076,7 @@ async function revokeLocalToken() {
 |--------|--------|---------|
 | `theme` | `dark` \| `light` \| `auto` | `dark` |
 | `lang` | BCP 47 tag: `en`, `es`, `fr`, … — written only when the visitor picks a language or applies a sync import | automatic: best `Accept-Language` match, else `en` (see "Language Selection") |
-| `cookie_consent` | JSON: granular categories + timestamp | unset (banner shown) |
+| `cookie_consent` | Percent-encoded compact JSON: granular categories + timestamp (see "Consent Logic") | unset (banner shown) |
 | `ccpa_opt_out` | `true` | unset |
 | `{project_name}_build` | running build stamp `{project_version}-{short_commit}` | set on first HTML response — drives the PART 9 version-change purge |
 
@@ -28588,7 +28589,7 @@ let message = cfg.privacy.get_consent_message();
 | Step | Behavior |
 |------|----------|
 | **Render** | The server renders the banner only when the request has no valid `cookie_consent` cookie — no `display: none`, no reveal script |
-| **POST `/server/consent`** | Reads `choice` (`accept` / `decline` / `save` from the Manage Preferences dialog — the banner's own route; the `/server/preferences` page saves consent through `POST /server/preferences`, rule 17), sets the `cookie_consent` cookie (JSON: granular categories + timestamp), redirects back to the originating page |
+| **POST `/server/consent`** | Reads `choice` (`accept` / `decline` / `save` from the Manage Preferences dialog — the banner's own route; the `/server/preferences` page saves consent through `POST /server/preferences`, rule 17), sets the `cookie_consent` cookie (percent-encoded compact JSON: granular categories + timestamp), redirects back to the originating page |
 | **Later requests** | Server reads `cookie_consent` to skip the banner and to decide tracking injection (`check_tracking_allowed`) |
 | **CCPA** | POST `/server/ccpa` (the privacy page's own opt-out form; `/server/preferences` saves the same cookie through `POST /server/preferences`, rule 17) sets/clears the `ccpa_opt_out` cookie with the rule 8 attributes and redirects back (`303`). Web-only: no API mirror, never exported |
 
@@ -28835,7 +28836,7 @@ initCCPA();
 
 ### Consent Logic (Granular)
 
-**Consent stored as JSON in the `cookie_consent` cookie (server-readable):** `{"essential":true,"preferences":true,"analytics":false,"timestamp":1704067200}`
+**Consent stored as percent-encoded compact JSON in the `cookie_consent` cookie (server-readable):** decoded value `{"essential":true,"preferences":true,"analytics":false,"timestamp":1704067200}`. The server writes it with `urlencoding::encode` and reads it with `urlencoding::decode` before `serde_json` parses it (the JS side uses `encodeURIComponent` and `decodeURIComponent`; both are plain percent-encoding), because raw JSON punctuation is not a legal cookie value and a quoted or sanitized value would come back as text that cannot be parsed. A value that does not decode or parse counts as no consent cookie: the banner shows and every non-essential category is off
 
 | Condition | Show Banner | Essential | Preferences | Analytics |
 |-----------|-------------|-----------|-------------|-----------|

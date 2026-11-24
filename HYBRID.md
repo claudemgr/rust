@@ -18708,7 +18708,8 @@ pub struct ConsentState {
     pub timestamp: i64,
 }
 
-// Stored in the `cookie_consent` cookie as URL-encoded JSON (server-readable on every request):
+// Stored in the `cookie_consent` cookie as percent-encoded compact JSON (urlencoding::encode / decode; JS encodeURIComponent / decodeURIComponent).
+// A value that does not decode or parse is treated as no consent cookie (banner shown, categories off). Decoded value:
 // cookie_consent = {"essential":true,"preferences":true,"analytics":false,"timestamp":1704067200}
 ```
 
@@ -25608,7 +25609,7 @@ async function clearClientData() {
 |--------|--------|---------|
 | `theme` | `dark` \| `light` \| `auto` | `dark` |
 | `lang` | BCP 47 tag: `en`, `es`, `fr`, … — written only when the visitor picks a language or applies a sync import | automatic: best `Accept-Language` match, else `en` (see "Language Selection") |
-| `cookie_consent` | JSON: granular categories + timestamp | unset (banner shown) |
+| `cookie_consent` | Percent-encoded compact JSON: granular categories + timestamp (see "Consent Logic") | unset (banner shown) |
 | `ccpa_opt_out` | `true` | unset |
 | `{project_name}_build` | running build stamp `{project_version}-{short_commit}` | set on first HTML response — drives the PART 9 version-change purge |
 
