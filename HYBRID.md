@@ -1151,6 +1151,8 @@ Debug endpoints are ONLY available when the debug flag is set; otherwise they re
 | `/debug/memory` | GET | Memory usage statistics |
 | `/debug/tasks` | GET | Async task statistics |
 
+**Credentials and debug output.** The debug endpoints return counts, sizes and routes, never memory contents, so none can expose a credential value, and the "always redacted in dumps" rule holds without a sanitizing layer. The one risky output is the process arguments: `/debug/vars` prints only the binary name, never the arguments. No endpoint produces a heap dump or a core file, the one artifact that would hold credential bytes. Every `/debug/*` request still needs the operator token.
+
 ## Architectural Rule
 
 Use **one shared core layer** with thin adapters for each surface — the GUI/TUI/CLI presentation layers on one side, and the server's frontend/backend on the other, both sitting on the same domain logic:
@@ -7550,7 +7552,7 @@ When the `NO_COLOR` environment variable is set and not empty (value doesn't mat
 
 | Priority | Source | Example |
 |----------|--------|---------|
-| 1 | CLI flag | `--color=yes`, `--color=no` |
+| 1 | CLI flag | `--color=yes`, `--color=no` (`--color=yes` also overrides `TERM=dumb`, for color sequences only; every other `TERM=dumb` restriction stays) |
 | 2 | Config file | `output.color: false` |
 | 3 | `NO_COLOR` env var | `NO_COLOR=1` |
 | 4 | Auto-detect | TTY check, `TERM` variable |
@@ -17817,9 +17819,11 @@ server:
 | `discord` | Webhook URL | `POST {url}` body `{"content": "<message>", "username": "{app_name}"}` |
 | `slack` | Incoming Webhook URL | `POST {url}` body `{"text": "<message>"}` |
 | `mattermost` | Incoming Webhook URL | Slack-compatible body |
-| `pushover` | Pushover API URL with `user`/`token` | Standard Pushover params |
-| `gotify` | Gotify URL | `POST {url}/message?token={token}` body `{"title", "message", "priority"}` |
+| `pushover` | `https://api.pushover.net/1/messages.json` with `user` and `token` query parameters | `POST {url}` form fields `user`, `token`, `title` (the subject), `message` (the body) and `priority` (mapping below) |
+| `gotify` | Gotify URL | `POST {url}/message?token={token}` body `{"title", "message", "priority"}` (mapping below) |
 | `generic` | Any HTTPS URL | `POST {url}` JSON body: `{role, event, subject, body, severity, timestamp, project_name, project_version, app_url, tracking_id?}` |
+
+**Severity and priority.** `severity` is `info`, `warning` or `critical` (a success or info event is `info`, a warning is `warning`, an error is `critical`). Pushover `priority` is `0` for `info` and `warning` and `1` for `critical`; the emergency priority `2` is never used because it needs retry and expire parameters. Gotify `priority` is `2` for `info`, `5` for `warning` and `8` for `critical`.
 
 **Additional transports can be plugged in by adding adapters in `src/notify/`. The config schema above is open — any key under `webhooks` is treated as a transport name, and the adapter for that name is invoked.**
 
@@ -23272,7 +23276,7 @@ footer p {
 
 | Rule | Detail |
 |------|--------|
-| **No horizontal overflow, ever** | At every viewport from 320 px up, `document.documentElement.scrollWidth <= window.innerWidth` with NO `overflow-x` backstop applied. A page wider than the screen makes mobile browsers shrink the whole layout (content at ~60% width with a dead strip beside it). Typical causes, all banned: negative-offset off-canvas boxes, fixed pixel widths, `100vw` widths (use `100%`), images without `max-width: 100%`, tables outside a scroll wrapper, unwrapped long strings (see "Long Strings"). `body { overflow-x: clip }` may exist as a last-resort backstop only |
+| **No horizontal overflow, ever** | At every viewport from 320 px up, `document.documentElement.scrollWidth <= window.innerWidth` with the `overflow-x` backstop DISABLED (the automated test removes it first). A page wider than the screen makes mobile browsers shrink the whole layout (content at ~60% width with a dead strip beside it). Typical causes, all banned: negative-offset off-canvas boxes, fixed pixel widths, `100vw` widths (use `100%`), images without `max-width: 100%`, tables outside a scroll wrapper, unwrapped long strings (see "Long Strings"). `body { overflow-x: clip }` may exist in the shipped CSS as a last-resort backstop only; a layout that passes only because of it fails the test |
 | **Content fills the viewport width correctly** | The `.container` rules above apply on every page: phones use the full width minus `1rem` padding; a content column is centered, never stuck left with dead space on the right |
 | **Fixed/overlay containment** | See "Drawer containment" in the header / navigation section ("Mobile Menu Behavior"). Overlays are direct children of `<body>`; no `transform`, `filter`, `backdrop-filter`, `contain` or `will-change` on an ancestor of a `position: fixed` element |
 | **Dynamic viewport** | `100dvh` / `min-height: 100dvh`, never bare `100vh` (mobile browser bars); `env(safe-area-inset-*)` padding on anything touching a screen edge (drawer, toast, banner, bottom actions) |
@@ -28885,7 +28889,7 @@ pub fn validate_footer_html(html: &str) -> Result<String, anyhow::Error> {
 | Allowed | Blocked (Stripped) |
 |---------|-------------------|
 | `<p>`, `<br>`, `<span>`, `<div>` | `<script>`, `<noscript>` |
-| `<strong>`, `<b>`, `<em>`, `<i>` | `<iframe>`, `<frame>` |
+| `<strong>`, `<b>`, `<em>`, `<i>`, `<u>`, `<s>`, `<small>` | `<iframe>`, `<frame>` |
 | `<a href="...">` | `<object>`, `<embed>` |
 | `<img src="...">` | `<form>`, `<input>`, `<button>` |
 | `<ul>`, `<ol>`, `<li>` | `<style>`, `<link>` |
