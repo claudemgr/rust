@@ -110,6 +110,7 @@ AI reads AI.md for the first time
 | `{internal_name}` | lowercase for a new value (a mixed-case value kept by a migration is the one exception, see the migration rule) | **Stable** at first-time setup | `myapp` |
 | `{INTERNAL_NAME}` | UPPERCASE | **Stable** | `MYAPP` |
 | `{plist_name}` | derived | Derived from `{internal_org}` + `{internal_name}` (frozen identifiers, so a rename never changes the launchd label) | `io.github.myorg.myapp` |
+| `{PLATFORM_REPO_URL}` (and the other `{PLATFORM_*}` URL, registry and badge placeholders) | derived | Resolved from the "Platform-Specific URLs" table for the project's platform, with `{org}` = `{project_org}` and `{repo}` = `{project_name}`; not an `IDEA.md` variable, never written by hand | `https://github.com/myorg/myapp` |
 
 **`{internal_name}` rule:** set ONCE on first run (initial value = `{project_name}`), then stable across ordinary renames (reset only on an explicit org/repo rename with path migration, or at a fork's first setup). Used for every on-disk identifier (`{config_dir}`, `{data_dir}`, `{log_dir}`, `{cache_dir}`, systemd unit, `{plist_name}`) so a project rename does not orphan paths or services.
 
@@ -4304,14 +4305,15 @@ Implementation matches the declared threat/abuse model
 Every feature MUST work via:
 1. **Web browser** - HTML pages, forms, interactive UI
 2. **PWA (Progressive Web App)** - Installable, offline-capable, native-like experience
-3. **API clients** - JSON for curl, wget, automation, scripts
+3. **API clients** - JSON for automation, scripts and any client that sends `Accept: application/json`; plain text for curl, wget and similar HTTP tools that send no explicit `Accept` (an explicit `Accept` always beats client detection, see "Content Negotiation Priority")
 4. **clients** - Dedicated command-line tools (PART 32 — required for all projects)
 
 | Client Type | Examples | Response Format |
 |-------------|----------|-----------------|
 | **Browser** | Chrome, Firefox, Safari | HTML (pretty UI) |
 | **PWA** | Installed web app (desktop/mobile) | HTML (same as browser) |
-| **API/Automation** | curl, wget, scripts, integrations | JSON |
+| **API/Automation** | scripts, integrations, and curl or wget sending `Accept: application/json` | JSON |
+| **HTTP tool** | curl, wget, httpie with no explicit `Accept` | Plain text (an explicit `Accept` always wins) |
 | **CLI tool** | `{project_name}-cli` | Text/JSON (configurable) |
 
 **Endpoint Pattern (applies to ENTIRE app):**
@@ -5192,6 +5194,8 @@ Router::new()
 | Release download | `https://github.com/{org}/{repo}/releases/latest/download/{file}` | `https://gitlab.com/{org}/{repo}/-/releases/permalink/latest/downloads/{file}` | `https://git.example.com/{org}/{repo}/releases/download/latest/{file}` |
 | Container registry | `ghcr.io/{org}/{repo}` | `registry.gitlab.com/{org}/{repo}` | `git.example.com/{org}/{repo}` |
 
+**The `{PLATFORM_*}` placeholders are derived, not `IDEA.md` variables.** `{PLATFORM_REPO_URL}` is the Repository row above, `{PLATFORM_RAW_URL}` the Raw file row, `{PLATFORM_RELEASE_URL}` the Release download row and `{PLATFORM_CONTAINER_REGISTRY}` the registry row, each for the project's detected platform, with `{org}` = `{project_org}` and `{repo}` = `{project_name}`. A project never defines or hand-writes them.
+
 #### README Template
 
 **Use the appropriate badges and URLs for your platform (see above).**
@@ -5471,7 +5475,7 @@ curl -L https://api.example.com/server/healthz
 | **No AI/ML** | Smart logic only, no machine learning |
 | **Concise Responses** | Short, descriptive, and helpful |
 | **Everything Configurable** | ALL settings MUST be configurable in the configuration files (`server.yml`, the `yaml.d/` area files and `secrets.yml`) |
-| **Live Reload** | Configuration changes apply without restart (file-watch hot-reload), except the restart-required settings of "Smart Config Reload" (listen port and address, `ssl.*`, `database.*`, `server.daemonize`, `tor.*`), which are logged as a warning and apply at the next start |
+| **Live Reload** | Configuration changes apply without restart (file-watch hot-reload), except the restart-required settings of "Smart Config Reload" (listen port and address, `server.ssl.*`, `server.database.*`, `server.daemonize`, `server.tor.*`), which are logged as a warning and apply at the next start |
 | **Built-in Scheduler** | NEVER use cron, Task Scheduler, or external schedulers (PART 18) |
 
 ### File-Only Configuration
@@ -5495,7 +5499,7 @@ curl -L https://api.example.com/server/healthz
 | **Hot reload** | Application watches for config changes and reloads |
 | **Graceful** | In-flight requests complete before new config applies |
 | **Feedback** | User sees confirmation that changes are active |
-| **Exceptions** | The restart-required settings of "Smart Config Reload" (`server.port`, `server.address`, `ssl.*`, `server.daemonize`, `database.*`, `tor.*`) apply at the next start, with a clear warning; the graceful-reload settings apply without downtime |
+| **Exceptions** | The restart-required settings of "Smart Config Reload" (`server.port`, `server.address`, `server.ssl.*`, `server.daemonize`, `server.database.*`, `server.tor.*`) apply at the next start, with a clear warning; the graceful-reload settings apply without downtime |
 
 **What MUST live reload:**
 - Branding (title, tagline, description)
@@ -5505,15 +5509,15 @@ curl -L https://api.example.com/server/healthz
 - Rate limiting rules
 - robots.txt / security.txt
 - Scheduler settings
-- SSL certificate renewal (the `ssl.*` settings themselves need a restart)
+- SSL certificate renewal (the `server.ssl.*` settings themselves need a restart)
 - All feature toggles
 
 **What requires restart (with warning), exactly the "Requires Restart" list of "Smart Config Reload":**
 - Listen address and port number
-- `ssl.*` (the TLS listener)
+- `server.ssl.*` (the TLS listener)
 - `server.daemonize`
-- `database.*` (connection pool and driver)
-- `tor.*`
+- `server.database.*` (connection pool and driver)
+- `server.tor.*`
 
 ### Sensitive Information Handling
 
@@ -8099,7 +8103,7 @@ Wherever this specification says a setting is set "in `server.yml`", it means th
 | Rule | Behavior |
 |------|----------|
 | **Keys** | Only these, for every one the project has: `server.token`; `server.security.encryption_key` and `server.security.encryption_key_version`; `server.notifications.email.smtp.password`; `server.cache.password`; `server.database.token` (libsql only); `server.database.url` and `server.cache.url` (each only while the URL carries a credential); `server.pages.contact.captcha_secret_key`; `server.ssl.letsencrypt.dns_credentials`; `data.cve.api_key`; `server.backup.encryption_password`; `server.metrics.auth.tokens.*`; every webhook URL and its `_secret` under `server.contact.{role}.webhooks`. `server.tokens.*` is token policy, not a secret. Every other key stays in its area file |
-| **Generated** | When one of these keys is empty or missing at start, the server generates it BEFORE it serves anything, writes it to `secrets.yml` (atomic, `0600`) and records `config.secret_generated` (the key name only) in `audit.log`: `server.token`; `server.security.encryption_key` (with `encryption_key_version: 1`); `server.metrics.auth.tokens.prometheus`, `.grafana` and `.loki`; and a `webhooks.<name>_secret` whenever its webhook URL is set. `server.token` is an `adm_` token and each metrics token an `mtr_` token, each plus 32 random base62 characters ("Token Catalogue") and the encryption key is 32 random bytes. Only `server.token` is printed, once, to the console at first creation ("First-start disclosure") and never logged; every other value is read from `secrets.yml` |
+| **Generated** | When one of these keys is empty or missing at start, the server generates it BEFORE it serves anything, writes it to `secrets.yml` (atomic, `0600`) and records `config.secret_generated` (the key name only) in `audit.log`: `server.token`; `server.security.encryption_key` (with `encryption_key_version: 1`); `server.metrics.auth.tokens.prometheus`, `.grafana` and `.loki`; and a `server.contact.{role}.webhooks.{transport}_secret` whenever its webhook URL `server.contact.{role}.webhooks.{transport}` is set. `server.token` is an `adm_` token and each metrics token an `mtr_` token, each plus 32 random base62 characters ("Token Catalogue") and the encryption key is 32 random bytes. Only `server.token` is printed, once, to the console at first creation ("First-start disclosure") and never logged; every other value is read from `secrets.yml` |
 | **Never generated** | Credentials that someone else issues stay empty until the operator sets them: `server.notifications.email.smtp.password`, `server.cache.password`, `server.database.token`, `server.database.url` and `server.cache.url` with a credential in them, `server.pages.contact.captcha_secret_key`, `server.ssl.letsencrypt.dns_credentials`, `data.cve.api_key`, `server.backup.encryption_password` and the webhook URLs |
 | **Rotation** | Blank a generated key in `secrets.yml` and restart: a new value is generated. `--maintenance secret rotate {name}` rotates the encryption key and the HMAC secrets with their grace periods (PART 11) |
 | **Written by** | The server writes generated, rotated and moved secrets to `secrets.yml` and ONLY there, never to `server.yml` and never to a drop-in (this limits what the server writes; an operator may still hand-write a value elsewhere, see "Operator-set values"): the first-run `server.token`, `server.security.encryption_key` with its version, and every rotation (`--maintenance secret rotate encryption_key`) |
@@ -11840,10 +11844,10 @@ The app automatically watches config files and hot-reloads what it can. Settings
 |---------|-----|
 | `server.port` | Bound socket cannot change |
 | `server.address` | Bound socket cannot change |
-| `ssl.*` | TLS listener must be recreated |
+| `server.ssl.*` | TLS listener must be recreated |
 | `server.daemonize` | Process mode cannot change |
-| `database.*` | Connection pool must be recreated |
-| `tor.*` | Child process must be restarted |
+| `server.database.*` | Connection pool must be recreated |
+| `server.tor.*` | Child process must be restarted |
 
 **Implementation:**
 
@@ -12342,7 +12346,7 @@ The server creates the owner and its primary token (hash + encrypted copy), stor
 
 | Rule | Detail |
 |------|--------|
-| Management requires the primary | Token management (reveal, rotate, restore, create/rename/expiry/revoke linked, revoke the primary) is allowed only with the primary token (owner cookie, or primary Bearer on the API mirror). A linked token on any of these returns `403` — a leaked automation token can never mint, read, or extend other tokens |
+| Management requires the primary | Token management (reveal, rotate, restore, create/rename/expiry/revoke linked, revoke the primary) is allowed only with the primary token (owner cookie, or primary Bearer on the API mirror). A linked token on any of these returns `403` — a leaked automation token can never mint, read, or extend other tokens. Primary issuance (`POST .../tokens/primary`, "Issue on request") is not management: it needs no token, and a caller presenting ANY valid token, a linked one included, gets `409 CONFLICT`, never `403` |
 | Issue on request | `POST /server/preferences/token/create` (web) and `POST /api/{api_version}/server/preferences/tokens/primary` (API) need no token: they create a new owner and its primary token, return it as `owner_token` (`201`), set the owner cookie on the web route, use the `strict` limiter, write `token.created` with `details.source` set to `issue`, and answer `409 CONFLICT` when the caller already presents a valid token (one caller never gets a second primary) |
 | Independent rotation | Rotating the primary replaces only the primary token: linked tokens keep working with their own values. Rotating a linked token replaces only that token: the primary and the other linked tokens are untouched |
 | Linked = full owner access otherwise | A linked token can do everything the primary can to the owner's resources through the API and MCP, except token management |
@@ -13875,7 +13879,7 @@ See **PART 12: SERVER CONFIGURATION** for full Valkey/Redis setup.
 | User profile | 5 minutes | Balance freshness and load |
 | Configuration | 1 minute | Quick propagation of changes |
 | Static content hash | 24 hours | Immutable content |
-| GeoIP data | 7 days | Infrequent updates |
+| GeoIP data | 7 days | The weekly update refreshes it; it is stale (health `degraded`) only after 21 days without an update (PART 19) |
 | Blocklist | 1 hour | Security updates |
 | Page cache | 5 minutes | Dynamic content |
 | API response cache | 30 seconds | Frequently changing data |
@@ -15621,8 +15625,8 @@ web:
 
 #### Tools
 
-- **One tool per API operation the project defines** (`{api_version}` routes): the public reads AND every authenticated operation, create / read / list / update / delete included, for every resource the project defines. Everything the REST API lets a caller do, that caller can do as a tool; nothing authenticated is REST-only and nothing is added that REST lacks. Generated from the same route definitions that feed Swagger and `llms.txt` — never a hand-maintained second list.
-- **Annotations come from the HTTP method** (MCP tool annotations, so a client can ask its user before a risky call): `GET` → `readOnlyHint: true`; `DELETE` → `destructiveHint: true`; `PUT` and `DELETE` → `idempotentHint: true`; `POST` and `PATCH` → `readOnlyHint: false`.
+- **One tool per API operation the project defines** (`{api_version}` routes): the public reads AND every authenticated operation, create / read / list / update / delete included, for every resource the project defines. Everything the REST API lets a caller do, that caller can do as a tool; nothing authenticated is REST-only and nothing is added that REST lacks. The one exclusion is the cookie-bound `/server/preferences/**` family (it configures a browser, not the API) together with token management and issuance, which are never tools. Generated from the same route definitions that feed Swagger and `llms.txt` — never a hand-maintained second list.
+- **Annotations come from the HTTP method** (MCP tool annotations, so a client can ask its user before a risky call): `GET` → `readOnlyHint: true`; `DELETE` → `destructiveHint: true`; `PUT` and `DELETE` → `idempotentHint: true`; `POST` and `PATCH` → `readOnlyHint: false`. A `GET` that changes state, the preferences sync import (`GET /api/{api_version}/server/preferences/sync/import`, which applies preferences and sets cookies), is never a tool: the cookie-bound `/server/preferences/**` routes are not exposed over MCP, so every tool annotated `readOnlyHint: true` is really read-only.
 - **Never a tool:** the MCP endpoint itself, and token management (see Authentication → "Token management").
 - Tool `name` = the OpenAPI `operationId`; `description` and `inputSchema` come from the OpenAPI definition; `tools/list` returns only the tools the caller's token may use.
 - A tool call dispatches **in-process into the existing handler** with the caller's `Authorization` header — no second implementation, no loopback HTTP request, no bypass of middleware (validation, rate limits, audit, the project's ownership checks).
@@ -17008,7 +17012,7 @@ All of these headers are supported regardless of proxy vendor (Nginx, Caddy, HAP
 
 **Middleware ordering — preserve the original TCP peer.** Any real-IP middleware/extractor that replaces the request's peer address with the resolved client IP MUST first store the original TCP peer (socket address) in the request extensions/context. The trusted-peer check — and every `trusted_proxies` gate in the spec (`build_url(headers, ...)`, `X-Forwarded-Prefix` handling, domain learning, CORS/CSP origin learning) — MUST evaluate that preserved original peer, never the rewritten value. Client-IP consumers (rate limiting, blocklists, access logs, GeoIP) use the resolved client IP. Rewriting first and trust-checking later makes every later gate judge the end client's public IP: proxy headers are silently dropped and `{proto}` downgrades to `http` behind a working proxy.
 
-**Tor exception:** Tor requests bypass this gate entirely. When `tor.onion_address` is set and the incoming `Host` matches it, FQDN/proto/port are resolved from `tor.*` config — no proxy header inspection, no IP check. See "Tor Hidden Service Configuration" below.
+**Tor exception:** Tor requests bypass this gate entirely. When `tor.onion_address` is set and the incoming `Host` matches it, FQDN/proto/port are resolved from `server.tor.*` config — no proxy header inspection, no IP check. See "Tor Hidden Service Configuration" below.
 
 **I2P exception:** identical to the Tor exception. When I2P is enabled (the resolved `server.i2p.enabled`) and `i2p.b32_address` is set, a request whose `Host` matches it is resolved from `i2p.*` config — always `http://`, no proxy header inspection, no IP check (the eepsite backend is a plain loopback listener with no PROXY header). When I2P is disabled or the address is unset, `.b32.i2p` Host headers are treated like any other host. See **PART 31.2 → "I2P Eepsite"**.
 
@@ -17298,7 +17302,7 @@ server:
 
 | Role | Resolution |
 |------|------------|
-| `admin` | Required. Empty → startup warning. Auto-populated from the operator's email on first install if unset. |
+| `admin` | Required. Default `admin@{fqdn}`; the operator sets the real mailbox in `server.contact.admin.email`. There is no other input for it, so nothing is filled in automatically. Empty → startup warning. |
 | `security` | `server.contact.security.email` (default `security@{fqdn}` per RFC 2142). If explicitly set to `""`, falls back to `server.contact.admin.email`. Same fallback for each webhook transport (security.webhooks.telegram → admin.webhooks.telegram). |
 | `abuse` | `server.contact.abuse.email` if set → else `server.contact.general.email` if set → else `server.contact.admin.email`. Same fallback chain for webhooks. Never defaults to `abuse@{fqdn}` automatically — RFC 2142 recommends that address, but the operator must opt in (an unprovisioned mailbox would bounce reports). |
 | `general` | `server.contact.general.email` if set → else `server.contact.admin.email`. Same fallback for webhooks. |
@@ -17331,7 +17335,7 @@ Every outbound webhook POST includes these headers so the receiver can verify th
 
 | Header | Value |
 |--------|-------|
-| `X-Webhook-Signature` | `sha256=<hex_hmac>` where `hmac = HMAC-SHA256(per_webhook_secret, request_body_bytes)`. The `per_webhook_secret` is generated at start whenever the webhook URL is set and its secret is empty (random 32 bytes, persisted in `secrets.yml` as `webhooks.<name>_secret`). It is never returned by any API response and never printed: the operator reads it from `secrets.yml` (mode `0600`) to configure the receiving end, or writes a value of their own there before the first start. |
+| `X-Webhook-Signature` | `sha256=<hex_hmac>` where `hmac = HMAC-SHA256(per_webhook_secret, request_body_bytes)`. The `per_webhook_secret` is generated at start whenever the webhook URL is set and its secret is empty (random 32 bytes, persisted in `secrets.yml` as `server.contact.{role}.webhooks.{transport}_secret`, the sibling of the URL key `{transport}`). It is never returned by any API response and never printed: the operator reads it from `secrets.yml` (mode `0600`) to configure the receiving end, or writes a value of their own there before the first start. |
 | `X-Webhook-Timestamp` | Unix seconds — receiver SHOULD reject if delta exceeds `±5 min` to prevent replay |
 | `X-Webhook-ID` | UUID v7 (PART 13) — idempotency key the receiver can use to deduplicate retries |
 | `X-Webhook-Event` | The event type (e.g., `security.report_received`, `admin.backup_failed`) |
@@ -17359,6 +17363,8 @@ if !constant_time_eq(got.as_bytes(), want.as_bytes()) {
 | `security` | Incoming security report (full content, encrypted), researcher status update, CVE assignment milestone | PGP-encrypted body if a researcher pubkey or admin pubkey is configured (PART 11 → "GPG Keypair Management"). |
 | `abuse` | Application-defined abuse events (user-flagged content, DMCA/takedown requests) and every `abuse` and `dmca` submission of the report form (`/server/contact`) | Sender name, sender email, subject, message body, and the reported resource URL when the application provides one. Spam-filtered before dispatch (PART 16 → "Contact antispam"). |
 | `general` | Fallback for `abuse`, `dmca` and `privacy` submissions of the report form (`/server/contact`) when the abuse or DPO address is empty | Sender name, sender email, subject, message body. Spam-filtered before dispatch (PART 16 → "Contact antispam"). |
+
+**Webhook payloads are always summaries.** A webhook is not encrypted end to end, so whichever role resolved, a security-role webhook included and a security -> admin fallback included, it carries only the summary (subject, severity, `tracking_id`, component and a link to the operator's report view), never a report body or a contact. The full encrypted report goes by email only.
 
 ### Privacy & Public Exposure
 
@@ -18657,7 +18663,7 @@ pub struct StatsInfo {
 | **Stable keys** | `{kind}_{id}` is a stable snake_case identifier — NEVER a file path, URL, or filename (public-safe; see Security) |
 | **Order** | Core checks first (`database`, `cache`, `disk`, `scheduler`), then `tor`, `i2p`, then dataset checks in registration order. JSON emits keys in exactly this order (custom marshaller — never an unordered map) |
 | **Cost** | `/server/healthz` reads CACHED results. The scheduler re-runs dataset checks at most every 60 seconds and after every data-set reload/update; a request NEVER triggers a disk scan, parse, or network fetch |
-| **Freshness** | Each data set declares a `max_age` (e.g. 7 days for GeoIP, 72 hours for every blocklist source, fixed, no per-source field); the check compares last successful load/update against it |
+| **Freshness** | Each data set declares a `max_age` (e.g. 21 days for GeoIP, 72 hours for every blocklist source, fixed, no per-source field; the GeoIP update itself runs weekly, so 21 days is three missed runs, and the timestamp that drives it is `{data_dir}/security/geoip/.last_updated`); the check compares last successful load/update against it |
 | **Public-safe** | `ok` / `degraded` / `error` only — no paths, URLs, sizes, record counts, versions, or error text |
 
 **Frontend labels:** the Component Status table shows one row per check. Labels come from i18n keys `health.check.{key}`; a key with no translation uses the translated generic label `health.check.unknown` ("Check: {key}") with the stable key as the `{key}` value (`blocklist_ads` → "Check: blocklist_ads"); the key is data, so no English label is ever built or humanized in code. Dataset rows follow the core rows, grouped under their kind.
@@ -25121,7 +25127,7 @@ Preferences aren't tied to identity — any two guests who set the same `theme`/
 | 15 | **Page layout and buttons** | `/server/preferences` is ONE `<form method="POST" action="/server/preferences">` carrying the CSRF token and every section: appearance (`theme`), language (`lang`), cookie-consent and CCPA controls, every `{project_name}_pref_{key}` control — all sections always visible, none collapsed or revealed by a button. A **More preferences** card, outside the form, links every registered preferences page (see "Preferences and Help Hubs"). The form has exactly three action buttons (the header theme toggle is a separate mini-form on other pages and is not part of this page's form): **Save** (submit; applies every changed field, then `303` per rules 9–10), **Cancel** (a link to the rule 10 redirect target; discards unsaved edits, sends no write) and **Reset** (a `type="button"` with `popovertarget` that opens a native HTML `popover` — no JS; the popover holds the warning, an **Erase everything** submit with `action=reset`, and a dismiss control using `popovertargetaction="hide"`; those two belong to Reset, not to the page's button set; forgets the visitor completely: every noncredential cookie this app set — `theme`, `lang`, `{project_name}_pref_*`, `cookie_consent`, `ccpa_opt_out`, `{project_name}_build`, plus any other noncredential cookie the project defines (announcement dismissals, flash messages, age-verification or content-acknowledgment cookies, forwarding preferences) — is deleted (`Max-Age=0`, same `Path`/attributes as rule 8), and the `303` carries `Clear-Site-Data: "storage"` to wipe localStorage/sessionStorage/IndexedDB without JS. Defaults apply and the consent banner returns on the next page. Never deletes session, CSRF or other credential cookies — signing out is a separate action. The popover warning states exactly what is erased. Only Reset confirms — Save and Cancel never ask for confirmation. The popover is styled with CSS, and a direct `POST action=reset` behaves identically on the server). No per-section save buttons and no "Sync", "Export", "Import" or "Show" buttons: sync has its own page. Every other preferences page (`/server/preferences/sync`, `/server/preferences/tokens` where the project has owner tokens, and project pages) is NOT part of this form: each lives on its own page, reached from the More preferences card, and those pages' own forms are exempt from this button limit. Reset never deletes credential cookies: session, CSRF and the owner-token cookie |
 | 16 | **Web save never `400`** | `400 VALIDATION_FAILED` (rule 11) is API-only. A web `POST /server/preferences` or `POST /server/preferences/sync` always answers `303` (rule 9) — including empty submits, unchecked checkboxes (absent fields), invalid values (dropped) and a bad `code`. The only `4xx` is a missing/invalid CSRF token (`403`), so every preferences form MUST always render the token and post only to the canonical route, never to the `/api/{api_version}/…` mirror |
 | 17 | **Consent and CCPA controls** | The page form's cookie-consent toggles (`consent_preferences`, `consent_analytics`; `essential` is always on and not a field) and the CCPA opt-out toggle (`ccpa_opt_out`, rendered only when `server.privacy.data.sold` is `true`; otherwise absent and never written) are web-form-only controls handled by `POST /server/preferences`, with a hidden `consent_form=1` marker rendered inside the form. They are applied only when `consent_form=1` is present — an unchecked checkbox then means off, while a POST without the marker (the header theme toggle) never touches consent or CCPA. Applying writes `cookie_consent` (JSON per PART 16 consent state, with a fresh timestamp in Unix seconds) and `ccpa_opt_out` with the rule 8 attributes. Import and the API mirror never write them, Reset deletes them (rule 15), and they are never exported (rule 1). The privacy page's own CCPA form is the one other writer of `ccpa_opt_out` (`POST /server/ccpa`), as the cookie banner is the other writer of `cookie_consent` (`POST /server/consent`) |
-| 18 | **Consent gate** | An explicit preference action (Save, Import, an API write) is not itself consent to the Preferences cookie category, and a visitor who has taken no consent action has the category off. `theme`, `lang` and every `{project_name}_pref_{key}` cookie belong to the **Preferences** cookie category, not to the essential one, so import, save and sync set them only on a device whose `cookie_consent` has `preferences: true` (the same per-device consent that is never exported, rule 1). The gate sits in the one shared implementation, after validation and before any cookie is written, for the web routes and the API mirror alike. When the category is not accepted (no `cookie_consent` cookie, or `preferences: false`): nothing is written, `applied` is empty, every valid value is reported in `ignored`, and the API `data` carries `"consent_required": true`. The web route still answers `303` (rules 9 and 16), never a `4xx`, and the redirect carries `consent_required=1` as a query parameter that the landing page reads, never stores, and turns into a notice pointing at the cookie-consent toggle of rule 17. An import link opened on a new device therefore applies nothing until that device's visitor accepts Preferences and opens the link again; the server keeps no pending state. While the cookies are absent the page renders with the defaults (the language detected from `Accept-Language`) |
+| 18 | **Consent gate** | An explicit preference action (Save, Import, an API write) is not itself consent to the Preferences cookie category, and a visitor who has taken no consent action has the category off. `theme`, `lang` and every `{project_name}_pref_{key}` cookie belong to the **Preferences** cookie category, not to the essential one, so import, save and sync set them only on a device whose `cookie_consent` has `preferences: true` (the same per-device consent that is never exported, rule 1). The gate sits in the one shared implementation, after validation and before any cookie is written, for the web routes and the API mirror alike. When the category is not accepted (no `cookie_consent` cookie, or `preferences: false`): nothing is written, `applied` is empty, every valid value is reported in `ignored`, and the API `data` carries `"consent_required": true`. The web route still answers `303` (rules 9 and 16), never a `4xx`, and the redirect carries `consent_required=1` as a query parameter that the landing page reads, never stores, and turns into a notice pointing at the cookie-consent toggle of rule 17. An import link opened on a new device therefore applies nothing until that device's visitor accepts Preferences and opens the link again; the server keeps no pending state. While the cookies are absent the page renders with the defaults (the language detected from `Accept-Language`). **The header toggles are gated too.** The no-JavaScript header theme POST and the language switcher are preference writes like any other: with no consent they write nothing, answer `303` with `consent_required=1` (the notice of rule 17 appears) and the theme or language does not change. Only the JS instant preview (`static/js/theme.js`) may change the `<html>` class for the CURRENT page view, and it stores nothing. **Cookie visibility is one rule for every preference cookie** (`theme`, `lang`, `{project_name}_pref_{key}`): not HttpOnly, because the preview script reads them, and set only after consent; `owner_token` is the one HttpOnly cookie in this family |
 
 **Page layout (`/server/preferences`) — one form, one Save, always visible, then the More preferences card:**
 ```
@@ -27513,7 +27519,7 @@ server:
 | Rule | Behavior |
 |------|----------|
 | **Format** | `md` is Markdown, rendered by the project's Markdown renderer. `html` is a fragment (no `<html>`, `<head>` or `<body>`). `txt` is plain text: HTML-escaped, a blank line starts a paragraph. `header` and `footer` are `html` only |
-| **Sanitizing** | Every body is sanitized before it renders; nothing the operator writes can run script. `header` and `footer` use the strict policy of "Footer Customization → Custom HTML Validation". `about`, `privacy` and `terms` (after Markdown rendering) use the same policy plus `table`, `thead`, `tbody`, `tr`, `th`, `td`, `pre`, `code`, `blockquote`, `hr`, `dl`, `dt`, `dd`, `sup`, `sub`, so ordinary documents keep their tables and code blocks |
+| **Sanitizing** | Every body is sanitized before it renders; nothing the operator writes can run script. `header` and `footer` use the strict policy of "Footer Customization → Custom HTML Validation". `about`, `privacy` and `terms` (after Markdown rendering) use the same policy plus `table`, `thead`, `tbody`, `tr`, `th`, `td`, `pre`, `code`, `blockquote`, `hr`, `dl`, `dt`, `dd`, `sup`, `sub`, so ordinary documents keep their tables and code blocks. No policy allows `<h1>`: the page title is the page's one `<h1>`, so a heading in any operator body is `<h2>` or lower (a Markdown `#` heading renders as `<h2>`) |
 | **Language** | A `body` map picks the request's resolved language (PART 30 → "I18N & A11Y"), then its `default` key, then the built-in content. A plain string is used for every language |
 | **Variables** | The placeholders of "Footer Customization → Available Footer Variables" work in every body |
 | **Links** | A body MUST NOT link `/server/contact` (PART 16 → "Who can reach the form"). Scripts, styles, forms and frames are stripped by the sanitizer |
@@ -28348,7 +28354,7 @@ pub fn validate_footer_html(html: &str) -> Result<String> {
 | `<a href="...">` | `<object>`, `<embed>` |
 | `<img src="...">` | `<form>`, `<input>`, `<button>` |
 | `<ul>`, `<ol>`, `<li>` | `<style>`, `<link>` |
-| `<h1>`-`<h6>` | `<meta>`, `<base>` |
+| `<h2>`-`<h6>` (never `<h1>`) | `<meta>`, `<base>` |
 | `class`, `id` attributes | `onclick`, `onerror`, etc. |
 | | `javascript:` URLs |
 | | `style` attribute |
@@ -32826,7 +32832,7 @@ When compliance mode is on:
 | Remove encryption | Only while compliance mode is off | Cannot remove while compliance mode is on |
 
 **Important:**
-- Old backups encrypted with old password still need old password to restore
+- Old backups encrypted with old password still need old password to restore; the first run after a change makes a new full and skips the incremental ("Incremental Backup Contract" -> Password change)
 - No password recovery - if lost, backups are unrecoverable
 - The Argon2id login-password hashing rule (PART 11) does not apply to this password: it is key material, and Argon2id is used here only to derive the encryption key
 
@@ -33154,6 +33160,7 @@ on a Sunday counts as daily + weekly + monthly + yearly - uses highest priority)
 | **Base protection** | Retention never deletes a full that is the `base_backup` of a retained incremental |
 | **Verification** | An incremental is verified like a full, plus: base file exists and its SHA-256 equals `base_sha256` |
 | **First run** | No previous full: skip the daily incremental |
+| **Password change** | Every encrypted archive's manifest records `key_id`, a non-secret identifier of its encryption key (the first 8 hex characters of `HMAC-SHA256(derived_key, "key-id")`; never the password or the key). When the base full's `key_id` differs from the current key's, the run skips the incremental (as on the first run) and creates a new full under the new password. The incremental that already exists keeps its old base and old password until the next run replaces it, so the full + at most one incremental chain is always decryptable with ONE password |
 
 **Restore (`--maintenance restore <file>`):**
 
@@ -35509,7 +35516,7 @@ make build
 | **Copy to system dirs** | `cp binaries/app /usr/local/bin/` | Stale binaries, version confusion |
 | **Symlink for testing** | `ln -s ../binaries/app test/app` | Use full path instead |
 | **Copy between dirs** | `cp binaries/app releases/app` | Use the CI/CD release process (or the `make release` staging below) |
-| **Install locally** | Any form of "installing" the binary | Run from `binaries/` directly |
+| **Install locally** | Any form of "installing" the binary on the development machine | Run from `binaries/` directly |
 
 ### Correct Usage
 
@@ -35540,6 +35547,8 @@ The **only** times binaries are copied are the CI/CD release process, the `make 
 **This is handled by CI/CD, not manual commands.**
 
 **Disposable test containers (the third exception).** `tests/*.sh` may push the binary into a Docker or Incus test container, and may copy it under another name inside that container for the rename test (PART 28). That copy exists only inside the container, the file in `binaries/` is never modified, and the container is removed when the test ends. Copies on the host (`/tmp`, `/usr/local/bin`, `releases/` by hand) stay prohibited, with ONE allowance: a test script may stage the binary it tests in its own `{tempdir}/{project_org}/{internal_name}-XXXXXX/` directory (to pick the musl build), and its `trap` removes that directory.
+
+**Operator-side install (the fourth exception).** `--service --install` (PART 23) and the packages and installers (PART 24) place the binary at the service path (`/usr/local/bin/{project_name}`) on the machine that will run it. That is the operator's action on their own system: AI sessions and development workflows never run it on the development machine, and the rules above stay in force there.
 
 ## Release Artifacts
 
@@ -37809,8 +37818,8 @@ jobs:
           elif [ "${{ gitea.event_name }}" = "pull_request" ]; then
             BASE="${{ gitea.event.pull_request.base.sha }}"; HEAD="${{ gitea.event.pull_request.head.sha }}"
           fi
-          echo "base=$BASE" >> "$GITHUB_OUTPUT"
-          echo "head=$HEAD" >> "$GITHUB_OUTPUT"
+          echo "base=$BASE" >> "$GITEA_OUTPUT"
+          echo "head=$HEAD" >> "$GITEA_OUTPUT"
       - name: Scan for secrets (truffleHog)
         uses: trufflesecurity/trufflehog@b2b0a92070f206ab7b5a1105d82a7f2f48d92341  # v3.99.0
         with:
@@ -44908,6 +44917,9 @@ server:
     # Publish the .onion address in /api/autodiscover (default false: advertised only on the operator's explicit say-so)
     expose: false
 
+    # Contact email shown on Tor responses (security.txt, contact pages, error pages); empty = no email, never the clearnet address
+    contact_email: ""
+
     # --- Outbound Network Settings ---
     # Use Tor network for outbound connections (server-wide setting)
     use_network: false
@@ -45265,6 +45277,11 @@ pub struct TorConfig {
     // Binary path (empty = auto-detect)
     pub binary: String,
 
+    // Publish the .onion address in /api/autodiscover, default false
+    pub expose: bool,
+    // Contact address shown on Tor responses; empty = none, never the clearnet address
+    pub contact_email: String,
+
     // Outbound network settings
     pub use_network: bool,
 
@@ -45305,6 +45322,8 @@ pub fn default_tor_config() -> TorConfig {
     TorConfig {
         // auto-detect
         binary: String::new(),
+        expose: false,
+        contact_email: String::new(),
         use_network: false,
         max_circuits: 32,
         circuit_timeout: 60,

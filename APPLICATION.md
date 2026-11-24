@@ -855,6 +855,8 @@ The `assets/` directory in the repo holds source files (fonts, icons, default th
 | Cargo package name (`[package].name`) | lowercase, hyphenated | `notes-app` |
 | Rust crate identifier (used in `use`, `extern crate`) | lowercase, underscored — Cargo auto-converts hyphens | `notes_app` |
 
+**Operator-side install (the fourth exception).** `--service --install` (PART 23) and the packages and installers (PART 24) place the binary at the service path (`/usr/local/bin/{project_name}`) on the machine that will run it. That is the operator's action on their own system: AI sessions and development workflows never run it on the development machine, and the rules above stay in force there.
+
 ## Release Artifacts
 
 - Primary binary follows the naming schema `{project_name}-{platform}-{arch}{.ext}` defined in PART 2 → "Binary Model" — single statically linked file, `-musl`/vendor/ABI tokens stripped
