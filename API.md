@@ -4325,7 +4325,7 @@ Every feature MUST work via:
 | `/quotes` | `/api/{api_version}/quotes` | Project feature (example) |
 | `/quotes/random` | `/api/{api_version}/quotes/random` | Project feature (example) |
 | `/server/docs/swagger` | `/api/{api_version}/server/swagger` (also `/api/swagger` alias) | Swagger UI / OpenAPI JSON spec |
-| `/server/docs/graphql` | `/api/{api_version}/server/graphql` (also `/api/graphql` alias) | GraphiQL UI / GraphQL POST endpoint |
+| `/server/docs/graphql` | `/api/{api_version}/server/graphql` (also `/api/graphql` alias) | GraphiQL UI / GraphQL endpoint (POST, and GET for queries) |
 
 **This pattern applies to ALL features:**
 - Every server-management endpoint exposed via REST is reachable under `/api/{api_version}/server/...`
@@ -9000,8 +9000,8 @@ server:
         enabled: true
         # Daily: 3:00 AM (after backup at 2:00)
         schedule: "0 3 * * *"
-        # Renew 7 days before expiry
-        renew_before: 7d
+        # No other key: the renewal window is not configurable. The task renews a managed certificate
+        # when 30 days or fewer remain (Let's Encrypt certificates last 90 days)
 
       # Health checks
       health_check:
@@ -9159,7 +9159,7 @@ Before proceeding, confirm you understand:
 
 ## Debug Endpoints (`--debug` / `DEBUG=true` Only)
 
-**Debug endpoints are ONLY available when `--debug` flag or `DEBUG=true` is set. Otherwise returns 404. When enabled, EVERY `/debug/*` endpoint additionally requires the operator token (`server.token`) as a Bearer credential — `--debug` turns the endpoints on, it never replaces authentication.**
+**Debug endpoints are ONLY available when `--debug` flag or `DEBUG=true` is set. Otherwise returns 404. The tree exists ONLY at the root `/debug/*` (operator diagnostics, not part of the versioned API): there is no `/api/{api_version}/debug/*` route and no `/api/debug/*` alias. When enabled, EVERY `/debug/*` endpoint additionally requires the operator token (`server.token`) as a Bearer credential — `--debug` turns the endpoints on, it never replaces authentication.**
 
 ### Debug API Endpoints
 
@@ -17419,7 +17419,7 @@ if !constant_time_eq(got.as_bytes(), want.as_bytes()) {
 | `abuse` | Application-defined abuse events (user-flagged content, DMCA/takedown requests) and every `abuse` and `dmca` submission of the report form (`/server/contact`) | Sender name, sender email, subject, message body, and the reported resource URL when the application provides one. Spam-filtered before dispatch (PART 16 → "Contact antispam"). |
 | `general` | Fallback for `abuse`, `dmca` and `privacy` submissions of the report form (`/server/contact`) when the abuse or DPO address is empty | Sender name, sender email, subject, message body. Spam-filtered before dispatch (PART 16 → "Contact antispam"). |
 
-**Webhook payloads are always summaries.** A webhook is not encrypted end to end, so whichever role resolved, a security-role webhook included and a security -> admin fallback included, it carries only the summary (subject, severity, `tracking_id`, component and a link to the operator's report view), never a report body or a contact. The full encrypted report goes by email only.
+**Webhook payloads are always summaries.** A webhook is not encrypted end to end, so whichever role resolved, a security-role webhook included and a security -> admin fallback included, it carries only the summary (subject, severity, `tracking_id`, component and the command that reads the report, `{project_name} --maintenance security <action> {tracking_id}` (there is no admin UI and no operator report-view URL, so no link is sent)), never a report body or a contact. The full encrypted report goes by email only.
 
 ### Privacy & Public Exposure
 
@@ -19421,7 +19421,7 @@ Plain text, no color. The first line is always `{project_name} {project_version}
 
 | Path | Kind | Rule |
 |------|------|------|
-| `/api/swagger`, `/api/graphql`, `/api/healthz`, `/api/metrics[/{service}]`, `/api/mcp`, `/api/debug/*` | Alias of a versioned canonical route | Mounts the SAME handler as the canonical route for the current `{api_version}`; never a redirect (see "Unversioned API aliases") |
+| `/api/swagger`, `/api/graphql`, `/api/healthz`, `/api/metrics[/{service}]`, `/api/mcp` | Alias of a versioned canonical route | Mounts the SAME handler as the canonical route for the current `{api_version}`; never a redirect (see "Unversioned API aliases") |
 | `/mcp` | Root alias of `/api/{api_version}/server/mcp` | Same handler, never a redirect; API-class (see "MCP Endpoint") |
 | `/api/autodiscover` | Unversioned by design | Clients call it before they know the API version; it has no versioned form |
 
@@ -21024,6 +21024,7 @@ Need additional compatible endpoints?"
 | `/api/healthz` | GET | None | Health check JSON — direct alias for current `{api_version}` |
 | `/api/{api_version}/server/swagger` | GET | None | OpenAPI JSON spec (versioned) |
 | `/api/{api_version}/server/graphql` | POST | None | GraphQL queries (versioned; schema may differ across versions) |
+| `/api/{api_version}/server/graphql` | GET | None | The same queries over GET (`query`, optional `variables` and `operationName` parameters; the API is query-only, so a GET can never mutate). This is the link target of the no-JavaScript docs card; a request with no `query` answers a short usage message |
 | `/api/{api_version}/server/mcp` | POST | Bearer (required) | MCP endpoint (versioned; Streamable HTTP, same tokens as the API) |
 | `/api/{api_version}/server/healthz` | GET | None | Health check (JSON default; text via API rules) |
 | `/server/preferences` | GET, POST | None (POST: CSRF) | Guest preferences hub and save form; links every registered preferences page; `POST` sets cookies, `303` |
@@ -21048,7 +21049,7 @@ Need additional compatible endpoints?"
 | The contract is stable across versions OR the alias is documented as "current version's contract" | The contract is version-specific and clients should pin a version |
 | The cost of forcing clients to read `/api/autodiscover` first is real | Versioning is the whole point (e.g., `/api/{api_version}/items`) |
 
-**Examples that get an alias:** `/api/swagger`, `/api/graphql`, `/api/healthz`, `/api/metrics[/{service}]`, `/api/mcp` (plus the root `/mcp`), `/api/debug/*` (the complete set, see "Unversioned API Exceptions"). `/api/autodiscover` is not an alias; it is unversioned by design.
+**Examples that get an alias:** `/api/swagger`, `/api/graphql`, `/api/healthz`, `/api/metrics[/{service}]`, `/api/mcp` (plus the root `/mcp`) (the complete set, see "Unversioned API Exceptions"). `/api/autodiscover` is not an alias; it is unversioned by design.
 **Examples that do NOT get an alias:** `/api/{api_version}/items`, `/api/{api_version}/server/contact` (these stay versioned only).
 
 **Why "served directly — no redirect" (not a 301/302 to the versioned URL):**
@@ -23418,7 +23419,7 @@ Use CSS custom properties for repeated or long strings. Never hardcode them inli
 
 ## CSS Variable Reference
 
-**All components use these CSS variables for consistent theming** — copy the block into `static/css/variables.css`:
+**All components use these CSS variables for consistent theming** — copy the block into the `:root {}` of `static/css/common.css`:
 
 ```css
 :root {
@@ -23432,7 +23433,8 @@ Use CSS custom properties for repeated or long strings. Never hardcode them inli
 
   /* Text */
   --color-text: #f8f8f2;
-  --color-muted: #6272a4;
+  /* 4.5:1 or better on every dark surface below (bg, secondary, card, code) */
+  --color-muted: #939fcc;
 
   /* Borders */
   --color-border: #44475a;
@@ -27233,8 +27235,8 @@ pub struct IndexPage {
 
 | Screen Size | Width |
 |-------------|-------|
-| ≥ 768px | 90% (5% margins) |
-| < 768px | 98% (1% margins) |
+| ≥ 768px | 90% (5% margins), `max-width: 1400px` |
+| < 768px | 100% width with 1rem side padding (the "Container" rule) |
 | Footer | Always centered, always at bottom |
 
 ## Themes (NON-NEGOTIABLE - PROJECT-WIDE)
@@ -27279,7 +27281,7 @@ pub struct IndexPage {
 | Swagger theming | `src/swagger/theme.rs` | Swagger UI theme application |
 | GraphQL theming | `src/graphql/theme.rs` | GraphiQL theme application |
 | WebUI theming | `templates/` | HTML template theme classes |
-| CSS variables | `static/css/variables.css` (embedded in the binary with the other static assets) | Theme-specific CSS custom properties: the one canonical location, never copied into templates |
+| CSS variables | `static/css/common.css`, in its `:root {}` block (embedded in the binary with the other static assets) | Theme-specific CSS custom properties: the one canonical location, never copied into templates; there is no separate `variables.css` |
 | **TUI theming** | `src/client/tui/styles.rs` | Ratatui styles from palette |
 | **CLI colors** | `src/client/cli/output.rs` | ANSI colors from palette |
 | **GUI theming** | `src/client/gui/theme.rs` | Native widget theming |
@@ -27892,7 +27894,7 @@ Both routes carry the same items. They are fixed-format files like `sitemap.xml`
 | Summary | Plain text, at most 280 characters, XML-escaped; never raw HTML or full private content |
 | Author | Only when the author is publicly shown on the item's own page; otherwise omitted |
 
-**Which items appear:** only items an anonymous visitor can already see and that are listed publicly. Never private, unlisted, password-protected, expired, deleted, moderated-away or burn-after-read items. The public-info rule (PART 11) applies to every feed byte. All text is XML-escaped and characters invalid in XML 1.0 are removed.
+**Which items appear:** only items an anonymous visitor can already see and that are listed publicly. Never private, unlisted, password-protected (an item a project locks with its own access password, defined in IDEA.md; user profiles have no password), expired, deleted, moderated-away or burn-after-read items. The public-info rule (PART 11) applies to every feed byte. All text is XML-escaped and characters invalid in XML 1.0 are removed.
 
 **Recent-search filtering (meta search and any project that lists searches):** a recent-search feed is always served (no setting turns it off). It lists the query text and the time only, never an IP, user, session or result. Before an entry is stored or served, the query is dropped, not masked, when any of these match:
 
@@ -29899,7 +29901,7 @@ curl -H "Accept: application/xml" https://jokes.example.com/api/v1/joke</code></
 | `#limits` | Behavior and limits | `POST` only; no sessions; the same rate limits and audit as the API; `Origin` validated; the supported MCP protocol versions |
 | `#troubleshooting` | Troubleshooting | A table of `400` (protocol-version or header mismatch), `401` (missing, invalid or expired token — `WWW-Authenticate: Bearer`), `403` (bad `Origin` or insufficient scope), `405` (GET or DELETE; the endpoint is POST-only) with the fix for each |
 
-**Project expansion (required content):** the project appends its own section, `#project`, after the base sections. The text comes from IDEA.md `## Business logic` and is stored as Markdown in `server.pages.help.mcp` (canonical storage is `server.yml` `server.pages.help.mcp`, edited there by the operator and applied on config reload; a project that has an admin panel also exposes it in Pages → Help. API projects have no admin panel or web editor, so `server.yml` is the only editing path). It MUST use the project's real tool names and real data — example prompts a user can paste into an assistant, per-tool tips and limits, and documentation of any MCP resources or prompts the project exposes. It never repeats or contradicts the base sections, and generic placeholder text is forbidden (same rule as `/server/help`).
+**Project expansion (required content):** the project appends its own section, `#project`, after the base sections. The text comes from IDEA.md `## Business logic` and is stored as Markdown in `server.pages.help.mcp` (canonical storage is the `yaml.d/pages.yml` area file, key `server.pages.help.mcp`, edited there by the operator and applied on config reload; a project that has an admin panel also exposes it in Pages → Help. API projects have no admin panel or web editor, so the `yaml.d/pages.yml` area file is the only editing path). It MUST use the project's real tool names and real data — example prompts a user can paste into an assistant, per-tool tips and limits, and documentation of any MCP resources or prompts the project exposes. It never repeats or contradicts the base sections, and generic placeholder text is forbidden (same rule as `/server/help`).
 
 **JSON body (`GET /api/{api_version}/server/help/mcp`, envelope `{ "ok": true, "data": ... }`; field names are fixed):**
 ```json
@@ -30027,6 +30029,7 @@ server:
 | `/api/{api_version}/server/healthz` | GET | Health check (JSON default; text via API rules) |
 | `/api/{api_version}/server/swagger` | GET | OpenAPI JSON spec |
 | `/api/{api_version}/server/graphql` | POST | GraphQL endpoint |
+| `/api/{api_version}/server/graphql` | GET | GraphQL queries over GET (`query`, `variables`, `operationName`; queries only) |
 | `/api/{api_version}/server/mcp` | POST | MCP endpoint (Streamable HTTP) |
 
 **Direct alias endpoints (same handler, no redirect):**
@@ -36179,7 +36182,7 @@ exec $APP_BIN --address "${LISTEN:-[::]}" $FLAGS "$@"
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TZ` | `America/New_York` | Timezone for app and scheduler |
-| `MODE` | `development` | `production` (`prod`) strict · `development` (`dev`/`devel`) relaxed · `debug` explicit-only |
+| `MODE` | not set (the binary defaults to `production`) | `production` (`prod`) strict · `development` (`dev`/`devel`) relaxed · `debug` explicit-only |
 | `DEBUG` | `false` | Enable ALL debug features (debug endpoints, detailed logging) |
 | `LISTEN` | `[::]` | Listen address (`[::]` = IPv4 + IPv6; `0.0.0.0` = IPv4 only) |
 | `PORT` | `80` | Listen port (update docker-compose ports: to match) |
