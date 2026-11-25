@@ -699,7 +699,7 @@ let cache_size = (avail_mem / 10)
 | **Generated text is fully expanded** | Release notes, release names and descriptions, asset names and links, labels and any other text a workflow generates MUST contain real values, never a literal `${VAR}`, `${{ … }}` or a spec placeholder such as `{project_name}`. Shell: build a file with an unquoted heredoc or `printf` (a quoted heredoc is only for text that must stay literal). GitHub/Gitea/Forgejo YAML values use `${{ env.X }}`; shell `${X}` is not expanded there. GitLab keywords outside `script:` (`release:` name, description and assets, `artifacts:paths`) expand only `$VAR` / `${VAR}`, never `${VAR:0:7}` or `${VAR#v}`: compute the value in an upstream job and pass it with a dotenv report. Jenkins: Groovy `"…"` strings interpolate, `'…'` strings do not. Any workflow that builds its own notes or description file runs the guard step below before publishing |
 | **Build metadata** | Passed as env vars (VERSION, COMMIT_ID, BUILD_EPOCH, OFFICIAL_SITE) and embedded via `build.rs` → `option_env!("APP_*")`: version, commit ID, build epoch, official site; `BUILD_DATE` is derived from `BUILD_EPOCH` (build systems for the Docker OCI label, `build_date()` in-app) — never independently captured |
 | **Docker builds on EVERY push** | Any branch push triggers Docker image build |
-| **Docker tags** | Any push → `{commit_id}`; beta → adds `beta`; tag → `{version}`, `latest`, `{yymm}`, `{commit_id}`; `devel` = built by the `build-devel` job in `docker.yml` from `docker/Dockerfile.dev`, on every push to `main`/`master` and on a daily schedule |
+| **Docker tags** | Any push to `main` → `{commit_id}`; a `*-beta` tag → adds `beta`; tag → `{version}`, `latest`, `{yymm}`, `{commit_id}`; `devel` = built by the `build-devel` job in `docker.yml` from `docker/Dockerfile.dev`, on every push to `main`/`master` and on a daily schedule |
 | **Workflow permissions** | Default to read-only / least privilege; grant write only to the specific release/publish job that needs it |
 | **Third-party action pinning** | External actions MUST be pinned to a full commit SHA — never float on `@main`, `@master`, or broad tags; verify runtime and maintenance status on every SHA update |
 | **Unsafe PR triggers forbidden by default** | Do NOT use `pull_request_target` for untrusted code execution, build, test, or artifact upload paths |
@@ -2796,6 +2796,7 @@ resize_for_context() {
 | "Health check lives at `/health` and returns plain text" | HOW, and it contradicts AI.md (health routes and formats) | Remove; AI.md defines it |
 | "Skip the security headers, this is an internal tool" | A waiver of a mandatory requirement | Remove; mandatory parts are built exactly as AI.md defines them |
 | "Publishes a raw TCP paste port 9999" | WHAT (AI.md says such a port is documented in IDEA.md) | Keep |
+| The `### API routes` inventory of the project's own routes (`/api/{api_version}/pastes`) | WHAT, by explicit exception: PART 14 requires this inventory in IDEA.md as the build-time route contract, so it stays even though routes are otherwise HOW | Keep; it lists only routes the project defines, never the template's own (health, auth, docs, well-known) |
 
 **IDEA.md may declare only what AI.md explicitly lets it declare:** the product's features, data models, business rules and audience; the template's explicitly OPTIONAL capabilities the project uses (except PARTS 34-36, whose activation is declared in SPEC.md only); and the specific items AI.md names as "declared in IDEA.md" (for example a custom build image, a custom raw port, a data class or compliance profile). Everything else IDEA.md says about HOW is either a copy of AI.md (remove it: duplicated rules drift when AI.md changes) or a contradiction (fix it). IDEA.md refers to AI.md by PART number instead of restating a rule.
 
@@ -4330,7 +4331,7 @@ Every feature MUST work via:
 - Every public web page has a corresponding public API (exception: a page reached only through a one-shot emailed link, such as `/server/security/report/{tracking_id}`)
 - Project-specific features (IDEA.md) follow same pattern
 
-**Rule (the pairing rule):** every web page has a corresponding API endpoint, and every USER-FACING API endpoint (project features and public server pages) has a web page that shows the same data. **Exception, system-only endpoints:** an endpoint that only programs call, never a person in a browser (the token check `/api/{api_version}/server/auth/check`, the MCP endpoint, `/api/autodiscover`, and any route whose route-table row says "machine-only"), is API-only: it has no page, and that is never a defect. PART 14 → "Frontend-Backend Integration" and the FINAL checklist apply this rule; they neither widen nor narrow it.
+**Rule (the pairing rule):** every web page has a corresponding API endpoint, and every USER-FACING API endpoint (project features and public server pages) has a web page that shows the same data. **Exception, system-only endpoints:** an endpoint that only programs call, never a person in a browser (the token check `/api/{api_version}/server/auth/check`, the MCP endpoint, `/api/autodiscover`, and any route whose route-table row says "machine-only"), is API-only: it has no page, and that is never a defect. **Exception, privileged features:** a feature that needs operator or admin authority is paired with a page only where the template defines a browser credential for it (the admin session of SERVER and HYBRID projects). A project with no browser credential (an API project, whose operator credential is the Bearer `server.token`) exposes its privileged operations through the API and the CLI only and never builds a page or form for them; the pairing rule applies to non-privileged features. PART 14 → "Frontend-Backend Integration" and the FINAL checklist apply this rule; they neither widen nor narrow it.
 
 ---
 
@@ -8146,7 +8147,7 @@ Wherever this specification says a setting is set "in `server.yml`", it means th
 | **Early read** | The early config read (PART 8 startup, step 8e) never opens `secrets.yml`: it needs only `server.port`, `server.address`, `server.daemonize` and `server.pidfile`, plus each raw-protocol listener's `{proto}.enabled`, `{proto}.address` and `{proto}.port` |
 | **Permissions** | Always `0600` (PART 8 → "Directory Validation Rules": private paths); a wrong mode is fixed at start |
 | **Reload** | The file watcher watches it with `server.yml`, `yaml.d/` and `assets/`; a change re-merges everything and an invalid result keeps the last good config |
-| **Backup** | Included in every backup whenever it exists (PART 21 → "Backup Contents"), so a restore brings back the same token and encryption key |
+| **Backup** | Included in every backup whenever it exists (PART 21 → "Backup Contents"), so a restore brings back the encryption key and every other secret. `server.token` is the one exception: it is left out of the backup copy (PART 11), and a restore keeps the target host's own token, or generates one (printed once) when it has none |
 | **Never exposed** | Secret values are never logged, never printed by `--config` (shown as `********`), and never returned by any API response (PART 11) |
 ### Connection Strings (database and cache)
 
@@ -11129,9 +11130,9 @@ PHASE 5: Server startup (actual server start)
     └─ Configure rotation (per-log rotate/keep policies)
 
 15. Initialize database:
-    ├─ Connect to the databases (SQLite: {data_dir}/db/server.db for server state, and {data_dir}/db/users.db for admins, users and tokens, PART 10)
-    ├─ Create each database file if missing
-    ├─ Run CREATE TABLE IF NOT EXISTS for all tables of each database
+    ├─ Connect to database (SQLite: {data_dir}/db/server.db)
+    ├─ Create database file if missing
+    ├─ Run CREATE TABLE IF NOT EXISTS for all tables
     ├─ Run schema migrations if needed
     └─ Verify database integrity
 
@@ -12115,7 +12116,8 @@ async fn open_database(cfg: &Config) -> anyhow::Result<Database> {
 
 -- ----------------------------------------------------------------------------
 -- Rate Limiting (sliding window counter: the current and the previous fixed window)
--- allowed while prev_count * (1 - elapsed / window) + count is below the limit, where elapsed is the seconds since window_start;
+-- the request is counted first, then allowed while prev_count * (1 - elapsed / window) + count (this request included) is AT MOST the limit,
+-- so a limit of 120 allows exactly 120 requests per window and the 121st gets 429; elapsed is the seconds since window_start;
 -- when now passes window_start + window, count becomes prev_count and a new window starts
 -- ----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS rate_limits (
@@ -17155,7 +17157,7 @@ These are concrete cases of parity-principle point 2 — features that cannot wo
 | **Third-party clearnet embeds** — external CDNs, fonts, scripts, remote images, analytics | Loading a clearnet URL from a `.onion` page either fails or deanonymizes the user by forcing a non-Tor request. | Serve every asset same-origin from the onion; ship fonts/scripts/images locally; disable third-party analytics for Tor requests. |
 | **Third-party OAuth / SSO login** | Many providers reject `.onion` redirect URIs and will not federate to a hidden service. | Offer local or onion-native auth for Tor; if an external provider is required and unavailable, show a clear "not available over Tor" message — never redirect to a clearnet callback. |
 | **CAPTCHA (reCAPTCHA, hCaptcha) and other clearnet security services** | These are clearnet endpoints; calling them from a `.onion` leaks the request off Tor and usually fails. | Use a self-hosted / Tor-friendly challenge or a proof-of-work / rate-limit alternative. |
-| **Payment gateways, webhooks, outbound callbacks to clearnet** | The target is a clearnet URL; an onion-origin request to it defeats anonymity or is rejected. | Route through a Tor-aware integration if one exists; otherwise fail loudly and tell the caller the action isn't available over Tor. |
+| **Payment gateways, webhooks, outbound callbacks to clearnet** | The target is a clearnet URL; an onion-origin request to it defeats anonymity or is rejected. | Route through a Tor-aware integration if one exists; otherwise fail loudly and tell the caller the action isn't available over Tor. **Exception:** a notification webhook (the contact and security-report copy) is optional, never the action itself: over Tor or I2P it is skipped with one WARN log, and the submission is still accepted and stored, with the same response the caller would get otherwise. |
 | **Absolute / cross-network links** | A link to the clearnet FQDN pushes the client off Tor and leaks the clearnet identity. | Build every absolute URL (canonical tags, redirects, webhook/callback URLs, email links) from `tor.onion_address` for Tor requests. |
 
 ### Tor Request Logging & Identity
@@ -17267,7 +17269,7 @@ server:
 
 ## Contact Configuration (Server Notification Recipients)
 
-**One unified config tree for every "where do messages go" decision the server makes — admin notifications, security reports, abuse reports, contact-form submissions. Each role supports email AND any number of webhook transports (Telegram, Discord, Slack, generic). Empty role-specific email falls back to the admin address. There is one knob to set (`server.contact.admin.email`); everything else is optional.**
+**One unified config tree for every "where do messages go" decision the server makes — admin notifications, security reports, abuse reports, contact-form submissions. Each role supports email AND any number of webhook transports (Telegram, Discord, Slack, generic). An empty `abuse` or `general` email falls back (abuse to general, then admin) for INTERNAL delivery; an explicitly empty `security` email falls back to admin for internal delivery only and omits the public `mailto:`; the admin address is never published. There is one knob to set (`server.contact.admin.email`); everything else is optional.**
 
 ### Schema
 
@@ -19198,7 +19200,7 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 | `status` | healthy, degraded, unhealthy, restart_required, maintenance, shutting_down (see Health Status Values & HTTP Codes) |
 | `pending_restart` | Present (`true`) only when a config change requires a restart |
 | `restart_reason` | Settings that changed (only with `pending_restart`) |
-| `version` | The version `--version` reports: SemVer for a release, `YYYYMMDDHHMMSS-beta` for a beta, the short commit id for a devel build; never the word `devel` ("Health Output Invariants") |
+| `version` | The version `--version` reports: SemVer for a release, `YYYYMMDDHHMMSS-beta` for a beta, the short commit id for a devel build (`devel` only for a local build outside git that has no release, beta or commit identity, "Health Output Invariants") |
 | `mode` | production, development, debug |
 | `uptime` | Compact uptime `{d}d {h}h {m}m` (zero leading units dropped, `45s` under a minute); the frontend shows `format.Duration()` |
 | `timestamp` | RFC 3339, UTC, whole seconds (`2026-11-20T17:21:53Z`) |
@@ -19259,7 +19261,7 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 |-----------|------|
 | **Key order** | JSON keys follow the struct order of this specification, written by a custom marshaller. Alphabetical or map order is a bug. A golden-order test covers JSON and both text formats |
 | **Always present** | `project`, `status`, `version`, `go_version`, `build`, `uptime`, `mode`, `timestamp`, `features`, `checks` and `stats` are in every response. |
-| **`version`** | Exactly what `--version` prints as `{project_version}`: SemVer for a release, `YYYYMMDDHHMMSS-beta` for a beta, the short commit id for a devel build, `devel` only when the build has none of these. Never the word `devel` |
+| **`version`** | Exactly what `--version` prints as `{project_version}`: SemVer for a release, `YYYYMMDDHHMMSS-beta` for a beta, the short commit id for a devel build, `devel` only when the build has none of these (a local build outside git). A build with a commit identity never reports the word `devel` |
 | **`timestamp`, `build.date`** | RFC 3339, UTC, whole seconds, `Z` suffix (`2026-11-20T17:21:53Z`); never nanoseconds |
 | **`uptime` (JSON, API text)** | Compact `{d}d {h}h {m}m`: the leading zero units are dropped and seconds appear only under one minute. `45s`, `24m`, `2h 16m`, `1d 1h 4m`. Never `0h 10m 57s` |
 | **`uptime` (frontend)** | `format.Duration()`: `2 hours 16 minutes`, `1 day 1 hour` ("Frontend Human-Readable Rules") |
@@ -22180,7 +22182,7 @@ at the appropriate level — a healthy server prints nothing.
 
 | Directory | Check Frequency | Renewal Trigger |
 |-----------|-----------------|-----------------|
-| `{config_dir}/ssl/letsencrypt/{fqdn}/` | Daily (03:00) | 7 days before expiry |
+| `{config_dir}/ssl/letsencrypt/{fqdn}/` | Daily (03:00) | When 30 days or fewer remain (fixed) |
 | `{config_dir}/ssl/local/{fqdn}/` | Never | Manual only |
 | `/etc/letsencrypt/live/**` | Never | System (certbot) manages |
 
@@ -29726,7 +29728,7 @@ CREATE INDEX IF NOT EXISTS idx_captcha_challenges_expires ON captcha_challenges(
 | Getting started | Quick start guide |
 | Features | How to use key features |
 | More help | The `More help` card links every registered help page (`/server/help/mcp` and the project's own pages), see "Preferences and Help Hubs" |
-| API Documentation | Links to Swagger (`/server/docs/swagger`) and GraphQL (`/server/docs/graphql`) — UIs fetch from the versioned `/api/{api_version}/server/swagger` and `/api/{api_version}/server/graphql` routes |
+| API Documentation | Links to Swagger (`/server/docs/swagger`) and GraphQL (`/server/docs/graphql`); the MCP help page is linked once, by the "More help" card (the registry rule), never repeated here — UIs fetch from the versioned `/api/{api_version}/server/swagger` and `/api/{api_version}/server/graphql` routes |
 | Tor Access | How to access via Tor (only shown if Tor enabled) |
 | I2P Access | How to access via I2P (only shown if I2P enabled and running) |
 | FAQ | Frequently asked questions |
@@ -29817,7 +29819,6 @@ curl -H "Accept: application/xml" https://jokes.example.com/api/v1/joke</code></
   <ul>
     <li><a href="/server/docs/swagger">Swagger UI</a> - Interactive REST API explorer</li>
     <li><a href="/server/docs/graphql">GraphiQL</a> - Interactive GraphQL explorer</li>
-    <li><a href="/server/help/mcp">MCP server</a> - Use this application from an AI assistant</li>
   </ul>
 </div>
 ```
@@ -30299,7 +30300,7 @@ server:
 
 **Default Sender:**
 - From Name: `{app_name}` (defaults to binary name if not set)
-- From Address: `no-reply@{fqdn}` (defaults to `no-reply@localhost` if FQDN not set)
+- From Address: `no-reply@{fqdn}`; when `{fqdn}` is empty no email is sent and the startup WARN says so (there is no `no-reply@localhost`)
 - Reply-To: `{notification_reply_to}` (if set in `server.notifications.email.reply_to`, otherwise omitted)
 
 **SMTP Check Before Sending:**
@@ -32797,7 +32798,7 @@ groups:
 |---------|----------|-------|
 | `server.yml` | ✓ Always | Configuration file |
 | `{config_dir}/yaml.d/` | ✓ If exists | Drop-in config files |
-| `{config_dir}/secrets.yml` | ✓ If exists | Secrets (token, encryption key, credentials) |
+| `{config_dir}/secrets.yml` | ✓ If exists | Secrets (encryption key, credentials); `server.token` is blanked in the backup copy |
 | `{config_dir}/assets/` | ✓ If exists | Branding image files |
 | `server.db` | ✓ When the local file exists | The local SQLite database: the main database with the SQLite driver (settings, rate limits, audit log); with the libSQL driver, the local cache file when `server.database.cache.enabled` is true. A remote database is never part of a backup (see below) |
 | `{config_dir}/template/` | ✓ If exists | Custom email templates |
@@ -34907,7 +34908,7 @@ fn service_main(_arguments: Vec<std::ffi::OsString>) {
 
 # PART 25: MAKEFILE
 
-**Six core targets. DO NOT ADD MORE.** The only other permitted targets are `clean`, a housekeeping target that removes `binaries/` and `releases/` and builds nothing, and `release-check`, an internal helper that is the first prerequisite of `release`, validates the version and builds nothing (it is never the entry point of a workflow). There is no `all` target and none is required.
+**Seven core targets (`dev`, `local`, `build`, `test`, `release`, `beta`, `docker`). DO NOT ADD MORE.** The only other permitted targets are `clean`, a housekeeping target that removes `binaries/` and `releases/` and builds nothing, and `release-check`, an internal helper that is the first prerequisite of `release`, validates the version and builds nothing (it is never the entry point of a workflow). There is no `all` target and none is required.
 
 ## Targets
 
@@ -35739,7 +35740,7 @@ The **only** times binaries are copied are the CI/CD release process, the `make 
 |--------------|---------|-----------------|--------------|-------------|
 | **Stable** | `v1.2.3` or `1.2.3` | ✓ YES (numbers) | `v1.2.3` | `1.2.3` |
 | **Stable** | `v0.2.0` or `0.2.0` | ✓ YES (numbers) | `v0.2.0` | `0.2.0` |
-| **Beta** | (`beta-` tag push) | ✗ NO (timestamp) | `20251205-beta` | `20251205-beta` |
+| **Beta** | `20251205143022-beta` (tag push) | ✗ NO (timestamp) | `20251205143022-beta` | `20251205143022-beta` |
 | **Devel** | rolling `devel` tag | ✗ NO (commit id) | `Devel Build a1b2c3d` | `a1b2c3d` |
 | **Dev** | `dev` | ✗ NO (text) | `dev` | `dev` |
 
@@ -36806,7 +36807,7 @@ rm -rf "$TEMP_DIR"
 
 **Tag release auto-cancel policy:** Tag-only release workflows like `release.yml` MUST also use workflow concurrency, but only per exact tag ref. A newer run for `refs/tags/v1.2.3` should cancel the older `refs/tags/v1.2.3` run. A run for `v1.2.4` must NOT cancel `v1.2.3`.
 
-**Pull requests and merges:** a pull request runs `ci.yml` only (build, test, lint, coverage, secret scan, workflow policy) — it never publishes an image or a release, and a fork PR receives no secrets. Merging into `main`/`master` is simply a push to that branch, so the merge triggers `ci.yml`, `devel.yml` (the rolling `devel` release) and `docker.yml` (the `{commit_id}` image and the `:devel` image). Merging into `beta` triggers `beta.yml`; a stable release is a tag push, never a merge. A PR and its target branch have different refs, so their concurrency groups never cancel each other.
+**Pull requests and merges:** a pull request runs `ci.yml` only (build, test, lint, coverage, secret scan, workflow policy) — it never publishes an image or a release, and a fork PR receives no secrets. Merging into `main`/`master` is simply a push to that branch, so the merge triggers `ci.yml`, `devel.yml` (the rolling `devel` release) and `docker.yml` (the `{commit_id}` image and the `:devel` image). A beta is a pushed tag `YYYYMMDDHHMMSS-beta` (`make beta`), a stable release is a pushed `v*` tag, and neither is ever a merge. A PR and its target branch have different refs, so their concurrency groups never cancel each other.
 
 ## Build Info Variables
 
@@ -38837,6 +38838,8 @@ All `$CI_*` variables are auto-populated by GitLab (works with self-hosted).
 
 ## GitLab CI Configuration
 
+**Image pinning:** the examples below show floating tags (`trufflehog:latest`, `docker:latest`, `docker:dind`, `release-cli:latest`, `trivy:latest`) only for readability. A project pins every third-party `image:` and `services:` entry in `.gitlab-ci.yml`, and every agent image in the `Jenkinsfile`, by digest (`name@sha256:{digest}`), resolved when the file is written and kept current by Renovate `pinDigests`. The one deliberate floating tag is the maintained `casjaysdev/go:latest` toolchain image.
+
 **File:** `.gitlab-ci.yml`
 
 ```yaml
@@ -39947,6 +39950,21 @@ pipeline {
                         '''
                     }
                 }
+            }
+        }
+
+        // Optional GUI client: separate dynamically linked artifact, Linux/macOS/Windows only, never BSD
+        stage('Build GUI client') {
+            when { expression { fileExists('src/client/gui') } }
+            agent { label 'amd64' }
+            steps {
+                sh '''
+                    for t in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+                        os=${t%/*}; arch=${t#*/}; ext=""; [ "$os" = windows ] && ext=".exe"
+                        docker run --rm -v ${WORKSPACE}:/app -v ${GO_CACHE}:/usr/local/share/go/pkg/mod -v ${GO_BUILD}:/usr/local/share/go/cache -w /app -e CGO_ENABLED=0 -e GOOS=$os -e GOARCH=$arch casjaysdev/go:latest \
+                            go build -buildvcs=false -trimpath -tags gui -ldflags "${LDFLAGS}" -o ${BINDIR}/${PROJECT_NAME}-cli-gui-${os}-${arch}${ext} ./src/client
+                    done
+                '''
             }
         }
 
@@ -43592,7 +43610,7 @@ make test
 | **Web Frontend** | All UI text: navigation, headings, labels, buttons, tooltips, placeholders, footers, legal pages |
 | **API Responses** | Error messages, validation messages, status descriptions |
 | **Swagger/OpenAPI** | Endpoint descriptions, parameter descriptions, schema descriptions, error examples |
-| **GraphQL** | Type descriptions and field descriptions of the query-only schema (a project that ever exposes mutations adds their descriptions here) |
+| **GraphQL** | Type descriptions and field descriptions of the query-only schema (GraphQL is query-only and never has mutations: writes belong to REST and Swagger, PART 14) |
 | **Email Templates** | Subject lines, body text, headings, CTAs, regulatory/compliance notices |
 | **Server CLI Output** | Help text, status messages, error messages, startup banners |
 | **Client CLI Output** | Help text, command descriptions, error messages, TUI labels, operator output |
@@ -43609,7 +43627,7 @@ make test
 |-------------|-------------|
 | **Encoding** | UTF-8 everywhere - files, database, HTTP responses |
 | **Default language** | English (en) when no preference detected |
-| **Fallback chain** | `?lang= query param (sets cookie) → lang cookie → Accept-Language header → default (en)` |
+| **Fallback chain** | `?lang= query param (used for this response; it also writes the cookie only when the Preferences consent category is accepted) → lang cookie → Accept-Language header → default (en)` |
 | **100% coverage** | Every user-facing string uses a translation key - no hardcoded text |
 | **Missing key fallback** | If a key is missing in the active language, fall back to English (`en`) |
 | **Unsupported language fallback** | If `--lang` or `Accept-Language` specifies an unsupported language, silently fall back to English (`en`) — never error or crash |
@@ -43644,9 +43662,9 @@ make test
 
 ```
 GET /dashboard?lang=es
-  → Sets cookie: lang=es; Max-Age=31536000; Path=/; SameSite=Lax
   → Renders page in Spanish
-  → All subsequent requests use Spanish (cookie persists)
+  → With Preferences consent: sets cookie lang=es; Max-Age=31536000; Path=/; SameSite=Lax, and later requests use Spanish
+  → Without consent: no cookie is written, and only this response is Spanish
 
 GET /dashboard
   → Reads lang cookie → Spanish
@@ -43657,7 +43675,7 @@ GET /dashboard
 **Fallback chain (in order):**
 
 ```
-1. ?lang= query parameter (if present → set cookie + use immediately)
+1. ?lang= query parameter (if present → use immediately; also set the cookie only when the Preferences consent category is accepted)
 2. lang cookie (persistent, 1 year)
 3. Accept-Language HTTP header (browser preference)
 4. Default: en
@@ -43672,7 +43690,7 @@ pub async fn language_middleware(
 ) -> Response {
     let lang;
 
-    // 1. Query parameter (highest priority, also sets cookie)
+    // 1. Query parameter (highest priority); the cookie is written only with Preferences consent
     let query_lang = req.uri().query()
         .and_then(|q| {
             url::form_urlencoded::parse(q.as_bytes())
@@ -43683,7 +43701,7 @@ pub async fn language_middleware(
     if let Some(q) = query_lang {
         if is_supported(&q) {
             lang = q.clone();
-            // Set cookie in response (handled below)
+            // The response sets the cookie only when the Preferences consent category is accepted (handled below)
         } else {
             lang = "en".to_string();
         }
