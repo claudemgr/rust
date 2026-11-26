@@ -316,7 +316,7 @@ Single-process, single binary. Where APPLICATION-style specifications state the 
 
 ### CRITICAL: No Host Toolchain or Binary Execution
 
-Never run `cargo build`, `cargo run`, `cargo test`, or execute any produced binary directly on the host. All builds, tests, and binary execution happen in containers (`casjaysdev/rust:latest` via Docker for builds/tests; Incus `debian:latest` for full OS/systemd integration testing of the server). See `~/.claude/memory/execution_hierarchy.md` and PART 6 (Toolchain, Build & Packaging).
+Never run `cargo build`, `cargo run`, `cargo test`, or execute any produced binary directly on the host, not even for `--help` or `--version` (no invocation of any flag is harmless). All builds, tests, and binary execution happen in containers (`casjaysdev/rust:latest` via Docker for builds/tests; Incus `debian:latest` for full OS/systemd integration testing of the server). See `~/.claude/memory/execution_hierarchy.md` and PART 6 (Toolchain, Build & Packaging).
 
 ### CRITICAL: X11 AND Wayland Are Both Required
 
@@ -28926,7 +28926,7 @@ When the admin panel is enabled (PART 28) these are also editable at `/server/{a
 
 ## CSRF Protection
 
-**CSRF protects cookie-authenticated browser forms from cross-site forgery. It does NOT apply to Bearer/API-token requests, public endpoints, read-only methods, or callers that don't carry browser cookies — applying it there breaks legitimate clients (CLI tools, webhooks, OAuth callbacks) without adding security value.**
+**CSRF protects cookie-authenticated browser forms from cross-site forgery. It does NOT apply to Bearer/API-token requests, public BACKEND endpoints (`/api/**`, no auth), read-only methods, or callers that don't carry browser cookies — applying it there breaks legitimate clients (CLI tools, webhooks, OAuth callbacks) without adding security value.**
 
 ### Scope — Frontend Only (Never Backend)
 
@@ -29000,7 +29000,7 @@ server:
 |------|--------|
 | Token in cookie + matching value in form/header | Double-submit cookie pattern. Token cookie is `SameSite=Strict`, `HttpOnly=false` (the form needs to read it), `Secure` per `csrf.secure`. |
 | Forms include hidden `<input name="csrf_token" value="…">` | Server-rendered HTML inserts the token automatically — no manual work in templates. |
-| Non-GET frontend requests under cookie-session auth check the token | Per the "When CSRF Validation Runs" table above — Bearer/public/read-only paths skip the check. |
+| Non-GET frontend requests under cookie-session auth check the token | Per the "When CSRF Validation Runs" table above — Bearer, backend (`/api/**`) and read-only requests skip the check; a public FRONTEND form (contact, guest preferences) does not, and a missing or invalid token is `403`. |
 | Token regenerated on login, logout, and privilege change | Prevents fixation. |
 | Validation failure → `403 FORBIDDEN` with canonical error body | `{"ok": false, "error": "CSRF_FAILED", "message": "CSRF token validation failed"}` (PART 13 → "Error Response"). |
 | Reject if cookie present and header/form missing, or if values mismatch | No silent fallback. |
@@ -33470,7 +33470,7 @@ groups:
 | Include system metrics | `metrics.system` | Include CPU/memory/disk |
 | Include runtime metrics | `metrics.runtime` | Include Rust runtime stats |
 | Unauthenticated access | `metrics.auth.allow_unauthenticated` | Skip token checks for ALL services (firewalled networks only; default: false) |
-| Per-service tokens | `metrics.auth.tokens.{prometheus,grafana,loki}` | Mandatory bearer tokens — empty disables that service (403) |
+| Per-service tokens | `metrics.auth.tokens.{prometheus,grafana,loki}` | Mandatory bearer tokens — generated at start when empty, never empty afterward |
 
 ---
 
@@ -35333,7 +35333,7 @@ rm -rf "$TEST_DIR"
 | Rule | Description |
 |------|-------------|
 | **Local machine has NO Rust** | Rust is NOT installed on the local machine - don't even try |
-| **NEVER run binaries locally** | All binaries run inside containers, never directly |
+| **NEVER run binaries locally** | All binaries run inside containers, never directly. This includes EVERY invocation: `--help`, `--version`, `--status` and any other flag. There is no harmless command |
 | **NEVER** | Run `cargo build --release` directly on local machine |
 | **NEVER** | Run `cargo test` directly on local machine |
 | **NEVER** | Run `binaries/{project_name}` on local machine |
@@ -42666,12 +42666,12 @@ cd {project_name}
 make build
 ```
 
-## Run Locally (a person's own command)
+## Run Locally (in a container)
 
-**This is the operator's or developer's own command on their own machine. AI work never runs the binary on the host: it uses Docker, Incus or the Phase 2 scripts ("No Host Toolchain or Binary Execution").**
+**The project's binary never runs on the host, for a developer or an AI alike: not for the server, not for `--help` or `--version`. Run it in a container, or use Incus or the Phase 2 scripts.**
 
 ```bash
-./binaries/{project_name} --config server.yml --debug
+docker run --rm --name "{project_name}-$(head -c6 /dev/urandom | od -An -tx1 | tr -d ' \n' | cut -c1-8)" -v "$PWD/binaries:/app:ro" -v "$PWD/server.yml:/config/server.yml:ro" alpine:latest /app/{project_name} --config /config/server.yml --debug
 ```
 
 ## Testing

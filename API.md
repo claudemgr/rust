@@ -399,7 +399,7 @@ permission rules, business invariants. The HOW lives in AI.md PARTS 0-32; PART 3
 
 ## Container-Only Development
 
-**NEVER run Rust or binaries on the local machine. ALL development uses containers.**
+**NEVER run Rust or binaries on the local machine, not even for `--help` or `--version`. ALL development uses containers.**
 
 ### Building (ALWAYS via Makefile - Local Development)
 
@@ -32865,7 +32865,7 @@ groups:
 | Include system metrics | `server.metrics.include_system` | Include CPU/memory/disk |
 | Include runtime metrics | `server.metrics.include_runtime` | Include Rust runtime stats |
 | Skip auth (firewalled only) | `server.metrics.auth.allow_unauthenticated` | Skip token checks for ALL metrics services (default: false) |
-| Per-service tokens | `server.metrics.auth.tokens.prometheus` / `.grafana` / `.loki` | Bearer token per service (empty = that service disabled, 403) |
+| Per-service tokens | `server.metrics.auth.tokens.prometheus` / `.grafana` / `.loki` | Bearer token per service (generated at start when empty, never empty afterward) |
 | Loki limits | `server.metrics.loki.max_entries` / `server.metrics.loki.max_age` | Bounds for the `loki` service's recent-log output |
 
 ---
@@ -40767,7 +40767,7 @@ rm -rf "$TEST_DIR"
 | Rule | Description |
 |------|-------------|
 | **Local machine has NO Rust** | Rust is NOT installed on the local machine - don't even try |
-| **NEVER run binaries locally** | All binaries run inside containers, never directly |
+| **NEVER run binaries locally** | All binaries run inside containers, never directly. This includes EVERY invocation: `--help`, `--version`, `--status` and any other flag. There is no harmless command |
 | **NEVER** | Run `cargo build --release` directly on local machine |
 | **NEVER** | Run `cargo test` directly on local machine |
 | **NEVER** | Run `binaries/{project_name}` on local machine |
@@ -43676,12 +43676,12 @@ cd {project_name}
 make build
 ```
 
-## Run Locally (a person's own command)
+## Run Locally (in a container)
 
-**This is the operator's or developer's own command on their own machine. AI work never runs the binary on the host: it uses Docker, Incus or the Phase 2 scripts ("No Host Toolchain or Binary Execution").**
+**The project's binary never runs on the host, for a developer or an AI alike: not for the server, not for `--help` or `--version`. Run it in a container, or use Incus or the Phase 2 scripts.**
 
 ```bash
-./binaries/{project_name} --config server.yml --debug
+docker run --rm --name "{project_name}-$(head -c6 /dev/urandom | od -An -tx1 | tr -d ' \n' | cut -c1-8)" -v "$PWD/binaries:/app:ro" -v "$PWD/server.yml:/config/server.yml:ro" alpine:latest /app/{project_name} --config /config/server.yml --debug
 ```
 
 ## Testing
