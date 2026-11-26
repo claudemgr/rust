@@ -18478,8 +18478,6 @@ server:
         decline: "Decline"
         accept: "I Agree"
 
-      # Banner position: bottom, top
-      position: bottom
 
       # Show "Manage Preferences" link for granular control
       show_preferences: true
@@ -18529,7 +18527,7 @@ server:
 
 | Keys | Role |
 |------|------|
-| `consent.*` (banner message, buttons, position, `show_preferences`), `cookies.*.enabled` | Behavior only: they change what the server does, they do not add page text. `cookies.*.enabled` decides only whether a category is offered to the visitor; the consent state is the visitor's own `cookie_consent` cookie, and without it every non-essential category is off |
+| `consent.*` (banner message, buttons, `show_preferences`; the banner is always fixed to the bottom of the viewport), `cookies.*.enabled` | Behavior only: they change what the server does, they do not add page text. `cookies.*.enabled` decides only whether a category is offered to the visitor; the consent state is the visitor's own `cookie_consent` cookie, and without it every non-essential category is off |
 | `data.sold` | Behavior AND page: picks the banner message, the CCPA opt-out and the Data Usage text |
 | `data.stored_on_server`, `data.sharing`, `retention.*`, `cookies.*.description`, `third_party.services` | Page content only: they fill the Data Storage, Data Retention, Cookie Policy and Third Parties sections of `/server/privacy` |
 
@@ -18802,7 +18800,6 @@ pub struct PrivacyTemplateData {
 | `policy.version` | `"1"` | Policy version recorded in every `compliance.consent_updated` event |
 | `buttons.decline` | "Decline" | Decline button label |
 | `buttons.accept` | "I Agree" | Accept button label |
-| `position` | `bottom` | Banner position (top/bottom) |
 | `show_preferences` | `true` | Show "Manage Preferences" link |
 
 ### Cookie Categories
@@ -37573,7 +37570,7 @@ In addition to the workflows, every repository ships:
 - `image-scan` (Trivy) — conditional on Dockerfile present; builds its own image first (host-runner job, no `needs`)
 
 **GitHub Actions job ordering (`needs:`):**
-- `ci.yml`: `lint` and `test` run in parallel → `build` needs: test → `upload-artifacts` needs: build; security jobs (`secret-scan`, `workflow-policy`, `vuln-scan`, `image-scan`) run in parallel with each other
+- `ci.yml`: `lint` and `test` run in parallel → `build` needs: lint and test; coverage collection and the 60% enforcement are steps of the `test` job, never a separate job; security jobs (`secret-scan`, `workflow-policy`, `vuln-scan`, `image-scan`) run in parallel with each other
 - `release.yml`: `build` → `release` (needs: build); release job always re-runs its own build inline
 - Cross-workflow ordering via branch protection; never `workflow_run`
 
@@ -42636,7 +42633,9 @@ cd {project_name}
 make build
 ```
 
-## Run Locally
+## Run Locally (a person's own command)
+
+**This is the operator's or developer's own command on their own machine. AI work never runs the binary on the host: it uses Docker, Incus or the Phase 2 scripts ("No Host Toolchain or Binary Execution").**
 
 ```bash
 ./binaries/{project_name} --config server.yml --debug
