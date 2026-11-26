@@ -8381,7 +8381,7 @@ PHASE 5: Server startup (actual server start)
     ├─ Resolve {startup_datetime} = the current time at this step in the server's timezone (`TZ`, default `America/New_York`), human-readable as `%B %d, %Y at %H:%M:%S %Z` ("Human-Readable Values (Frontend)")
     └─ Build `urls` from the resolved {proto}/{fqdn}/{port} and call
        print_server_startup_banner(app_name, version, app_mode, urls,
-       force_color) — the banner's "Listening on" line ALWAYS shows the
+       force_color, lang) — the banner's "Listening on" line ALWAYS shows the
        resolved {fqdn}, never the raw bind {address} (see "URL Variables"
        for the full placeholder list)
 
@@ -15792,7 +15792,7 @@ default-src 'self';
 script-src 'self';
 style-src 'self' 'unsafe-inline';
 img-src 'self' data: blob: https:;
-font-src 'self' https:;
+font-src 'self' data: https:;
 connect-src 'self' {learned_origins};
 media-src 'self' blob:;
 worker-src 'self' blob:;
@@ -15815,7 +15815,7 @@ report-uri /api/{api_version}/server/reports/csp
 | `script-src` | `'self'` | All JS lives in `static/js/app.js` — no inline scripts (the `application/ld+json` block is data that is never executed) and no inline handlers — so `'self'` costs nothing and blocks every injected `<script>`, inline or cross-origin. |
 | `style-src` | `'self' 'unsafe-inline'` | Application code NEVER emits inline `style=""` attributes or `<style>` blocks (all CSS lives in static files, PART 16). `'unsafe-inline'` stays in `style-src` only as a tolerance for styles injected by third parties (browser extensions, embedded widgets); it is not permission for application code, and the frontend tests assert that rendered pages contain no inline styles. |
 | `img-src` | `'self' data: blob: https:` | `data:` for inline icons/SVG, `blob:` for client-side generated previews, `https:` so user avatars / CDN images / OG embeds work without per-host config. (HTTP images explicitly excluded — TLS only.) |
-| `font-src` | `'self' https:` | Web fonts (Google Fonts, FontAwesome CDN, custom CDNs) work without per-host config. HTTPS only. |
+| `font-src` | `'self' data: https:` | Web fonts (Google Fonts, FontAwesome CDN, custom CDNs) work without per-host config. HTTPS only, plus `data:` because the vendored GraphiQL/Monaco stylesheet embeds its editor and icon fonts as `data:` URLs. |
 | `connect-src` | `'self' {learned_origins}` | XHR/fetch/EventSource/WebSocket. `{learned_origins}` = DOMAIN env entries + reverse-proxy-detected hosts (same source as CORS — see PART 15 → "CORS Allow-list Resolution Order"). |
 | `media-src` | `'self' blob:` | `<video>`/`<audio>` from own host + client-generated streams (recording, MediaSource API). |
 | `worker-src` | `'self' blob:` | Service workers (PWA), web workers, including blob-instantiated workers. |
@@ -16875,7 +16875,7 @@ server:
       filename: audit.log
       # json only - must be machine-parseable
       format: json
-      # daily, weekly, monthly, NMB, or combined
+      # daily, weekly, monthly, NMB, or a comma-separated combination such as `weekly,50MB`: rotates at whichever trigger is reached first
       rotate: daily
       # none, N, Nd, Nw, Nm
       keep: none
@@ -16896,8 +16896,7 @@ server:
 
       # Sensitive data handling
       include_user_agent: true
-      # Mask email addresses in entries
-      mask_emails: true
+      # Email addresses are ALWAYS masked in entries: there is no setting that logs them in full
 ```
 
 ## Sane Defaults
@@ -16909,7 +16908,6 @@ server:
 | `rotate` | `daily` | Rotate daily |
 | `keep` | `none` | Delete on rotation (no old logs kept) |
 | `compress` | `false` | No compression (deleted immediately) |
-| `mask_emails` | `true` | Mask email addresses |
 | All event categories | `true` | Log config, security, backup, and server events |
 | `token_usage` | `false` | Don't log every token use |
 
@@ -17796,6 +17794,7 @@ These rules apply to **all responses** when the request is detected as a Tor req
 | **Email** | Show `server.tor.contact_email` only; if unset, omit email entirely from all responses (security.txt, contact pages, error pages, footers). Never fall back to the clearnet contact email. |
 | **URLs** | All absolute URLs in responses must use `tor.onion_address`. Never embed clearnet FQDN. Applies to: `security.txt`, `llms.txt`, OpenAPI `servers[0].url`, GraphQL endpoint, OAuth redirect URIs, email verification links, pagination links. |
 | **Clearnet links** | Any link that would normally point to the clearnet site must use the onion address or be omitted entirely. |
+| **Third-party and user-authored links** | An operator-authored external link (a privacy-policy URL, a Markdown link) is rendered as plain text without a link, so a Tor visitor's browser never contacts a clearnet host. `/api/autodiscover` answers a Tor request with the onion origin only, never a clearnet origin. |
 | **CORS** | The onion address is added to the CORS allow-list automatically when `tor.onion_address` is set. The clearnet origin must NOT appear in Tor response CORS headers. |
 | **OAuth / external auth** | Redirect URIs must use the onion address. If the OAuth provider does not support `.onion` redirect URIs, that provider is disabled for Tor requests with a `503` error. |
 | **`Preferred-Languages`** | Omitted from `security.txt` served over Tor — locale selection leaks fingerprinting information. |
@@ -19145,6 +19144,8 @@ pub struct HealthResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     // settings that changed
     pub restart_reason: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub maintenance: Option<MaintenanceInfo>,
 
     // 3. Version & build info (PART 7: binary requirements)
     // SemVer "1.0.0"
@@ -19192,6 +19193,28 @@ pub struct BuildInfo {
     pub commit: String,
     // ISO 8601 build timestamp
     pub date: String,
+}
+
+// MaintenanceInfo - present in the health response only while status is "maintenance"
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MaintenanceInfo {
+    pub reason: String,
+    pub message: String,
+    // RFC 3339, UTC
+    pub since: String,
+    pub self_healing: SelfHealingInfo,
+}
+
+// SelfHealingInfo - the automatic recovery attempts (PART 5)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SelfHealingInfo {
+    pub enabled: bool,
+    pub exhausted: bool,
+    pub attempts: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_attempt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_attempt: Option<String>,
 }
 
 // FeaturesInfo - PUBLIC features only (no /server/metrics - PART 19 is internal)
@@ -19800,6 +19823,7 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 | `status` | healthy, degraded, unhealthy, restart_required, maintenance, shutting_down (see Health Status Values & HTTP Codes) |
 | `pending_restart` | Present (`true`) only when a config change requires a restart |
 | `restart_reason` | Settings that changed (only with `pending_restart`) |
+| `maintenance` | Present only while `status` is `maintenance`, right after the restart fields: `reason`, `message`, `since` (RFC 3339 UTC) and `self_healing` (`enabled`, `exhausted`, `attempts`, `last_attempt`, `next_attempt`); the shape of the maintenance example in PART 5 |
 | `version` | The version `--version` reports: SemVer for a release, `YYYYMMDDHHMMSS-beta` for a beta, the short commit id for a devel build (`devel` only for a local build outside git that has no release, beta or commit identity, "Health Output Invariants") |
 | `mode` | production, development, debug |
 | `uptime` | Compact uptime `{d}d {h}h {m}m` (zero leading units dropped, `45s` under a minute); the frontend shows `format.Duration()` |
@@ -22335,7 +22359,7 @@ pub fn is_dev_tld(host: &str, project_name: &str) -> bool {
 
 ### Responsive Startup Banner
 
-**Banner MUST adapt to terminal size. Phone SSH users are common.**
+**Banner MUST adapt to terminal size. Phone SSH users are common.** The server banner decides on COLUMNS only (rows are ignored because a banner scrolls); its 40, 60 and 80 column boundaries are the same as the terminal size modes of `common::terminal`. It is a separate module from `common::banner` (client, TUI and GUI).
 
 | Terminal Size | Banner Style | Example |
 |---------------|--------------|---------|
@@ -22356,6 +22380,7 @@ pub fn print_server_startup_banner(
     app_mode: &str,
     urls: &[String],
     force_color: Option<bool>,
+    lang: &str,
 ) {
     let width = terminal_size().map(|(Width(w), _)| w as usize).unwrap_or(80);
 
@@ -26549,8 +26574,10 @@ pub struct Route {
     pub auth: Auth,
     // Listed in llms.txt and Swagger (public and authenticated routes; never operator-only ones)
     pub listed: bool,
-    // Internal-only (the debug and diagnostics routes of the debug flag, PART 6): in neither llms.txt, Swagger, GraphQL nor MCP, whatever listed and auth say; registered only while the debug flag is on
+    // Internal (visibility only): in neither llms.txt, Swagger, GraphQL nor MCP, whatever listed and auth say. Set for the debug routes, the metrics routes and the local-CLI control routes (for example Tor control); it says nothing about whether the route is mounted
     pub internal: bool,
+    // Mount condition (separate from internal): the route is registered only while the debug flag is on (the debug and diagnostics routes of PART 6); metrics and control routes are not debug_only
+    pub debug_only: bool,
     // Request and response schemas; the response struct's declared field order is the text output order
     pub request: Option<SchemaFn>,
     pub response: SchemaFn,
@@ -31383,7 +31410,7 @@ Every row of this table is a BLOCKING error: the template is not loaded (the emb
 |--------|------|
 | Measured | The same probe as `checks.database` in `/server/healthz` (PART 13): a trivial query on the write handle and on the read handle, each under a 5-second deadline |
 | Trigger | `server.notifications.database_error.failures` (default `3`) consecutive failed probes; `{since}` is the time of the FIRST failure of that run, `{error}` the last error with any credentials removed |
-| Cadence | Built-in scheduler task `database_check` every `server.notifications.database_error.check_interval` (default `1m`); no external cron |
+| Cadence | Built-in scheduler task `database_check` on its own schedule `server.scheduler.tasks.database_check.schedule` (default `@every 1m`), the one cadence key: there is no separate `check_interval`; no external cron |
 | Deduplication | One WARN and email when the trigger is first met; repeated at most once per `server.notifications.database_error.repeat` (default `24h`) while probes keep failing |
 | Recovery | The first successful probe logs INFO `Database connection recovered` (log only, no email) and resets the failure count and the deduplication state |
 | Remote database | A remote libSQL/Turso outage is a failed probe like any other; the cache fallback of PART 10 does not stop the probe from failing |
@@ -31394,7 +31421,6 @@ server:
     database_error:
       enabled: true
       failures: 3
-      check_interval: 1m
       repeat: 24h
 ```
 
@@ -31405,7 +31431,7 @@ server:
 | Measured | The filesystem volumes holding `{data_dir}`, `{log_dir}` and `{backup_dir}`, deduplicated by volume so each volume notifies once; the `path` in the message is the first of those directories on the volume |
 | Value | Used percentage (the same value as `system_disk_usage_percent`, PART 19) plus free bytes |
 | Threshold | `server.notifications.disk_low.threshold_percent` (default `85`, matching the PART 19 Prometheus example). The stricter backup rule in PART 20 (skip backups above 90%) is a separate safeguard |
-| Cadence | Built-in scheduler task `disk_check` every `server.notifications.disk_low.check_interval` (default `5m`); no external cron |
+| Cadence | Built-in scheduler task `disk_check` on its own schedule `server.scheduler.tasks.disk_check.schedule` (default `@every 5m`), the one cadence key: there is no separate `check_interval`; no external cron |
 | Deduplication | One WARN and email per volume when the threshold is first crossed; repeated at most once per `server.notifications.disk_low.repeat` (default `24h`) while usage stays above it |
 | Switch | `server.notifications.disk_low.enabled` (default `true`) controls the check and its email together; there is no separate `events.disk_low` email switch, so while it is on the email follows the matrix below (sent whenever SMTP works) |
 | Recovery | When usage falls 5 percentage points below the threshold, log INFO `Disk space recovered` (log only) and reset the deduplication state |
@@ -31416,7 +31442,6 @@ server:
     disk_low:
       enabled: true
       threshold_percent: 85
-      check_interval: 5m
       repeat: 24h
 ```
 
