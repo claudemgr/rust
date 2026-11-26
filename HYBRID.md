@@ -35841,7 +35841,7 @@ verify_all_endpoints_tested
 ```bash
 # Rust unit tests (fast)
 1. make test
-# Integration tests (slower, full coverage)
+# Basic integration tier (Docker only; ./tests/incus.sh is the explicit full-app check)
 2. ./tests/run_tests.sh
 ```
 
@@ -35898,7 +35898,7 @@ docker run --rm \
 mkdir -p binaries
 cp "$CARGO_TARGET/release/${PROJECT_NAME}" binaries/${PROJECT_NAME}
 
-# 2. Test (prefer Incus, fallback to Docker)
+# 2. Full-app check run by the developer (prefer Incus, fallback to Docker; tests/run_tests.sh itself is Docker-only)
 if command -v incus &>/dev/null; then
   # PREFERRED: Full OS test in Incus (debian + systemd)
   # Use latest Debian stable (currently 13/trixie)
