@@ -6127,7 +6127,7 @@ make build
 
 | Property | Value |
 |----------|-------|
-| Trigger | Daily schedule (3am UTC) + push to main/master |
+| Trigger | Daily schedule (3am UTC) + push to main |
 | Git tag | `devel` (single rolling tag, NOT a timestamp) |
 | Version format | Short commit id (`git rev-parse --short=7 HEAD`) — NO `v` prefix |
 | Release name | `Devel Build {VERSION}` |
@@ -7233,7 +7233,7 @@ See PART 27 for the full Tor hidden-service specification.
 |-------------|----------|
 | Release | Platform container registry (ghcr.io, registry.gitlab.com, etc.) |
 | Local development (`:dev`, `:test`) | Local Docker daemon only |
-| Rolling devel image (`:devel`) | Platform container registry; published only from `main`/`master` and the daily schedule by the `build-devel` job |
+| Rolling devel image (`:devel`) | Platform container registry; published only from `main` and the daily schedule by the `build-devel` job |
 
 **Tag Rules:**
 1. **Release builds** MUST push to `{PLATFORM_CONTAINER_REGISTRY}/{project_org}/{internal_name}`
@@ -8297,7 +8297,7 @@ PHASE 5: Server startup (actual server start)
     exists yet, so only the non-header-dependent resolution priorities apply
     — see "Resolution Order (Reverse Proxy Preferred)"):
     ├─ Resolve {fqdn}: DOMAIN env var → system `hostname` → $HOSTNAME env var
-    │  → public IPv6 → public IPv4 → `localhost` fallback (priorities 2-7;
+    │  → public IPv6 → public IPv4 → unresolved, `{fqdn}` stays EMPTY (priorities 2-7;
     │  priorities 0-1, Tor onion match and reverse-proxy headers, require a
     │  request and do NOT apply here)
     ├─ Resolve {proto}: TLS enabled on the bound listener → `https`,
@@ -17748,7 +17748,7 @@ Expires: {expiry_date}
 
 Rate limiting is the primary abuse defense. It is always on: there is no `enabled` setting, and the numbers below are its tunables. Anonymous requests are limited per IP; requests carrying a valid Bearer token (REST and MCP alike) are limited per token, so clients that share an egress IP (hosted assistants, NAT) never throttle one another, and failed authentication is always counted per IP. Counters use a sliding window stored in the cache layer (see Cache Usage in Application, PART 12).
 
-**Counter backend unavailable.** Rate limiting never fails open. When the external cache is unreachable the counters fall back to the in-process memory counter (per instance, started empty, enforcing the same limits), one `warn` is logged and the cache health check reports `degraded`. The failed-authentication lockout and the strict token actions keep their limits through the fallback, so an unavailable cache never lifts a lockout; the counters reset only when the process restarts.
+**Counter backend unavailable.** Rate limiting never fails open. When the external cache is unreachable the counters fall back to the in-process memory counter (per instance, started empty, enforcing the same limits), one `warn` is logged and the cache health check reports `degraded`. The failed-authentication lockout and the strict token actions keep their limits through the fallback, so an unavailable cache never lifts a lockout; the in-memory counters, seeded from the last `server.db` flush, take over while the cache is unreachable, and the counters never reset on a process restart.
 
 ```yaml
 server:
@@ -21957,7 +21957,7 @@ zone "example.com" {
 | 4 | `$HOSTNAME` env var |
 | 5 | Public IPv6 (excludes private/link-local) |
 | 6 | Public IPv4 (excludes 10/8, 172.16/12, 192.168/16) |
-| 7 | `localhost` |
+| 7 | Unresolved: `{fqdn}` stays EMPTY, startup logs ONE warning, no URL is built from a guess (`localhost` is never a value of `{fqdn}`) |
 
 **We prefer to run behind a reverse proxy. Reverse proxy headers take priority.**
 
@@ -22046,8 +22046,8 @@ pub fn get_fqdn(project_name: &str) -> String {
         return ipv4;
     }
 
-    // Last resort (not recommended)
-    "localhost".to_string()
+    // Unresolved: the FQDN stays empty, startup logs ONE warning and no URL is built from a guess; "localhost" is never returned
+    String::new()
 }
 
 pub fn is_loopback(host: &str) -> bool {
@@ -22195,11 +22195,11 @@ pub fn get_display_url(project_name: &str, port: u16, is_https: bool) -> String 
     let fqdn = get_fqdn(project_name);
 
     // If valid production FQDN, use it
-    if !is_dev_tld(&fqdn, project_name) && fqdn != "localhost" {
+    if !fqdn.is_empty() && !is_dev_tld(&fqdn, project_name) {
         return format_url(&fqdn, port, is_https);
     }
 
-    // Dev TLD or localhost - use global IP instead
+    // Dev TLD or unresolved - use global IP instead
     if let Some(ipv6) = get_global_ipv6() {
         return format_url(&format!("[{}]", ipv6), port, is_https);
     }
@@ -22207,8 +22207,8 @@ pub fn get_display_url(project_name: &str, port: u16, is_https: bool) -> String 
         return format_url(&ipv4, port, is_https);
     }
 
-    // Last resort
-    format_url(&fqdn, port, is_https)
+    // Nothing resolved: no display URL is built from a guess; the caller prints the listen address (host:port) instead
+    String::new()
 }
 
 pub fn is_dev_tld(host: &str, project_name: &str) -> bool {
@@ -37851,7 +37851,7 @@ If signing or attestation is required but keys/permissions are unavailable, stop
 - Use CI-native caching (NOT local host paths)
 - Set VERSION, COMMIT_ID, BUILD_EPOCH explicitly; derive BUILD_DATE from BUILD_EPOCH (never a second independent `date` call)
 - Build all platforms in matrix: the Release, Beta and Devel workflows build every target; the CI workflow's `build` job is a compile gate for the container's own platform
-- Auto-cancel older in-progress runs for the same ref on push workflows targeting `main` or `master`
+- Auto-cancel older in-progress runs for the same ref on push workflows targeting `main`
 
 **CI/CD workflows MUST NOT:**
 - Reference local user paths like `~/.local/share/cargo` (use `/tmp/` or CI-native caching)
@@ -37882,15 +37882,15 @@ If signing or attestation is required but keys/permissions are unavailable, stop
 | `ci.yml` | Push, PR to default branch; security jobs also run on weekly cron | Build + test + lint + coverage + secret scanning + image scanning + workflow-policy |
 | `release.yml` | Tag push (`v*`, `*.*.*`) + manual dispatch | Production releases |
 | `beta.yml` | Push of a `*-beta` tag | Beta releases |
-| `devel.yml` | Daily at 3am UTC + push to main/master | Devel builds |
+| `devel.yml` | Daily at 3am UTC + push to main | Devel builds |
 | `docker.yml` | Push to `main`, version tags, `*-beta` tags and the daily schedule | Docker images (`build-standard` + `build-devel` jobs) |
 > **Note:** `ci.yml` and `release.yml` are required on every project. Rust projects never have `build-toolchain.yml` — `casjaysdev/rust:latest` is maintained externally. `beta.yml`, `devel.yml`, and `docker.yml` are project-specific optional workflows — include only when the project requires them.
 
-**Branch push auto-cancel policy:** Any workflow triggered by pushes to `main` or `master` MUST use workflow concurrency to cancel older in-progress runs for the same ref. This applies to branch-based CI (for example `beta.yml`, `devel.yml`, `docker.yml`, and any project-specific branch-push workflow).
+**Branch push auto-cancel policy:** Any workflow triggered by pushes to `main` MUST use workflow concurrency to cancel older in-progress runs for the same ref. This applies to branch-based CI (for example `beta.yml`, `devel.yml`, `docker.yml`, and any project-specific branch-push workflow).
 
 **Tag release auto-cancel policy:** Tag-only release workflows like `release.yml` MUST also use workflow concurrency, but only per exact tag ref. A newer run for `refs/tags/v1.2.3` should cancel the older `refs/tags/v1.2.3` run. A run for `v1.2.4` must NOT cancel `v1.2.3`.
 
-**Pull requests and merges:** a pull request runs `ci.yml` only (build, test, lint, coverage, secret scan, workflow policy) — it never publishes an image or a release, and a fork PR receives no secrets. Merging into `main`/`master` is simply a push to that branch, so the merge triggers `ci.yml`, `devel.yml` (the rolling `devel` release) and `docker.yml` (the `{commit_id}` image and the `:devel` image). A beta is a pushed tag `YYYYMMDDHHMMSS-beta` (`make beta`), a stable release is a pushed `v*` tag, and neither is ever a merge. A PR and its target branch have different refs, so their concurrency groups never cancel each other.
+**Pull requests and merges:** a pull request runs `ci.yml` only (build, test, lint, coverage, secret scan, workflow policy) — it never publishes an image or a release, and a fork PR receives no secrets. Merging into `main` is simply a push to that branch, so the merge triggers `ci.yml`, `devel.yml` (the rolling `devel` release) and `docker.yml` (the `{commit_id}` image and the `:devel` image). A beta is a pushed tag `YYYYMMDDHHMMSS-beta` (`make beta`), a stable release is a pushed `v*` tag, and neither is ever a merge. A PR and its target branch have different refs, so their concurrency groups never cancel each other.
 
 ## Build Info Variables
 
@@ -37921,9 +37921,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
   schedule:
     # Weekly security run (Monday 06:00 UTC) — only security jobs run on schedule
     - cron: '0 6 * * 1'
@@ -38506,12 +38506,11 @@ on:
   push:
     branches:
       - main
-      - master
   workflow_dispatch:
 
 concurrency:
   group: devel-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -38717,7 +38716,7 @@ jobs:
 | Push of a `*-beta` tag | `beta`, `{commit_id}` |
 | Version tag (`v*`, `*.*.*`) | `{version}`, `latest`, `{yymm}` |
 
-> **Note:** `:devel` is not tagged by `build-standard`. It is built by the `build-devel` job in the same `docker.yml` workflow (below) from `docker/Dockerfile.dev`, triggered on every push to `main`/`master` and on a daily schedule.
+> **Note:** `:devel` is not tagged by `build-standard`. It is built by the `build-devel` job in the same `docker.yml` workflow (below) from `docker/Dockerfile.dev`, triggered on every push to `main` and on a daily schedule.
 
 **Notes:**
 - `{commit_id}` = short SHA (7 characters) from `git rev-parse --short=7 HEAD`
@@ -38734,7 +38733,7 @@ name: Docker Build
 on:
   push:
     # main only: branches are local and temporary, never pushed
-    branches: [main, master]
+    branches: [main]
     tags:
       - 'v*'
       - '*.*.*'
@@ -38745,7 +38744,7 @@ on:
 
 concurrency:
   group: docker-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 
 env:
   PROJECT_NAME: {project_name}
@@ -38862,7 +38861,7 @@ jobs:
             manifest:org.opencontainers.image.licenses=MIT
 
   build-devel:
-    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'push') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'push') && (github.ref == 'refs/heads/main')
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -38942,7 +38941,7 @@ jobs:
 
 ```
 
-The `:devel` image is built from `docker/Dockerfile.dev` (debug tooling, alpine base) by the `build-devel` job in this same `docker.yml` workflow. It runs on every push to `main`/`master`, on a daily schedule, and on manual dispatch from `main`/`master`, so `:devel` always reflects both the latest commit and stays fresh even without new pushes. `Dockerfile.dev` sets `MODE=devel` via `ENV`; the app treats `dev`, `devel`, and `development` as synonymous valid `MODE` values. The static `:devel` tag is always overwritten — no commit-SHA or dated tags are produced by this job.
+The `:devel` image is built from `docker/Dockerfile.dev` (debug tooling, alpine base) by the `build-devel` job in this same `docker.yml` workflow. It runs on every push to `main`, on a daily schedule, and on manual dispatch from `main`, so `:devel` always reflects both the latest commit and stays fresh even without new pushes. `Dockerfile.dev` sets `MODE=devel` via `ENV`; the app treats `dev`, `devel`, and `development` as synonymous valid `MODE` values. The static `:devel` tag is always overwritten — no commit-SHA or dated tags are produced by this job.
 
 **Image Tag Summary:**
 
@@ -39006,7 +39005,7 @@ For self-hosted runners, change `runs-on: ubuntu-26.04` to your runner label.
 | `ci.yml` | Push and pull requests; weekly schedule for security jobs | Build, test, lint, coverage, security jobs |
 | `release.yml` | Tag push (`v*`, `*.*.*`) + manual dispatch | Production releases |
 | `beta.yml` | Push of a `*-beta` tag | Beta releases |
-| `devel.yml` | Daily at 3am UTC + push to main/master | Devel builds |
+| `devel.yml` | Daily at 3am UTC + push to main | Devel builds |
 | `docker.yml` | Push to `main`, version tags, `*-beta` tags and the daily schedule | Docker images (`build-standard` + `build-devel` jobs) |
 
 ## CI Workflow (Gitea/Forgejo Actions)
@@ -39018,9 +39017,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
   schedule:
     # Weekly security run (Monday 06:00 UTC) — only security jobs run on schedule
     - cron: '0 6 * * 1'
@@ -39566,12 +39565,11 @@ on:
   push:
     branches:
       - main
-      - master
   workflow_dispatch:
 
 concurrency:
   group: devel-${{ gitea.ref }}-${{ gitea.event_name }}
-  cancel-in-progress: ${{ gitea.ref == 'refs/heads/main' || gitea.ref == 'refs/heads/master' }}
+  cancel-in-progress: ${{ gitea.ref == 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -39764,7 +39762,7 @@ name: Docker Build
 on:
   push:
     # main only: branches are local and temporary, never pushed
-    branches: [main, master]
+    branches: [main]
     tags:
       - 'v*'
       - '*.*.*'
@@ -39775,7 +39773,7 @@ on:
 
 concurrency:
   group: docker-${{ gitea.ref }}-${{ gitea.event_name }}
-  cancel-in-progress: ${{ gitea.ref == 'refs/heads/main' || gitea.ref == 'refs/heads/master' }}
+  cancel-in-progress: ${{ gitea.ref == 'refs/heads/main' }}
 
 env:
   PROJECT_NAME: {project_name}
@@ -39902,7 +39900,7 @@ jobs:
             manifest:org.opencontainers.image.licenses=MIT
 
   build-devel:
-    if: (gitea.event_name == 'schedule' || gitea.event_name == 'workflow_dispatch' || gitea.event_name == 'push') && (gitea.ref == 'refs/heads/main' || gitea.ref == 'refs/heads/master')
+    if: (gitea.event_name == 'schedule' || gitea.event_name == 'workflow_dispatch' || gitea.event_name == 'push') && (gitea.ref == 'refs/heads/main')
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -39986,7 +39984,7 @@ jobs:
 
 ```
 
-The `:devel` image is built by the `build-devel` job in this same `docker.yml` workflow, from `docker/Dockerfile.dev`, on every push to `main`/`master`, on a daily schedule, and on manual dispatch from `main`/`master` — mirroring the GitHub Actions design above.
+The `:devel` image is built by the `build-devel` job in this same `docker.yml` workflow, from `docker/Dockerfile.dev`, on every push to `main`, on a daily schedule, and on manual dispatch from `main` — mirroring the GitHub Actions design above.
 
 ## Variable Mapping (GitHub → Gitea → Forgejo)
 
@@ -40292,7 +40290,7 @@ test:
       if [ "$PCT" -lt 60 ]; then echo "coverage ${PCT}% is below the 60% threshold"; exit 1; fi
   rules:
     - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+/
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_TAG =~ /^\d{14}-beta$/
 
 # =============================================================================
@@ -40471,7 +40469,7 @@ release:beta:
     - if: $CI_COMMIT_TAG =~ /^\d{14}-beta$/
 
 # =============================================================================
-# DEVEL BUILDS (Scheduled + main/master push) - All 7 platforms
+# DEVEL BUILDS (Scheduled + main push) - All 7 platforms
 # =============================================================================
 
 build:devel:
@@ -40510,7 +40508,7 @@ build:devel:
     expire_in: 1 day
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_BRANCH == "main"
       when: manual
       allow_failure: true
 
@@ -40578,7 +40576,7 @@ release:devel:
           url: "${CI_PROJECT_URL}/-/jobs/artifacts/devel/raw/${PROJECT_NAME}-freebsd-amd64?job=build:devel"
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_BRANCH == "main"
       when: manual
       allow_failure: true
 
@@ -40653,11 +40651,11 @@ docker:build:
         .
   rules:
     - if: $CI_COMMIT_TAG =~ /^v?\d+\.\d+\.\d+/
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_TAG =~ /^\d{14}-beta$/
 
 # =============================================================================
-# DOCKER DEVEL BUILD (dedicated job — main/master push + daily schedule, never folded
+# DOCKER DEVEL BUILD (dedicated job — main push + daily schedule, never folded
 # into docker:build; builds docker/Dockerfile.dev, static :devel tag)
 # =============================================================================
 
@@ -40713,7 +40711,7 @@ docker:build:devel:
   rules:
     - if: $CI_COMMIT_TAG
       when: never
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_BRANCH == "main"
 
 ```
 
@@ -40738,10 +40736,10 @@ Create in GitLab Project → Build → Pipeline schedules:
 | Description | Devel Build |
 | Interval Pattern | `0 3 * * *` (3am UTC daily) |
 | Cron Timezone | UTC |
-| Target Branch | `main` or `master` |
+| Target Branch | `main` |
 | Activated | Yes |
 
-Add a second schedule (Description: `Devel Docker Build`, Interval Pattern: `0 4 * * *`, Target Branch: `main`) so `docker:build:devel` also runs daily in addition to every push to `main`/`master`.
+Add a second schedule (Description: `Devel Docker Build`, Interval Pattern: `0 4 * * *`, Target Branch: `main`) so `docker:build:devel` also runs daily in addition to every push to `main`.
 
 ## Variable Mapping
 
@@ -40775,7 +40773,7 @@ Jenkins provides equivalent functionality to GitHub Actions, Gitea Actions, and 
 |---------|-------|
 | Agents | `arm64`, `amd64` (both required) |
 | Build | All 7 platforms in parallel |
-| Triggers | Tag push (release and `*-beta`), main/master, scheduled daily |
+| Triggers | Tag push (release and `*-beta`), main, scheduled daily |
 
 ## Triggers (Matching GitHub Actions)
 
@@ -40783,7 +40781,7 @@ Jenkins provides equivalent functionality to GitHub Actions, Gitea Actions, and 
 |---------|----------------|---------------|
 | Tag push | `when { buildingTag() }` | `release.yml` |
 | Beta tag | `when { tag '*-beta' }` | `beta.yml` |
-| Main/master | `when { anyOf { branch 'main'; branch 'master' } }` | `devel.yml` |
+| Main | `when { branch 'main' }` | `devel.yml` |
 | Scheduled | `triggers { cron('0 3 * * *') }` | `devel.yml` schedule |
 | All branches | Default (no `when`) | `docker.yml` |
 
@@ -40855,7 +40853,7 @@ pipeline {
                         // Release build (tag push) - matches release.yml
                         env.BUILD_TYPE = 'release'
                         env.VERSION = env.TAG_NAME.replaceFirst('^v', '')
-                    } else if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master') {
+                    } else if (env.BRANCH_NAME == 'main') {
                         // Devel build - matches devel.yml
                         // Devel builds are identified by the commit they're built from -
                         // not a release.txt version, not a timestamp
@@ -41333,7 +41331,7 @@ pipeline {
             }
         }
 
-        // Devel Release - matches devel.yml (main/master + scheduled)
+        // Devel Release - matches devel.yml (main + scheduled)
         stage('Release: Devel') {
             agent { label 'amd64' }
             when {
@@ -41443,12 +41441,12 @@ pipeline {
         }
 
         // Docker Devel - dedicated stage, never folded into the Docker stage above;
-        // runs on every push to main/master plus the daily cron trigger, builds
+        // runs on every push to main plus the daily cron trigger, builds
         // docker/Dockerfile.dev, always overwrites the static :devel tag
         stage('Docker Devel') {
             agent { label 'amd64' }
             when {
-                anyOf { branch 'main'; branch 'master' }
+                branch 'main'
             }
             steps {
                 script {
@@ -41567,7 +41565,7 @@ REGISTRY = "ghcr.io/${PROJECT_ORG}/${INTERNAL_NAME}"
 |--------------|----------------|---------|
 | Stable | `release.yml` (tag push) | `BUILD_TYPE == 'release'` (tag) |
 | Beta | `beta.yml` (`*-beta` tag) | `BUILD_TYPE == 'beta'` (`*-beta` tag) |
-| Devel | `devel.yml` (schedule + main) | `BUILD_TYPE == 'devel'` (cron + main/master) |
+| Devel | `devel.yml` (schedule + main) | `BUILD_TYPE == 'devel'` (cron + main) |
 | Docker | `docker.yml` (main, version and beta tags) | Docker stage (always runs) |
 | Docker devel | `docker.yml` `build-devel` job (push + devel) | Docker Devel stage (push + devel) |
 
