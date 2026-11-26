@@ -33809,7 +33809,7 @@ retention:
 Backups on disk (January 15, 2025):
   myapp_backup_2025-01-15.tar.gz.enc    ← Today's run (daily full at T0)
   myapp_backup_2025-01-12.tar.gz.enc    ← Last Sunday (weekly)
-  myapp_backup_2025-01-01.tar.gz.enc    ← 1st of Jan 2025 (monthly + yearly)
+  myapp_backup_2025-01-01.tar.gz.enc    ← 1st of Jan 2025 (yearly; a backup fills exactly one category, so the monthly slot stays empty until the next 1st)
   myapp-daily.tar.gz.enc                 ← Incremental
 
 Total: 4 files

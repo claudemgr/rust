@@ -33190,7 +33190,7 @@ retention:
 Backups on disk (January 15, 2025):
   myapp_backup_2025-01-15.tar.gz.enc    ← Today's run (daily full at T0)
   myapp_backup_2025-01-12.tar.gz.enc    ← Last Sunday (weekly)
-  myapp_backup_2025-01-01.tar.gz.enc    ← 1st of Jan 2025 (monthly + yearly)
+  myapp_backup_2025-01-01.tar.gz.enc    ← 1st of Jan 2025 (yearly; a backup fills exactly one category, so the monthly slot stays empty until the next 1st)
   myapp-daily.tar.gz.enc                 ← Incremental
 
 Total: 4 files
@@ -33208,12 +33208,11 @@ retention:
 Backups on disk (January 15, 2026):
   myapp_backup_2026-01-15.tar.gz.enc    ← Today's run (daily full at T0)
   myapp_backup_2026-01-12.tar.gz.enc    ← Last Sunday (weekly)
-  myapp_backup_2026-01-01.tar.gz.enc    ← 1st of Jan 2026 (monthly + yearly)
-  myapp_backup_2025-12-01.tar.gz.enc    ← 1st of Dec 2025 (monthly, kept until Feb)
-  myapp_backup_2025-01-01.tar.gz.enc    ← 1st of Jan 2025 (yearly)
+  myapp_backup_2026-01-01.tar.gz.enc    ← 1st of Jan 2026 (yearly; the 2025-01-01 yearly is pruned, keep_yearly is 1)
+  myapp_backup_2025-12-01.tar.gz.enc    ← 1st of Dec 2025 (monthly, kept until the next 1st)
   myapp-daily.tar.gz.enc                 ← Incremental
 
-Total: 6 files (1 daily + 1 weekly + 2 monthly + 1 yearly + incremental)
+Total: 5 files (1 daily + 1 weekly + 1 yearly + 1 monthly + incremental)
 ```
 
 **Backup Cleanup Logic (runs after successful backup and at startup):**
