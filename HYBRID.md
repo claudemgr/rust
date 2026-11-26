@@ -17453,12 +17453,13 @@ pub fn is_allowlisted<B>(req: &Request<B>) -> bool {
 ```rust
 // validate_config validates all config values, replacing invalid with defaults
 fn validate_config(cfg: &mut Config) {
-    // Example: port must be 1-65535
-    if cfg.server.port < 1 || cfg.server.port > 65535 {
+    // server.port is a string holding one port ("8090") or two ("{http},{https}", "80,443"); a YAML integer is read as its
+    // decimal string. Every number must be 1-65535 and there are at most two (PART 5 "Dual Port Support")
+    if parse_port_spec(&cfg.server.port).is_err() {
         // 64000-64999 range
         let random_port = get_random_available_port();
         tracing::warn!("invalid port {}, using random port {}", cfg.server.port, random_port);
-        cfg.server.port = random_port;
+        cfg.server.port = random_port.to_string();
     }
 
     // Example: timeout must be positive
