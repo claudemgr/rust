@@ -26669,10 +26669,10 @@ See **JavaScript Rules** section below for `app.js` structure.
   <a href="/server/login">Login</a>
 </nav>
 
-<style>
+<!-- The CSS lives in static/css/common.css, never in a <style> block:
 .menu { display: none; }
 #menu-toggle:checked ~ .menu { display: block; }
-</style>
+-->
 
 <!-- Dropdown - use :focus-within NOT JS -->
 <div class="dropdown">
@@ -26683,10 +26683,10 @@ See **JavaScript Rules** section below for `app.js` structure.
   </div>
 </div>
 
-<style>
+<!-- The CSS lives in static/css/common.css, never in a <style> block:
 .dropdown-content { display: none; }
 .dropdown:focus-within .dropdown-content { display: block; }
-</style>
+-->
 ```
 
 ### Askama Templates
@@ -29413,7 +29413,6 @@ function loadTracking() {
 **CCPA "Do Not Sell"** (only rendered when `server.privacy.data.sold = true`) is a plain POST form to `/consent/ccpa` — no JavaScript required. The server sets the `ccpa_opt_out` cookie (1 year), declines non-essential categories in `cookieConsent`, blocks third-party data sharing, and honors the GPC (Global Privacy Control) signal server-side. Nothing is stored in localStorage — the server must be able to read the opt-out on every request.
 
 ```css
-<style>
 /* Cookie Consent Banner - matches reference design.
    No hidden state needed: the server only renders the banner when there is
    no valid consent cookie, and the JS enhancement removes the element. */
@@ -29501,7 +29500,6 @@ function loadTracking() {
     padding: 0.5rem 1.25rem;
   }
 }
-</style>
 ```
 
 ### Consent Logic (Granular)
