@@ -40161,6 +40161,19 @@ image-scan:
         - docker/Dockerfile
 
 # =============================================================================
+# BUILD GATE (every main push and merge request: explicit go build, nothing published)
+# =============================================================================
+
+build:check:
+  <<: *rust-build
+  stage: build
+  script:
+    - cargo check --locked --workspace --all-targets
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# =============================================================================
 # RELEASE BUILDS (Tag Push: v* or semver)
 # =============================================================================
 

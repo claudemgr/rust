@@ -5802,7 +5802,7 @@ jobs:
 
 ### License Verification Script
 
-**Scan scope and reviewed overrides.** The scan covers the packages of the shipped binaries, `./src/...`; `tests/` and tooling are not shipped and are not scanned. A dependency whose license the scanner cannot classify (`Unknown`, for example a BSD-3-Clause text with a non-standard copyright line) is resolved by a reviewed override, never by skipping the check: `.github/license-overrides.txt` holds one line per module, `{module path} {SPDX id} {reviewer note}`, added only after a person read that module's LICENSE file. The scan ignores that one module and the override's SPDX id takes its place in the report, so the copyleft check still sees it; a module not listed, and any copyleft id, still fails the scan, and a missing file means no overrides.
+**Scan scope and reviewed overrides.** The scan covers the packages of the shipped binaries, `./src/...`; `tests/` and tooling are not shipped and are not scanned. A dependency whose license the scanner cannot classify (`Unknown`, for example a BSD-3-Clause text with a non-standard copyright line) is resolved by a reviewed override, never by skipping the check: `.github/license-overrides.txt` holds one line per module, `{module path} {SPDX id} {reviewer note}`, added only after a person read that module's LICENSE file. The scan ignores that one module and the override's SPDX id takes its place in the report, so the copyleft check still sees it; a module not listed, and any copyleft id, still fails the scan, and a missing file means no overrides. The scanner reads only the first two fields; everything after them is the reviewer note (free text: who read which file, and when), which stays in the committed file as the review record, and a line starting with `#` is a comment. A module whose archive has NO LICENSE file gives a person nothing to read, so it is never overridden on a guess: either its repository states the license in another file (README, COPYING, NOTICE), which the note then names and the SPDX id is recorded the same way, or the license cannot be established and the dependency is replaced or removed.
 
 **Include in project repository:**
 
@@ -38973,6 +38973,19 @@ image-scan:
   rules:
     - exists:
         - docker/Dockerfile
+
+# =============================================================================
+# BUILD GATE (every main push and merge request: explicit go build, nothing published)
+# =============================================================================
+
+build:check:
+  <<: *rust-build
+  stage: build
+  script:
+    - cargo check --locked --workspace --all-targets
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
 
 # =============================================================================
 # RELEASE BUILDS (Tag Push: v* or semver)
