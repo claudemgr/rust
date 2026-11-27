@@ -405,16 +405,15 @@ permission rules, business invariants. The HOW lives in AI.md PARTS 0-32; PART 3
 
 | Command | Purpose | Output Location | When to Use |
 |---------|---------|-----------------|-------------|
-| `make dev` | **Development & Debugging** | `${TMPDIR}/${PROJECT_ORG}/${INTERNAL_NAME}-XXXXXX/` | Active coding, quick tests |
-| `make local` | **Production Testing** | `binaries/` (with version) | Test prod builds locally |
-| `make build` | **Full Release** | `binaries/` (all 7 platforms) | Before release |
+| `make build` | **Debug binaries** | `binaries/` (all 7 platforms) | Active coding, debugging, verification |
+| `make release` | **Production binaries** | `releases/` (all 7 platforms) | Check the production artifacts locally |
 | `make test` | **Phase 1 — Toolchain Gate** | Coverage report | Before commits; after code changes |
 
 | NEVER (locally) | ALWAYS (Makefile targets) |
 |-----------------|---------------------------|
-| `cargo build ...` | `make dev` or `make local` or `make build` |
+| `cargo build ...` | `make build` |
 | `cargo test` (directly) | `make test` |
-| `cargo run` | `make dev` then run binary in Docker |
+| `cargo run` | `make build` then run the binary in Docker |
 | Run binary on host directly | `docker run --rm -v "$BUILD_DIR:/app" alpine:latest /app/{project_name}` or Phase 2 scripts |
 
 **Makefile targets use Docker internally (`casjaysdev/rust:latest`) with host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`/`CARGO_TARGET`) — local machine stays clean.**
@@ -424,8 +423,8 @@ permission rules, business invariants. The HOW lives in AI.md PARTS 0-32; PART 3
 **For local debugging and quick tests, use Docker with required tools:**
 
 ```bash
-# After make dev, debug in Docker with tools
-BUILD_DIR=$(ls -td ${TMPDIR:-/tmp}/${PROJECT_ORG}/${INTERNAL_NAME}-*/ 2>/dev/null | head -1)
+# After make build, debug in Docker with tools
+BUILD_DIR="$PWD/binaries"
 docker run --rm --name "${PROJECT_NAME}-$(head -c6 /dev/urandom | od -An -tx1 | tr -d ' \n' | cut -c1-8)" -v "$BUILD_DIR:/app" alpine:latest sh -c "
   # Required debug tools
   apk add --no-cache curl bash file jq tor i2pd tzdata ca-certificates
@@ -472,32 +471,26 @@ The Incus preference applies to the full-app check, `tests/incus.sh`, which a de
 **Local Development Workflow:**
 ```bash
 # 1. Active development
-# Quick build to temp dir
-make dev
+# Debug binaries (symbols kept) to binaries/
+make build
+# Output: binaries/{project_name}, binaries/{project_name}-cli (debug)
 
 # 2. Debug in Docker (with tools)
-BUILD_DIR=$(ls -td ${TMPDIR:-/tmp}/${PROJECT_ORG}/${INTERNAL_NAME}-*/ 2>/dev/null | head -1)
+BUILD_DIR="$PWD/binaries"
 docker run --rm --name "${PROJECT_NAME}-$(head -c6 /dev/urandom | od -An -tx1 | tr -d ' \n' | cut -c1-8)" -v "$BUILD_DIR:/app" alpine:latest sh -c "
   apk add --no-cache curl bash file jq tor i2pd tzdata ca-certificates
   /app/{project_name} --help
 "
 
-# Phase 1: Toolchain gate — unit tests inside Docker
+# Phase 1 and the Phase 2 basic tier: lints, vulnerability scan, unit tests, then the binary checks (start, --help, --version, CLI), all in Docker
 make test
 
-# Phase 2: Binary validation — shell scripts run against the compiled binary
-# Basic tier: Docker
-./tests/run_tests.sh
-
-# 5. Production test (before release)
-# Build with version info
-make local
+# 5. Production check (before release)
+# Production binaries (stripped) to releases/
+make release
+# Output: releases/{project_name}-{os}-{arch}, checksums and the source archive
 # Full systemd testing (PREFERRED)
 ./tests/incus.sh
-
-# 6. Full release build
-# All 7 platforms
-make build
 ```
 
 **See PART 25: MAKEFILE and PART 28: TESTING & DEVELOPMENT for complete details.**
@@ -1175,7 +1168,7 @@ Quick reference: Accept `yes/no`, `true/false`, `1/0`, `on/off`, `enable/disable
 | Implement usage limits/quotas | Rate limits protect servers; usage limits extract money |
 | Create enterprise/premium tiers | All features free for all users, always |
 | Use singular directory names | Use plural: `handlers/`, `models/`, not `handler/` |
-| Run Rust locally | Use `make dev` / `make local` (containers only) |
+| Run Rust locally | Use `make build` / `make test` (containers only) |
 
 ## Files & Directories Master Rules
 
@@ -1278,8 +1271,8 @@ Quick reference: Accept `yes/no`, `true/false`, `1/0`, `on/off`, `enable/disable
 | `.cursor/settings.json` | ✓ | Cursor personal settings — gitignored |
 | `.windsurf/rules/` | — | Windsurf team config — **committed** |
 | `.windsurf/settings.json` | ✓ | Windsurf personal settings — gitignored |
-| `.aider/` | ✓ | Aider AI configuration — gitignored |
-| `.ai/` | ✓ | Generic AI configuration — gitignored |
+| `.aider/` | ✓ | Aider AI configuration — committed (regenerated whenever AI.md changes) |
+| `.ai/` | ✓ | Generic AI configuration — committed (regenerated whenever AI.md changes) |
 
 **Rule:** team config (rules, agents, hooks, shared settings) is committed; personal overrides, credentials, cache, and lock files are gitignored.
 
@@ -3437,7 +3430,7 @@ Project is now 100% compliant with AI.md
 |--------|--------|
 | **Modifying PARTS 0-32** | **Implementation patterns are fixed - NEVER modify** |
 | Plain `git commit` (any flag form) | Bypasses signing wrapper. Use `gitcommit --dir {project_dir} all` instead |
-| Plain `git push` | gitcommit already pushes. Plain `git push` bypasses the wrapper entirely. Scope: AI sessions and day-to-day repository updates. The release targets (`make release`, run by the human maintainer, and the CI workflows) delete and recreate ONLY the rolling `devel` tag with `git tag`, `git push origin refs/tags/...` and `gh release`, because a tag is not a commit and `gitcommit` has no tag operation |
+| Plain `git push` | gitcommit already pushes. Plain `git push` bypasses the wrapper entirely. Scope: AI sessions and day-to-day repository updates. The maintainer's tag pushes and the CI workflows delete and recreate ONLY the rolling `devel` tag with `git tag`, `git push origin refs/tags/...` and `gh release`, because a tag is not a commit and `gitcommit` has no tag operation |
 | `gitcommit --dir {project_dir} all` without first writing AND re-reading `.git/COMMIT_MESS` | The script reads the message from the file and pushes immediately. Wrong file = wrong commit on the remote |
 | `gitcommit -m "..."` / `gitcommit --message "..."` | Defeats the point. The message belongs in `.git/COMMIT_MESS` so it can be verified before committing |
 | Running `gitcommit --dir {project_dir} all` mid-task with files in an inconsistent state | Every commit is pushed — half-finished work goes public. Finish the unit of work first |
@@ -3665,7 +3658,7 @@ When the specification is unclear:
 | **CLI commands** | `--service`, `--maintenance`, `--update` action flags - same interface everywhere (the CLI is flags-only; no subcommands) |
 | **Flag formats** | Short/long flag patterns, output formats |
 | **Makefile structure** | Targets, variables, Docker commands |
-| **Makefile targets** | `dev`, `local`, `build`, `test`, `release`, `beta`, `docker` (plus the `clean` and `release-check` helpers) |
+| **Makefile targets** | `build`, `test`, `release`, `docker`, `clean`, `help` |
 | **CI/CD workflows** | GitHub/Gitea/Jenkins pipeline structure |
 | **Directory layout** | `src/`, `docker/`, `binaries/`, etc. |
 | **Config file format** | YAML structure, standard keys |
@@ -4421,12 +4414,12 @@ When working on this project, the following roles are assumed based on the task:
 
 ```bash
 # CORRECT - Use Makefile targets
-# Quick build to {tempdir}/{project_org}/{internal_name}-XXXXXX/
-make dev
-# Build with version info to binaries/
-make local
-# Full cross-platform build to binaries/
+# Debug binaries (symbols kept) to binaries/
 make build
+# Output: binaries/{project_name}, binaries/{project_name}-cli (debug)
+# Production binaries (stripped) to releases/
+make release
+# Output: releases/{project_name}-{os}-{arch}, checksums and the source archive
 # Run unit tests
 make test
 
@@ -5382,8 +5375,9 @@ curl -q -LSsf -H "Authorization: Bearer TOKEN" {official_site}/api/{api_version}
 git clone {PLATFORM_REPO_URL}
 cd {project_name}
 
-# Quick dev build (outputs to OS temp dir)
-make dev
+# Debug binaries (symbols kept) to binaries/
+make build
+# Output: binaries/{project_name}, binaries/{project_name}-cli (debug)
 
 # Full build (all platforms, outputs to binaries/)
 make build
@@ -6914,7 +6908,7 @@ When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
 - Version numbers are examples - always use latest stable versions
 - Not all projects need all modules - include only what you use
 - Clean up unused dependencies: `cargo fix` and `cargo udeps` help identify unused crates
-- **NEVER run `cargo` directly on the host - always use Makefile targets (`make dev`, `make test`, etc.)**
+- **NEVER run `cargo` directly on the host - always use Makefile targets (`make build`, `make test`, etc.)**
 
 ---
 
@@ -8516,7 +8510,7 @@ ENTRYPOINT [ "tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]
        }
 
        if !can_escalate() {
-           // User CANNOT escalate - don't ask, just inform
+           // User CANNOT escalate by a detected method - don't ask, just inform (su alone never causes a prompt, PART 23)
            return Err(anyhow::anyhow!(
                "{} requires administrator privileges\n\nYou do not have sudo/admin access. Contact your system administrator.",
                action
@@ -11425,12 +11419,14 @@ PHASE 5: Server startup (actual server start)
 | LXC/LXD/Incus | `/dev/lxc` exists OR `container=lxc` env |
 | systemd-nspawn | `container=systemd-nspawn` env |
 | Generic | `container` env var set (any value) |
-| Init systems | Parent PID 1 is: `tini`, `dumb-init`, `s6-svscan`, `runsv`, `runsvdir`, `catatonit` |
+| Init systems | The PARENT process (`/proc/{ppid}/comm`) is: `tini`, `dumb-init`, `s6-svscan`, `runsv`, `runsvdir`, `catatonit` |
 | Kubernetes | `KUBERNETES_SERVICE_HOST` env var set |
 | cgroup | `/proc/1/cgroup` contains `docker`, `kubepods`, `lxc` |
 | Self wrapper | Parent process is `{project_name}` (entrypoint wrapper) |
 
 **System containers (Incus/LXC/LXD/systemd-nspawn):** these run a full init, so the table above does not make them "container" for service-manager purposes. When systemd launched the process (`INVOCATION_ID` set) the service manager is `systemd`; when OpenRC launched it (`RC_SVCNAME` set, or PID 1 being OpenRC's init with `/run/openrc` present, whatever the launch method) the service manager is `openrc`. In both cases service install/start/stop/status work normally. "container" applies to application containers (Docker, Podman, Kubernetes) and to Incus/LXC containers whose init is neither systemd nor OpenRC. The systemd and OpenRC checks run before generic container detection. The same order decides every default that depends on being in a container (the listen port `80` and `server.i2p.enabled`): the systemd and OpenRC checks run first, so an Incus/LXC system container run by systemd or OpenRC is a host for them, and only then is `isContainer()` consulted.
+
+**One precedence rule for every container-dependent default and for service-manager selection:** call `detectServiceManager()` first. A `systemd` or `openrc` result (including inside an Incus/LXC system container, whose init is a normal host) means the process is a HOST, never a container; the process counts as a container only when `detectServiceManager()` returns `container`. `isContainer()` is a raw marker check and is never used on its own for a default. PID 1 (`/proc/1/comm`) is read only to find systemd or OpenRC as the host init; the container init names above are matched against the PARENT process only.
 
 **Manual Start Priority Order:**
 1. `--daemon` CLI flag (highest)
@@ -15815,7 +15811,7 @@ web:
 - API base URL from config
 - Endpoints auto-discovered from route registrations (public + authenticated, not admin-only)
 - Capabilities derived from enabled features
-- Contact info from the canonical contact keys: `{api_contact}` is `server.contact.general.email` and `{security_contact}` is `server.contact.security.email` (PART 12 -> "Contact Configuration")
+- Contact info from the canonical contact keys: `{api_contact}` is `server.contact.general.email` (public in `llms.txt` by the operator's choice of a role address; the line is omitted when it is empty) and `{security_contact}` is `server.contact.security.email` (PART 12 -> "Contact Configuration")
 
 **Endpoint Inclusion Rules:**
 | Route Type | Included | Reason |
@@ -17629,7 +17625,7 @@ if !constant_time_eq(got.as_bytes(), want.as_bytes()) {
 | `server.contact.admin.email` | NEVER public | Server-internal recipient only. |
 | `server.contact.security.email` | Public (security.txt `Contact: mailto:` line — the secondary/CC channel; GitHub private vulnerability reporting is primary) | Researchers need to reach you. Choose carefully. Suggest a role address (`security@{fqdn}`) over a personal one. |
 | `server.contact.abuse.email` | Public (contact page "Abuse Reports" section) when set | RFC 2142 role address (`abuse@{fqdn}`) recommended over a personal one. |
-| `server.contact.general.email` | Public only where the DPO page falls back to it | Same — role address recommended. |
+| `server.contact.general.email` | Public where the DPO page falls back to it and in `llms.txt` when set | Same — role address recommended. |
 | `server.contact.dpo.email` | Public (DPO page and privacy policy) when set | Same — role address recommended. |
 | Any `webhooks.*` | NEVER public | URLs contain secrets / chat IDs / etc. |
 
@@ -18925,6 +18921,17 @@ pub struct StatsInfo {
 | `checks.i2p` | `check_i2p()` (only when I2P opt-in enabled) | 31.2 |
 | `stats.*` | `stats_collector.*` | - |
 
+### Core Check Probes
+
+**The core checks report `ok` or `error` only (never `degraded`); each runs with its own timeout so a slow dependency cannot stall `/server/healthz`.**
+
+| Check | Probe | `error` when |
+|-------|-------|--------------|
+| `check_database()` | `SELECT 1` through the primary, 2 s timeout | The query fails or times out |
+| `check_cache()` | `SET`, `GET` and `DEL` of the key `healthz:probe` on the configured cache (the in-process cache is probed the same way), 1 s timeout | Any step fails or the value read back differs |
+| `check_disk()` | Create and remove a probe file in `{data_dir}`, then read the free space of that volume | The probe write fails, or less than 64 MiB is free |
+| `check_scheduler()` | The scheduler task's heartbeat is newer than twice the shortest task interval | The heartbeat is older, or the scheduler is not running |
+
 ### Dataset & Dependency Checks
 
 **Every data set or external dependency the app loads, downloads, or reads at runtime is a health check.** A feature that silently runs on a missing, empty, or stale data set is a broken feature that reports "healthy" — health MUST say so.
@@ -20000,7 +20007,8 @@ pub async fn handler(
   margin: 0 auto;
 }
 
-@media (min-width: 768px) { /* md */
+/* md */
+@media (min-width: 768px) {
   .container {
     width: 95%;
   }
@@ -21235,11 +21243,12 @@ Need additional compatible endpoints?"
 |----------|--------|------|-------------|
 | `/` | GET | None | Web interface (HTML) |
 | `/server/healthz` | GET | None | Health check (HTML/JSON/text via content negotiation) |
+| `/server/help/mcp` | GET | None | MCP help page (HTML); always registered, the MCP endpoint is always on (JSON at `/api/{api_version}/server/help/mcp`) |
 | `/healthz` | GET | None | Optional direct alias to `/server/healthz` when `server.healthz.root.enabled` is `true` |
 | `/server/docs/swagger` | GET | None | Swagger UI (interactive REST explorer; fetches the spec from `/api/{api_version}/server/swagger`) |
 | `/server/docs/graphql` | GET | None | GraphiQL UI (interactive GraphQL explorer; POSTs to `/api/{api_version}/server/graphql`) |
-| `/server/metrics[/{service}]` | GET | Bearer token (per-service) | Metrics services: `prometheus` (default), `grafana`, `loki` |
-| `/api/{api_version}/server/metrics[/{service}]` | GET | Bearer token (per-service) | Versioned metrics — same handlers |
+| `/server/metrics[/{service}]` | GET | Bearer token (per-service) | Metrics services: `prometheus` (default), `grafana`, `loki`; mounted only while metrics are enabled (`server.metrics.enabled`, default on) |
+| `/api/{api_version}/server/metrics[/{service}]` | GET | Bearer token (per-service) | Versioned metrics — same handlers; mounted only while metrics are enabled (`server.metrics.enabled`, default on) |
 | `/api/metrics[/{service}]` | GET | Bearer token (per-service) | Unversioned metrics alias for current `{api_version}` — same handlers |
 | `/metrics[/{service}]` | GET | Bearer token (per-service) | Root alias when `server.metrics.root.enabled: true` (default true) — same handler, NEVER a redirect |
 | `/api/{api_version}` | GET | None | API root (no trailing slash; `/api/{api_version}/` redirects `301` to it): returns the same envelope document as `/api/autodiscover` |
@@ -22912,7 +22921,7 @@ fi
 
 | Rule | Detail |
 |------|--------|
-| **Written literally** | A media query cannot read a custom property, so the four widths are written literally, always as `min-width` in `px`, in this order inside a file (`sm` before `md` before `lg` before `xl`). The names appear in a comment on each query (`/* md */`) and in the tests |
+| **Written literally** | A media query cannot read a custom property, so the four widths are written literally, always as `min-width` in `px`, in this order inside a file (`sm` before `md` before `lg` before `xl`). The name appears in a comment on the line above each query (`/* md */`), never on the same line, and in the tests |
 | **Container queries first for components** | A component adapts to the width of its container, not of the viewport: the card or section that holds it declares `container-type: inline-size` and the component answers with `@container`. Named container widths: `cq-sm` 20 rem, `cq-md` 30 rem, `cq-lg` 40 rem, `cq-xl` 60 rem. A tile grid in a narrow card and in a wide card therefore both look right without a page rule |
 | **Page layout uses viewport queries** | Only page-level layout (the header drawer, the number of columns of the page grid, the container width) answers to `sm`, `md`, `lg` and `xl`; everything inside a card answers to its container |
 | **Tested at the edges** | The layout tests run at 320 px and at both sides of every name (639 and 640, 767 and 768, 1023 and 1024, 1279 and 1280) plus 1920 px, in both themes |
@@ -22953,7 +22962,7 @@ fi
 | Rule | Detail |
 |------|--------|
 | **Which components** | Button (`.btn-sm`, `.btn-lg`, `.btn-xl`), input and select (`.input-sm`, `.input-lg`), toggle (`.toggle-sm`, `.toggle-lg`), badge (`.badge-sm`, `.badge-lg`), tile (`.tile-sm`, `.tile-lg`, `.tile-xl`), icon (`.icon-sm` to `.icon-xl`). A component without a size simply has none; a project never invents another size name |
-| **Touch targets** | Below `md` every interactive control has a hit area of at least 44 x 44 px, so `sm` controls are `md` there: the base rule of each sized component sets `--control-height: var(--size-md)` for `-sm`, and the component's own block restores `--size-sm` under the named query `@media (min-width: 768px) /* md */ { .btn-sm { --control-height: var(--size-sm); } }`, so no `max-width` query is ever written. At `md` and up an `sm` control may be 2 rem tall and is never below 24 x 24 px (WCAG 2.5.8) |
+| **Touch targets** | Below `md` every interactive control has a hit area of at least 44 x 44 px, so `sm` controls are `md` there: the base rule of each sized component sets `--control-height: var(--size-md)` for `-sm`, and the component's own block restores `--size-sm` under the named query `@media (min-width: 768px) { .btn-sm { --control-height: var(--size-sm); } }` (with the `/* md */` comment on the line above), so no `max-width` query is ever written. At `md` and up an `sm` control may be 2 rem tall and is never below 24 x 24 px (WCAG 2.5.8) |
 | **Sizes never mix in a group** | Buttons in one row, inputs in one form row and tiles in one grid share one size |
 | **Responsive size** | A size change with the viewport goes through the named breakpoints or the container (a page's main action is `lg` from `md` up, never a one-off `font-size` and `padding`) |
 | **One text scale** | Text sizes are the `--font-size-xs` to `--font-size-4xl` tokens; a component size never changes the type scale of the page |
@@ -23746,8 +23755,8 @@ No other stylesheet exists: a project never adds a file per page. The HTML links
   --tap-target: 2.75rem;
   --measure: 72ch;
   --container-sm: 40rem;
-  --container-md: 48rem;
-  --container-lg: 64rem;
+  --container-md: 56rem;
+  --container-lg: 72rem;
   --container-xl: 87.5rem;
   --size-sm: 2rem;
   --size-md: 2.75rem;
@@ -23789,7 +23798,7 @@ No other stylesheet exists: a project never adds a file per page. The HTML links
 
 | Primitive | Purpose | Customization |
 |-----------|---------|---------------|
-| `.container` | Page column (see "Container") | none |
+| `.container`, `.container-sm`, `.container-md`, `.container-lg` | Page column and its three width modifiers, backed by `--container-sm`, `--container-md` and `--container-lg` (see "Container") | none |
 | `.stack` | Vertical rhythm: children separated by `gap` | `--stack-gap` (default `var(--space-4)`; `.stack-6` sets `--space-6`) |
 | `.cluster` | Inline group that wraps (button rows, chips, badges) | `--cluster-gap` (default `var(--space-3)`) |
 | `.grid` | Responsive columns, no media query: `repeat(auto-fit, minmax(min(var(--grid-min), 100%), 1fr))` | `--grid-min` (default `16rem`) |
@@ -23825,7 +23834,7 @@ No other stylesheet exists: a project never adds a file per page. The HTML links
 
 | Component | Block and elements | Variants | Sizes | State hooks |
 |-----------|--------------------|----------|-------|-------------|
-| Button | `.btn` | `-primary`, `-secondary`, `-danger`, `-ghost`, `--block` | `sm`, `lg`, `xl` | `:disabled`, `[aria-busy]`, `[aria-pressed]` |
+| Button | `.btn` | `-primary`, `-secondary`, `-danger`, `-ghost`, `-icon` (square, icon only, needs `aria-label`), `--block` | `sm`, `lg`, `xl` | `:disabled`, `[aria-busy]`, `[aria-pressed]` |
 | Input, select, textarea | `.input` | none | `sm`, `lg` | `:disabled`, `:read-only`, `[aria-invalid]` |
 | Form group | `.form-group`, `.form-group-label`, `.form-group-help`, `.form-group-error` | none | none | `[aria-invalid]` on the control |
 | Toggle | `.toggle`, `.toggle-track`, `.toggle-thumb`, `.toggle-label`, `.toggle-help` | none | `sm`, `lg` | `:checked`, `:disabled`, `:focus-visible` |
@@ -23837,7 +23846,7 @@ No other stylesheet exists: a project never adds a file per page. The HTML links
 | Modal, popover | `.modal`, `.modal-body`, `.modal-actions` on `<dialog>` or `[popover]` | none | none | `[open]`, `:popover-open` |
 | Table | `.table-wrapper`, `.data-table` | none | `sm` | `[aria-sort]` |
 | Navigation | `.nav-links`, `.nav-link`, hamburger drawer | none | none | `[aria-current]`, `[aria-expanded]` |
-| Header, footer | `.site-header`, `.site-footer`, `.footer-onion` | none | none | none |
+| Header, footer | `.site-header`, `.site-brand`, `.site-header-actions`, `.site-header-link`, `.site-footer`, `.footer-onion`, `.footer-i2p` | none | none | none |
 | Hub list | `.hub-list`, `.hub-item`, `.hub-link`, `.hub-title`, `.hub-desc` | none | none | `:focus-visible` |
 | Info list | `.info-list`, `.info-label`, `.info-value` | none | none | none |
 | Empty state | `.empty-state`, `.empty-state-title` | none | `lg`, `xl` | none |
@@ -23870,7 +23879,7 @@ No other stylesheet exists: a project never adds a file per page. The HTML links
 | Topic | Rule |
 |-------|------|
 | **Themes** | `html.theme-dark` is the base token set, `html.theme-light` overrides the color tokens, `html.theme-auto` follows `prefers-color-scheme`. Every theme sets `color-scheme` so native controls and scrollbars match. A component never branches on the theme: it reads tokens |
-| **Direction** | Logical properties only: `margin-inline`, `padding-block`, `inset-inline-start`, `border-start-start-radius`, `text-align: start`, `float: inline-start`. `left`, `right`, `margin-left` and the like are banned, except inside `transform` or for a deliberately physical illustration. `[dir="rtl"]` rules exist only for icons that must mirror |
+| **Direction** | Logical properties only: `margin-inline`, `padding-block`, `inset-inline-start`, `border-start-start-radius`, `text-align: start`, `float: inline-start`. `left`, `right`, `margin-left` and the like are banned, except inside `transform` or for a deliberately physical illustration. `[dir="rtl"]` rules exist only for icons that must mirror and for the two motions a logical property cannot express: the toggle thumb and the navigation drawer slide, each defined in its own section |
 | **Motion** | Durations come from `--transition-*`; every animation and transition is wrapped so that `@media (prefers-reduced-motion: reduce)` removes it (a state change stays visible without motion) |
 | **Contrast** | Text 4.5:1 and UI parts 3:1 in every theme; `@media (forced-colors: active)` keeps borders on controls, the toggle track and focus rings (they use `CanvasText` and `Highlight` there); `@media (prefers-contrast: more)` raises borders to `--color-text` |
 | **Print** | One `@media print` block in `utilities`: white background, black text, no nav, no toast, no banner, links show their URL |
@@ -24278,7 +24287,7 @@ fetch('/api/save', { method: 'POST', body: data })
 | **Phone layout** | Single column; every control `width: 100%`, `min-height: 2.75rem`, `font-size >= 16px` |
 | **Tablet and desktop** | Short related fields pair on one row (Name + Expiry) using `grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr))`; never more than two columns inside a card; long fields (text areas, tokens) span the full row |
 | **Optional extras** | A rarely used extra (for example a custom date) is a second, clearly labeled input revealed in a `<details>` or via `:has()` — never a second `<select>` and never a blank control |
-| **Action row** | `.actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }`. Phones: the primary button is full width on top, secondary actions full width below. >= 768 px: inline, in `inline-end` order Cancel (secondary) then the primary button last |
+| **Action row** | `.form-actions` (a `.cluster` with `gap: var(--space-3)`, from the layout primitives). Phones: the primary button is full width on top, secondary actions full width below. >= 768 px: inline, in `inline-end` order Cancel (secondary) then the primary button last |
 | **Hierarchy** | Exactly ONE primary button per form or card. Secondary is outlined; ghost for low emphasis; destructive actions use `.btn-danger`, are separated from other buttons by at least `--space-4` (own row, a "Danger zone" block, or the item's own footer), and confirm through a native popover |
 | **Per-item actions** | A list item's actions live in the card footer toolbar: at most three visible buttons with text labels, any more inside a `<details class="menu">`. Icon-only is allowed only for universally understood icons (copy, close) and always has an `aria-label` and tooltip |
 | **Feedback** | Success and failure use the toast/flash patterns below; after a POST the redirect lands on the same card (`#anchor`) so the page does not jump to the top |
@@ -24761,7 +24770,7 @@ document.querySelectorAll(".site-banner .site-banner-dismiss").forEach((form) =>
 
 ### Theme Toggle
 
-**Theme toggle button in header, last item in the header-actions zone. No user accounts — but see "Header Layout" above for the profile/preferences zone that sits directly to its left, which is dependent on `owner_token` cookie state, not accounts/sessions.**
+**Theme toggle button in header, last item in the site-header-actions zone. No user accounts — but see "Header Layout" above for the profile/preferences zone that sits directly to its left, which is dependent on `owner_token` cookie state, not accounts/sessions.**
 
 **Theme Toggle Behavior:**
 
@@ -24804,7 +24813,7 @@ fn next_theme(current: &str) -> &'static str {
 
 **CSS for Header Actions:**
 ```css
-.header-actions {
+.site-header-actions {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -25158,7 +25167,7 @@ if ('serviceWorker' in navigator) {
 > When a service worker calls `event.respondWith()` it owns that response completely. If the promise it passes **resolves to `undefined`** (a cache miss on the last fallback) or **rejects** (an uncaught network failure), the browser shows **`net::ERR_FAILED`** — a dead tab — instead of a page. A transient network blip on a page navigation MUST degrade to a real offline/error page, never a broken site. The handler below, and any service worker a project ships, MUST obey:
 >
 > - **Navigations are network-first** — fetch the network first so a new build's HTML is seen immediately (and the `Clear-Site-Data` build-purge has nothing stale to fight); only on failure fall back to the cached page, then to a **synthesized** `Response`.
-> - **Offline copies are for public pages only** — the server adds the internal header `X-Offline-Cache: public` to a navigation response ONLY when the page is identical for every visitor: the request carries no session or owner cookie, and the body holds no signed-in state, owner token or per-visitor value. The CSRF value of the shared header theme form and the consent forms does not count against eligibility: it is only used online, a form submitted from an offline copy fails, and nothing is queued. `Cache-Control` stays `no-store`; the header is only a signal to the worker. The worker puts a navigation response in the cache only when it also has that header; any other navigation response is not cached, and the worker deletes an existing entry for that URL, so a page that becomes private leaves no old copy. Authenticated pages, token pages, the admin area and every page with a form of its own (the shared header theme and consent forms do not count) never carry the header, and on offline they show the synthesized offline page.
+> - **Offline copies are for public pages only** — the server adds the internal header `X-Offline-Cache: public` to a navigation response ONLY when the page is identical for every visitor: the request carries no session or owner cookie, and the body holds no signed-in state, owner token or per-visitor value. The CSRF value of the shared header theme form and the consent forms does not count against eligibility: it is only used online, a form submitted from an offline copy fails, and nothing is queued. Theme, language and consent are rendering inputs: the worker stores each copy under the URL plus the values of the theme cookie, the language (cookie or `Accept-Language`) and the consent cookie, and serves it only to a request with the same values, so an offline copy is the page the visitor would see online. `Cache-Control` stays `no-store`; the header is only a signal to the worker. The worker puts a navigation response in the cache only when it also has that header; any other navigation response is not cached, and the worker deletes an existing entry for that URL, so a page that becomes private leaves no old copy. Authenticated pages, token pages, the admin area and every page with a form of its own (the shared header theme and consent forms do not count) never carry the header, and on offline they show the synthesized offline page.
 > - **Every `respondWith()` branch ends in a guaranteed `Response`** — a terminal `.catch()` returning a real `Response` (a synthesized 503 offline page for navigations, a 504 for subresources). Never end a chain on `cached || caches.match('/offline…')`: that link can itself miss and resolve `undefined`.
 > - **Only intercept same-origin GET.** Let API calls, cross-origin requests, and non-GET methods fall through untouched — never call `respondWith()` for them.
 > - **The wait for the network is bounded** — a navigation `fetch` races an 8 s timer (`NAV_TIMEOUT_MS`); on timeout the worker falls back to the cached public page, then the synthesized offline page. A server that is restarting, updating or hung never leaves a tab on a blank page with a stuck load bar.
@@ -26146,8 +26155,8 @@ async function requestPersistentStorage() {
 
   <title>{app_name}</title>
   <link rel="stylesheet" href="{{ asset "css/common.css" }}">
-  <link rel="stylesheet" href="{{ asset "css/public.css" }}">
   <link rel="stylesheet" href="{{ asset "css/components.css" }}">
+  <link rel="stylesheet" href="{{ asset "css/public.css" }}">
 </head>
 <body>
   <!-- Offline indicator -->
@@ -26985,7 +26994,7 @@ html.theme-light {
 
 /* public.css and components.css use the SAME variables */
 .sidebar { background: var(--color-bg); }
-.header { color: var(--color-text); }
+.site-header { color: var(--color-text); }
 ```
 
 **Theme preference source:**
@@ -27300,7 +27309,7 @@ partial/
 | Element | Position | Purpose | Contents |
 |---------|----------|---------|----------|
 | `<nav>` | TOP | Navigation | Links to app sections |
-| Header `.header-actions` | TOP | Cross-cutting UI state | Profile/preferences zone (always `/server/preferences`; contents vary if an `owner_token` cookie exists), then theme toggle — in that order, right of the centered nav links |
+| Header `.site-header-actions` | TOP | Cross-cutting UI state | Profile/preferences zone (always `/server/preferences`; contents vary if an `owner_token` cookie exists), then theme toggle — in that order, right of the centered nav links |
 | `<footer>` | BOTTOM | Information | About, Privacy, Help, Preferences, GitHub, version (never the report form) |
 
 **Nav contains (app navigation):**
@@ -27334,7 +27343,7 @@ Mobile:
                                               └───────────────────┘
 ```
 
-**Header Layout — single row, three top-level zones in this exact order (brand, nav links, `.header-actions`):**
+**Header Layout — single row, three top-level zones in this exact order (brand, nav links, `.site-header-actions`):**
 
 ```
 {logo/text}          {links}          {profile/preferences}  {theme_toggle}
@@ -27344,7 +27353,7 @@ Brand sits left, nav links are horizontally centered (not pushed right against
 the actions), and the actions cluster (profile/preferences, then theme toggle)
 sits right. Do NOT split header/nav into two separate rows on desktop — that
 pushes links flush right against the header edge with no centering, which is
-the layout bug this section fixes. The two items on the right (profile/preferences, then theme toggle) are not zones of their own: both sit inside the one `.header-actions` element, in that order, so the DOM has exactly three top-level header zones. The hamburger label (`.nav-toggle`) is not a fourth zone: it belongs to the navigation zone as the below-breakpoint form of `.nav-links`, shown only when the links are hidden and never together with them, and in the markup it follows `<nav class="nav-links">` directly as that zone's second element.
+the layout bug this section fixes. The two items on the right (profile/preferences, then theme toggle) are not zones of their own: both sit inside the one `.site-header-actions` element, in that order, so the DOM has exactly three top-level header zones. The hamburger label (`.nav-toggle`) is not a fourth zone: it belongs to the navigation zone as the below-breakpoint form of `.nav-links`, shown only when the links are hidden and never together with them, and in the markup it follows `<nav class="nav-links">` directly as that zone's second element.
 
 ```html
 <!-- Menu state checkbox, drawer panel and scrim are children of <body>, NOT of <header>
@@ -27353,7 +27362,7 @@ the layout bug this section fixes. The two items on the right (profile/preferenc
 <input type="checkbox" id="nav-toggle" class="nav-checkbox" aria-label="Toggle navigation">
 
 <!-- Header bar: single row — brand | centered links | profile/preferences | theme toggle -->
-<header class="header">
+<header class="site-header">
   <a href="/" class="site-brand">{project_name}</a>
 
   <!-- Desktop: inline links, centered | Mobile: hamburger only -->
@@ -27366,13 +27375,13 @@ the layout bug this section fixes. The two items on the right (profile/preferenc
   <label for="nav-toggle" class="nav-toggle" aria-label="Toggle navigation">☰</label>
 
   <!-- Actions: profile/preferences zone, then theme toggle (always visible, far right) -->
-  <div class="header-actions">
+  <div class="site-header-actions">
     <!-- Profile/preferences zone — state-dependent, see "Profile/Preferences Zone" below.
          Route is always /server/preferences regardless of state; only the menu
          CONTENTS change with whether an owner_token cookie exists. -->
     {% if owner_token_cookie_exists %}
       <div class="dropdown">
-        <button class="dropdown-toggle header-link" aria-label="Preferences and resource management">
+        <button class="dropdown-toggle site-header-link" aria-label="Preferences and resource management">
           <svg class="icon-preferences"><!-- gear icon --></svg>
         </button>
         <div class="dropdown-menu">
@@ -27382,7 +27391,7 @@ the layout bug this section fixes. The two items on the right (profile/preferenc
         </div>
       </div>
     {% else %}
-      <a href="/server/preferences" class="header-link" aria-label="Preferences" title="Preferences">
+      <a href="/server/preferences" class="site-header-link" aria-label="Preferences" title="Preferences">
         <svg class="icon-preferences"><!-- gear icon --></svg>
       </a>
     {% endif %}
@@ -27410,7 +27419,7 @@ the layout bug this section fixes. The two items on the right (profile/preferenc
 ```
 
 ```css
-.header {
+.site-header {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -27426,7 +27435,7 @@ the layout bug this section fixes. The two items on the right (profile/preferenc
   justify-content: center;
 }
 
-.header-actions {
+.site-header-actions {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -27472,7 +27481,7 @@ Without the script: Esc and overflow detection are unavailable, but the scrim, t
 /* Base: Mobile styles (no media query) */
 /* Visually hidden but focusable: the keyboard focus target of the menu, with its focus ring drawn on the visible hamburger */
 .nav-checkbox { position: absolute; inline-size: 1px; block-size: 1px; margin: 0; opacity: 0; }
-.nav-checkbox:focus-visible ~ .header .nav-toggle { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.nav-checkbox:focus-visible ~ .site-header .nav-toggle { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .nav-toggle { display: block; cursor: pointer; }
 .nav-links { display: none; }
 
@@ -28155,7 +28164,7 @@ web:
 
 | Entry | Mode | Effect |
 |-------|------|--------|
-| `header` | **Extends** | Inserted as the last child of `<header>` of every public page, after `.header-actions` (the built-in brand, navigation and actions). It replaces nothing, and it is the one operator-supplied exception to the "Header and Navigation Conformance" allowlist |
+| `header` | **Extends** | Inserted as the last child of `<header>` of every public page, after `.site-header-actions` (the built-in brand, navigation and actions). It replaces nothing, and it is the one operator-supplied exception to the "Header and Navigation Conformance" allowlist |
 | `about` | **Extends** | Appended after the built-in About content |
 | `privacy` | **Extends** | Appended after the built-in privacy sections (after "Your Rights" and the consent controls) and before the Contact section. The built-in sections are never replaced, because they must stay in step with `server.privacy.*` |
 | `footer` | **Overrides** | Replaces the custom branding block above the Application Footer ("Footer Customization"). No entry: the built-in branding. An entry whose body is empty or whitespace-only: no branding. The Default Application Footer is always shown |
@@ -29081,7 +29090,7 @@ When `branding.content.footer` is set, the server logs at startup and on every r
 ### Default Application Footer (Always Shown)
 
 ```html
-<footer class="footer">
+<footer class="site-footer">
   <!-- Onion address (only shown if Tor is enabled, running, and an onion address is published) -->
   {% if tor_enabled && tor_running && !onion_address.is_empty() %}
   <p class="footer-onion">
@@ -29483,7 +29492,8 @@ initCCPA();
 }
 
 /* Desktop: side-by-side layout */
-@media (min-width: 640px) { /* sm */
+/* sm */
+@media (min-width: 640px) {
   .cookie-banner-content {
     flex-direction: row;
     padding: 0.875rem 1.5rem;
@@ -29640,9 +29650,9 @@ pub fn tracking_script(consent: Option<&Consent>, cfg: &Config) -> String {
 **Shared shell CSS (in `components.css`, tokens only, no pixel literals except the width caps):**
 
 ```css
-.container-sm { max-width: 40rem; }
-.container-md { max-width: 56rem; }
-.container-lg { max-width: 72rem; }
+.container-sm { max-width: var(--container-sm); }
+.container-md { max-width: var(--container-md); }
+.container-lg { max-width: var(--container-lg); }
 .page-header { display: grid; gap: var(--space-2); margin-block: var(--space-6) var(--space-4); }
 .page-title { margin: 0; }
 .page-lead { margin: 0; max-width: 70ch; color: var(--color-muted); }
@@ -29658,7 +29668,7 @@ pub fn tracking_script(consent: Option<&Consent>, cfg: &Config) -> String {
 | Need | Component |
 |------|-----------|
 | Actions | `.btn` with one of `.btn-primary`, `.btn-secondary`, `.btn-danger`, `.btn-ghost`; at most ONE `.btn-primary` per card; the same action has the same label and translation key on every page (Save, Cancel, Copy, Reveal, Rotate, Revoke) |
-| Form fields | `.form-group` wrapping a visible `<label>`, the control (`.form-input`) and optional help text; a placeholder is never the label; one column on phones |
+| Form fields | `.form-group` wrapping a visible `<label>`, the control (`.input`) and optional help text; a placeholder is never the label; one column on phones |
 | Copyable value | `.copy-value` or `.code-block` showing the value (CSS `user-select: all`) with ONE `.copy-btn[data-copy]`; the Copy feedback text is announced through `aria-live="polite"`; never a control that submits a form |
 | Commands and config | `.code-block` with a `<pre><code>` body and a Copy control; the real, resolved URL and project name, never a generic placeholder |
 | Tables | `.table-wrapper` containing `table.data-table` with a `<thead>`, `<th scope="col">` headers and a caption or heading; horizontal scroll happens inside the wrapper only; never a table for layout |
@@ -29726,7 +29736,7 @@ These rules tighten "Header Layout" above. A header that breaks one of them is a
 
 | No. | Rule |
 |-----|------|
-| 1 | **Allowed elements, in this order, and nothing else:** the brand link, `<nav class="nav-links">`, the hamburger label (below the desktop breakpoint), then `.header-actions` containing exactly the preferences link (or the owner dropdown) and the theme-toggle form. No language selector, no search box (a project's search lives in `<main>`), no install button, no sign-in or sign-up buttons, no sponsor or social icons, no second preferences link for mobile. The one addition is the operator's `branding.content.header` fragment ("Page Content"): when the operator sets it, it is rendered as the last child of `<header>`, after `.header-actions`; with the entry unset nothing is rendered. The conformance test renders every page with it unset, and one more render with it set asserts the fragment is the last child and that nothing else in the header changed. This list is the content of `<header>`: the `nav-toggle` checkbox, the drawer panel and the scrim are not header elements but siblings of `<header>` in `<body>` (as in the example), and the `~` selectors need only those three to share that parent |
+| 1 | **Allowed elements, in this order, and nothing else:** the brand link, `<nav class="nav-links">`, the hamburger label (below the desktop breakpoint), then `.site-header-actions` containing exactly the preferences link (or the owner dropdown) and the theme-toggle form. No language selector, no search box (a project's search lives in `<main>`), no install button, no sign-in or sign-up buttons, no sponsor or social icons, no second preferences link for mobile. The one addition is the operator's `branding.content.header` fragment ("Page Content"): when the operator sets it, it is rendered as the last child of `<header>`, after `.site-header-actions`; with the entry unset nothing is rendered. The conformance test renders every page with it unset, and one more render with it set asserts the fragment is the last child and that nothing else in the header changed. This list is the content of `<header>`: the `nav-toggle` checkbox, the drawer panel and the scrim are not header elements but siblings of `<header>` in `<body>` (as in the example), and the `~` selectors need only those three to share that parent |
 | 2 | **Nav is application sections only:** Home plus the project's own sections, labels of one or two words, plain `<a>` elements, no dropdowns. About, Help, Privacy, Terms, Preferences and API or documentation links belong to the footer; the Contact form is linked nowhere (see "/server/contact" → "Who can reach the form"). The current page carries `aria-current="page"` and `.active`. A project with many sections groups them behind a landing page instead of growing the bar |
 | 3 | **Mobile:** one hamburger (checkbox plus label, no JavaScript) opens the drawer; the preferences link and the theme toggle stay in the bar and never move into the drawer; the drawer holds exactly the nav links |
 | 4 | **No JavaScript required:** the theme toggle is a form `POST` whose target is the server-computed next mode; no `<noscript>` copy of a control; option and button labels come from the value enum (`dark`, `light`, `auto` → their translated names), never by position |
@@ -31665,7 +31675,7 @@ Check for missed tasks (within catch_up_window)
        │   (in order of original scheduled time)
        │
        ▼
-Run startup retention sweep (backup dir cached at step 7)
+Run the pre-run sweep (backup dir cached at step 7): leftovers of crashed/failed prior runs only, never a valid backup (PART 21)
        │
        ▼
 Start scheduler loop
@@ -32021,7 +32031,7 @@ it in a compliance-sensitive form.
 | `/server/metrics/prometheus` | GET | Bearer token (`prometheus`) | Complete Prometheus text exposition — every exported metric |
 | `/server/metrics/grafana` | GET | Bearer token (`grafana`) | Complete importable Grafana dashboard JSON covering every exported metric |
 | `/server/metrics/loki` | GET | Bearer token (`loki`) | Recent structured log entries in Loki-compatible JSON streams |
-| `/api/{api_version}/server/metrics[/{service}]` | GET | Same per-service token | Versioned API path — same handlers |
+| `/api/{api_version}/server/metrics[/{service}]` | GET | Same per-service token | Versioned API path — same handlers; mounted only while metrics are enabled (`server.metrics.enabled`, default on) |
 | `/api/metrics[/{service}]` | GET | Same per-service token | Unversioned machine-friendly alias for current `{api_version}` — same handlers |
 | `/metrics[/{service}]` | GET | Same per-service token | Root alias, gated on `server.metrics.root.enabled: true` (default **true** — Prometheus scrapers default to `/metrics`); same handler, NEVER a redirect |
 
@@ -32033,7 +32043,7 @@ it in a compliance-sensitive form.
 | Service | Content-Type | Body |
 |---------|--------------|------|
 | `prometheus` | `text/plain; version=0.0.4` | Full Prometheus text exposition — all required + project metrics |
-| `grafana` | `application/json` | A complete, importable Grafana dashboard definition (Classic dashboard-model JSON for Grafana 12.0 and newer: `schemaVersion` 42 and `timeseries` panels; older Grafana versions are not supported) with panels covering every metric category this specification requires (HTTP, database, cache, scheduler, system, business); datasource left as a template variable so it imports against any Prometheus datasource |
+| `grafana` | `application/json` | A complete, importable Grafana dashboard definition (Classic dashboard-model JSON for Grafana 12.0 and newer: `schemaVersion` 42; `timeseries`, `stat` and `gauge` panels; older Grafana versions are not supported) with panels covering every metric category this specification requires (HTTP, database, cache, scheduler, system, business); datasource left as a template variable so it imports against any Prometheus datasource |
 | `loki` | `application/json` | Recent structured log entries in Loki push-API stream format: `{"streams":[{"stream":{labels},"values":[["<ns-timestamp>","<line>"],...]}]}` — bounded by `loki.max_entries`/`loki.max_age`, same sanitization as log files (credentials ALWAYS redacted) |
 
 ## Access Control
@@ -33372,7 +33382,7 @@ groups:
 
 | Element | Config Key | Description |
 |---------|------------|-------------|
-| Enable metrics | `server.metrics.enabled` | Turn metrics on/off |
+| Enable metrics | `server.metrics.enabled` | Turn metrics on/off (default: on); off unmounts every metrics route (`404`), so the route inventory marks them as mounted when this key is `true` |
 | Root alias | `server.metrics.root.enabled` | Mount `/metrics[/{service}]` root aliases (default: true) |
 | Include system metrics | `server.metrics.include_system` | Include CPU/memory/disk |
 | Include runtime metrics | `server.metrics.include_runtime` | Include Rust runtime stats |
@@ -33391,7 +33401,7 @@ groups:
 {project_name} --maintenance backup test [file]
 ```
 
-`backup test` verifies a backup without touching live data: `file` defaults to the newest full backup in `{backup_dir}` (chosen by the UTC date in the file name, exactly as for restore; an incremental is checked together with its base). An encrypted backup asks for its password interactively exactly like restore (there is no password flag; without a terminal the command fails with a message that says so). It extracts into a temporary directory, verifies the manifest checksums, reports each result and removes the temporary directory.
+`backup test` verifies a backup without touching live data: `file` defaults to the newest backup file in `{backup_dir}`, full or incremental (chosen by the UTC date in the file name, "Default archive selection"; an incremental is checked together with its base). An encrypted backup asks for its password interactively exactly like restore (there is no password flag; without a terminal the command fails with a message that says so). It extracts into a temporary directory, verifies the manifest checksums, reports each result and removes the temporary directory.
 
 ### Backup Contents
 
@@ -33724,7 +33734,7 @@ Every backup is verified **immediately after creation** - backups must be 100% w
 |------|-------------|-----------|
 | `{project_name}-hourly.tar.gz[.enc]` | Hourly incremental | Always 1 (replaced each run) |
 
-**Default archive selection (restore and "Test Backup").** When no archive is named, the newest full is the one with the latest date in its file name (`{project_name}_backup_YYYY-MM-DD`, UTC; a tie goes to the later file modification time). The manifest and its `snapshot_at` are never read to choose, because an encrypted archive keeps the manifest inside the ciphertext and the cleartext `BKUP1` header carries no timestamp.
+**Default archive selection (restore and "Test Backup").** When no archive is named, the newest file is the one with the latest date in its file name (restore considers fulls only and uses an incremental only when it is named; "Test Backup" considers every backup file and tests an incremental together with its base) (`{project_name}_backup_YYYY-MM-DD`, UTC; a tie goes to the later file modification time). The manifest and its `snapshot_at` are never read to choose, because an encrypted archive keeps the manifest inside the ciphertext and the cleartext `BKUP1` header carries no timestamp.
 
 **Validation (warn, don't error - server must start):**
 
@@ -33822,7 +33832,7 @@ Backups on disk (January 15, 2026):
 Total: 5 files (1 daily + 1 weekly + 1 yearly + 1 monthly + incremental)
 ```
 
-**Backup Cleanup Logic (runs after successful backup and at startup):**
+**Backup Cleanup Logic (retention runs after every verified backup; the startup sweep removes only leftovers, never a valid backup):**
 
 Operates on the backup directory resolved and cached at startup step 7 — never re-resolves the path.
 Matches all files the app creates: `{project_name}_backup_*` (daily full and manual/timestamped) and
@@ -33852,7 +33862,7 @@ on a Sunday counts as daily + weekly + monthly + yearly - uses highest priority)
 |------|------|
 | **Snapshot instant** | The backup task takes ONE instant `T0` at the start of the run. Every archive made in that run reflects the state at `T0` (SQLite via online backup API / `VACUUM INTO`, files copied after the DB snapshot). The new full is named with the date of `T0`, so a full dated today holds today's 02:00 state, never yesterday's |
 | **Order in the 02:00 run** | Daily incremental FIRST (previous full -> `T0`), then the new full at `T0`. An incremental taken after the new full would cover an empty interval, which is the bug this order prevents |
-| **Base** | The most recent full on disk before this run. Hourly incremental: the newest full (including today's) |
+| **Base** | The most recent full on disk before this run. Hourly incremental: the newest full (including today's). The daily and the hourly incremental coexist on disk (one of each, each replaced by its own task) and may name different fulls: the exemption from pruning applies to both bases |
 | **Cumulative** | An incremental holds EVERY change since its base's `snapshot_at`, not since the previous incremental; each new run replaces the old one |
 | **Manifest fields** | `manifest.json` of every archive: `type` (`full`/`incremental`), `snapshot_at` (UTC ISO 8601), `sha256`; incrementals add `base_backup` (file name), `base_sha256`, `deleted` (list of paths removed since the base) |
 | **Changed-file detection** | Compare each file's size + mtime + SHA-256 against the base manifest's file list (the full's manifest lists `path`, `size`, `mtime` (Unix seconds) and `sha256` for every file). Changed or new files go in the archive, removed ones in `deleted` |
@@ -34509,7 +34519,7 @@ Application user creation **REQUIRES** privilege escalation. If the user cannot 
 
 ## Escalation Detection by OS
 
-**Detection (normative).** `canEscalate()` is true when `sudo -n true` succeeds or the user is in the `sudo`, `wheel` or `admin` group, or `doas` is installed and permits the user (`doas -n true` or `doas -C /etc/doas.conf true` succeeds), or `pkexec` is installed and a graphical session can show its prompt. `su` is never DETECTED (whether the user knows the root password cannot be probed): it is only the last-resort method, used in a terminal after the user chose to escalate when none of the detected methods exists. The lists below give the order in which the available methods are tried.
+**Detection (normative).** `canEscalate()` is true when `sudo -n true` succeeds or the user is in the `sudo`, `wheel` or `admin` group, or `doas` is installed and permits the user (`doas -n true` or `doas -C /etc/doas.conf true` succeeds), or `pkexec` is installed and a graphical session can show its prompt. `su` is never DETECTED (whether the user knows the root password cannot be probed): it is only the last-resort method, tried in a terminal after the user accepted the prompt (which exists only when a detected method does) and every detected method failed. The lists below give the order in which the available methods are tried.
 
 ### Linux
 ```
@@ -34518,7 +34528,7 @@ Escalation Methods (in order):
 2. sudo (`sudo -n true` works, or the user is in the sudo/wheel/admin group)
 3. doas (installed and permits the user)
 4. pkexec (PolicyKit, with a graphical session)
-5. su (never detected: the last-resort method, in a terminal, after the user chose to escalate)
+5. su (never detected and never a reason to prompt: tried last, in a terminal, only after the user accepted the prompt and every detected method then failed)
 ```
 
 ### macOS
@@ -35544,19 +35554,18 @@ fn service_main(_arguments: Vec<std::ffi::OsString>) {
 
 # PART 25: MAKEFILE
 
-**Seven core targets (`dev`, `local`, `build`, `test`, `release`, `beta`, `docker`). DO NOT ADD MORE.** The only other permitted targets are `clean`, a housekeeping target that removes `binaries/` and `releases/` and builds nothing, and `release-check`, an internal helper that is the first prerequisite of `release`, validates the version and builds nothing (it is never the entry point of a workflow). There is no `all` target and none is required. A CI job named `lint` (or `secret-scan`, `vuln-scan`) is a job of the CI file and runs its tools directly in the toolchain container: it is not a Makefile target and adds none.
+**Six targets (`build`, `test`, `release`, `docker`, `clean`, `help`). DO NOT ADD MORE.** `clean` is a housekeeping target that removes `binaries/` and `releases/` and builds nothing; `help` lists the targets, builds nothing and is the default goal. There is no `all` target and none is required. A CI job named `lint` (or `secret-scan`, `vuln-scan`) is a job of the CI file and runs its tools directly in the toolchain container: it is not a Makefile target and adds none.
 
 ## Targets
 
 | Target | Purpose | Output Location | When to Use |
 |--------|---------|-----------------|-------------|
-| `dev` | Quick development build | `${TMPDIR}/${PROJECT_ORG}/${INTERNAL_NAME}-XXXXXX/` | Active coding, quick tests |
-| `local` | Production test build | `binaries/` (with version) | Test prod builds locally |
-| `build` | Full release (all 7 platforms) | `binaries/` | Before release |
-| `test` | Run unit tests | Coverage report | After code changes |
-| `release` | Release with source archive | `releases/` | Creating releases |
-| `beta` | Tag the current `main` commit `YYYYMMDDHHMMSS-beta` and push the tag; CI builds and publishes the beta | a tag only | Publishing a beta (maintainer) |
+| `build` | Debug binaries, all 7 platforms (symbols kept, no optimization) | `binaries/` | Active coding, debugging, cross-platform verification |
+| `test` | Lints, vulnerability scan, unit tests with coverage, then the binary checks (start, `--help`, `--version`, CLI) | Coverage report | Before every commit |
+| `release` | Production binaries, all 7 platforms (stripped, optimized), source archive and checksums; never tags or publishes | `releases/` | Checking the production artifacts locally |
 | `docker` | Build the host-platform container image locally (no push: CI/CD publishes) | `$REGISTRY` tags | Container deployment |
+| `clean` | Remove `binaries/` and `releases/` | none | Fresh start |
+| `help` | List the targets (the default goal) | Terminal | Finding the right target |
 
 ## Versioning
 
@@ -35566,7 +35575,7 @@ fn service_main(_arguments: Vec<std::ffi::OsString>) {
 
 - Single-line version for local Makefile builds (see PART 13); optional, empty or missing means the devel rule
 - Semantic versioning: `MAJOR.MINOR.PATCH` (e.g., `1.2.3`)
-- `make release` accepts ONLY a stable `X.Y.Z` here (`release-check` fails the run with an `ERROR:` on stderr for a devel commit id or a prerelease such as `-beta`; `make` itself reports exit `2` for a failed recipe); it tags `v{version}` and marks the release `--latest`. Devel and beta releases come from CI, never from `make release`
+- `make release` builds with the version the rule resolves (`VERSION` env override, then `release.txt`, then the devel commit id) and never tags or publishes; the stable `v{version}` tag, the beta and devel releases and all publishing are CI/CD's job
 - Read only by the Makefile for local testing and debugging, when present and non-empty; empty or missing means the devel rule (short commit id); CI/CD never reads it; an explicitly set `VERSION` env var overrides it (user only, AI never sets it)
 
 ### Official Site File: `site.txt` (Optional)
@@ -35822,23 +35831,25 @@ RUST_DOCKER := $(RUST_DOCKER_RUN) casjaysdev/rust:latest
 # shellcheck and shfmt are in the Go image, not the Rust image: the shell-script gate of `make test` runs there
 SHELL_DOCKER := $(RUST_DOCKER_RUN) casjaysdev/go:latest
 
-.PHONY: build local release release-check beta docker test dev clean
+.DEFAULT_GOAL := help
+.PHONY: build release docker test clean help
 
 # =============================================================================
-# BUILD - Build all platforms + local binary (via Docker with cached modules)
+# BUILD - Debug binaries for all platforms (via Docker with cached crates)
 # =============================================================================
+# Debug build: the dev profile (debug info, no optimization), so a debugger or a backtrace shows real source lines
 build: clean
 	@mkdir -p $(BINDIR) $(CARGO_CACHE) $(RUSTUP_CACHE) $(SCCACHE_CACHE) $(CARGO_TARGET)
-	@echo "Building version $(VERSION)..."
+	@echo "Building debug binaries, version $(VERSION)..."
 
 	# Fetch, local build and every platform in ONE container (one sh -c loop, never a container per platform)
 	@$(RUST_DOCKER) sh -c ' \
 		set -e; \
 		cargo fetch; \
 		echo "Building local binary..."; \
-		cargo build --release; \
-		cp target/release/$(PROJECT_NAME) $(BINDIR)/$(PROJECT_NAME); \
-		if [ -d src/client ]; then cp target/release/$(PROJECT_NAME)-cli $(BINDIR)/$(PROJECT_NAME)-cli; fi; \
+		cargo build; \
+		cp target/debug/$(PROJECT_NAME) $(BINDIR)/$(PROJECT_NAME); \
+		if [ -d src/client ]; then cp target/debug/$(PROJECT_NAME)-cli $(BINDIR)/$(PROJECT_NAME)-cli; fi; \
 		for platform in $(PLATFORMS); do \
 			OS=$${platform%/*}; \
 			ARCH=$${platform#*/}; \
@@ -35854,87 +35865,65 @@ build: clean
 			esac; \
 			EXT=""; \
 			if [ "$$OS" = "windows" ]; then EXT=".exe"; fi; \
-			echo "Building server $$OS/$$ARCH..."; \
-			cargo zigbuild --release --target $$TARGET; \
-			cp target/$$TARGET/release/$(PROJECT_NAME)$$EXT $(BINDIR)/$(PROJECT_NAME)-$$OS-$$ARCH$$EXT; \
+			echo "Building $$OS/$$ARCH..."; \
+			cargo zigbuild --target $$TARGET; \
+			cp target/$$TARGET/debug/$(PROJECT_NAME)$$EXT $(BINDIR)/$(PROJECT_NAME)-$$OS-$$ARCH$$EXT; \
 			if [ -d src/client ]; then \
-				echo "Building CLI $$OS/$$ARCH..."; \
-				cargo zigbuild --release --target $$TARGET; \
-				cp target/$$TARGET/release/$(PROJECT_NAME)-cli$$EXT $(BINDIR)/$(PROJECT_NAME)-cli-$$OS-$$ARCH$$EXT; \
+				cp target/$$TARGET/debug/$(PROJECT_NAME)-cli$$EXT $(BINDIR)/$(PROJECT_NAME)-cli-$$OS-$$ARCH$$EXT; \
 			fi; \
 		done'
 
 	@echo "Build complete: $(BINDIR)/"
 
 # =============================================================================
-# LOCAL - Build local binaries only (fast development builds)
+# RELEASE - Production binaries for all platforms, source archive and checksums
 # =============================================================================
-local: clean
-	@mkdir -p $(BINDIR) $(CARGO_CACHE) $(RUSTUP_CACHE) $(SCCACHE_CACHE) $(CARGO_TARGET)
-	@echo "Building local binaries version $(VERSION)..."
+# Builds only: it never tags, pushes or publishes (CI/CD tags, builds and publishes the release)
+# Production build: the release profile (optimized, stripped, LTO per Cargo.toml), version info embedded
+release:
+	@mkdir -p $(RELDIR) $(CARGO_CACHE) $(RUSTUP_CACHE) $(SCCACHE_CACHE) $(CARGO_TARGET)
+	@rm -rf $(RELDIR)/*
+	@echo "Building production binaries, version $(VERSION)..."
 
-	# Fetch and build every local binary in ONE container
+	# Fetch and every platform in ONE container
 	@$(RUST_DOCKER) sh -c ' \
 		set -e; \
 		cargo fetch; \
-		echo "Building $(PROJECT_NAME)..."; \
-		cargo build --release; \
-		cp target/release/$(PROJECT_NAME) $(BINDIR)/$(PROJECT_NAME); \
-		if [ -d src/client ]; then \
-			echo "Building $(PROJECT_NAME)-cli..."; \
-			cp target/release/$(PROJECT_NAME)-cli $(BINDIR)/$(PROJECT_NAME)-cli; \
-		fi'
+		for platform in $(PLATFORMS); do \
+			OS=$${platform%/*}; \
+			ARCH=$${platform#*/}; \
+			case "$$OS/$$ARCH" in \
+				linux/amd64) TARGET="x86_64-unknown-linux-musl" ;; \
+				linux/arm64) TARGET="aarch64-unknown-linux-musl" ;; \
+				darwin/amd64) TARGET="x86_64-apple-darwin" ;; \
+				darwin/arm64) TARGET="aarch64-apple-darwin" ;; \
+				windows/amd64) TARGET="x86_64-pc-windows-gnu" ;; \
+				windows/arm64) TARGET="aarch64-pc-windows-gnullvm" ;; \
+				freebsd/amd64) TARGET="x86_64-unknown-freebsd" ;; \
+				*) echo "Unknown platform: $$platform"; exit 1 ;; \
+			esac; \
+			EXT=""; \
+			if [ "$$OS" = "windows" ]; then EXT=".exe"; fi; \
+			echo "Building $$OS/$$ARCH..."; \
+			cargo zigbuild --release --target $$TARGET; \
+			cp target/$$TARGET/release/$(PROJECT_NAME)$$EXT $(RELDIR)/$(PROJECT_NAME)-$$OS-$$ARCH$$EXT; \
+			if [ -d src/client ]; then \
+				cp target/$$TARGET/release/$(PROJECT_NAME)-cli$$EXT $(RELDIR)/$(PROJECT_NAME)-cli-$$OS-$$ARCH$$EXT; \
+			fi; \
+		done'
 
-	@echo "Local build complete: $(BINDIR)/"
-
-# =============================================================================
-# RELEASE - Manual local release (stable only)
-# =============================================================================
-# Stable SemVer only: a devel version (short commit id or "devel") and any prerelease (-beta, -rc) are published by CI, never by this target
-release-check:
-	@echo "$(VERSION)" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$$' >/dev/null || { echo "ERROR: make release needs a stable SemVer X.Y.Z in release.txt (got '$(VERSION)')" >&2; exit 78; }
-
-# beta tags the current commit YYYYMMDDHHMMSS-beta and pushes the tag; CI builds and publishes the beta. It never creates a branch
-# and is run by the maintainer, like release (gitcommit has no tag operation)
-beta:
-	@[ "$$(git branch --show-current)" = main ] || { echo "beta: run it on main"; exit 1; }
-	@[ -z "$$(git status --porcelain)" ] || { echo "beta: the working tree is not clean"; exit 1; }
-	@TAG=$$(date -u +%Y%m%d%H%M%S)-beta; git tag "$$TAG" && git push origin "refs/tags/$$TAG" && echo "Pushed $$TAG"
-
-release: release-check build
-	@mkdir -p $(RELDIR)
-	@echo "Preparing release $(VERSION)..."
-
-	# Create version.txt
+	# version.txt stays unprefixed (numeric SemVer or the devel commit id)
 	@echo "$(VERSION)" > $(RELDIR)/version.txt
 
-	# Copy binaries to releases (strip if needed)
-	@for f in $(BINDIR)/$(PROJECT_NAME)-*; do \
-		[ -f "$$f" ] || continue; \
-		strip "$$f" 2>/dev/null || true; \
-		cp "$$f" $(RELDIR)/; \
-	done
-
-	# Create source archive (exclude VCS and build artifacts)
+	# Source archive (exclude VCS and build artifacts)
 	@tar --exclude='.git' --exclude='.github' --exclude='.gitea' \
 		--exclude='binaries' --exclude='releases' --exclude='*.tar.gz' \
 		-czf $(RELDIR)/$(PROJECT_NAME)-$(VERSION)-source.tar.gz .
 
-	# Generate checksums
+	# Checksums
 	@cd $(RELDIR) && FILES="$$(ls)" && sha256sum $$FILES > sha256.txt && sha512sum $$FILES > sha512.txt
 
-	# A release tag is immutable: stop when v{version} already exists locally or on the remote (bump the version instead)
-	@if git rev-parse -q --verify "refs/tags/v$(VERSION)" >/dev/null || git ls-remote --exit-code --tags origin "refs/tags/v$(VERSION)" >/dev/null 2>&1; then echo "ERROR: tag v$(VERSION) already exists; release tags are never moved or recreated" >&2; exit 1; fi
-	@git tag v$(VERSION)
-	@git push origin refs/tags/v$(VERSION)
-
-	# Create new release (stable) — v-prefixed tag matches the v* triggers in release.yml/docker.yml
-	@gh release create v$(VERSION) $(RELDIR)/* \
-		--title "$(PROJECT_NAME) $(VERSION)" \
-		--notes "Release $(VERSION)" \
-		--latest
-
-	@echo "Release complete: v$(VERSION)"
+	@echo "Release build complete: $(RELDIR)/"
 
 # =============================================================================
 # DOCKER - Build the host-platform container image locally (no push: CI/CD publishes; set REGISTRY env var for the tag)
@@ -35981,6 +35970,8 @@ test:
 		cargo deny check advisories 2>&1 | tee \$$COVDIR/deny.out && \
 		cargo test --lib --no-fail-fast 2>&1 | tee \$$COVDIR/test.out && \
 		echo \"Tests complete ✓\""
+	@echo "Running the binary checks (start, --help, --version, CLI)..."
+	@./tests/run_tests.sh
 
 # =============================================================================
 # Coverage gates by project type:
@@ -35994,32 +35985,22 @@ test:
 # =============================================================================
 
 # =============================================================================
-# DEV - Quick build for local development/testing (to random temp dir)
-# =============================================================================
-# Fast: local platform only, no extra flags, random temp dir for isolation
-# Builds server + CLI (if they exist)
-dev:
-	@mkdir -p "$${TMPDIR:-/tmp}/$(PROJECT_ORG)" && \
-		BUILD_DIR=$$(mktemp -d "$${TMPDIR:-/tmp}/$(PROJECT_ORG)/$(INTERNAL_NAME)-XXXXXX") && \
-		echo "Quick dev build to $$BUILD_DIR..." && \
-		$(RUST_DOCKER_RUN) -v $$BUILD_DIR:/build casjaysdev/rust:latest sh -c ' \
-			set -e; \
-			cargo fetch; \
-			cargo build; \
-			cp target/debug/$(PROJECT_NAME) /build/$(PROJECT_NAME); \
-			if [ -d src/client ]; then \
-				cargo build; \
-				cp target/debug/$(PROJECT_NAME)-cli /build/$(PROJECT_NAME)-cli; \
-			fi' && \
-		echo "Built: $$BUILD_DIR/$(PROJECT_NAME)" && \
-		if [ -d "src/client" ]; then echo "Built: $$BUILD_DIR/$(PROJECT_NAME)-cli"; fi && \
-		echo "Test:  docker run --rm --name $(PROJECT_NAME)-$$(head -c6 /dev/urandom | od -An -tx1 | tr -d ' \n' | cut -c1-8) -v $$BUILD_DIR:/app alpine:latest /app/$(PROJECT_NAME) --help"
-
-# =============================================================================
 # CLEAN - Remove build artifacts
 # =============================================================================
 clean:
 	@rm -rf $(BINDIR) $(RELDIR)
+
+# =============================================================================
+# HELP - List the targets (the default goal)
+# =============================================================================
+help:
+	@echo "Targets:"
+	@echo "  build    Debug binaries for all platforms to $(BINDIR)/"
+	@echo "  test     Lint, vulnerability scan, unit tests, then the binary checks (start, --help, --version, CLI)"
+	@echo "  release  Production binaries for all platforms, source archive and checksums to $(RELDIR)/"
+	@echo "  docker   Container image for the host platform (no push)"
+	@echo "  clean    Remove $(BINDIR)/ and $(RELDIR)/"
+	@echo "  help     This list"
 ```
 
 ## Embedded Build Info
@@ -36105,23 +36086,21 @@ All Docker builds use persistent Rust crate caching to avoid re-downloading depe
 
 1. **Runs `clean` first** (removes previous build artifacts)
 2. Creates cache directories if needed
-3. Downloads Rust crates (cached)
-4. Creates `binaries/` directory
-5. Builds local binary: `binaries/{project_name}`
-6. Builds all platform binaries: `binaries/{project_name}-{os}-{arch}`
-7. Uses musl targets for fully static binaries
-8. Embeds Version, CommitID, BuildDate, BuildEpoch via environment variables / `build.rs`
-9. All builds via Docker (`casjaysdev/rust:latest`), in ONE container for the whole target (dependencies, the local binary and every platform in a single `sh -c` run, never a container per platform)
+3. Fetches crates (cached)
+4. Builds the DEBUG binaries: the local platform (`binaries/{project_name}`, plus `-cli` and `-agent` when they exist) and every platform (`binaries/{project_name}-{os}-{arch}`, 7 platforms)
+5. Debug build: the `dev` cargo profile (debug info, no optimization), so a debugger or a backtrace shows real source lines; version info is still embedded via `build.rs` and env vars
+6. All builds via Docker (`casjaysdev/rust:latest`), in ONE container for the whole target (dependencies, the local binary and every platform in a single `sh -c` run, never a container per platform)
+7. Debug binaries are for development, debugging and the binary checks of `make test`; they are never published
 
 ### `make release`
 
-1. Runs `build` first
-2. Creates `releases/version.txt` with current version
-3. Strips binaries (removes symbols)
-4. Creates source archive (excludes `.git`, `.github`, `.gitea`, `binaries/`, `releases/`)
-5. Stops with an error when `v{version}` already exists locally or on the remote (release tags are immutable: bump the version instead)
-6. Creates new GitHub release marked as `--latest`
-7. Uses `gh` CLI - **manual local release only**
+1. Empties `releases/` first and does not run `clean`
+2. Builds the PRODUCTION binaries for every platform into `releases/{project_name}-{os}-{arch}` (7 platforms; the CLI and agent binaries too when they exist)
+3. Production build: the `release` cargo profile from `Cargo.toml` (optimized, stripped, LTO), static musl binaries for Linux, version info embedded via `build.rs` and env vars
+4. Writes `releases/version.txt` with the current version (unprefixed)
+5. Creates the source archive (excludes `.git`, `.github`, `.gitea`, `binaries/`, `releases/`) and `sha256.txt` / `sha512.txt` for every file
+6. **Builds only: it never tags, pushes or creates a release.** CI/CD tags, builds and publishes (`v{version}` for a stable release), so `releases/` is for checking the production artifacts locally
+7. All builds via Docker (`casjaysdev/rust:latest`), in ONE container
 
 ### `make docker`
 
@@ -36141,51 +36120,35 @@ All Docker builds use persistent Rust crate caching to avoid re-downloading depe
 4. Runs every gate CI runs, first: `cargo fmt --check`, `clippy -D warnings`, `cargo audit`, `cargo deny check advisories`, and `shellcheck` plus `shfmt -d` on `tests/*.sh` (run in the Go image); then `cargo test`
 5. Tests all crates
 6. Container removed after completion (`--rm`)
-7. A green `make test` means CI's quality gates pass for the same commit: the gate set is identical, and the pre-commit gate tests the tree being committed (uncommitted changes outside the commit are stashed, or a clean checkout of the commit is used), never a working tree that CI cannot see
-
-### `make dev`
-
-1. Quick build for local development/testing
-2. Builds local platform only (fastest)
-3. No release optimizations (debug build, version info not embedded)
-4. Outputs to `{tempdir}/{project_org}/{internal_name}-XXXXXX/` (isolated, org-identifiable)
-5. Uses Docker (`casjaysdev/rust:latest`) - keeps local machine clean
-6. Easy cleanup: `rm -rf "${TMPDIR:-/tmp}/${PROJECT_ORG}/"` or auto-deleted on reboot
-
-### `make local`
-
-1. **Runs `clean` first** (removes previous build artifacts)
-2. Builds local platform binaries only (fast)
-3. Outputs to `binaries/` (server, cli)
-4. Full release build (version info embedded via env vars)
-5. Uses Docker (`casjaysdev/rust:latest`) - keeps local machine clean
-6. **Use for local testing before full cross-platform build**
+7. Then runs `./tests/run_tests.sh` (the basic tier of Phase 2): it builds the host-platform debug binaries and checks that the server starts without errors and that `--help`, `--version` and the CLI work
+8. A green `make test` means CI's quality gates pass for the same commit: every gate CI runs is run here too (`make test` adds the binary checks of the basic tier), and the pre-commit gate tests the tree being committed (uncommitted changes outside the commit are stashed, or a clean checkout of the commit is used), never a working tree that CI cannot see
 
 **When to use (Local Development - NOT CI/CD):**
 
 | Command | Purpose | Output | When to Use |
 |---------|---------|--------|-------------|
-| `make dev` | **Development & Debugging** | `${TMPDIR}/${PROJECT_ORG}/${INTERNAL_NAME}-XXXXXX/` | Active coding, quick tests, debugging |
-| `make local` | **Production Testing** | `binaries/` (with version) | Test production builds locally before release |
-| `make build` | **Full Release Build** | `binaries/` (all 7 platforms) | Before tagging release, cross-platform verification |
-| `make test` | **Phase 1 — Toolchain Gate** | Coverage report | Before commits; after code changes |
+| `make build` | **Debug binaries** | `binaries/` (all 7 platforms) | Active coding, debugging, cross-platform verification |
+| `make test` | **Phase 1 + Phase 2 basic tier** | Coverage report | Before commits; after code changes |
+| `make release` | **Production binaries** | `releases/` (all 7 platforms, source archive, checksums) | Checking the production artifacts locally |
+| `make docker` | **Container image** | Local image store | Container deployment |
+| `make clean` | **Housekeeping** | removes `binaries/` and `releases/` | Fresh start |
+| `make help` | **Target list** | Terminal | Finding the right target |
 
 **Local Development Workflow:**
 
 | Stage | Command | Purpose |
 |-------|---------|---------|
-| **1. Coding** | `make dev` | Rapid iteration - builds to temp dir, no version info |
+| **1. Coding** | `make build` | Debug binaries to `binaries/` |
 | **2. Quick Test** | Run binary in Docker | Debug with curl, file, bash tools |
-| **3. Phase 1 — Toolchain Gate** | `make test` | Unit tests in Docker; pre-commit requirement |
-| **4. Phase 2 — Binary Validation** | `./tests/run_tests.sh` | Shell scripts run against compiled binary |
-| **5. Production Test** | `make local` | Build with version info to `binaries/` |
-| **6. Release** | `make build` | Full cross-platform build (7 platforms) |
+| **3. Phase 1 + Phase 2 basic tier** | `make test` | Lints, vulnerability scan, unit tests, then `./tests/run_tests.sh` (start, `--help`, `--version`, CLI) |
+| **4. Full OS testing** | `./tests/incus.sh` | Real init systems (PREFERRED) |
+| **5. Production check** | `make release` | Production binaries to `releases/` |
 
 **Debugging in Docker (Local Development):**
 
 ```bash
-# After make dev, test in Docker with debug tools
-BUILD_DIR=$(ls -td ${TMPDIR:-/tmp}/${PROJECT_ORG}/${INTERNAL_NAME}-*/ 2>/dev/null | head -1)
+# After make build, test in Docker with debug tools
+BUILD_DIR="$PWD/binaries"
 docker run --rm \
   --name "${PROJECT_NAME}-$(head -c6 /dev/urandom | od -An -tx1 | tr -d ' \n' | cut -c1-8)" \
   -v "$BUILD_DIR:/app" \
@@ -36210,22 +36173,18 @@ docker run --rm \
 **Typical workflow:**
 ```bash
 # Active development
-# Quick build to temp dir
-make dev
-# Unit tests
+# Debug binaries (symbols kept) to binaries/
+make build
+# Output: binaries/{project_name}, binaries/{project_name}-cli (debug)
+# Gates, unit tests and the basic binary checks (before every commit)
 make test
 
-# Before commit
-# Basic tests (Docker)
-./tests/run_tests.sh
-
 # Before release
-# Production build locally
-make local
+# Production binaries (stripped) to releases/
+make release
+# Output: releases/{project_name}-{os}-{arch}, checksums and the source archive
 # Full systemd testing (PREFERRED)
 ./tests/incus.sh
-# Full cross-platform build
-make build
 ```
 
 ## Directory Rules
@@ -36247,7 +36206,7 @@ make build
 | **Symlink to PATH** | `ln -s binaries/app /usr/local/bin/app` | Creates maintenance nightmare |
 | **Copy to system dirs** | `cp binaries/app /usr/local/bin/` | Stale binaries, version confusion |
 | **Symlink for testing** | `ln -s ../binaries/app test/app` | Use full path instead |
-| **Copy between dirs** | `cp binaries/app releases/app` | Use the CI/CD release process (or the `make release` staging below) |
+| **Copy between dirs** | `cp binaries/app releases/app` | Use the CI/CD release process (or the `make release` build below) |
 | **Install locally** | Any form of "installing" the binary on the development machine | Run from `binaries/` directly |
 
 ### Correct Usage
@@ -36256,7 +36215,7 @@ make build
 |------|-------|---------|
 | **Run binary** | `ln -s binaries/app ~/bin/app && app` | `./binaries/app` or `binaries/app` |
 | **Test binary** | `cp binaries/app /tmp/ && /tmp/app` | `./binaries/app --test` |
-| **Release** | `cp binaries/* releases/` by hand | CI/CD handles release artifacts; `make release` stages them for a manual local release |
+| **Release** | `cp binaries/* releases/` by hand | CI/CD handles release artifacts; `make release` builds production binaries fresh into `releases/` for a local check |
 | **Deploy** | Copy binary to server | Use container or package manager |
 
 ### Why This Rule Exists
@@ -36271,7 +36230,7 @@ make build
 
 ### The Only Exceptions: CI/CD Release, `make release` and Disposable Test Containers
 
-The **only** times binaries are copied are the CI/CD release process, the `make release` target (manual local stable release), which stages stripped copies of `binaries/` into `releases/` before uploading, and disposable test containers (below). In CI/CD they are:
+The **only** times binaries are copied are the CI/CD release process, the `make release` target, which builds production binaries fresh into `releases/` (it never copies from `binaries/` and never uploads), and disposable test containers (below). In CI/CD they are:
 1. Built fresh by CI/CD
 2. Stripped (debug symbols removed)
 3. Uploaded directly to release (GitHub Releases, registry, etc.)
@@ -36348,7 +36307,7 @@ The **only** times binaries are copied are the CI/CD release process, the `make 
 
 | Property | Value |
 |----------|-------|
-| Trigger | Push of a `YYYYMMDDHHMMSS-beta` tag (`make beta`); there is no beta branch |
+| Trigger | Push of a `YYYYMMDDHHMMSS-beta` tag (created by the maintainer with `git tag` and `git push origin refs/tags/{tag}`); there is no beta branch |
 | Version format | `{YYYYMMDDHHMMSS}-beta` - TEXT, NO `v` prefix |
 | Release name | `{YYYYMMDDHHMMSS}-beta` (e.g., `20251205143022-beta`) |
 | version.txt | `{YYYYMMDDHHMMSS}-beta` |
@@ -36404,11 +36363,11 @@ The **only** times binaries are copied are the CI/CD release process, the `make 
 
 | Type | Method | Version Example | Max Releases |
 |------|--------|-----------------|--------------|
-| Stable | CI/CD (tag) or `make release` (local) | `1.2.3` | Unlimited |
+| Stable | CI/CD (tag `v{version}`) | `1.2.3` | Unlimited |
 | Beta | CI/CD only | `20251205143022-beta` | Unlimited |
 | Devel | CI/CD only | `20251218060432` | **1** (rolling) |
 
-**Note:** `make release` is for manual local releases only. All automated releases use CI/CD: GitHub Actions, Gitea Actions, Forgejo Actions, GitLab CI or Jenkins, depending on the git provider (every provider has the same release equivalence, see the CI/CD Equivalence table).
+**Note:** `make release` only builds the production artifacts locally and never publishes. Every published release uses CI/CD: GitHub Actions, Gitea Actions, Forgejo Actions, GitLab CI or Jenkins, depending on the git provider (every provider has the same release equivalence, see the CI/CD Equivalence table).
 
 ---
 
@@ -37140,7 +37099,7 @@ $TEMP_DIR/
 
 ### Running Docker Compose (AI / Automated Testing)
 
-**AI must NEVER run `docker-compose.yml` or `docker-compose.dev.yml` — those are human-only.** AI's preferred interface for testing is the project's `tests/` directory scripts (`tests/docker.sh`, `tests/run_tests.sh`), which wrap the temp-dir copy/run/cleanup sequence below. Direct invocation of `docker-compose.test.yml` is only a fallback when no `tests/` script exists yet.
+**AI must NEVER run `docker-compose.yml` or `docker-compose.dev.yml` — those are human-only.** AI's preferred interface for testing is the project's `tests/` directory scripts (PART 28: `tests/docker.sh` validates the binary in its own Alpine container and does not use this compose file). `docker-compose.test.yml` is run only through the temp-dir copy/run/cleanup sequence below, when a test needs the full compose stack.
 
 **When a direct invocation is unavoidable, always use the temp directory workflow:**
 1. Create unique temp dir with `{project_org}` prefix
@@ -37403,7 +37362,7 @@ rm -rf "$TEMP_DIR"
 |--------|-------------------|-----------------|
 | **Rust installation** | Docker `casjaysdev/rust:latest` | Docker `casjaysdev/rust:latest` |
 | **Caching** | Host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`/`CARGO_TARGET`) bind-mounted into container | CI-native cache mounted into `casjaysdev/rust:latest` |
-| **Build command** | `make dev`, `make local`, `make build` | Direct `cargo build --release` with explicit flags |
+| **Build command** | `make build`, `make release` | Direct `cargo build --release` with explicit flags |
 | **Testing** | Docker/Incus containers | `casjaysdev/rust:latest` job container or explicit `docker run` |
 | **Makefile** | ALWAYS use Makefile targets | NEVER use Makefile (explicit commands) |
 
@@ -37451,7 +37410,7 @@ rm -rf "$TEMP_DIR"
 
 **Tag release auto-cancel policy:** Tag-only release workflows like `release.yml` MUST also use workflow concurrency, but only per exact tag ref. A newer run for `refs/tags/v1.2.3` should cancel the older `refs/tags/v1.2.3` run. A run for `v1.2.4` must NOT cancel `v1.2.3`.
 
-**Pull requests and merges:** a pull request (from a fork or a bot branch, the only kind there is) runs `ci.yml` only (build, test, lint, coverage, secret scan, workflow policy) — it never publishes an image or a release, and a fork PR receives no secrets. Merging into `main` is simply a push to that branch, so the merge triggers `ci.yml`, `devel.yml` (the rolling `devel` release) and `docker.yml` (the `{commit_id}` image and the `:devel` image). A beta is a pushed tag `YYYYMMDDHHMMSS-beta` (`make beta`), a stable release is a pushed `v*` tag, and neither is ever a merge. A PR and its target branch have different refs, so their concurrency groups never cancel each other.
+**Pull requests and merges:** a pull request (from a fork or a bot branch, the only kind there is) runs `ci.yml` only (build, test, lint, coverage, secret scan, workflow policy) — it never publishes an image or a release, and a fork PR receives no secrets. Merging into `main` is simply a push to that branch, so the merge triggers `ci.yml`, `devel.yml` (the rolling `devel` release) and `docker.yml` (the `{commit_id}` image and the `:devel` image). A beta is a pushed tag `YYYYMMDDHHMMSS-beta` (created by the maintainer), a stable release is a pushed `v*` tag, and neither is ever a merge. A PR and its target branch have different refs, so their concurrency groups never cancel each other.
 
 ## Build Info Variables
 
@@ -37560,8 +37519,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Run tests with coverage
         run: |
-          mkdir -p "/tmp/${{ github.repository_owner }}"
-          COVDIR=$(mktemp -d "/tmp/${{ github.repository_owner }}/${{ env.INTERNAL_NAME }}-XXXXXX")
+          mkdir -p "${TMPDIR:-/tmp}/${{ github.repository_owner }}"
+          COVDIR=$(mktemp -d "${TMPDIR:-/tmp}/${{ github.repository_owner }}/${{ env.INTERNAL_NAME }}-XXXXXX")
           echo "COVDIR=$COVDIR" >> "$GITHUB_ENV"
           cargo tarpaulin --out Xml --output-dir "$COVDIR"
       - name: Enforce coverage threshold
@@ -37829,7 +37788,7 @@ name: Beta Release
 
 on:
   push:
-    # A beta is published by pushing the tag YYYYMMDDHHMMSS-beta (`make beta`); there is no beta branch
+    # A beta is published by pushing the tag YYYYMMDDHHMMSS-beta (created by the maintainer); there is no beta branch
     tags:
       - '*-beta'
   workflow_dispatch:
@@ -38595,8 +38554,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Run tests with coverage
         run: |
-          mkdir -p "/tmp/${{ gitea.repository_owner }}"
-          COVDIR=$(mktemp -d "/tmp/${{ gitea.repository_owner }}/${{ env.INTERNAL_NAME }}-XXXXXX")
+          mkdir -p "${TMPDIR:-/tmp}/${{ gitea.repository_owner }}"
+          COVDIR=$(mktemp -d "${TMPDIR:-/tmp}/${{ gitea.repository_owner }}/${{ env.INTERNAL_NAME }}-XXXXXX")
           echo "COVDIR=$COVDIR" >> "$GITEA_ENV"
           cargo tarpaulin --out Xml --output-dir "$COVDIR"
       - name: Enforce coverage threshold
@@ -38834,7 +38793,7 @@ name: Beta Release
 
 on:
   push:
-    # A beta is published by pushing the tag YYYYMMDDHHMMSS-beta (`make beta`); there is no beta branch
+    # A beta is published by pushing the tag YYYYMMDDHHMMSS-beta (created by the maintainer); there is no beta branch
     tags:
       - '*-beta'
   workflow_dispatch:
@@ -41048,7 +41007,7 @@ REGISTRY = "ghcr.io/${PROJECT_ORG}/${INTERNAL_NAME}"
 
 Before proceeding, confirm you understand:
 - [ ] Docker uses tini as init, Alpine base
-- [ ] Makefile has exactly 7 build targets (dev, local, build, test, release, beta, docker) plus the `clean` and `release-check` helpers; no `all`
+- [ ] Makefile has exactly 6 targets (build, test, release, docker, clean, help); no `all`
 - [ ] Binary naming: NEVER include -musl suffix
 - [ ] All 8 platform builds required (4 OS x 2 arch)
 - [ ] CLI builds (if src/client/ exists): 8 additional binaries with `-cli` suffix
@@ -41125,7 +41084,7 @@ When a test or debug step requires `reboot`, `systemctl`, `iptables`, `mount`, p
 |------|---------|----------------|
 | `docker/docker-compose.test.yml` | Automated testing | Preferred: run via the project's `tests/` scripts. Fallback (no `tests/` script exists yet): copy to temp dir, run from there |
 
-**`tests/` scripts are AI's preferred interface for testing** — prefer `tests/docker.sh` / `tests/run_tests.sh` over invoking `docker-compose.test.yml` directly; those scripts wrap the temp-dir copy/run/cleanup sequence below. Only fall back to the manual workflow when no `tests/` script exists yet.
+**`tests/` scripts are AI's preferred interface for testing** — prefer `tests/docker.sh` / `tests/run_tests.sh` (PART 28); they validate the binary in their own Alpine container and do not use `docker-compose.test.yml`. That file is run only through the temp-dir copy/run/cleanup sequence below, when a test needs the full compose stack.
 
 **AI testing workflow (fallback, when no `tests/` script exists):**
 ```bash
@@ -41424,7 +41383,7 @@ rm -rf "$TEST_DIR"
 | Phase | Files | Run With | Tests |
 |-------|-------|----------|-------|
 | **Phase 1 — Toolchain Gate** | `#[cfg(test)]` blocks or `tests/` dir | `make test` | Source-code logic via `cargo test`; pre-commit gate |
-| **Phase 2 — Binary Validation** | `./tests/*.sh` | `./tests/run_tests.sh` (basic tier); the other scripts are run explicitly | Compiled binary behavior — routes, auth, debugging — **manual, developer-initiated** |
+| **Phase 2 — Binary Validation** | `./tests/*.sh` | The basic tier runs inside `make test` (`./tests/run_tests.sh`); the other scripts are run explicitly | Compiled binary behavior — start, `--help`, `--version`, CLI, routes, auth; the basic tier is part of `make test`, the rest is **manual, developer-initiated** |
 
 **Phase 1 — Toolchain Gate (`#[cfg(test)]` blocks or `tests/` dir):**
 - Tests individual functions and modules via `cargo test` inside Docker
@@ -41433,7 +41392,7 @@ rm -rf "$TEST_DIR"
 - Create or update the matching test module immediately when you add or change module logic
 - Run with `make test`
 
-**Phase 2 — Binary Validation (`./tests/*.sh`) — manual, developer-initiated:**
+**Phase 2 — Binary Validation (`./tests/*.sh`) — the basic tier runs inside `make test`; the other scripts are manual, developer-initiated:**
 - Tests the complete running server binary
 - Tests API endpoints, .txt extension, Accept headers
 - Tests authentication, API token validation
@@ -41465,7 +41424,7 @@ rm -rf "$TEST_DIR"
 **BOTH types of tests are REQUIRED for all projects:**
 
 1. **Phase 1 — Toolchain Gate** (`make test`) — source-code logic via `cargo test`, pre-commit gate
-2. **Phase 2 — Binary Validation** (`./tests/*.sh`) — compiled binary behavior, debugging — **manual, developer-initiated**
+2. **Phase 2 — Binary Validation** (`./tests/*.sh`) — compiled binary behavior, debugging — the basic tier runs inside `make test`; the other scripts are **manual, developer-initiated**
 
 **Integration tests MUST be comprehensive:**
 - ✓ Test ALL project-specific endpoints (IDEA.md)
@@ -41787,7 +41746,7 @@ test:
 
 ### How to Achieve 60% Coverage
 
-**0. Keep the process entry thin and testable.** The unit gate counts every crate target, `src/main.rs` included, so orchestration left in `main()` drags the percentage down while only the compiled binary can reach it. `src/main.rs` holds only `main()`: it calls `config::load(std::env::args())` (flag parsing and configuration building live in `src/config.rs`, which unit tests reach) and then calls `app::run(cancel, cfg).await`, where `cfg` is the `ServerConfig` value, the aggregate runtime configuration built by the config loader: it carries every section of the merged configuration that the project defines (server and web, the project's own sections such as `search` or `engine` only when IDEA.md defines them, and the area-file settings of PART 5), so `app::run` needs nothing else and `app` is the library module `src/app.rs` (declared in `src/lib.rs`), which never depends on the binary target. `app::run(cancel: CancellationToken, cfg: ServerConfig) -> anyhow::Result<()>` (startup, signal handling, graceful shutdown) is in that module, which unit tests reach: the test calls `run` with a cancellation token and a listener on `127.0.0.1:0`, waits for the ready signal, makes one request, cancels and asserts a clean return. Phase 2 still tests the compiled binary; its coverage never counts toward the Phase 1 percentage.
+**0. Keep the process entry thin and testable.** The unit gate counts every crate target, `src/main.rs` included, so orchestration left in `main()` drags the percentage down while only the compiled binary can reach it. `src/main.rs` holds only `main()`: it calls `config::load(std::env::args())` (flag parsing and configuration building live in `src/config.rs`, which unit tests reach) and then calls `app::run(cancel, cfg).await`, where `cfg` is the `ServerConfig` value, the aggregate runtime configuration built by the config loader: it has a field for every section of the merged configuration that the project defines (server and web, the project's own sections such as `search` or `engine` only when IDEA.md defines them, and the area-file settings of PART 5), so `app::run` needs nothing else from `main`; `config::load` only parses flags and environment and resolves paths, and `app::run` reads `server.yml`, the drop-ins and `secrets.yml` at startup step 13 (PART 8), after path setup, privilege transition, logging and PID handling; and `app` is the library module `src/app.rs` (declared in `src/lib.rs`), which never depends on the binary target. `app::run(cancel: CancellationToken, cfg: ServerConfig) -> anyhow::Result<()>` (startup, signal handling, graceful shutdown) is in that module, which unit tests reach: the test calls `run` with a cancellation token and a listener on `127.0.0.1:0`, waits for the ready signal, makes one request, cancels and asserts a clean return. Phase 2 still tests the compiled binary; its coverage never counts toward the Phase 1 percentage.
 
 **1. Test All Code Paths:**
 ```rust
@@ -42034,7 +41993,7 @@ fi
 
 **docker.sh and incus.sh MUST:**
 1. Host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`/`CARGO_TARGET`) provide persistent Rust cache across builds
-2. Build all binaries using Docker (casjaysdev/rust:latest) in temp directory:
+2. Build the host-platform debug binaries (the same debug profile as `make build`) using Docker (casjaysdev/rust:latest) in temp directory:
    - Server (`./src`)
    - Client (`./src/client`) if exists
 3. Install test tools in container (Docker: `apk add --no-cache curl bash file jq tor i2pd tzdata ca-certificates`)
@@ -42056,7 +42015,7 @@ fi
 
 **Every operator route (`server.token`, `adm_`) is tested with five requests, in `docker.sh` and `incus.sh` alike:** no `Authorization` header → `401`; a wrong token → `401`; an owner or linked token (`own_`) → `403`; the real `server.token` read from `secrets.yml` inside the test container → `200`, meaning authentication succeeds (a route that deliberately answers with another status keeps its own documented status, for example `/debug/error500` answers `500` after authenticating, and the suite asserts that status for it); and the same route with the token in a query string → `401` (a URL is never a credential). The token value is never echoed: scripts pass it through a variable and print only the route and the status.
 
-**CLI full functionality:** the built client runs against the running server with a linked API token (not just `--help`): `--version`, a status or health command, one read command and one write command, each checked for exit code `0` and expected output, plus one failure case (bad token → non-zero exit and a clear message).
+**CLI full functionality:** the built client runs against the running server with a linked API token (not just `--help`): `--version`, a status or health command, one read command and one write command, each checked for exit code `0` and expected output, plus one failure case (bad token → non-zero exit and a clear message). A project with no owner-writable resource and no authenticated CLI call (read-only data) runs the checks that exist: a second read command replaces the write command, and an unknown-resource failure case (non-zero exit and a clear message) replaces the bad-token case.
 
 #### tests/docker.sh
 
@@ -51055,17 +51014,13 @@ fn detect_input(args: &[String]) -> (String, String) {
 ### Local Development (Makefile + Docker)
 
 ```bash
-# Quick dev build (server + CLI if exist)
-make dev
-# Output: ${TMPDIR}/${PROJECT_ORG}/${INTERNAL_NAME}-XXXXXX/{project_name}, {project_name}-cli
-
-# Production test build
-make local
-# Output: binaries/{project_name}, binaries/{project_name}-cli (with version)
-
-# Full release (all 7 platforms)
+# Debug binaries (symbols kept) to binaries/
 make build
-# Output: binaries/{project_name}-{os}-{arch}, binaries/{project_name}-cli-{os}-{arch}
+# Output: binaries/{project_name}, binaries/{project_name}-cli (debug)
+
+# Production binaries (stripped) to releases/
+make release
+# Output: releases/{project_name}-{os}-{arch}, checksums and the source archive
 ```
 
 ### CI/CD (Direct cargo build - NOT Makefile)
@@ -51948,7 +51903,7 @@ maintainer_email: jane@example.com
 **Container-Only (NO LOCAL EXECUTION):**
 | NEVER | ALWAYS |
 |-------|--------|
-| `cargo build --release` locally | `make dev` or `make local` or `make build` |
+| `cargo build --release` locally | `make build` |
 | `cargo test` locally | `make test` (includes coverage enforcement) |
 | `cargo update` locally | Handled by `make build/local/dev` automatically |
 | `./binaries/{project_name}` locally | Run binary inside Docker/Incus container |
@@ -52001,10 +51956,9 @@ cd "$TEMP_DIR" && docker compose up -d
 
 **Makefile Targets:**
 ```bash
-# Quick build → temp dir (no version info)
-make dev
-# Full build → binaries/ (with --release flags)
+# Debug binaries (symbols kept) to binaries/
 make build
+# Output: binaries/{project_name}, binaries/{project_name}-cli (debug)
 # Run tests in container
 make test
 # Build Docker image
@@ -52294,11 +52248,9 @@ make docker
 - [ ] BSD: rc.d script
 
 **PART 25: Makefile**
-- [ ] `make dev` - Quick development build
-- [ ] `make local` - Production test build
-- [ ] `make build` - Full release build (all platforms)
-- [ ] `make test` - Run tests
-- [ ] `make release` - Create release with source archive
+- [ ] `make build` - Debug binaries (all platforms)
+- [ ] `make test` - Lints, vulnerability scan, unit tests and binary checks
+- [ ] `make release` - Production binaries, source archive and checksums (never tags or publishes)
 - [ ] `make docker` - Build container image
 - [ ] Cross-compilation targets
 - [ ] Version injection at build time
@@ -52419,7 +52371,7 @@ make docker
 - [ ] Business logic documented
 - [ ] Data models defined
 - [ ] API endpoints specified
-- [ ] Configuration options listed
+- [ ] Product-visible choices listed (the owner's decisions; configuration keys belong to AI.md and the README Configuration section, never to IDEA.md)
 - [ ] No implementation details (AI.md defines HOW)
 
 ---
@@ -52512,7 +52464,7 @@ make docker
 
 ### Build Terminology
 
-- [ ] **`make local`** used (not `make host`)
+- [ ] **`make build`** used (not `make host`)
 - [ ] **"local binary"** used (not "host binary")
 - [ ] **"local platform"** used (not "host platform")
 - [ ] **"locally"** used for dev machine context (not "on host")
