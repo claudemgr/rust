@@ -818,7 +818,7 @@ Rust projects never have `build-toolchain.yml` — `casjaysdev/rust:latest` is m
 | Jenkins | `Jenkinsfile` | Declarative Pipeline |
 
 **`security` job conditionality (applies to all providers):**
-- Secret scan (truffleHog) — always runs; full git history required
+- Secret scan (truffleHog) — always runs: a range scan of the pushed commits (or the PR range) on branch pushes and pull requests, and the full git history on new-branch, scheduled and manual runs (see the CI/CD secret-scan contract)
 - Workflow policy (SHA/digest pinning check) — always runs
 - `vuln-scan` (`cargo audit`) — conditional on `Cargo.lock` present
 - `image-scan` (Trivy) — conditional on Dockerfile present; builds its own image first (host-runner job, no `needs`)
@@ -3384,7 +3384,7 @@ Project is now 100% compliant with AI.md
 
 | Rule | Description |
 |------|-------------|
-| **NEVER** | Include AI attribution anywhere (code, comments, commits, PRs, documentation) |
+| **NEVER** | Include AI attribution anywhere (code, comments, commits, PRs, documentation); the one exception is the owner-directed original-content statement on the attribution surface ("Embedded Datasets and Content") |
 | **NEVER** | Add tool-attribution trailers or "Co-Authored-By" lines in commits |
 | **NEVER** | Add comments crediting automated tools |
 | **NEVER** | Reference AI tools in commit messages, PR descriptions, or changelogs |
@@ -5297,6 +5297,14 @@ chmod +x {project_name}-linux-amd64
 ./{project_name}-linux-amd64
 ```
 
+### systemd
+
+```bash
+# Install the service and start it (the binary writes its own unit file)
+sudo ./{project_name}-linux-amd64 --service --install
+sudo systemctl enable --now {project_name}
+```
+
 ## Client
 
 A companion client is available for interacting with the server API.
@@ -5365,8 +5373,7 @@ curl -q -LSsf -H "Authorization: Bearer TOKEN" {official_site}/api/{api_version}
 
 ### Prerequisites
 
-- Rust (latest stable)
-- Docker (for containerized builds)
+- Docker (the Rust toolchain runs in the `casjaysdev/rust` container; no local Rust install is needed or used)
 
 ### Build
 
@@ -7600,7 +7607,7 @@ Self-Healing Successful?                        │
     │        Resume Normal Operation
     │
     └─► NO: Continue in Maintenance Mode
-            Retry every 30 seconds
+            Retry every 30 seconds (until maintenance.self_healing.max_attempts is reached; 0 = forever)
             Log fix instructions to server log
 ```
 
@@ -7802,7 +7809,7 @@ server:
       # Notify when exiting maintenance mode
 ```
 
-**Self-healing limit.** `max_attempts: 0` retries forever. A positive value caps the failed attempts: once it is reached retrying stops and the server stays in maintenance mode (writes keep answering `503`; reads keep working only while the database or a usable cache can answer them, and with neither, for example a remote database that is down and no usable cache, only the health endpoints answer and every other route is `503`). `maintenance.self_healing` in `/server/healthz` then reports `enabled: false`, `exhausted: true` and `next_attempt: null`; the audit log records `server.self_healing_exhausted` (reason, attempts); and one notification (when email is configured) says operator action is needed. The server leaves maintenance mode only when an operator removes the cause and restarts the service (`--service restart`); a restart also resets the attempt count.
+**Self-healing limit.** `max_attempts: 0` retries every 30 seconds forever; a positive value caps the failed attempts, after which the health fields keep `attempts`, report `exhausted` and recovery needs an operator restart. A positive value caps the failed attempts: once it is reached retrying stops and the server stays in maintenance mode (writes keep answering `503`; reads keep working only while the database or a usable cache can answer them, and with neither, for example a remote database that is down and no usable cache, only the health endpoints answer and every other route is `503`). `maintenance.self_healing` in `/server/healthz` then reports `enabled: false`, `exhausted: true` and `next_attempt: null`; the audit log records `server.self_healing_exhausted` (reason, attempts); and one notification (when email is configured) says operator action is needed. The server leaves maintenance mode only when an operator removes the cause and restarts the service (`--service restart`); a restart also resets the attempt count.
 
 ### What Goes Where
 
@@ -8199,7 +8206,7 @@ Wherever this specification says a setting is set "in `server.yml`", it means th
 | `server.security.installation_secret`, `.installation_secret_previous`, `.installation_secret_previous_expires`, `.encryption_key_previous`, `.encryption_key_previous_expires` | imported into the database `app_secrets` row of the same name when that row is missing (the legacy `..._previous_expires` keys become the canonical `{name}_previous_until` rows), then removed from the file (PART 11 → "Rotation contract") |
 | Settings that no longer exist | removed: `web.llms.enabled`, `server.privacy.content.*`, `server.mcp`, `server.rate_limit.enabled`, `server.rate_limit.requests`, `server.rate_limit.window`, `server.scheduler.enabled`, `server.maintenance_mode`, `server.i18n.auto_detect`, `.rtl_languages`, `.show_selector`, `.translations_dir`, `server.geoip.dir`, `.databases`, `.country_mode`, `server.database.sqlite`, `server.metrics.endpoint`, `server.notifications.email_enabled`, `.webhook_enabled`, `server.secret_key`, `web.permissions_policy`, `web.honor_dnt`, `web.robots.ai_bots` |
 
-**Scheduler tasks.** A task under `server.scheduler.tasks` has exactly the keys `enabled`, `schedule`, `retry_on_fail` and `retry_delay` (backup retention is NOT a task key: it lives only in `server.backup.retention`, PART 21). Any other per-task key is removed by the migration, and a built-in task that still has its default values is not written at all.
+**Scheduler tasks.** A task under `server.scheduler.tasks` has exactly the keys `enabled`, `schedule`, `retry_on_fail`, `retry_delay` and `timeout` (default `1h`, the run limit that the lock lease is derived from) (backup retention is NOT a task key: it lives only in `server.backup.retention`, PART 21). Any other per-task key is removed by the migration, and a built-in task that still has its default values is not written at all.
 
 **Layout.** Sections and keys are written in the order this specification lists them, so a rewrite never reshuffles a file and diffs stay small.
 
@@ -9225,7 +9232,7 @@ Before proceeding, confirm you understand:
 | **Operator token (`server.token`) auth** | **NEVER bypassed** — all auth and security checks remain fully enforced |
 | Debug endpoints | **Enabled** (`/debug/*`) |
 | Runtime variables endpoint | **Enabled** (`/debug/vars`) |
-| Request/response logging | Full (headers, body, timing) |
+| Request/response logging | Full (headers, timing) and bodies only when `server.debug.log_bodies` is `true` (default `false`; bodies are sanitized like every other logged value) |
 | Database query logging | Enabled (queries, timing, rows) |
 | Cache operation logging | Enabled (hits, misses, evictions) |
 | Memory profiling | Enabled |
@@ -11516,6 +11523,17 @@ fn detect_service_manager() -> &'static str {
         }
     }
 
+    // Explicit runit (SVDIR) and s6 (S6_*) evidence wins over the container markers, so a supervised host is never reported as a container
+    // runit: check for SVDIR
+    if std::env::var("SVDIR").is_ok() {
+        return "runit";
+    }
+
+    // s6: check for S6_* vars
+    if std::env::var("S6_LOGGING").is_ok() {
+        return "s6";
+    }
+
     // Check for container environment
     if is_container() {
         return "container";
@@ -11538,16 +11556,6 @@ fn detect_service_manager() -> &'static str {
     #[cfg(target_os = "macos")]
     if ppid == 1 {
         return "launchd";
-    }
-
-    // runit: check for SVDIR
-    if std::env::var("SVDIR").is_ok() {
-        return "runit";
-    }
-
-    // s6: check for S6_* vars
-    if std::env::var("S6_LOGGING").is_ok() {
-        return "s6";
     }
 
     // OpenRC: PPID=1 with OpenRC running. Checked BEFORE SysV: both use /etc/init.d
@@ -12220,6 +12228,8 @@ See **PART 10: DATABASE** for full database configuration.
 | Auto-increment | `AUTOINCREMENT` | `AUTOINCREMENT` |
 | Upsert | `ON CONFLICT DO UPDATE` | `ON CONFLICT DO UPDATE` |
 | Boolean | `INTEGER (0/1)` | `INTEGER (0/1)` |
+
+**MSSQL equivalents:** timestamps `DATEDIFF_BIG(SECOND, '1970-01-01', SYSUTCDATETIME())`, auto-increment `IDENTITY(1,1)`, upsert `MERGE … WHEN MATCHED THEN UPDATE WHEN NOT MATCHED THEN INSERT`, boolean `BIT`.
 
 **Automatic Detection:**
 
@@ -14555,7 +14565,7 @@ SQLite allows ONE writer at a time. Without the rules below, concurrent requests
 | Busy wait | `busy_timeout=10000` (10 s) on EVERY connection, set through `SqliteConnectOptions::busy_timeout`, so every pooled connection gets it |
 | Two handles | `write pool`: `max_connections(1)` and `min_connections(1)`, and every transaction starts with `BEGIN IMMEDIATE` (the write lock is taken up front and a busy wait is honored). `read pool`: `max_connections(pool.max_open)` with `query_only=1`. Only the store layer sees the handles; it exposes `write(f)` and `read()`, so a handler cannot pick the wrong one |
 | Writes only through `write` | Every INSERT, UPDATE, DELETE, DDL and every transaction that may write goes through `write`. A read-then-write flow runs entirely inside ONE `write` transaction; it never reads on `read pool` and then writes |
-| Short transactions | A write transaction holds no network call, email send, file I/O, sleep or user callback. Target under 100 ms; `write` has a 10 s context deadline |
+| Short transactions | A write transaction holds no network call, email send, file I/O, sleep or user callback. Target under 100 ms; `write` has a 10 s context deadline. The two operations the specification requires to be ONE atomic transaction, owner privacy deletion and PGP key rotation re-encryption (PART 11), are explicit exceptions to this target and to the batch limit below: each runs as one transaction under a dedicated 5-minute deadline, bounded by the owner's own rows or the stored reports, and keeps its crash-recovery marker inside the same transaction |
 | Rows are closed first | Rows from a query are fully read and closed before a write in the same flow: collect the ids, close, then write. A cursor held open across a write is a defect |
 | Batches | Cleanup, retention, audit purge and import work in batches of at most 500 rows per transaction, with a short yield between batches (the scheduler tasks of PART 19). `VACUUM` runs only from a maintenance task on the write handle, never inside a transaction and never during a request |
 | Hot counters | Rate-limit counters, request metrics, session `last_used` and other per-request bookkeeping are NOT written per request. They live in memory and one goroutine flushes them in a single transaction every 30 s and on shutdown. `last_used` (a token's `last_used_at`, and a session's where the template has sessions) is updated only when the stored value is older than 60 seconds and then reaches the database with the next flush, so a token or session is written at most once a minute |
@@ -16113,7 +16123,7 @@ CREATE TABLE IF NOT EXISTS security_thanks (
 
 **Restore behavior:** restoring a backup re-installs the keypair and `keyservers.state`, then submits the public key only to the configured keyservers that the restored state does not already list for this fingerprint (a keyserver added since the backup, or a different fingerprint). A keyserver already listed is not contacted again, and a submission that does happen is idempotent because keyservers de-duplicate by fingerprint. The `installation_secret` is restored from the same backup, so the encrypted private key decrypts correctly.
 
-**Operator UX:** running `{project_name} --maintenance backup` and `{project_name} --maintenance restore` covers the security keypair without any extra steps. `{project_name} --maintenance backup test [file]` verifies a backup without touching live data: `file` defaults to the newest full backup in `{backup_dir}` (the newest by the UTC date in the file name wins, as for restore, "Default archive selection", and the manifest is never read to choose) and also tests the daily and hourly incrementals when present, each together with its base. An encrypted backup asks for its password interactively exactly like restore (there is no password flag; without a terminal the command fails with a message that says so). It extracts into a temporary directory, verifies the manifest checksums, decrypts `pgp.priv.asc.enc` with the `installation_secret` found in that same backup, compares the fingerprint of the decrypted key with `pgp.pub.asc`, reports each result, and removes the temporary directory.
+**Operator UX:** running `{project_name} --maintenance backup` and `{project_name} --maintenance restore` covers the security keypair without any extra steps. `{project_name} --maintenance backup test [file]` verifies a backup without touching live data: `file` defaults to the newest full backup in `{backup_dir}` (the newest by the UTC date in the file name wins, as for restore, "Default archive selection", and the manifest is never read to choose) and also tests the daily and hourly incrementals when present, each together with its base. An encrypted backup takes its password like restore: the `--password` flag when given, otherwise an interactive prompt (without a flag or a terminal the command fails with a message that says so). It extracts into a temporary directory, verifies the manifest checksums, decrypts `pgp.priv.asc.enc` with the `installation_secret` found in that same backup, compares the fingerprint of the decrypted key with `pgp.pub.asc`, reports each result, and removes the temporary directory.
 
 ## Logging
 
@@ -18094,6 +18104,7 @@ server:
     # ============================================================
     consent:
       # Show banner on ALL frontend pages until user acknowledges
+      # Fixed: the banner always appears while the cookie_consent cookie is absent; false is an invalid value and is reset to true
       show_until_acknowledged: true
 
       # Non-essential cookies and tracking are OPT-IN: nothing non-essential runs until the visitor accepts
@@ -18169,7 +18180,7 @@ server:
 | Keys | Role |
 |------|------|
 | `consent.*` (banner message, buttons, `show_preferences`; the banner is always fixed to the bottom of the viewport), `cookies.*.enabled` | Behavior only: they change what the server does, they do not add page text. `cookies.*.enabled` decides only whether a category is offered to the visitor; the consent state is the visitor's own `cookie_consent` cookie, and without it every non-essential category is off |
-| `data.sold` | Behavior AND page: picks the banner message, the CCPA opt-out and the Data Usage text |
+| `data.sold` | Behavior AND page: picks the banner message variant (the banner text and button labels are built-in translation keys, no setting owns them), the CCPA opt-out and the Data Usage text |
 | `data.stored_on_server`, `data.sharing`, `retention.*`, `cookies.*.description`, `third_party.services` | Page content only: they fill the Data Storage, Data Retention, Cookie Policy and Third Parties sections of `/server/privacy` |
 
 ### Built-in privacy text (not configurable)
@@ -18931,7 +18942,7 @@ pub struct StatsInfo {
 
 ### Core Check Probes
 
-**The core checks report `ok` or `error` only (never `degraded`); each runs with its own timeout so a slow dependency cannot stall `/server/healthz`.**
+**The core checks report `ok` or `error` only (never `degraded`); each runs with its own timeout. The scheduler refreshes them every 30 seconds (the database queries and the disk probe-file write happen there) and `/server/healthz` reads the cached results: a request never runs a probe.**
 
 | Check | Probe | `error` when |
 |-------|-------|--------------|
@@ -18954,13 +18965,13 @@ pub struct StatsInfo {
 | Rule | Detail |
 |------|--------|
 | **Registry, not hand-coding** | Each data set registers itself once at load time: `health::register(key, critical, check_fn)`. `buildHealthResponse()` iterates the registry — adding a data set MUST NOT require editing the health handler |
-| **Values** | `ok` = loaded, parsed, non-empty, and within its maximum age · `degraded` = loaded but stale (update failing, past its max age) or running on the last known good copy · `error` = missing, empty, or unparseable with no usable copy |
+| **Values** | `ok` = loaded, parsed, non-empty, and within its maximum age · `degraded` = loaded but stale (update failing, past its max age) or running on the last known good copy · `error` = missing, empty, or unparseable with no usable copy (the one exception: GeoIP and the other enrichment datasets whose features fail open, such as blocklists and `extra_sources`, report `degraded` with no usable copy, because they never make the service unhealthy) |
 | **Disabled features** | A data set whose feature is disabled is OMITTED from `checks` (never reported as `ok` or `error`) |
 | **Aggregation** | `error` on `database` or `disk` → `unhealthy`. A dataset check at `degraded` → `degraded`, whether or not it is `critical`. A dataset check at `error` → `degraded`, unless it was registered `critical` (the app cannot do its core job without it; downloaded datasets such as GeoIP, blocklists and CVE data and third-party upstreams such as search engines are never critical, "Startup Never Fails"), which makes the service `unhealthy` |
 | **Overlay networks** | A Tor or I2P check at `degraded` → overall `degraded`. It is never `critical` and never makes the overall status `unhealthy` (see "Overlay Network Health") |
 | **Stable keys** | `{kind}_{id}` is a stable snake_case identifier — NEVER a file path, URL, or filename (public-safe; see Security) |
 | **Order** | Core checks first (`database`, `cache`, `disk`, `scheduler`), then `tor`, `i2p`, then dataset checks in registration order. JSON emits keys in exactly this order (custom marshaller — never an unordered map) |
-| **Cost** | `/server/healthz` reads CACHED results. The scheduler re-runs dataset checks at most every 60 seconds and after every data-set reload/update; a request NEVER triggers a disk scan, parse, or network fetch |
+| **Cost** | `/server/healthz` reads CACHED results. The scheduler re-runs dataset checks at most every 60 seconds and after every data-set reload/update; a request NEVER triggers a probe, disk scan, parse, or network fetch |
 | **Freshness** | Each data set declares a `max_age` (e.g. 21 days for GeoIP, 72 hours for every blocklist source, fixed, not configurable per source (each source's own last-update time is a stored `{id}.last_updated` file, PART 17); the GeoIP update itself runs weekly, so 21 days is three missed runs, and the timestamp that drives it is `{data_dir}/security/geoip/.last_updated`); the check compares last successful load/update against it |
 | **Public-safe** | `ok` / `degraded` / `error` only — no paths, URLs, sizes, record counts, versions, or error text |
 
@@ -19107,7 +19118,7 @@ pub struct StatsInfo {
           🧅 Tor: <span class="status status-ok">✅ healthy</span>
           <div class="code-block">
             <code class="code-content">abc123xyz456abcdef789xyz456abcdef789xyz456abcdef789xyz.onion</code>
-            <button class="copy-btn" data-copy="abc123xyz456abcdef789xyz456abcdef789xyz456abcdef789xyz.onion">
+            <button class="copy-btn" data-js-copy data-copy="abc123xyz456abcdef789xyz456abcdef789xyz456abcdef789xyz.onion">
               <span class="copy-icon">📋</span><span class="copy-text" aria-live="polite">Copy</span>
             </button>
           </div>
@@ -19117,7 +19128,7 @@ pub struct StatsInfo {
           🔗 I2P: <span class="status status-ok">✅ healthy</span>
           <div class="code-block">
             <code class="code-content">abc123xyz456abcdef789xyz456abcdef789xyz456abcdef789xyz.b32.i2p</code>
-            <button class="copy-btn" data-copy="abc123xyz456abcdef789xyz456abcdef789xyz456abcdef789xyz.b32.i2p">
+            <button class="copy-btn" data-js-copy data-copy="abc123xyz456abcdef789xyz456abcdef789xyz456abcdef789xyz.b32.i2p">
               <span class="copy-icon">📋</span><span class="copy-text" aria-live="polite">Copy</span>
             </button>
           </div>
@@ -19199,7 +19210,7 @@ pub struct StatsInfo {
 }
 /* Uses same modifier classes as inline .status: .status-ok, .status-error, .status-warning */
 .status-banner.status-ok { background: var(--color-success-bg); color: var(--color-success); }
-.status-banner.status-error { background: var(--color-error-bg); color: var(--color-error); }
+.status-banner.status-error { background: var(--color-error-bg); color: var(--color-error-text); }
 .status-banner.status-warning { background: var(--color-warning-bg); color: var(--color-warning); }
 
 /* Stats with larger values */
@@ -20222,9 +20233,9 @@ fn get_api_response_format(req: &Request) -> &'static str {
 | **5** | CLI/curl (no browser UA) | `curl /joke` | Plain text |
 | **6** | Default | Any request | HTML |
 
-**Mapping for `Accept: application/json` on a frontend route.** The paired API route is the same path under the API prefix: `/jokes/random` is `/api/{api_version}/jokes/random`, `/server/about` is `/api/{api_version}/server/about`; the JSON is that route's response, byte for byte. The pairing rule (PART 1) guarantees the pair exists, so a page never has "no API route": a form or tool page whose API operation is not a plain `GET` pairs with the `GET` form descriptor of that API route (as `GET /api/{api_version}/server/contact` does for the contact form), and a hub or information page pairs with an API route that returns the same structured content. A page found without a pair is a defect fixed by adding the pair, never by inventing a JSON shape for the page.
+**Mapping for `Accept: application/json` on a frontend route.** The paired API route is the same path under the API prefix: `/jokes/random` is `/api/{api_version}/jokes/random`, `/server/about` is `/api/{api_version}/server/about`; the JSON is that route's response, byte for byte for a deterministic document. A document that carries per-request state (a fresh CAPTCHA challenge, a one-use token reveal) is one issuance: the frontend negotiation calls the API handler once and returns its output, while two independent GETs share fields and schema only. The pairing rule (PART 1) guarantees the pair exists, so a page never has "no API route": a form or tool page whose API operation is not a plain `GET` pairs with the `GET` form descriptor of that API route (as `GET /api/{api_version}/server/contact` does for the contact form), and a hub or information page pairs with an API route that returns the same structured content. A page found without a pair is a defect fixed by adding the pair, never by inventing a JSON shape for the page; the one documented exception is `/server/preferences/tokens`, a public form shell whose API operations are all Bearer-only, so it has no JSON pair and `Accept: application/json` on it answers `406`.
 
-**Health endpoints (`/server/healthz`, `/healthz`) are ordinary frontend routes:** `Accept: application/json` returns the bare health JSON, byte-identical to `/api/{api_version}/server/healthz`. There is no healthz-specific negotiation.
+**Health endpoints (`/server/healthz`, `/healthz`) are ordinary frontend routes:** `Accept: application/json` returns the bare health JSON, the same document as `/api/{api_version}/server/healthz` (same fields and schema; the volatile values `uptime`, `timestamp` and the request statistics come from one shared snapshot refreshed together with the cached checks, so two requests inside one refresh window are byte-identical). There is no healthz-specific negotiation.
 
 **HTML variant:** once the format is HTML, the User-Agent picks the variant. Text browsers (lynx, w3m, links) advertise `text/html` but cannot run JavaScript, so they get the no-JS HTML even with an explicit `Accept: text/html`; every other client gets the full HTML.
 
@@ -20701,7 +20712,7 @@ fn render_no_js_html(data: &impl serde::Serialize) -> String {
 | **Optional routes** | The embedded build-time spec is the full SUPERSET of routes, and every route that depends on a flag or a setting (the root aliases, optional well-known files, optional features) carries `x-mounted-when` naming its condition (for example the setting that enables the feature); INTERNAL routes (metrics, `/debug/*`, Tor control) are never in the OpenAPI document, embedded or served. At startup the server derives the SERVED spec from the embedded one by removing every operation whose condition is false for this run, so the spec a client reads always matches the routes that are actually mounted. The drift test compares the superset with the route table |
 | **JSON only** | OpenAPI spec uses JSON format only (NO YAML) |
 | **Source of truth** | AI.md defines the TEMPLATE routes and the `### API routes` inventory in IDEA.md defines EVERY project-defined route, including any native or compatibility API of the project; together they are the API CONTRACT: routes, methods, auth and shapes. AI.md never enumerates project routes. The code and its annotations implement that contract, and the specs are GENERATED from the code, so they are artifacts, never edited by hand. Drift is detected by a test with three legs: the generated OpenAPI route and method list, the router's registered routes, and the union of the AI.md template routes and the IDEA.md `### API routes` inventory. A route present in one leg and missing from another fails the build, naming the route and the missing place; a project whose IDEA.md has no `### API routes` subsection fails with that message instead of passing vacuously. A deliberate change is made in AI.md or IDEA.md first, then the code, then the specs are regenerated |
-| **Template route inventory** | The template leg of the drift test is read from the project's own `AI.md` at test time, deterministically: a template route is a row of a Markdown table whose header row has a path column (`Endpoint`, `Path` or `Route`) and a method column (`Method` or `Methods`), in any order and with any other columns (rows are read by those headers, never by column position): the path cell is exactly one backticked path starting with `/` and the method cell lists one or more HTTP methods (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`) separated by `/` or `,` (each method of the path is its own route), and the method is always explicit (a row without one is not a route). A row whose method cell is `ALL` and whose path ends in `/*` declares a PREFIX, not routes (the admin panel and admin API rows): the drift test does not expand it, the concrete routes under the prefix are the rows of the tables that define them (each with explicit methods), and the test requires at least one registered route under the prefix and every registered route under it to be such a row; `ALL` is valid only on a prefix row. Route classes: a row whose path starts with `/api/`, or is a root alias of an API route (`/mcp`), is an API route and is compared with all three legs (an INTERNAL path, below, is compared with the router and the inventory only, never with the OpenAPI leg); every other row (`/`, `/server/healthz` and its root alias `/healthz` (the alias of the frontend handler, never of the API one), the Swagger and GraphiQL pages, the admin pages, the preferences forms) is a PAGE-class route, compared with the router's registered routes and, when it renders a page, with the page registry (an action route that only changes state, such as `GET /server/preferences/sync/import`, is a route but not a page and is never in the page registry), and expected in NONE of the OpenAPI document. INTERNAL is a class of path, not a marker on each row: every path of the INTERNAL services (metrics with its `/metrics`, `/api/metrics` and versioned aliases, the `/debug/*` routes, the Tor control routes; the INTERNAL rows of the PART 1 endpoint-pattern table) counts as a template route when it has a row, and the drift test expects it in the route table and in NONE of the OpenAPI document, llms.txt, GraphQL and MCP; an alias is its own row (a path cell never holds two paths); optional-segment brackets such as `/metrics[/{service}]` expand to two routes, the path without and the path with the bracketed segment. A row in a fenced code block or in a table introduced as an illustrative example (for example the generic REST row `/api/{api_version}/{resource}`) is not a template route. `{api_version}` is the API version in use, `{admin_path}` the configured admin path, a representation suffix (`.txt`) of an inventoried route is not a separate route (`/api/{api_version}/server/healthz.txt` is the `.txt` form of the inventoried `GET /api/{api_version}/server/healthz`), a leading `{base}` (the Scoped Agents API table only) is replaced by the Base Route of each enabled scope (admin always, user with PART 34, org with PART 35), any other `{name}` segment matches a path parameter. A row under a section marked OPTIONAL counts only when the project enables that feature (its `x-mounted-when` condition); a row whose description names its own condition (an alias that exists `when server.healthz.root.enabled is true`) is optional in the same way and carries that condition as its `x-mounted-when`. A table without a method column (the frontend page lists, static files, the well-known support matrix) is not a route inventory either: those are `GET`/`HEAD` pages covered by the page registry and conformance tests, not by the drift parser, and any route that accepts a `POST` form is listed in an inventory table with an explicit `POST` row. A table that writes the method inside the route cell (`GET /path`) instead of a method column illustrates the page/API pairing and is not an inventory: its routes are inventoried by the section tables that define them. A route table in any other form is not a route inventory: a new template route is added to AI.md in this form, and nothing is copied into a project |
+| **Template route inventory** | The template leg of the drift test is read from the project's own `AI.md` at test time, deterministically: a template route is a row of a Markdown table whose header row has a path column (`Endpoint`, `Path` or `Route`) and a method column (`Method` or `Methods`), in any order and with any other columns (rows are read by those headers, never by column position): the path cell is exactly one backticked path starting with `/` and the method cell lists one or more HTTP methods (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`) separated by `/` or `,` (each method of the path is its own route), and the method is always explicit (a row without one is not a route). A row whose method cell is `ALL` and whose path ends in `/*` declares a PREFIX, not routes (the admin panel and admin API rows): the drift test does not expand it, the concrete routes under the prefix are the rows of the tables that define them (each with explicit methods), and the test requires at least one registered route under the prefix and every registered route under it to be such a row; `ALL` is valid only on a prefix row. Route classes: a row whose path starts with `/api/`, or is a root alias of an API route (`/mcp`), is an API route and is compared with all three legs (an INTERNAL path, below, is compared with the router and the inventory only, never with the OpenAPI leg); every other row (`/`, `/server/healthz` and its root alias `/healthz` (the alias of the frontend handler, never of the API one), the Swagger and GraphiQL pages, the admin pages, the preferences forms) is a PAGE-class route, compared with the router's registered routes and, when it renders a page, with the page registry (an action route that only changes state, such as `GET /server/preferences/sync/import`, is a route but not a page and is never in the page registry), and expected in NONE of the OpenAPI document. INTERNAL is a class of path, not a marker on each row: every path of the INTERNAL services (metrics with its `/metrics`, `/api/metrics` and versioned aliases, the `/debug/*` routes, the Tor control routes; the INTERNAL rows of the PART 1 endpoint-pattern table) counts as a template route when it has a row, and the drift test expects it in the route table and in NONE of the OpenAPI document, llms.txt, GraphQL and MCP; an alias is its own row (a path cell never holds two paths); optional-segment brackets such as `/metrics[/{service}]` expand to two routes, the path without and the path with the bracketed segment. A row in a fenced code block or in a table introduced as an illustrative example (for example the generic REST row `/api/{api_version}/{resource}`) is not a template route. `{api_version}` is the API version in use, `{admin_path}` the configured admin path, a representation suffix (`.txt`) of an inventoried route is not a separate route (`/api/{api_version}/server/healthz.txt` is the `.txt` form of the inventoried `GET /api/{api_version}/server/healthz`), a leading `{base}` is replaced in two tables only: in the Scoped Agents API table by the Base Route of each enabled scope (admin always, user with PART 34, org with PART 35), and in the CLI Auto-Update tables by `/api/{api_version}` (so the CLI download route is an API route and is in the OpenAPI document), any other `{name}` segment matches a path parameter. A row under a section marked OPTIONAL counts only when the project enables that feature (its `x-mounted-when` condition); root aliases such as `/healthz` and `/metrics` are PAGE-class and are not in the OpenAPI document: their mount condition is the `x-mounted-when` of the versioned API route they alias; a row whose description names its own condition (an alias that exists `when server.healthz.root.enabled is true`) is optional in the same way and carries that condition as its `x-mounted-when`. A table without a method column (the frontend page lists, static files, the well-known support matrix) is not a route inventory either: those are `GET`/`HEAD` pages covered by the page registry and conformance tests, not by the drift parser, and any route that accepts a `POST` form is listed in an inventory table with an explicit `POST` row. A table that writes the method inside the route cell (`GET /path`) instead of a method column illustrates the page/API pairing and is not an inventory: its routes are inventoried by the section tables that define them. A route table in any other form is not a route inventory: a new template route is added to AI.md in this form, and nothing is copied into a project |
 | **Match site theme** | Both UIs styled to match site theme (light/dark/auto) |
 | **Standardized locations** | ALWAYS `src/swagger/` and `src/graphql/` (NEVER in root `.`) |
 
@@ -23134,7 +23145,7 @@ footer p {
 | **No empty or unlabeled controls** | A `<select>` always has options and a visible selected default; an input always has a visible `<label>`; a button always has visible text or an `aria-label` plus tooltip. Two controls never share a label (a duplicated "Expiry" with a blank select is a defect) |
 | **Readable measure** | Prose max `72ch`; single-purpose form and card columns max `40rem` on desktop, centered |
 | **Typography** | Base 16 px, line-height 1.5, a heading scale via CSS variables, `0.875rem` monospace for tokens and code, `font-size >= 16px` on inputs (iOS zoom) |
-| **Contrast and focus** | Text 4.5:1 and UI parts 3:1 in BOTH themes; visible `:focus-visible` ring; `prefers-reduced-motion` honored |
+| **Contrast and focus** | Text 4.5:1 and UI parts 3:1 in BOTH themes (text in the error color uses `--color-error-text`, and text on an error fill uses `--color-on-error`, which is dark on the dark theme's `#ff5555`; both are measured by the conformance test); visible `:focus-visible` ring; `prefers-reduced-motion` honored |
 | **Opaque surfaces** | Modals, drawers, dropdowns and popovers have solid backgrounds; page content never shows through |
 | **No overlap, no touching** | No two text-bearing or interactive elements overlap; boxes may intersect only for an intended overlay (modal, drawer, toast, popover, a badge on a tile). Sibling cards and sections are separated by `--space-6`, form groups by `--space-4`, and a button row is followed by `--space-6`: two adjacent blocks with a gap of 0 are a defect |
 | **Controls render as designed** | A custom control (toggle, tile picker, segmented control, custom select) renders every part at its declared size and inside its container; no absolutely positioned part (a thumb, a check mark, a badge) overlaps the control's own label. Every `[role="switch"]`, `[role="radio"]` and `[role="tab"]` has a visible, non-collapsed visual and a hit area of at least 44 x 44 px |
@@ -23154,7 +23165,7 @@ footer p {
 | **States** | empty, loading, error, success flash, disabled, JavaScript off |
 | **Pass criteria** | No horizontal scroll; nothing clipped or overlapping; every target >= 44x44 px (below `md`; an `sm` control at `md` and up is at least 24x24 px); no empty or unlabeled control; no heading repeated; screenshot looks intentional at every viewport |
 
-Automated layout tests (headless browser at the viewports above) assert: `scrollWidth <= innerWidth`; no element's bounding box extends past the viewport; every `<select>` has options; every form control has a label; the open nav drawer covers the full viewport height and lists every nav link. The same run, on every registered page and error page, in dark and light, asserts: no overlap between text-bearing or interactive boxes outside the intended overlays; no zero gap between adjacent cards, sections or a button row and the next block; every custom control part (`.toggle-track`, tile, segmented option) has a non-zero rendered size and lies inside its container; no visible text matches the raw-key shape or a placeholder ("No raw keys or placeholders"); computed contrast of every text node against its effective background is at least 4.5:1 (3:1 for large text and UI parts), checked with the vendored axe-core script; every interactive element has a hit area of at least 44 x 44 px below `md` (24 x 24 px for an `sm` control at `md` and up); every component size (`sm`, `md`, `lg`, `xl`) of the gallery renders at its declared height; the browser console reports no error or warning; and the layout shift score stays below 0.1. These checks run in the same pure-Go chromedp harness as the browser E2E tests (PART 28, no Node toolchain): the test code lives in `tests/e2e/` behind the `e2e` build tag, the accessibility checks use a pinned `axe.min.js` vendored under `tests/e2e/vendor/` and injected with `chromedp.Evaluate`, and they run from `./tests/e2e.sh`, never from `make test`.
+Automated layout tests (headless browser at the viewports above) assert: `scrollWidth <= innerWidth`; no element's bounding box extends past the viewport (descendants clipped by an intentional horizontal scroll container such as `.table-wrapper` are excluded; the container itself and the document width are still checked); every `<select>` has options; every form control has a label; the open nav drawer covers the full viewport height and lists every nav link. The same run, on every registered page and error page, in dark and light, asserts: no overlap between text-bearing or interactive boxes outside the intended overlays; no zero gap between adjacent cards, sections or a button row and the next block; every custom control part (`.toggle-track`, tile, segmented option) has a non-zero rendered size and lies inside its container; no visible text matches the raw-key shape or a placeholder ("No raw keys or placeholders"); computed contrast of every text node against its effective background is at least 4.5:1 (3:1 for large text and UI parts), checked with the vendored axe-core script; every interactive element has a hit area of at least 44 x 44 px below `md` (24 x 24 px for an `sm` control at `md` and up); every component size (`sm`, `md`, `lg`, `xl`) of the gallery renders at its declared height; the browser console reports no error or warning; and the layout shift score stays below 0.1. These checks run in the same pure-Go chromedp harness as the browser E2E tests (PART 28, no Node toolchain): the test code lives in `tests/e2e/` behind the `e2e` build tag, the accessibility checks use a pinned `axe.min.js` vendored under `tests/e2e/vendor/` and injected with `chromedp.Evaluate`, and they run from `./tests/e2e.sh`, never from `make test`.
 
 ---
 
@@ -23211,7 +23222,7 @@ code {
 ```html
 <div class="code-block">
   <code class="code-content">abc123xyz789.onion</code>
-  <button type="button" class="copy-btn" data-copy="abc123xyz789.onion" data-copied-label="Copied!" aria-label="Copy to clipboard">
+  <button type="button" class="copy-btn" data-js-copy data-copy="abc123xyz789.onion" data-copied-label="Copied!" aria-label="Copy to clipboard">
     <span class="copy-icon">📋</span>
     <span class="copy-text" aria-live="polite">Copy</span>
   </button>
@@ -23293,7 +23304,7 @@ code {
 ```javascript
 // Copy button handler - every copy button MUST show visible "Copied!" feedback
 document.addEventListener('click', function(e) {
-  const btn = e.target.closest('.copy-btn');
+  const btn = e.target.closest('[data-js-copy]');
   if (!btn) return;
 
   const text = btn.dataset.copy || btn.previousElementSibling?.textContent;
@@ -23351,7 +23362,7 @@ document.addEventListener('click', function(e) {
 <div class="code-block-multi">
   <div class="code-header">
     <span class="code-lang">yaml</span>
-    <button type="button" class="copy-btn" data-copy-target="config-example">📋 Copy</button>
+    <button type="button" class="copy-btn" data-js-copy data-copy-target="config-example">📋 Copy</button>
   </div>
   <pre><code id="config-example">server:
   host: 0.0.0.0
@@ -23440,7 +23451,7 @@ document.addEventListener('click', function(e) {
 }
 
 .status-ok { background: var(--color-success-bg); color: var(--color-success); }
-.status-error { background: var(--color-error-bg); color: var(--color-error); }
+.status-error { background: var(--color-error-bg); color: var(--color-error-text); }
 .status-warning { background: var(--color-warning-bg); color: var(--color-warning); }
 
 .badge {
@@ -23455,7 +23466,7 @@ document.addEventListener('click', function(e) {
 /* Mode badges (badge-{mode} — see PART 13 healthz display rules) */
 .badge-production { background: var(--color-success-bg); color: var(--color-success); }
 .badge-development { background: var(--color-warning-bg); color: var(--color-warning); }
-.badge-debug { background: var(--color-error-bg); color: var(--color-error); }
+.badge-debug { background: var(--color-error-bg); color: var(--color-error-text); }
 
 @media (min-width: 768px) {
   .badge {
@@ -23482,7 +23493,7 @@ document.addEventListener('click', function(e) {
   <dd>
     <div class="code-block">
       <code class="code-content">abc123xyz789.onion</code>
-      <button class="copy-btn" data-copy="abc123xyz789.onion">📋</button>
+      <button class="copy-btn" data-js-copy data-copy="abc123xyz789.onion">📋</button>
     </div>
   </dd>
 </dl>
@@ -23627,7 +23638,7 @@ document.addEventListener('click', function(e) {
     <span class="status status-ok">✅ healthy</span>
     <div class="code-block">
       <code class="code-content">abc123xyz789.onion</code>
-      <button class="copy-btn" data-copy="abc123xyz789.onion">📋</button>
+      <button class="copy-btn" data-js-copy data-copy="abc123xyz789.onion">📋</button>
     </div>
   </li>
   <!-- I2P row mirrors Tor exactly — only rendered when features.i2p.enabled -->
@@ -23636,7 +23647,7 @@ document.addEventListener('click', function(e) {
     <span class="status status-ok">✅ healthy</span>
     <div class="code-block">
       <code class="code-content">abc123xyz789.b32.i2p</code>
-      <button class="copy-btn" data-copy="abc123xyz789.b32.i2p">📋</button>
+      <button class="copy-btn" data-js-copy data-copy="abc123xyz789.b32.i2p">📋</button>
     </div>
   </li>
   <li class="feature-disabled">📊 GeoIP</li>
@@ -23687,14 +23698,14 @@ document.addEventListener('click', function(e) {
   <li>
     <div class="code-block">
       <code class="code-content">https://node1.example.com</code>
-      <button class="copy-btn" data-copy="https://node1.example.com">📋</button>
+      <button class="copy-btn" data-js-copy data-copy="https://node1.example.com">📋</button>
     </div>
     <span class="badge badge-primary">👑 Primary</span>
   </li>
   <li>
     <div class="code-block">
       <code class="code-content">https://node2.example.com</code>
-      <button class="copy-btn" data-copy="https://node2.example.com">📋</button>
+      <button class="copy-btn" data-js-copy data-copy="https://node2.example.com">📋</button>
     </div>
     <span class="status status-ok">✅</span>
   </li>
@@ -23803,7 +23814,7 @@ No other stylesheet is written by hand: a project never adds a file per page. Th
 | Size | `.block-sm`, `.block-lg`, `.block-xl` (`md` is the default and has no class) | `.btn-lg`, `.input-sm` |
 | State | The native or ARIA state first: `:disabled`, `:checked`, `[aria-current="page"]`, `[aria-expanded="true"]`, `[aria-pressed="true"]`, `[aria-busy="true"]`, `[aria-invalid="true"]`; a state class (`.is-active`, `.is-loading`) only when no attribute exists | `.toggle input:checked + .toggle-track` |
 | Page hook | `.page-{name}` on `<body>` or `<main>`, with no styling of its own: `public.css` and `admin.css` may use it only for the documented placement properties ("Page placement"), and tests and anchors use it freely | `.page-preferences` |
-| JavaScript hook | `data-js-{name}` attribute, never a class | `data-js-copy` |
+| JavaScript hook | `data-js-{name}` attribute, never a class (a component that scripts attach to carries its own `data-js-{name}` next to its class: `.copy-btn` carries `data-js-copy`, and the listener selects `[data-js-copy]`) | `data-js-copy` |
 
 **Never:** an ID selector, a class named for its look (`.red`, `.big-box`), a class named for a spacing size (`.spacing-sm`: `sm` is a SIZE name, spacing helpers are numbered, see Utilities), a one-off class on one page, or a class that only one page uses.
 
@@ -23855,7 +23866,7 @@ No other stylesheet is written by hand: a project never adds a file per page. Th
 | Toggle | `.toggle`, `.toggle-track`, `.toggle-thumb`, `.toggle-label`, `.toggle-help` | none | `sm`, `lg` | `:checked`, `:disabled`, `:focus-visible` |
 | Check and radio | `.check`, `.check-box`, `.check-label` | none | none | `:checked`, `:indeterminate`, `:disabled` |
 | Tile (picker) | `.tile`, `.tile-icon`, `.tile-label` | none | `sm`, `lg`, `xl` | `[aria-checked]`, `:disabled` |
-| Badge | `.badge` | `-ok`, `-warning`, `-error`, `-info`, `-neutral` | `sm`, `lg` | none |
+| Badge | `.badge` | `-ok`, `-warning`, `-error`, `-info`, `-neutral`, `-production`, `-development`, `-debug` | `sm`, `lg` | none |
 | Alert | `.alert`, `.alert-title` | `-info`, `-success`, `-warning`, `-error` | none | none |
 | Toast | `.toast-container`, `.toast`, `.toast-icon`, `.toast-message`, `.toast-progress`, `.toast-close` | `-success`, `-info`, `-warning`, `-error` | none | `.toast-removing` (the exit animation, set by `app.js` just before the toast is removed) |
 | Modal, popover | `.modal`, `.modal-body`, `.modal-actions` on `<dialog>` or `[popover]` | none | none | `[open]`, `:popover-open` |
@@ -23876,7 +23887,7 @@ No other stylesheet is written by hand: a project never adds a file per page. Th
 |-------------------|------------------------------|------------|
 | Cookie banner | `.cookie-banner` (fixed at the bottom edge: `inset-inline: 0`, `inset-block-end: 0`, `z-index: var(--z-banner)`; one of the allowed fixed elements), `.cookie-banner-content`, `.cookie-message`, `.cookie-buttons`, `.policy-link`, `.btn-accept`, `.btn-decline` | Cookie banner section |
 | Navigation drawer | `.nav-panel`, `.nav-toggle`, `.nav-overlay`, `.nav-checkbox` | Navigation section |
-| Status | `.status-ok`, `.status-warning`, `.status-error`, `.status-banner`, `.status-text`, `.spinner` | Status and health sections |
+| Status | `.status`, `.status-ok`, `.status-info`, `.status-warning`, `.status-error`, `.status-neutral`, `.status-banner`, `.status-text`, `.spinner` | Status and health sections |
 | Code and copy | `.code-block`, `.copy-btn`, `.copy-icon`, `.copy-text`, `.copy-value`, `.long-string`, `.onion-address`, `.i2p-address`, `.monospace-data`, `.ip-address`, `.api-token`, `.hash` | Code block section |
 | Stats and lists | `.stats-grid`, `.feature-list`, `.feature-enabled`, `.feature-disabled`, `.node-list` | Landing and cluster sections |
 | Admin shell | `.topbar`, `.sidebar`, `.admin-footer`, `.dropdown-item`, `.notification-bell`, `.profile-menu`, `.avatar` | Admin panel section |
@@ -23988,7 +23999,8 @@ Use CSS custom properties for repeated or long strings. Never hardcode them inli
   --color-primary-bg: rgba(189, 147, 249, 0.15);
   --color-secondary: #50fa7b;
   --color-accent: #ff79c6;
-  --color-on-error: #ffffff;
+  --color-on-error: #282a36;
+  --color-error-text: #ff8080;
   --color-on-primary: #282a36;
   --color-overlay: rgba(0, 0, 0, 0.6);
 
@@ -24096,6 +24108,7 @@ html.theme-light {
   --color-secondary: #1a7f37;
   --color-accent: #8250df;
   --color-on-error: #ffffff;
+  --color-error-text: #d1242f;
   --color-on-primary: #ffffff;
   --color-overlay: rgba(0, 0, 0, 0.4);
 }
@@ -24406,6 +24419,7 @@ fetch('/api/save', { method: 'POST', body: data })
 | **Why `display: block` and `flex: 0 0`** | The track is a `<span>`: an inline span ignores `width` and `height`, so any rule that turns the label into a block (a generic `.form-group label { display: block }`) would collapse the track and draw the absolutely positioned thumb over the text. The track therefore sets its own `display`, and a generic form-label rule MUST exclude toggles (`label:not(.toggle)`) |
 | **Contrast** | The off-state track border is `--color-border-strong` (at least 3:1 against the card, WCAG 1.4.11) and the thumb contrasts with the track in both states; a track whose border equals its surface is a defect |
 | **Alignment** | The label and any description below it are start-aligned (never centered) and share one left edge with the page's other controls |
+| **Sizes** | `.toggle-sm` and `.toggle-lg` change the track height and the thumb only (`--size-sm` and `--size-lg` scale the height); the track is at least `2.5rem` wide at every size |
 | **Conformance test** | A browser test opens every page that contains a `.toggle` at 320, 768 and 1280 px and asserts that each `.toggle-track` renders at least `2.5rem x 1.5rem` and that its thumb lies inside it |
 
 ### Component State Matrix (REQUIRED)
@@ -25026,7 +25040,7 @@ textarea:user-invalid ~ .form-group-error {
 }
 
 .form-group-error {
-  color: var(--color-error);
+  color: var(--color-error-text);
   font-size: 0.875rem;
   margin-top: 0.25rem;
   display: block;
@@ -27547,13 +27561,13 @@ Without the script: Esc and overflow detection are unavailable, but the scrim, t
   padding-bottom: env(safe-area-inset-bottom);
   /* Opaque - page content must never show through */
   background: var(--color-bg);
-  /* Hidden with transform + visibility, NEVER a negative offset (it widens the page) */
-  transform: translateX(100%);
+  /* Hidden with clip-path + visibility, NEVER a negative offset or an off-canvas transform (both widen the document, at 320 px in Chromium too) */
+  clip-path: inset(0 0 0 100%);
   visibility: hidden;
-  transition: transform var(--duration-drawer) ease, visibility 0s linear var(--duration-drawer);
+  transition: clip-path var(--duration-drawer) ease, visibility 0s linear var(--duration-drawer);
   z-index: var(--z-drawer);
 }
-[dir="rtl"] .nav-panel { transform: translateX(-100%); }
+[dir="rtl"] .nav-panel { clip-path: inset(0 100% 0 0); }
 
 /* Overlay (hidden by default) */
 .nav-overlay {
@@ -27568,9 +27582,9 @@ Without the script: Esc and overflow detection are unavailable, but the scrim, t
 
 /* When checkbox is checked: show menu and overlay */
 .nav-checkbox:checked ~ .nav-panel {
-  transform: none;
+  clip-path: inset(0);
   visibility: visible;
-  transition: transform var(--duration-drawer) ease;
+  transition: clip-path var(--duration-drawer) ease;
 }
 
 .nav-checkbox:checked ~ .nav-overlay {
@@ -29193,7 +29207,7 @@ When `branding.content.footer` is set, the server logs at startup and on every r
 </footer>
 ```
 
-**No `<br />` spacers between rows** — rows are consecutive `<p>` elements; vertical rhythm comes from CSS (`footer p { margin: 0.25rem 0; }`), kept tight. Row order is fixed: onion address (Tor only) → page links → branding → last update. A disabled feature drops its row entirely without leaving a gap.
+**No `<br />` spacers between rows** — rows are consecutive `<p>` elements; vertical rhythm comes from CSS (`footer p { margin: 0.25rem 0; }`), kept tight. Row order is fixed: onion address (Tor only) → I2P address (I2P only) → page links → branding → last update. A disabled feature drops its row entirely without leaving a gap.
 
 ### Footer Configuration (config file)
 
@@ -31602,7 +31616,7 @@ server:
     # Catch-up window: run missed tasks if within this duration
     catch_up_window: 1h
 
-    # Built-in tasks: the schedule can be adjusted; the critical tasks ssl_renewal, session_cleanup and token_cleanup cannot be disabled (the same for every project); every other built-in can be disabled
+    # Built-in tasks: the schedule can be adjusted; the tasks marked `No` in the built-in task table cannot be disabled (the same for every project); every other built-in can be disabled
     tasks:
       # Daily at 03:00 (after backup at 02:00)
       ssl_renewal:
@@ -33458,7 +33472,7 @@ groups:
 {project_name} --maintenance backup test [file]
 ```
 
-`backup test` verifies a backup without touching live data: `file` defaults to the newest full backup in `{backup_dir}` (chosen by the UTC date in the file name, "Default archive selection") and also tests the daily and hourly incrementals when present, each together with its base: every file the next restore could use (incrementals have fixed names without a date, so they are tested when present, never "dated"). An encrypted backup asks for its password interactively exactly like restore (there is no password flag; without a terminal the command fails with a message that says so). It extracts into a temporary directory, verifies the manifest checksums, reports each result and removes the temporary directory.
+`backup test` verifies a backup without touching live data: `file` defaults to the newest full backup in `{backup_dir}` (chosen by the UTC date in the file name, "Default archive selection") and also tests the daily and hourly incrementals when present, each together with its base: every file the next restore could use (incrementals have fixed names without a date, so they are tested when present, never "dated"). An encrypted backup takes its password like restore: the `--password` flag when given, otherwise an interactive prompt (without a flag or a terminal the command fails with a message that says so). It extracts into a temporary directory, verifies the manifest checksums, reports each result and removes the temporary directory.
 
 ### Backup Contents
 
@@ -33475,6 +33489,8 @@ groups:
 | Connection TLS files | ✓ Always, when referenced | The files named by `tls_ca`, `tls_cert`, `tls_key` (cache), even without `--include-ssl`; only those files, not the whole `ssl/` directory ("Connection Strings") |
 | External TLS files | ✓ Always, when referenced | The files named by `server.ssl.cert` and `server.ssl.key` that lie OUTSIDE `{config_dir}/ssl/` (a manually supplied certificate), even without `--include-ssl`: only those two files, stored under `ssl-external/` in the archive. On restore they are written into `{config_dir}/ssl/` (the key with mode `0600`) and `server.ssl.cert` and `server.ssl.key` are rewritten to those paths, so the restored config never points at a file the archive lacks |
 | `{data_dir}/` | Optional | Data files (flag: `--include-data`) |
+
+**Remote restore and mismatched key material.** A restore into a remote database compares the archive's `installation_secret` and PGP fingerprint with the live remote rows. When they differ, the archive's secrets and `pgp.*` files are NOT installed (the live remote key material stays authoritative, because other nodes use it), the restore logs one `restore.key_material_kept` WARN naming the mismatch, and reports encrypted under the archived key stay unreadable unless the operator imports that key explicitly (`--maintenance pgp import`).
 
 **Remote database (libSQL/Turso driver):** the remote database itself is never part of a backup (its `app_secrets` rows are the one exception, exported as `app_secrets.json`), and that is neither an error nor a warning (a remote database is backed up by its own provider; the backup writes one `info` line naming the driver). On restore with a remote driver configured there is no `server.db` to restore: the archive's `app_secrets.json` is applied to the remote database ONLY when its `app_secrets` rows are absent (a new setup generates them exactly as at first start), and a remote database that already holds data is left untouched. An archive taken with the SQLite driver seeds an empty remote database from its `server.db`, exactly as a new setup initializes it.
 
@@ -36174,7 +36190,7 @@ All Docker builds use persistent Rust crate caching to avoid re-downloading depe
 1. Downloads Rust crates (cached)
 2. Runs tests inside Docker container (`casjaysdev/rust:latest`)
 3. Mounts project directory to `/app` (`-v $PWD:/app -w /app`)
-4. Runs every gate CI runs, first: `cargo fmt --check`, `clippy -D warnings`, `cargo audit`, `cargo deny check advisories`, and `shellcheck` plus `shfmt -d` on `tests/*.sh` (run in the Go image); then `cargo test`
+4. Runs every gate CI runs, first: `cargo fmt --check`, `clippy -D warnings`, `cargo audit`, `cargo deny check advisories`, and `shellcheck` plus `shfmt -d -i 2 -ci` on `tests/*.sh` (run in the Go image); then `cargo test`
 5. Tests all crates
 6. Container removed after completion (`--rm`)
 7. Then runs `./tests/run_tests.sh` (the basic tier of Phase 2): it builds the host-platform debug binaries and checks that the server starts without errors and that `--help`, `--version` and the CLI work
@@ -36598,7 +36614,7 @@ The Dockerfile stays clean: never add `LABEL` instructions. CI applies OCI label
 | Workflow `labels:` / `--label` flags | Per-platform image config | OCI labels on each image (docker inspect, tooling) |
 | Workflow `annotations:` | Manifest index | Registry display for multiarch pulls |
 
-**Apply annotations via `docker/metadata-action` in GitHub Actions:**
+**Apply annotations in GitHub Actions with either `docker/metadata-action` (shown here) or the explicit `annotations:` input of `docker/build-push-action` (used in the workflow examples); the required set of keys is the same:**
 
 ```yaml
 - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # v6.2.0
@@ -36893,6 +36909,8 @@ exec $APP_BIN --address "${LISTEN:-[::]}" $FLAGS "$@"
 | Layout order | `name:` → `x-logging` anchor → `services:` → environment map → `volumes:` → `ports:` → `healthcheck:` → `depends_on:` → `networks:` → top-level `networks:` block |
 
 ### Production Compose (`docker/docker-compose.yml`)
+
+The `valkey` service is in the example because the example project uses cache-backed features. A project that does not use them keeps the default `memory` cache or sets `server.cache.type: none`, and removes the `valkey` service and its cache variables: the cache service is never mandatory.
 
 App + Valkey for persistent session/rate-limit cache. No `DEBUG`/`MODE` vars — production always runs in strict production mode.
 
@@ -38387,6 +38405,10 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.licenses=MIT
+            maintainer={maintainer_name} <{maintainer_email}>
+            org.opencontainers.image.schema-version=${{ env.VERSION }}
+            org.opencontainers.image.vcs-type=Git
+            com.github.containers.toolbox=false
           annotations: |
             manifest:org.opencontainers.image.vendor={project_org}
             manifest:org.opencontainers.image.authors={project_org}
@@ -38400,6 +38422,10 @@ jobs:
             manifest:org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             manifest:org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
             manifest:org.opencontainers.image.licenses=MIT
+            manifest:maintainer={maintainer_name} <{maintainer_email}>
+            manifest:org.opencontainers.image.schema-version=${{ env.VERSION }}
+            manifest:org.opencontainers.image.vcs-type=Git
+            manifest:com.github.containers.toolbox=false
 
   build-devel:
     runs-on: ubuntu-26.04
@@ -38465,6 +38491,10 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.licenses=MIT
+            maintainer={maintainer_name} <{maintainer_email}>
+            org.opencontainers.image.schema-version=${{ env.VERSION }}
+            org.opencontainers.image.vcs-type=Git
+            com.github.containers.toolbox=false
           annotations: |
             manifest:org.opencontainers.image.vendor={project_org}
             manifest:org.opencontainers.image.authors={project_org}
@@ -38477,6 +38507,10 @@ jobs:
             manifest:org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             manifest:org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
             manifest:org.opencontainers.image.licenses=MIT
+            manifest:maintainer={maintainer_name} <{maintainer_email}>
+            manifest:org.opencontainers.image.schema-version=${{ env.VERSION }}
+            manifest:org.opencontainers.image.vcs-type=Git
+            manifest:com.github.containers.toolbox=false
 
 ```
 
@@ -39387,6 +39421,10 @@ jobs:
             org.opencontainers.image.source=${{ gitea.server_url }}/${{ gitea.repository }}
             org.opencontainers.image.documentation=${{ gitea.server_url }}/${{ gitea.repository }}
             org.opencontainers.image.licenses=MIT
+            maintainer={maintainer_name} <{maintainer_email}>
+            org.opencontainers.image.schema-version=${{ env.VERSION }}
+            org.opencontainers.image.vcs-type=Git
+            com.github.containers.toolbox=false
           annotations: |
             manifest:org.opencontainers.image.vendor={project_org}
             manifest:org.opencontainers.image.authors={project_org}
@@ -39400,6 +39438,10 @@ jobs:
             manifest:org.opencontainers.image.source=${{ gitea.server_url }}/${{ gitea.repository }}
             manifest:org.opencontainers.image.documentation=${{ gitea.server_url }}/${{ gitea.repository }}
             manifest:org.opencontainers.image.licenses=MIT
+            manifest:maintainer={maintainer_name} <{maintainer_email}>
+            manifest:org.opencontainers.image.schema-version=${{ env.VERSION }}
+            manifest:org.opencontainers.image.vcs-type=Git
+            manifest:com.github.containers.toolbox=false
 
   build-devel:
     runs-on: ubuntu-26.04
@@ -39474,6 +39516,10 @@ jobs:
             org.opencontainers.image.source=${{ gitea.server_url }}/${{ gitea.repository }}
             org.opencontainers.image.documentation=${{ gitea.server_url }}/${{ gitea.repository }}
             org.opencontainers.image.licenses=MIT
+            maintainer={maintainer_name} <{maintainer_email}>
+            org.opencontainers.image.schema-version=${{ env.VERSION }}
+            org.opencontainers.image.vcs-type=Git
+            com.github.containers.toolbox=false
           annotations: |
             manifest:org.opencontainers.image.vendor={project_org}
             manifest:org.opencontainers.image.authors={project_org}
@@ -39486,6 +39532,10 @@ jobs:
             manifest:org.opencontainers.image.source=${{ gitea.server_url }}/${{ gitea.repository }}
             manifest:org.opencontainers.image.documentation=${{ gitea.server_url }}/${{ gitea.repository }}
             manifest:org.opencontainers.image.licenses=MIT
+            manifest:maintainer={maintainer_name} <{maintainer_email}>
+            manifest:org.opencontainers.image.schema-version=${{ env.VERSION }}
+            manifest:org.opencontainers.image.vcs-type=Git
+            manifest:com.github.containers.toolbox=false
 
 ```
 
@@ -41988,10 +42038,10 @@ verify_all_endpoints_tested
 
 **Test Execution Order:**
 ```bash
-# Rust unit tests (fast)
+# Gates, unit tests and the basic binary tier (Docker only): make test already runs ./tests/run_tests.sh
 1. make test
-# Basic integration tier (Docker only; ./tests/incus.sh is the explicit full-app check)
-2. ./tests/run_tests.sh
+# Explicit full-app check, run by the developer (Incus preferred)
+2. ./tests/incus.sh
 ```
 
 ### Integration Testing Strategy
@@ -42081,7 +42131,7 @@ fi
 
 ### Test Scripts (tests/ directory)
 
-**ALL projects MUST have these test scripts in `tests/` directory:**
+**ALL projects MUST have these test scripts in `tests/` directory (`tests/virt.sh` is OPTIONAL: only a project that needs clean-OS VM testing has it):**
 
 **Definition:** Everywhere in this specification, `./tests/*` means executable shell scripts under the repository-root `tests/` directory. It does **not** refer to Rust `#[cfg(test)]` blocks.
 
@@ -42094,7 +42144,7 @@ fi
 
 **docker.sh and incus.sh MUST:**
 1. Host cache dirs (`CARGO_CACHE`/`RUSTUP_CACHE`/`SCCACHE_CACHE`/`CARGO_TARGET`) provide persistent Rust cache across builds
-2. Build the host-platform debug binaries: `tests/docker.sh` builds them directly with the toolchain container (casjaysdev/rust:latest, the same debug profile as `make build`) in the temp directory; `tests/incus.sh` and `tests/virt.sh` call `make build` once (every platform, debug) and use the binary of the host architecture. No test script ever adds a Makefile target:
+2. Build the host-platform debug binaries directly with the toolchain container (casjaysdev/rust:latest, the same debug profile as `make build`) in the temp directory; no test script calls `make build` (it builds every platform) or adds a Makefile target:
    - Server (`./src`)
    - Client (`./src/client`) if exists
 3. Install test tools in container (Docker: `apk add --no-cache curl bash file jq tor i2pd tzdata ca-certificates`)
@@ -42823,7 +42873,14 @@ detect_backend
 PROJECT_NAME=$(basename "$PWD")
 # The build output directory is the Makefile's BINDIR (default binaries)
 BIN_DIR="${BINDIR:-binaries}"
-make build BINDIR="$BIN_DIR"
+CARGO_CACHE="${CARGO_CACHE:-$HOME/.cargo}"
+RUSTUP_CACHE="${RUSTUP_CACHE:-$HOME/.rustup}"
+CARGO_TARGET="${CARGO_TARGET:-$HOME/.cache/cargo-target/${PROJECT_NAME}}"
+mkdir -p "$CARGO_CACHE" "$RUSTUP_CACHE" "$CARGO_TARGET" "$BIN_DIR"
+docker run --rm --name "${PROJECT_NAME}-$(head -c6 /dev/urandom | od -An -tx1 | tr -d ' \n' | cut -c1-8)" \
+  -v "$PWD:/app" -v "$CARGO_CACHE:/usr/local/share/cargo" -v "$RUSTUP_CACHE:/usr/local/share/rustup" -v "$CARGO_TARGET:/app/target" \
+  -w /app casjaysdev/rust:latest cargo build
+cp "$CARGO_TARGET/debug/${PROJECT_NAME}" "$BIN_DIR/${PROJECT_NAME}"
 VM_PREFIX="${PROJECT_NAME}-$(head -c6 /dev/urandom | od -An -tx1 | tr -d ' \n' | cut -c1-8)"
 VMS=()
 
@@ -46550,7 +46607,7 @@ impl TorService {
 | Child exits before port file | `try_wait` | Fail immediately with the exit status (bad torrc, port in use, `DataDirectory` locked) |
 | `515 Authentication failed` | Step 3 reply | Cookie unreadable or stale: kill child, delete `control_auth_cookie`, restart once; second failure = WARN |
 | `DataDirectory` lock held | Child exits at once | Another Tor uses this dir: kill only the PID in `{data_dir}/tor/tor.pid` if it is a `tor` process we started, then restart once |
-| Bootstrap timeout | Step 4 timeout | Kill child, WARN `Tor bootstrap timeout, hidden service unavailable`, retry per Restart rules |
+| Bootstrap timeout | Step 4 timeout | Kill child, WARN `Tor bootstrap timeout, hidden service unavailable`; no immediate retry: a bootstrap timeout is not a restart trigger, so Tor stays `unavailable` until the next trigger in "Restart rules" (a crash exit or a `server.tor.*` change) or a server restart |
 | `hostname` missing after bootstrap | Step 5 timeout | Kill child, WARN; check `HiddenServiceDir` mode `0700` and ownership |
 | Control connection drops at runtime | Read error | WARN `Tor control connection lost, restarting` (existing Restart rules) |
 
@@ -47205,7 +47262,7 @@ pub fn enforce_private(_path: &std::path::Path, _mode: u32) -> anyhow::Result<()
 
 - **"No REST API for Tor configuration" means no *public* REST API** — nothing under `/server/tor/*` is documented, versioned, advertised in `FeaturesInfo`, or reachable through `/api/{api_version}/**`. It is exactly as internal as `/server/metrics`, just without the bearer-token requirement (Tor control has no legitimate remote caller — the CLI always runs on the same host as the server).
 - **Loopback-gated, not public-gated**: handlers only accept requests whose immediate TCP peer is `127.0.0.1`/`::1` — same "trusted" address set as PART 12 → "Trusted Proxies". A request arriving from any other address is rejected (404, not 403 — the endpoint must not be discoverable).
-- **CLI resolution of the server's port**: identical to how `--status` locates the running server (PID file under `{data_dir}` + the configured bind port from `server.yml`/env) — no new discovery mechanism is introduced.
+- **CLI resolution of the server's port**: identical to how `--status` locates the running server (the PID file `{pid_file}` of PART 3, native installs only, plus the configured bind port from `server.yml`/env; a containerized server writes no PID file, so the CLI probes `/server/healthz` on the configured bind address instead) — no new discovery mechanism is introduced.
 - **No running server**: `tor restart`/`regenerate`/`vanity start`/`vanity stop`/`vanity apply`/`import-keys` all require a live server (they mutate a process Tor owns); if no server is detected, exit 1 with `Error: no running server detected — start the server first`. `tor status`/`tor validate` MAY fall back to reading on-disk state (`{data_dir}/tor/site/hostname`, `{config_dir}/tor/torrc`) directly when no server is running, since those two are read-only.
 
 ### Control Endpoint Contracts
@@ -52604,7 +52661,7 @@ make docker
 - [ ] GraphQL endpoint accessible
 - [ ] GraphiQL/Playground available
 - [ ] Schema matches REST API capabilities
-- [ ] Authentication integrated
+- [ ] Public and read-only: no authentication (the schema exposes only public data; operator and owner data is REST-only)
 - [ ] Query complexity limits
 - [ ] Introspection disabled in production (optional)
 - [ ] Theme matches project theme
@@ -53571,7 +53628,7 @@ Implement the required client, then any project-specific optional features:
 
 - [ ] Docker builds successfully
 - [ ] Docker Compose files work (prod, dev, test)
-- [ ] `docker/Dockerfile.build` does NOT exist — Rust projects always use `casjaysdev/rust:latest` directly; no custom toolchain image is ever needed
+- [ ] `docker/Dockerfile.build` does NOT exist by default — Rust projects use `casjaysdev/rust:latest` directly; it exists only for a genuine custom need the image cannot satisfy, and then it is `FROM casjaysdev/rust:latest`
 - [ ] `ci.yml` and `release.yml` use `container: image: casjaysdev/rust:latest` — no `ensure-build-image` pre-flight, no `build-toolchain.yml`
 - [ ] CI/CD workflows configured
 - [ ] Automated builds work
