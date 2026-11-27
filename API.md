@@ -2636,7 +2636,7 @@ Before I proceed, can you confirm [specific question]?
 8. If a Claude loader file exists but is not in the standard loader format: migrate project-specific content to IDEA.md, then merge remaining valid loader guidance into the efficient loader structure - NEVER overwrite blindly
 9. If TODO.AI.md or TODO.md exists: read both and check for needed updates (treat both files the same; never delete or empty the human-owned TODO.md)
 10. Read `.claude/memory/MEMORY.md` (if non-empty) and load referenced files as needed
-11. Commit all COMMIT, NEVER, and MUST rules to memory
+11. Commit all COMMIT, NEVER, and MUST rules to the assistant's own session memory (never into `.claude/memory/`, which holds project history and never duplicates `AI.md` or `.claude/rules/`)
 ```
 
 **Rule Files to Create/Update:**
@@ -7289,7 +7289,7 @@ pub fn safe_resource_path(input: &str) -> Result<String, PathError> {
 }
 ```
 
-**Two validation contracts, never one.** `safe_path` is for configured identifiers and URL prefixes (`admin_path`, base paths): lowercase `[a-z0-9_-]` segments only, so it correctly rejects a dot. `safe_resource_path` is for file and resource names that legitimately carry dots and case (`/static/css/main.css`, `/robots.txt`, an API `file` parameter). The HTTP path middleware checks only traversal and encoding of the request path and applies neither contract. Every use of user input as a file name goes through `safe_resource_path`, then `safe_file_path`'s base-directory check.
+**Two validation contracts, never one.** `safe_path` is for configured identifiers and URL prefixes (base paths and other configured identifiers): lowercase `[a-z0-9_-]` segments only, so it correctly rejects a dot. `safe_resource_path` is for file and resource names that legitimately carry dots and case (`/static/css/main.css`, `/robots.txt`, an API `file` parameter). The HTTP path middleware checks only traversal and encoding of the request path and applies neither contract. Every use of user input as a file name goes through `safe_resource_path`, then `safe_file_path`'s base-directory check.
 
 ### Normalization Examples
 
@@ -11256,7 +11256,7 @@ PHASE 5: Server startup (actual server start)
     ├─ Load task state from database
     ├─ Register built-in tasks (key tasks):
     │   ├─ backup_daily (02:00 daily)
-    │   ├─ ssl_renewal (03:00 daily)
+    │   ├─ ssl_renewal (daily, default 03:00; `server.scheduler.tasks.ssl_renewal.schedule`)
     │   ├─ token_cleanup (every 15m)
     │   ├─ geoip_update (03:00 Sunday)
     │   ├─ public_ip_refresh (startup + every 12h, hardcoded)
@@ -15868,7 +15868,7 @@ web:
 | Rate limiting, audit | The same limiters and audit events as the API; the audit entry's top-level `source` field (PART 11 → "Audit Log Format") is `mcp` so MCP traffic is distinguishable |
 | Owner and linked tokens | Owner tokens exist in EVERY project (PART 8 → "API Token Model") and every caller can obtain one: on a first resource creation, or on request from `/server/preferences/tokens` or `POST /api/{api_version}/server/preferences/tokens/primary`, so every MCP client can always hold the credential MCP requires. Owner and linked tokens both work as the Bearer token. A tool call sees exactly what the token's owner owns and runs the API's ownership check. **A linked token is the intended credential for MCP clients**: create one named for the client on `/server/preferences/tokens`; it is revoked, rotated and expired on its own, rotating it never changes the primary or the other linked tokens, and rotating the primary never changes the linked tokens |
 | Operator token | `server.token` works as Bearer and sees operator-only tools; for any other caller those tools are absent from `tools/list` AND rejected on `tools/call` |
-| MCP clients | Give each MCP client its own linked token (never the primary, never `server.token` — that is full operator access). The tiers: the operator token (`server.token`) IS accepted by MCP and also sees the operator-only tools; an owner or linked token sees every tool its scope may call and never an operator-only one. A standing MCP client uses a linked token; the operator token is for the operator's own tooling. |
+| MCP clients | Give each standing MCP client its own linked token (never the primary token). The operator may use the operator token (`server.token`) for their own MCP tooling: it is full operator access, so it is shown with that warning and stays out of shared or third-party clients. The tiers: the operator token (`server.token`) IS accepted by MCP and also sees the operator-only tools; an owner or linked token sees every tool its scope may call and never an operator-only one. A standing MCP client uses a linked token; the operator token is for the operator's own tooling. |
 | Token management | **Never exposed as tools.** Reveal, rotate, create, revoke and restore of tokens exist only on `/server/preferences/tokens` and its API mirror, never over MCP |
 | Token issuance | **Never a tool.** A new owner and its token are issued only by the REST API or the web form, never inside a tool result: tool results enter the model's context and the provider's logs. An MCP client always starts from a token it was given |
 
@@ -22422,7 +22422,7 @@ at the appropriate level — a healthy server prints nothing.
 
 | Directory | Check Frequency | Renewal Trigger |
 |-----------|-----------------|-----------------|
-| `{config_dir}/ssl/letsencrypt/{fqdn}/` | Daily (03:00) | When 30 days or fewer remain (fixed) |
+| `{config_dir}/ssl/letsencrypt/{fqdn}/` | Daily (default 03:00; `server.scheduler.tasks.ssl_renewal.schedule`) | When 30 days or fewer remain (fixed) |
 | `{config_dir}/ssl/local/{fqdn}/` | Never | Manual only |
 | `/etc/letsencrypt/live/**` | Never | System (certbot) manages |
 
@@ -24057,7 +24057,7 @@ html.theme-light {
 |-------|-------|-------|
 | `reset` | Box sizing, margin and padding reset | Nothing visual |
 | `tokens` | The `:root` custom properties (colors, spacing, radius, type) | The only place a literal color or size is written |
-| `base` | Bare element selectors (`body`, `a`, `h1`..`h6`, `label`, `input`) | Typography, color and spacing of plain elements only; never the layout or internals of a component |
+| `base` | Bare element selectors (`body`, `a`, `h1`..`h6`, `label`, `input`) | Typography, color and spacing of plain elements, plus the one page-shell rule (`body` as a column flex container with `min-height: 100dvh`, `main { flex: 1 }`); never the layout or internals of a component |
 | `components` | Every shared component (`.btn`, `.section-card`, `.form-group`, `.toggle`, `.hub-list`, `.badge`, `.table-wrapper`) | Class selectors only, specificity at most `(0,4,1)` (a state selector such as `.toggle input:checked + .toggle-track` is allowed), self-contained: a component sets its own `display`, size and alignment and never relies on its parent for them. A descendant selector on a generic parent (`.form-group label`) is forbidden: write `.form-group-label` or `label:not(.toggle)` |
 | `pages` | Page-specific placement | Grid placement and spacing of shared components through their documented custom properties (`--toggle-size`); a page never restyles a component's internals and never invents a styled class (see "Classes" in the page shell rules) |
 | `utilities` | Single-purpose helpers (`.visually-hidden`, `.text-start`, `.stack-4`) | Win over every other layer; one declaration each |
@@ -28934,10 +28934,7 @@ server:
   csrf:
     # default: true. Set false ONLY for API-only deployments (no browser forms at all).
     enabled: true
-    # bytes
-    token_length: 32
-    cookie_name: csrf_token
-    header_name: X-CSRF-Token
+    # token size, cookie name and header name are fixed and not configurable
     # auto | true | false. "auto" sets Secure when proto is https.
     secure: auto
     # Frontend (non-/api) endpoints exempt from CSRF (operator-declared). Glob patterns supported.
@@ -30499,7 +30496,7 @@ curl -H "Accept: application/xml" https://jokes.example.com/api/v1/joke</code></
 |--------|---------|---------|
 | `#overview` | What this is | One short paragraph: this application is an MCP server over Streamable HTTP (remote only); every API operation the project defines, authenticated create, read, update and delete included, is available to an assistant as a tool; every request carries a token, and the token decides which ones it sees |
 | `#endpoint` | Endpoint | The full MCP URL resolved for this request (PART 8 → "Resolution Order", never hardcoded) with the two aliases (`/api/mcp`, `/mcp`) and a copy control; the URL text uses CSS `user-select: all` so it works without JS |
-| `#authentication` | Authentication | Requests authenticate with `Authorization: Bearer {token}` — the same tokens as the REST API, no MCP-specific token. A token is required for every MCP request and there is no anonymous MCP access (the REST API itself works without one). Use a **linked token** created for this client on `/server/preferences/tokens` (named for the client, revocable alone). Never the primary token and never the operator token (`server.token`). |
+| `#authentication` | Authentication | Requests authenticate with `Authorization: Bearer {token}` — the same tokens as the REST API, no MCP-specific token. A token is required for every MCP request and there is no anonymous MCP access (the REST API itself works without one). Use a **linked token** created for this client on `/server/preferences/tokens` (named for the client, revocable alone). Never the primary token. Standing integrations use a linked token; the operator may use the operator token (`server.token`) for their own MCP tooling, which gives full operator access, so keep it out of shared or third-party clients. |
 | `#connect` | Connect a client | Copy-paste snippets using the resolved URL and the project name: a Claude Code command (`claude mcp add --transport http {project_name} {url} --header "Authorization: Bearer $MCP_TOKEN"`), a generic JSON client config (`mcpServers` with `type`, `url`, `headers`), and a `curl` `tools/list` request that verifies the connection (the endpoint has no `initialize` handshake: the request carries the Bearer token, `MCP-Protocol-Version: 2026-07-28` and `Mcp-Method: tools/list`, built exactly as "MCP Endpoint" defines). The token is the only value the page cannot know, so it appears as the shell variable `$MCP_TOKEN` — no other placeholders |
 | `#tools` | Tools | The live tool list a standard, non-operator token sees (name and description from the same registry that backs `tools/list`) — never hand-written. When the operator token sees more tools, say so |
 | `#limits` | Behavior and limits | `POST` only; no sessions; the same rate limits and audit as the API; `Origin` validated; the supported MCP protocol versions |
@@ -32036,7 +32033,7 @@ it in a compliance-sensitive form.
 | Service | Content-Type | Body |
 |---------|--------------|------|
 | `prometheus` | `text/plain; version=0.0.4` | Full Prometheus text exposition — all required + project metrics |
-| `grafana` | `application/json` | A complete, importable Grafana dashboard definition (Classic dashboard-model JSON: every Grafana version imports it and upgrades it to its own schema) with panels covering every metric category this specification requires (HTTP, database, cache, scheduler, system, business); datasource left as a template variable so it imports against any Prometheus datasource |
+| `grafana` | `application/json` | A complete, importable Grafana dashboard definition (Classic dashboard-model JSON for Grafana 12.0 and newer: `schemaVersion` 42 and `timeseries` panels; older Grafana versions are not supported) with panels covering every metric category this specification requires (HTTP, database, cache, scheduler, system, business); datasource left as a template variable so it imports against any Prometheus datasource |
 | `loki` | `application/json` | Recent structured log entries in Loki push-API stream format: `{"streams":[{"stream":{labels},"values":[["<ns-timestamp>","<line>"],...]}]}` — bounded by `loki.max_entries`/`loki.max_age`, same sanitization as log files (credentials ALWAYS redacted) |
 
 ## Access Control
