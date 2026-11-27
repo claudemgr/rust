@@ -20000,9 +20000,9 @@ pub async fn handler(
   margin: 0 auto;
 }
 
-@media (min-width: 720px) {
+@media (min-width: 768px) { /* md */
   .container {
-    width: 98%;
+    width: 95%;
   }
 }
 ⏎
@@ -20860,7 +20860,7 @@ See the **"Themes (NON-NEGOTIABLE - PROJECT-WIDE)"** section for the complete th
 
 .graphiql-container.theme-dark .CodeMirror-gutters {
   background: #21222c;
-  border-right: 1px solid #44475a;
+  border-inline-end: 1px solid #44475a;
 }
 
 .graphiql-container.theme-dark .result-window {
@@ -20987,7 +20987,7 @@ See the **"Themes (NON-NEGOTIABLE - PROJECT-WIDE)"** section for the complete th
 
 .graphiql-container.theme-light .CodeMirror-gutters {
   background: #f6f8fa;
-  border-right: 1px solid #d1d9e0;
+  border-inline-end: 1px solid #d1d9e0;
 }
 
 .graphiql-container.theme-light .result-window {
@@ -22933,9 +22933,14 @@ fi
   --icon-xl: 2rem;
 }
 .btn { min-height: var(--control-height, var(--size-md)); }
-.btn-sm { --control-height: var(--size-sm); }
+.btn-sm { --control-height: var(--size-md); }
 .btn-lg { --control-height: var(--size-lg); }
 .btn-xl { --control-height: var(--size-xl); }
+
+/* sm: the touch-target size below md, the compact size from md up */
+@media (min-width: 768px) {
+  .btn-sm { --control-height: var(--size-sm); }
+}
 ```
 
 | Name | Control height | Icon | Used for |
@@ -22948,7 +22953,7 @@ fi
 | Rule | Detail |
 |------|--------|
 | **Which components** | Button (`.btn-sm`, `.btn-lg`, `.btn-xl`), input and select (`.input-sm`, `.input-lg`), toggle (`.toggle-sm`, `.toggle-lg`), badge (`.badge-sm`, `.badge-lg`), tile (`.tile-sm`, `.tile-lg`, `.tile-xl`), icon (`.icon-sm` to `.icon-xl`). A component without a size simply has none; a project never invents another size name |
-| **Touch targets** | Below `md` every interactive control has a hit area of at least 44 x 44 px, so `sm` controls are `md` there (`@media (max-width: 767px) { .btn-sm { --control-height: var(--size-md); } }` is written once per component, in the component's own block). At `md` and up an `sm` control may be 2 rem tall and is never below 24 x 24 px (WCAG 2.5.8) |
+| **Touch targets** | Below `md` every interactive control has a hit area of at least 44 x 44 px, so `sm` controls are `md` there: the base rule of each sized component sets `--control-height: var(--size-md)` for `-sm`, and the component's own block restores `--size-sm` under the named query `@media (min-width: 768px) /* md */ { .btn-sm { --control-height: var(--size-sm); } }`, so no `max-width` query is ever written. At `md` and up an `sm` control may be 2 rem tall and is never below 24 x 24 px (WCAG 2.5.8) |
 | **Sizes never mix in a group** | Buttons in one row, inputs in one form row and tiles in one grid share one size |
 | **Responsive size** | A size change with the viewport goes through the named breakpoints or the container (a page's main action is `lg` from `md` up, never a one-off `font-size` and `padding`) |
 | **One text scale** | Text sizes are the `--font-size-xs` to `--font-size-4xl` tokens; a component size never changes the type scale of the page |
@@ -22960,16 +22965,16 @@ fi
 /* Mobile-first container */
 .container {
   width: 100%;
-  padding-left: 1rem;
-  padding-right: 1rem;
+  padding-inline-start: 1rem;
+  padding-inline-end: 1rem;
   margin: 0 auto;
 }
 
 @media (min-width: 768px) {
   .container {
     width: 90%;
-    padding-left: 0;
-    padding-right: 0;
+    padding-inline-start: 0;
+    padding-inline-end: 0;
     max-width: 1400px;
   }
 }
@@ -23538,7 +23543,7 @@ document.addEventListener('click', function(e) {
 .data-table td {
   padding: 0.5rem;
   border-bottom: 1px solid var(--color-border);
-  text-align: left;
+  text-align: start;
   white-space: nowrap;
 }
 
@@ -23839,6 +23844,27 @@ No other stylesheet exists: a project never adds a file per page. The HTML links
 | Site banner | `.site-banner` | `-info`, `-warning`, `-error`, `-success` | none | none |
 | Icon | `.icon` | none | `sm`, `lg`, `xl` | none |
 
+### Feature components and exempt CSS
+
+**The catalog above lists the shared components. Feature components are defined in the section that specifies the feature and live in `components.css` under the same naming rules (`.block`, `.block-element`, `.block--modifier`, sizes `-sm`/`-lg`/`-xl`); they use only tokens, logical properties and the named breakpoints, and get a `/debug/components` entry like any catalog component.**
+
+| Feature component | Classes (block and elements) | Defined in |
+|-------------------|------------------------------|------------|
+| Cookie banner | `.cookie-banner`, `.btn-accept`, `.btn-decline` | Cookie banner section |
+| Navigation drawer | `.nav-panel`, `.nav-toggle`, `.nav-overlay`, `.nav-checkbox` | Navigation section |
+| Status | `.status-ok`, `.status-warning`, `.status-error`, `.status-banner` | Status and health sections |
+| Code and copy | `.code-block`, `.copy-btn`, `.long-string`, `.ip-address`, `.api-token`, `.hash` | Code block section |
+| Stats and lists | `.stats-grid`, `.feature-list`, `.feature-enabled`, `.node-list` | Landing and cluster sections |
+| Admin shell | `.topbar`, `.sidebar`, `.admin-footer`, `.dropdown-item`, `.notification-bell`, `.profile-menu`, `.avatar` | Admin panel section |
+| Form feedback | `.field-error` | Form sections |
+| Skip link | `.skip-link` | Accessibility section |
+
+**Exempt from the class, token and lint rules of this section:**
+
+- Third-party theme CSS shown as an illustration (`.md-typeset`, `.swagger-ui`, `.opblock`, `.admonition`, `.graphiql-container`, CodeMirror). Its own palette is mapped from the project tokens; it never adds a second palette.
+- Examples labelled `WRONG`, which exist to show what the lint rejects (for example `.my-export-btn`). They are never copied into a stylesheet.
+- Component custom properties with a fallback (`--cluster-gap`, `--control-height`, `--grid-min`, `--stack-gap`, `--toast-duration`); they are set by the component, not defined in `:root`.
+
 ### Themes, direction, motion and contrast
 
 | Topic | Rule |
@@ -23905,6 +23931,8 @@ Use CSS custom properties for repeated or long strings. Never hardcode them inli
   --color-secondary: #50fa7b;
   --color-accent: #ff79c6;
   --color-on-error: #ffffff;
+  --color-on-primary: #282a36;
+  --color-overlay: rgba(0, 0, 0, 0.6);
 
   /* Typography (font families defined in "CSS — Font Family Variables" above) */
   --font-size-xs:   0.75rem;
@@ -24010,6 +24038,8 @@ html.theme-light {
   --color-secondary: #1a7f37;
   --color-accent: #8250df;
   --color-on-error: #ffffff;
+  --color-on-primary: #ffffff;
+  --color-overlay: rgba(0, 0, 0, 0.4);
 }
 ```
 
@@ -24074,10 +24104,11 @@ Before writing CSS for any element, check whether an existing class (`.btn`, `.b
 .domain-status-badge {
   background: var(--color-success-bg);
   color: var(--color-success);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 0.75rem;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding-block: var(--space-1);
+  padding-inline: var(--space-2);
+  font-size: var(--font-size-xs);
 }
 ```
 
@@ -24299,14 +24330,15 @@ fetch('/api/save', { method: 'POST', body: data })
 .toggle input:checked + .toggle-track { background: var(--color-primary); border-color: var(--color-primary); }
 .toggle-thumb {
   position: absolute;
-  top: 2px; left: 2px;
+  inset-block-start: 2px; inset-inline-start: 2px;
   width: calc(1.5rem - 6px);
   height: calc(1.5rem - 6px);
   background: var(--color-text);
   border-radius: var(--radius-full);
   transition: transform var(--transition-fast);
 }
-.toggle input:checked + .toggle-track .toggle-thumb { transform: translateX(1rem); background: var(--color-on-error); }
+.toggle input:checked + .toggle-track .toggle-thumb { transform: translateX(1rem); background: var(--color-on-primary); }
+[dir="rtl"] .toggle input:checked + .toggle-track .toggle-thumb { transform: translateX(-1rem); }
 .toggle input:focus-visible + .toggle-track { box-shadow: var(--focus-ring-offset); }
 .toggle-label { flex: 1; }
 ```
@@ -24534,17 +24566,17 @@ function deleteItem(itemId) {
 
 **Toast Container (for stacking):**
 ```html
-<div id="toast-container" aria-label="Notifications">
+<div id="toast-container" class="toast-container" aria-label="Notifications">
   <!-- Toasts inserted here, newest first -->
 </div>
 ```
 
 **CSS for Stacking:**
 ```css
-#toast-container {
+.toast-container {
   position: fixed;
   top: 1rem;
-  right: 1rem;
+  inset-inline-end: 1rem;
   z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
@@ -24569,9 +24601,10 @@ function deleteItem(itemId) {
 .toast-progress {
   position: absolute;
   bottom: 0;
-  left: 0;
+  inset-inline-start: 0;
   height: 3px;
-  background: rgba(255,255,255,0.5);
+  background: currentColor;
+  opacity: 0.5;
   animation: countdown linear forwards;
 }
 
@@ -24685,12 +24718,12 @@ The server only renders banners whose `id` is absent from the `dismissed_announc
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
   background: var(--color-info-bg);
-  color: var(--color-info-text);
+  color: var(--color-text);
 }
 
 .site-banner-warning, .site-banner-error {
   background: var(--color-warning-bg);
-  color: var(--color-warning-text);
+  color: var(--color-text);
 }
 
 .site-banner-text {
@@ -25036,7 +25069,7 @@ document.querySelectorAll('.form-group input, .form-group select, .form-group te
 .skip-link {
   position: absolute;
   top: var(--space-4);
-  left: var(--space-4);
+  inset-inline-start: var(--space-4);
   z-index: var(--z-tooltip);
   padding: var(--space-2) var(--space-4);
   background: var(--color-primary);
@@ -27467,7 +27500,7 @@ Without the script: Esc and overflow detection are unavailable, but the scrim, t
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-overlay);
   z-index: var(--z-overlay);
   cursor: pointer;
 }
@@ -27576,7 +27609,7 @@ main {
   a[href^="http"]:after {
     content: " (" attr(href) ")";
     font-size: 0.8em;
-    color: #666;
+    color: GrayText;
   }
 
   /* Avoid page breaks inside elements */
@@ -29383,12 +29416,12 @@ initCCPA();
 .cookie-banner {
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
+  inset-inline-start: 0;
+  inset-inline-end: 0;
   width: 100%;
-  /* Purple/magenta - or var(--accent-color) */
-  background: #7c5295;
-  color: #ffffff;
+  background: var(--color-bg-card);
+  color: var(--color-text);
+  border-block-start: var(--border-width) solid var(--color-border-strong);
   z-index: var(--z-banner);
 }
 
@@ -29439,9 +29472,9 @@ initCCPA();
 }
 
 .cookie-banner .btn-accept {
-  background: #ffffff;
+  background: var(--color-primary);
   border: none;
-  color: #7c5295;
+  color: var(--color-on-primary);
   padding: 0.625rem 1.5rem;
   cursor: pointer;
   font-size: 0.9rem;
@@ -29453,7 +29486,7 @@ initCCPA();
 }
 
 /* Desktop: side-by-side layout */
-@media (min-width: 601px) {
+@media (min-width: 640px) { /* sm */
   .cookie-banner-content {
     flex-direction: row;
     padding: 0.875rem 1.5rem;
@@ -45311,11 +45344,11 @@ no separate Makefile target is needed.
 ```css
 /* Use logical properties */
 .element {
-  /* Not margin-left */
+  /* Not margin-inline-start */
   margin-inline-start: 1rem;
-  /* Not padding-right */
+  /* Not padding-inline-end */
   padding-inline-end: 1rem;
-  /* Not text-align: left */
+  /* Not text-align: start */
   text-align: start;
 }
 
@@ -45439,7 +45472,7 @@ server:
 .skip-link {
   position: absolute;
   top: -40px;
-  left: 0;
+  inset-inline-start: 0;
   background: var(--color-primary);
   color: white;
   padding: 8px 16px;
