@@ -1217,7 +1217,7 @@ Debug endpoints are ONLY available when the debug flag is set; otherwise they re
 | `/debug/db` | GET | Database statistics |
 | `/debug/scheduler` | GET | Scheduler task status |
 | `/debug/error500` | GET | Deterministic 500 through the normal error renderer (the E2E suite's trigger for the themed 500 page) |
-| `/debug/components` | GET | Component gallery: every shared component in every state (review and browser tests) |
+| `/debug/components` | GET | Component gallery rendered server-side from the Component State Matrix: every catalog component, size and state, each in both themes and both directions (a wrapper sets `data-theme` and `dir`), for review and browser tests; the operator token applies like every `/debug` route |
 | `/debug/memory` | GET | Memory usage statistics |
 | `/debug/tasks` | GET | Async task statistics |
 
@@ -2232,7 +2232,7 @@ When `maintainer_email` is unset, use `authors = ["{maintainer_name}"]` instead.
 - Version numbers are examples - always use latest stable versions
 - Not all projects need all modules - include only what you use
 - Clean up unused dependencies: `cargo fix` and `cargo udeps` help identify unused crates
-- **NEVER run `cargo` directly on the host - always use Makefile targets (`make build`, `make test`, etc.)**
+- **NEVER run `cargo` directly on the host - always use Makefile targets (`make build`, `make test`, etc.); the one exception is the `tests/*.sh` scripts, which build host-only debug binaries with a direct toolchain-container command and never call `make`**
 
 ---
 
@@ -2882,10 +2882,10 @@ Current:
 |-------------|-------|
 | Username | `{internal_name}` |
 | Group | `{internal_name}` |
-| UID/GID | **Must match** - same value for both UID and GID |
+| UID/GID | **Must match** for an account the application creates (same value for UID and GID). An existing account named `{internal_name}` with IDs in the range is reused as it is even when its UID and GID differ; its IDs are never changed |
 | UID/GID Range | **200-899** (safe system range, avoids well-known service IDs) |
 | Shell | `/sbin/nologin` or `/usr/sbin/nologin` |
-| Home | Config directory (`/etc/{internal_org}/{internal_name}`) or data directory (`/var/lib/{internal_org}/{internal_name}`) |
+| Home | Data directory (`/var/lib/{internal_org}/{internal_name}`), which is `{data_dir}` |
 | Type | System user (no password, no login) |
 | Gecos | `{internal_name} service account` |
 
@@ -3869,7 +3869,7 @@ Self-Healing Successful?                        │
     │        Resume Normal Operation
     │
     └─► NO: Continue in Maintenance Mode
-            Retry every 30 seconds (the configured `maintenance.self_healing.interval`, 30 seconds by default, until max_attempts is reached; 0 = forever)
+            Retry every 30 seconds (the configured `maintenance.self_healing.retry_interval`, 30 seconds by default, until max_attempts is reached; 0 = forever)
             Log fix instructions to server log
 ```
 
@@ -4011,7 +4011,7 @@ X-Maintenance-Reason: database_connection
 
 **`mode` always reports the configured MODE (`production`/`development`/`debug`) — maintenance is a state carried by `status`, never a mode. HTTP code: `503 Service Unavailable`.**
 
-**Self-healing limit.** `max_attempts: 0` retries every 30 seconds forever; a positive value caps the failed attempts, after which the health fields keep `attempts`, report `exhausted` and recovery needs an operator restart. A positive value caps the failed attempts: once it is reached retrying stops and the server stays in maintenance mode (writes keep answering `503`; reads keep working only while the database or a usable cache can answer them, and with neither, for example a remote database that is down and no usable cache, only the health endpoints answer and every other route is `503`). `maintenance.self_healing` in `/server/healthz` then reports `enabled: false`, `exhausted: true` and `next_attempt: null`; the audit log records `server.self_healing_exhausted` (reason, attempts); and one notification (when email is configured) says operator action is needed. The server leaves maintenance mode only when an operator removes the cause and restarts the service (`--service restart`); a restart also resets the attempt count.
+**Self-healing limit.** `max_attempts: 0` retries every `retry_interval` (30 seconds by default) forever; a positive value caps the failed attempts, after which the health fields keep `attempts`, report `exhausted` and recovery needs an operator restart. A positive value caps the failed attempts: once it is reached retrying stops and the server stays in maintenance mode (writes keep answering `503`; reads keep working only while the database or a usable cache can answer them, and with neither, for example a remote database that is down and no usable cache, only the health endpoints answer and every other route is `503`). `maintenance.self_healing` in `/server/healthz` then reports `enabled: false`, `exhausted: true` and `next_attempt: null`; the audit log records `server.self_healing_exhausted` (reason, attempts); and one notification (when email is configured) says operator action is needed. The server leaves maintenance mode only when an operator removes the cause and restarts the service (`--service restart`); a restart also resets the attempt count.
 
 ### Recovery (Automatic)
 
@@ -4413,7 +4413,7 @@ impl CreateResourceRequest {
 | `yaml.d/logs.yml` | `server.logs` |
 | `yaml.d/metrics.yml` | `server.metrics` |
 | `yaml.d/notifications.yml` | `server.notifications` |
-| `yaml.d/tor.yml` | `server.tor` and the top-level `tor` |
+| `yaml.d/tor.yml` | `server.tor` (the runtime `tor.onion_address` is state, never configuration) |
 | `yaml.d/i2p.yml` | `server.i2p` |
 | `yaml.d/maintenance.yml` | `server.maintenance`, `server.scheduler`, `server.update`, `server.auto_update`, `server.backup`, `server.restore`, `server.import` and the top-level `cli` |
 | `yaml.d/accounts.yml` | `server.auth`, `server.users`, `server.orgs`, `server.session`, `server.admin`, `server.admin_path` |
@@ -7689,7 +7689,7 @@ The client binary applies the same pre-scan to its own command flags (PART 32). 
 | **Errors go to stderr** | `Error: ...`, `ERROR: ...`, `FAILED: ...`, `SKIP: ...` and `Warning: ...` are written to stderr, never stdout. A shell script writes them with `>&2` |
 | **Clean machine output** | With `--output json` (or any non-text format) stdout holds ONLY the document; errors stay on stderr, so `command \| jq` never reads a diagnostic |
 | **A non-zero exit has a reason** | Every non-zero exit is preceded by one line on stderr saying what failed (`Error: {what failed}` for the CLI, `{program}: {what failed}` for the server binary, `ERROR: {what failed}` for a script). User-facing binaries localize it (i18n); a script prints English |
-| **Help and usage** | `--help` and `--version` asked for explicitly: stdout, exit `0`. A usage error (bad flag, missing argument, unknown subcommand) prints the one-line problem and a usage hint to stderr and exits `2` |
+| **Help and usage** | `--help` and `--version` asked for explicitly: stdout, exit `0`. A usage error (bad flag, missing argument, unknown subcommand; where bare arguments are a search term, the first word is a subcommand only when it names one, otherwise all arguments are the term) prints the one-line problem and a usage hint to stderr and exits `2` |
 | **Color only on a terminal** | ANSI color and emoji are written to a stream only when that stream is a terminal and `NO_COLOR` is unset (see "NO_COLOR Support"); an explicit `output.emoji` governs emojis here too (`true` writes them even with `NO_COLOR`, `false` never) and `TERM=dumb` always wins; a pipe or a file always receives plain text |
 | **Logging is separate** | Log files, console log lines and their levels follow the logging PART; this section governs what a command prints as its own output. A fatal startup failure is printed to stderr before the process exits AND logged |
 | **`--status`** | Healthy: the result on stdout, exit `0`. Unhealthy: the reason on stderr, exit `1` |
@@ -8455,7 +8455,7 @@ PHASE 5: Server startup (actual server start)
     │  (priority 3-4)
     ├─ Resolve {app_mode} via get_app_mode_string()
     ├─ Resolve {startup_datetime} = the current time at this step in the server's timezone (`TZ`, default `America/New_York`), human-readable as `%B %d, %Y at %H:%M:%S %Z` ("Human-Readable Values (Frontend)")
-    └─ Build `urls` from the resolved {proto}/{fqdn}/{port} and call
+    └─ Build `urls` from the resolved {proto}/{fqdn}/{port} plus the configured `server.baseurl` (appended when it is not `/`; no reverse-proxy headers exist at startup) and call
        print_server_startup_banner(&info) with a
        ServerBannerInfo built from the resolved placeholders — the banner's "Listening on" line ALWAYS shows the
        resolved {fqdn}, never the raw bind {address} (see "URL Variables"
@@ -10912,7 +10912,7 @@ update:
 
 **Autodiscover response.** `/api/autodiscover` follows the standard envelope like every JSON route (it is unversioned, not unenveloped): `{"ok": true, "data": {...}}`. `data.api.current_version` is the API version prefix the server serves (for example `v1`); `data.cli_versions` and `data.cli_min_version` are described below; the rest of `data` is exactly `name` (the project name), `version` (the running version), `urls` (an array of public origins, each `scheme://host[:port]` with no path: the origin of this request first, then every other configured `DOMAIN` entry and learned reverse-proxy host, without duplicates; the `.onion` and `.b32.i2p` addresses are never in it, they have their own fields), and `onion` and `i2p` (the hidden-service addresses, present only when that overlay is enabled with `server.tor.expose` / `server.i2p.expose` set to `true`, default `false`). The server publishes no settings, no config schema and no option list: the CLI carries its own configuration (`cli.yml`). A client, and every test helper, reads these fields under `data`.
 
-**CLI binaries: where they come from.** The binaries the server distributes live in `{data_dir}/cli/` (override: `cli.binary_download.dir`) and are provisioned by the OPERATOR, or by the image or package build, by copying the files of a release into it: `{project_name}-cli-{os}-{arch}[.exe]`, `version.txt` and `sha256.txt` (the release already produces all three: "Release Artifacts"). The server never builds, downloads or edits them. At start, and whenever the directory changes, it derives what it publishes itself: the platforms are the `{os}-{arch}` of the files present, `version` is the line of `version.txt`, and `sha256` is read from `sha256.txt` AND recomputed from the file; a file whose hash does not match is not published and a WARN names it. An empty or missing directory publishes `cli_versions: {}`, `/cli/binaries/*` answers `404 NOT_FOUND`, and the CLI reports that no update is available. `cli_min_version` comes only from `server.update.cli_min_version`.
+**CLI binaries: where they come from.** The binaries the server distributes live in `{data_dir}/cli/` (override: `cli.binary_download.dir`) and are provisioned by the OPERATOR, or by the image or package build, by copying the files of a release into it: `{project_name}-cli-{os}-{arch}[.exe]`, `version.txt` and `sha256.txt` (the release already produces all three: "Release Artifacts"). The directory holds ONE channel's release, the channel the server itself follows; `cli_versions` and `version.txt` describe that channel only and there are no per-channel subdirectories. The server never builds, downloads or edits them. At start, and whenever the directory changes, it derives what it publishes itself: the platforms are the `{os}-{arch}` of the files present, `version` is the line of `version.txt`, and `sha256` is read from `sha256.txt` AND recomputed from the file; a file whose hash does not match is not published and a WARN names it. An empty or missing directory publishes `cli_versions: {}`, `/api/{api_version}/cli/binaries/*` answers `404 NOT_FOUND`, and the CLI reports that no update is available. `cli_min_version` comes only from `server.update.cli_min_version`.
 
 **Configuration (area file `yaml.d/maintenance.yml`, PART 5 "Area Files and Automatic Migration"; never `server.yml`):**
 
@@ -10930,7 +10930,7 @@ cli:
 | Event | Producer | Description |
 |-------|----------|-------------|
 | `cli.update_started` | Server | A CLI binary download was served: logged with the OS-arch, the served version and the client IP |
-| `cli.token_revoked_detected` | Server | The server answered `401 TOKEN_REVOKED` to a CLI request (User-Agent `{project_name}-cli/...`): logged with the token prefix, never the token |
+| `cli.token_revoked_detected` | Server | The server answered `401 TOKEN_REVOKED` to a CLI request (User-Agent `{project_name}-cli/...`): logged with `token_prefix_sha256[:8]` (the stable hash, never a plaintext prefix), never the token |
 | `cli.update_completed` | CLI | The CLI restarted on the new version (old version, new version, OS-arch) |
 | `cli.update_checksum_invalid` | CLI | The SHA-256 did not match the published checksum (versions, OS-arch) |
 | `cli.update_forced` | CLI | The CLI is below `cli_min_version` and refuses further requests (current version, minimum) |
@@ -14180,7 +14180,7 @@ Server: https://{project_name}.example.com
 Server Version: {project_version} (compatible)
 ```
 
-**Version compatibility check:** CLI queries server `/api/{api_version}/version` and warns if versions differ significantly.
+**Version compatibility check:** CLI reads the `version` field of the server's `/api/autodiscover` response and warns if versions differ significantly.
 
 ### Determining If Project Needs CLI
 
@@ -15678,7 +15678,7 @@ The root secret all other derived material hangs off. Without it, in-flight HMAC
 | Rule | Detail |
 |------|--------|
 | Previous value | Kept in `server.db` as the rows `app_secrets.{name}_previous` and `app_secrets.{name}_previous_until` (a UTC timestamp: the rotation time plus the grace period: 7 days for `installation_secret` and `cookie_signing_key`, 30 days for `encryption_key`). A previous `encryption_key` is stored AES-256-GCM-wrapped under the new key, never in plaintext |
-| Order | (1) write the previous-value rows, (2) generate the new value and persist it (a config file is written to a temp file and atomically renamed), (3) re-encrypt or re-base every dependent row EAGERLY, in batches, (4) write the audit event. A row is decrypted with the current key first and the previous key second, so a re-run skips rows that are already done |
+| Order | (1) write the previous-value rows (the `encryption_key` rotation may first stage the new key in `secrets.yml.new`, which is not active until the wrapped previous key is durable: see its order below), (2) generate the new value and persist it (a config file is written to a temp file and atomically renamed), (3) re-encrypt or re-base every dependent row EAGERLY, in batches, (4) write the audit event. A row is decrypted with the current key first and the previous key second, so a re-run skips rows that are already done |
 | Failure | The previous value is stored before the new one is used, so a crash or a failed step loses nothing. At the next start the server finishes any unfinished re-encryption: a row readable only with the previous key is re-encrypted then. A second rotation while a previous value still exists is refused until every row is readable under the current key |
 | Reads during grace | A value that fails under the current key is tried with the previous key; a success also re-encrypts that row under the current key |
 | Retirement | The daily cleanup task deletes `{name}_previous` and `{name}_previous_until` once `_until` has passed. A row that still needs the retired value fails closed and logs `security.decrypt_failed` with the table and row id, never any content |
@@ -16563,6 +16563,8 @@ CREATE INDEX IF NOT EXISTS idx_security_reports_status ON security_reports(statu
 CREATE TABLE IF NOT EXISTS security_thanks (
     tracking_id  VARCHAR(32) PRIMARY KEY,
     credit       VARCHAR(120) NOT NULL,
+    handle       VARCHAR(120),
+    visible      BOOLEAN NOT NULL DEFAULT TRUE,
     severity     VARCHAR(16) NOT NULL,
     disclosed_on DATE NOT NULL
 );
@@ -16641,7 +16643,7 @@ CREATE TABLE IF NOT EXISTS security_thanks (
 | **Import private key** | `--maintenance pgp import <file>` | Import an existing `pgp.priv.asc` from a local file (e.g., restoring from backup, migrating from another instance). Same sensitive-operation gate. Validates the key's identity matches the project's expected identity (warns on mismatch — operator can override). |
 | **Delete** | `--maintenance pgp delete` | Sensitive-operation flow with typed confirmation (the operator types the exact phrase `DELETE PGP KEY`). Deletes both keys, removes `Encryption:` line from security.txt. Stored and in-flight PGP-encrypted report bodies become un-decryptable (retention still purges them on schedule) — operator warned and must type confirmation. |
 
-**Keypair properties stored in DB (NOT the keys themselves — those are on disk):**
+**Keypair properties stored in DB (the key files are on disk; in cluster mode the primary also keeps the encrypted private key and the public key in `app_secrets`, see Cluster Mode):**
 
 | Field | Description |
 |-------|-------------|
@@ -18731,8 +18733,8 @@ server:
 
 | Keys | Role |
 |------|------|
-| `consent.*` (banner message, buttons, `show_preferences`; the banner is always fixed to the bottom of the viewport), `cookies.*.enabled` | Behavior only: they change what the server does, they do not add page text. `cookies.*.enabled` decides only whether a category is offered to the visitor; the consent state is the visitor's own `cookie_consent` cookie, and without it every non-essential category is off |
-| `data.sold` | Behavior AND page: picks the banner message variant (the banner text and button labels are built-in translation keys, no setting owns them), the CCPA opt-out and the Data Usage text |
+| `consent.*` (banner message, `message_if_sold`, buttons, policy link, `show_preferences`, `preferences_text`; the banner is always fixed to the bottom of the viewport), `cookies.*.enabled` | Banner text and behavior: an empty text value falls back to the built-in translation key of the visitor's language, a set value is shown as written in every language; the other keys change what the server does and add no page text. `cookies.*.enabled` decides only whether a category is offered to the visitor; the consent state is the visitor's own `cookie_consent` cookie, and without it every non-essential category is off |
+| `data.sold` | Behavior AND page: picks the banner message variant (`message` or `message_if_sold`), the CCPA opt-out and the Data Usage text |
 | `data.stored_on_server`, `data.sharing`, `retention.*`, `cookies.*.description`, `third_party.services` | Page content only: they fill the Data Storage, Data Retention, Cookie Policy and Third Parties sections of `/server/privacy` |
 
 ### Built-in privacy text (not configurable)
@@ -19133,8 +19135,7 @@ server:
     # Type: none (disabled), memory (default), valkey, redis
     type: memory
 
-    # Connection: Use EITHER url OR host/port/password (not both)
-    # url takes precedence if both are specified
+    # Connection: Use EITHER url OR host/port/password; setting both is a configuration error that stops startup
     # Format: redis://{user}:{password}@host:port/db or valkey://...
     url: ""
 
@@ -19389,7 +19390,17 @@ pub struct FeaturesInfo {
     // true = enabled, false = disabled
     pub geoip: bool,
 
+    /// PART 15: rate-limit counter backend
+    pub cache: CacheInfo,
+
     // APP-SPECIFIC: Add your app's features with enabled/disabled status
+}
+
+/// CacheInfo - from the cache layer (PART 15). `fallback` is true while the external cache is unreachable and the in-process counters serve
+/// (see "Counter backend unavailable"); it is false otherwise, including when `cache.type` is `memory` or `none`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheInfo {
+    pub fallback: bool,
 }
 
 // TorInfo - from Tor manager (PART 27.1)
@@ -20003,6 +20014,7 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 | `features.*` | Enabled features (bool or object) |
 | `features.tor.enabled` | The `tor` binary was found, so the hidden service is active on this instance (there is no toggle) |
 | `features.tor.running` | The hidden service is serving |
+| `features.tor.state` | Full lifecycle for operators: `disabled`, `no_provider`, `starting`, `building`, `running`, `error` (the same values as CLI `--status`, PART 32.1) |
 | `features.tor.status` | `disabled`, `starting`, `healthy` or `unavailable`; never free text (see "Overlay Network Health") |
 | `features.tor.hostname` | Onion address (if running) |
 | `features.i2p.enabled` | The resolved `server.i2p.enabled` is true (on by default in an application container, opt-in elsewhere) AND a provider was found |
@@ -20011,6 +20023,7 @@ Same underlying health response as `/server/healthz`, but formatted using the st
 | `features.i2p.state` | Full lifecycle: `disabled`, `no_provider`, `starting`, `building`, `running`, `error` (the same values as CLI `--status`, PART 27.2) |
 | `features.i2p.hostname` | `.b32.i2p` address (if running) |
 | `features.i2p.provider` | i2pd, sam, or none |
+| `features.cache.fallback` | `true` while the external cache is unreachable and the in-process counters serve ("Counter backend unavailable"); `false` otherwise |
 | `checks.*` | Service health (ok, degraded, error), including dataset checks (`geoip_*`, `blocklist_*`, `data_*`) |
 | `stats.requests_total` | Total requests served |
 | `stats.requests_24h` | Requests in last 24 hours |
@@ -20232,7 +20245,7 @@ Plain text, no color. The first line is always `{project_name} {project_version}
 
 | API Type | Frontend Required | Example |
 |----------|-------------------|---------|
-| **Project-specific features** | Yes | `/api/{api_version}/items` → `/items` page |
+| **Project-specific features** | Yes (non-privileged ones; privileged operations of an API project are API and CLI only, PART 1 pairing rule) | `/api/{api_version}/items` → `/items` page |
 | **Admin features** | Yes when the optional admin panel (PART 28) is enabled, otherwise No | `/api/{api_version}/server/{admin_path}/*` → `/server/{admin_path}/*` pages; without PART 28 administration is file-only and has no web routes |
 | **System-only (machine) endpoints** | No (API-only, marked "machine-only" in its route row) | `/api/{api_version}/server/auth/check`, the MCP endpoint, `/api/autodiscover` |
 | **Health/status** | Yes | `/server/healthz` has HTML frontend (with emojis), `/api/{api_version}/server/healthz` is JSON, `/api/healthz` is direct alias JSON |
@@ -20242,7 +20255,7 @@ Plain text, no color. The first line is always `{project_name} {project_version}
 | **API first** | API is complete and works standalone |
 | **Frontend consumes API** | Frontend makes requests to API, displays responses |
 | **Full functionality** | User-facing features work completely in browser |
-| **CRUD parity** | If user can do it in API, they can do it in frontend |
+| **CRUD parity** | If a user can do it in the API, they can do it in the frontend (non-privileged features; privileged operations of an API project have no page) |
 
 **Example - Project-Specific API Features:**
 
@@ -21252,7 +21265,7 @@ fn render_no_js_html(data: &impl serde::Serialize) -> String {
 | Rule | Description |
 |------|-------------|
 | **Sync with project** | Both MUST reflect current project API at all times |
-| **Sync with each other** | Both describe the same API: GraphQL is query-only (reads, per the route contract), so every read operation a client may call appears in both, while write operations (POST, PUT, PATCH, DELETE) exist in REST and Swagger only. Not every read is a GraphQL field: a route declared `Binary` (an image or a file, which a GraphQL response cannot carry) appears as its metadata and URL only, and the `service`-auth routes and the routes with `internal` set (metrics, debug) are in neither GraphQL nor MCP |
+| **Sync with each other** | Both describe the same API: GraphQL is query-only (reads, per the route contract), so every public read operation a client may call appears in both (GraphQL carries public data only and needs no authentication: owner, operator and token-gated reads exist in REST only), while write operations (POST, PUT, PATCH, DELETE) exist in REST and Swagger only. Not every read is a GraphQL field: a route declared `Binary` (an image or a file, which a GraphQL response cannot carry) appears as its metadata and URL only, and the `service`-auth routes and the routes with `internal` set (metrics, debug) are in neither GraphQL nor MCP |
 | **Auto-generated** | Both specs generated from code (annotations, comments, or schema) |
 | **Never manual** | NEVER manually edit the generated OpenAPI JSON or generated GraphQL output (code-first: the schema built from the code; schema-first: the generated Go types). In schema-first the hand-written `schema.graphqls` is the one source and IS edited |
 | **Build-time generation** | Specs regenerated on every build |
@@ -22566,7 +22579,7 @@ pub struct ServerBannerInfo {
 }
 
 // The Full and Compact levels print, after the URL list and in this order, every non-empty field of startup_datetime, onion_address, i2p_address,
-// smtp_address and setup_token through print_server_banner_extras(info, lang); the Plain, Minimal and Micro levels print URLs only.
+// smtp_address and setup_token through print_server_banner_extras(info); the Plain, Minimal and Micro levels print no extras (only the lines their own renderers draw).
 pub fn print_server_startup_banner(info: &ServerBannerInfo) {
     let (app_name, version, app_mode, urls, force_color, _lang) = (info.app_name.as_str(), info.version.as_str(), info.app_mode.as_str(), info.urls.as_slice(), info.force_color, info.lang.as_str());
     let width = terminal_size().map(|(Width(w), _)| w as usize).unwrap_or(80);
@@ -22583,8 +22596,8 @@ pub fn print_server_startup_banner(info: &ServerBannerInfo) {
     }
 
     match width {
-        w if w >= 80 => print_server_banner_full(app_name, version, app_mode, urls, use_colors),
-        w if w >= 60 => print_server_banner_compact(app_name, version, app_mode, urls, use_colors),
+        w if w >= 80 => print_server_banner_full(info, use_colors),
+        w if w >= 60 => print_server_banner_compact(info, use_colors),
         w if w >= 40 => print_server_banner_minimal(app_name, version, urls),
         _ => print_server_banner_micro(app_name, urls),
     }
@@ -22600,7 +22613,8 @@ pub fn print_server_banner_plain(app_name: &str, version: &str, app_mode: &str, 
     println!();
 }
 
-pub fn print_server_banner_full(app_name: &str, version: &str, app_mode: &str, urls: &[String], _use_colors: bool) {
+pub fn print_server_banner_full(info: &ServerBannerInfo, _use_colors: bool) {
+    let (app_name, version, app_mode, urls) = (info.app_name.as_str(), info.version.as_str(), info.app_mode.as_str(), info.urls.as_slice());
     // Full ASCII art logo (useColors gates ANSI styling of the art/labels)
     println!("{}", get_ascii_art(app_name));
     println!();
@@ -22610,16 +22624,19 @@ pub fn print_server_banner_full(app_name: &str, version: &str, app_mode: &str, u
     for url in urls {
         println!("  🌐 {}", url);
     }
+    print_server_banner_extras(info);
     println!();
 }
 
-pub fn print_server_banner_compact(app_name: &str, version: &str, app_mode: &str, urls: &[String], _use_colors: bool) {
+pub fn print_server_banner_compact(info: &ServerBannerInfo, _use_colors: bool) {
+    let (app_name, version, app_mode, urls) = (info.app_name.as_str(), info.version.as_str(), info.app_mode.as_str(), info.urls.as_slice());
     // No ASCII art, just icons and text (useColors gates ANSI styling)
     println!("🚀 {} v{}", app_name, version);
     print_server_banner_app_mode_line(app_mode, true);
     for url in urls {
         println!("🌐 {}", url);
     }
+    print_server_banner_extras(info);
 }
 
 pub fn print_server_banner_minimal(app_name: &str, version: &str, urls: &[String]) {
@@ -22637,6 +22654,22 @@ pub fn print_server_banner_micro(app_name: &str, urls: &[String]) {
         println!("{} {}", app_name, extract_host_port(url));
     } else {
         println!("{}", app_name);
+    }
+}
+
+// print_server_banner_extras prints, in this order, each non-empty extra of the info (Full and Compact levels only)
+pub fn print_server_banner_extras(info: &ServerBannerInfo) {
+    let extras = [
+        ("cli.banner_started_label", &info.startup_datetime),
+        ("cli.banner_onion_label", &info.onion_address),
+        ("cli.banner_i2p_label", &info.i2p_address),
+        ("cli.banner_smtp_label", &info.smtp_address),
+        ("cli.banner_setup_token_label", &info.setup_token),
+    ];
+    for (key, value) in extras {
+        if !value.is_empty() {
+            println!("  {}: {}", i18n::t(key), value);
+        }
     }
 }
 
@@ -23472,7 +23505,7 @@ curl -q -LSsf -H "Accept: text/html" /items/0b9a7c5e-3f1d-4a8e-9c2b-6d4e1f7a8b30
 ```bash
 # Test frontend returns text for CLI
 RESULT=$(curl -q -LSsf http://localhost:80/items/0b9a7c5e-3f1d-4a8e-9c2b-6d4e1f7a8b30)
-if echo "$RESULT" | grep -q "testitem"; then
+if echo "$RESULT" | grep "testitem" >/dev/null; then
     echo "✓ Frontend returns item data"
 else
     fail "Item data not returned"
@@ -23480,7 +23513,7 @@ fi
 
 # Test frontend returns HTML for browser (optional, just check Content-Type)
 CONTENT_TYPE=$(curl -q -LSsfI -H "Accept: text/html" http://localhost:80/items/0b9a7c5e-3f1d-4a8e-9c2b-6d4e1f7a8b30 | grep -i "content-type")
-if echo "$CONTENT_TYPE" | grep -q "text/html"; then
+if echo "$CONTENT_TYPE" | grep "text/html" >/dev/null; then
     echo "✓ Frontend serves HTML to browsers"
 fi
 ```
@@ -24421,6 +24454,7 @@ No other stylesheet is written by hand: a project never adds a file per page. Th
 | `.grid` | Responsive columns, no media query: `repeat(auto-fit, minmax(min(var(--grid-min), 100%), 1fr))` | `--grid-min` (default `16rem`) |
 | `.section-card` | Card surface (`--color-bg-card`), `--radius-lg`, padding `--space-6`, declares `container-type: inline-size` | `.section-card--flush` removes padding for tables |
 | `.page-header` | The `<h1>` block with the optional back link | none |
+| `.breadcrumb` | The back link of a sub-page: one link to its hub, above the `<h1>` | none |
 | `.form-actions` | The action row of a form: a `.cluster` that is followed by `--space-6` | none |
 | `.table-wrapper` | Horizontal scroll container for a table | none |
 
@@ -24721,7 +24755,7 @@ html.theme-light {
 | **Customize through properties** | A component exposes custom properties for what may vary; overriding its selectors from another file is a defect |
 | **No `!important`, no ID selectors** | The `!important` of the print block and of the reduced-motion block is the only exception; both live in `utilities` |
 | **Examples are unwrapped** | The CSS examples in this document are shown without their `@layer` wrapper to stay readable; in a project every rule sits inside its layer |
-| **Lint gate** | A CSS lint test runs in `make test` (Phase 1, no Node and no `package.json`): a unit test in the package that embeds the static files parses every embedded project stylesheet (not the vendored and generated-theme files of the exemption) with a pure-Rust CSS parser (the `lightningcss` crate) and fails on an unlayered rule, `!important`, an ID selector, a selector above `(0,4,1)` in `components`, and a descendant selector whose subject is a bare element under a generic or foreign component class (a component's own block may style its own `dt`, `dd`, `th`, `td`, `input` and `label`), plus every check of "CSS lint rules" above (token-bound values, logical properties, cataloged classes); the two lists together are the complete gate |
+| **Lint gate** | A CSS lint test runs in `make test` (Phase 1, no Node and no `package.json`): a unit test in the package that embeds the static files parses every embedded project stylesheet (not the vendored and generated-theme files of the exemption) with a pure-Rust CSS parser (the `lightningcss` crate) and fails on an unlayered rule, `!important`, an ID selector, a selector above `(0,4,1)` in `components`, and a descendant selector whose subject is a bare element under a generic or foreign component class (a component's own block may style its own `dt`, `dd`, `th`, `td`, `pre`, `input` and `label`), plus every check of "CSS lint rules" above (token-bound values, logical properties, cataloged classes); the two lists together are the complete gate |
 
 ## Reuse Before Creating
 
@@ -26137,7 +26171,7 @@ function isInstalledPWA() {
 
 ### Push Notifications (PWA)
 
-**Push notifications work even when app is closed (like native apps).**
+**Conditional (built only when IDEA.md requires closed-app notifications): push notifications work even when the app is closed (like native apps).**
 
 **(Only when the notification system (PART 16) enables web push. Push subscriptions belong to the signed-in system user (`sys_` token login). Skip this entire subsection when web push is not configured.)**
 
@@ -26582,7 +26616,7 @@ Sync page (`/server/preferences/sync`), one form, one Import button:
 | Endpoint | `data` |
 |----------|--------|
 | `GET /api/{api_version}/server/preferences` | `{ "theme": "dark", "lang": "en", "prefs": { "sort": "name" } }` |
-| `GET /api/{api_version}/server/preferences/sync` | the object above plus `"url": "https://host/server/preferences/sync/import?..."` and `"code": "..."` |
+| `GET /api/{api_version}/server/preferences/sync` | the object above plus `"url": "https://host/server/preferences/sync/import?..."` and `"code": "..."`; `url` is absolute from the resolved `{fqdn}`, and when none resolves it is the origin-relative path (`/server/preferences/sync/import?...`) while `code` is always present |
 | `GET /api/{api_version}/server/preferences/sync/import` and `POST /api/{api_version}/server/preferences` | `{ "theme": "dark", "lang": "fr", "prefs": {}, "applied": ["lang"], "ignored": ["cookie_consent"] }` |
 
 `consent_required` is `true` only when rule 18 blocked every write and is absent otherwise. `prefs` is keyed by the bare `{key}` (without the `{project_name}_pref_` prefix) and is `{}` when none are set. `theme`, `lang` and `prefs` are the resulting effective state. `applied` and `ignored` list request parameter names (`theme`, `lang`, `{project_name}_pref_{key}`, or the unrecognized name) and are always arrays. The names `url` and `code` are fixed — never `full_url`, `short_code`, `export_url` or `export_code`.
@@ -28278,7 +28312,7 @@ Without the script: Esc and overflow detection are unavailable, but the scrim, t
 
 | Rule | Why / how |
 |------|-----------|
-| **Never hide off-canvas with a negative offset** (`right: -280px`, `left: -100%`) | The box still extends the scrollable width, so the page becomes wider than the screen and mobile browsers shrink the whole layout (content at ~60% width, dead space on the right). Hide with `transform: translateX(100%)` + `visibility: hidden` (and `inert` when JS is present), never with a negative position |
+| **Never hide off-canvas with a negative offset** (`right: -280px`, `left: -100%`) | The box still extends the scrollable width, so the page becomes wider than the screen and mobile browsers shrink the whole layout (content at ~60% width, dead space on the right). Hide with `clip-path: inset(0 0 0 100%)` + `visibility: hidden` (and `inert` when JS is present), never with a negative position or an off-canvas `transform` (both widen the document) |
 | **The drawer and its scrim are children of `<body>`**, siblings after `<main>`, not descendants of `<header>` | A `position: fixed` element inside an ancestor that has `transform`, `filter`, `backdrop-filter`, `perspective`, `contain` or `will-change` is positioned against that ancestor, not the viewport: the drawer collapses to header size, clips ("Cairnb…") and renders under page content. The header MUST NOT use those properties on any ancestor of the panel; apply a frosted-glass effect to a `::before` pseudo-element of the header instead |
 | **Opaque panel** | The drawer background is a solid theme color. Hero text or pills showing through the menu is a bug |
 | **Every link, in order** | The panel lists the same links as the desktop nav (the screenshot showed one link). Active page marked with `aria-current="page"` |
@@ -28599,7 +28633,7 @@ Full CSS rules (custom properties, theming, layout): see "CSS Rules" earlier in 
 | Theme | When Active | Default | Color Scheme |
 |-------|-------------|---------|--------------|
 | **Dark** | User selects dark OR system dark + auto mode | **YES** | Dark theme colors (see the dark token set in `common.css`) |
-| **Light** | User selects light OR system light + auto mode | No | Light theme colors (see `light.css`) |
+| **Light** | User selects light OR system light + auto mode | No | Light theme colors (the light token set of `common.css`) |
 | **Auto** | Follows system preference (light/dark) | No | System `prefers-color-scheme` |
 
 **Critical Theme Rules (APPLY TO ENTIRE PROJECT):**
@@ -28629,7 +28663,7 @@ Full CSS rules (custom properties, theming, layout): see "CSS Rules" earlier in 
 
 ### Unified Color Palette
 
-**Colors are defined ONCE in Rust, as the literal hex source of truth for Web CSS, Swagger, and GraphiQL.** CLI, TUI, and GUI derive their theming from the same semantic roles but resolve them differently (see below) rather than consuming the hex values directly.
+**Colors are defined ONCE in Rust, as the source of truth for the palette roles: `common.css` mirrors them (checked by a unit test) and the Swagger and GraphiQL themes are generated from them.** CLI, TUI, and GUI derive their theming from the same semantic roles but resolve them differently (see below) rather than consuming the hex values directly.
 
 ```rust
 // src/common/theme/colors.rs
@@ -31314,7 +31348,7 @@ curl -H "Accept: application/xml" https://jokes.example.com/api/v1/joke</code></
 | `#limits` | Behavior and limits | `POST` only; no sessions; the same rate limits and audit as the API; `Origin` validated; the supported MCP protocol versions |
 | `#troubleshooting` | Troubleshooting | A table of `400` (protocol-version or header mismatch), `401` (missing, invalid or expired token — `WWW-Authenticate: Bearer`), `403` (bad `Origin` or insufficient scope), `405` (GET or DELETE; the endpoint is POST-only) with the fix for each |
 
-**Project expansion (required content):** the project appends its own section, `#project`, after the base sections. The text comes from IDEA.md `## Business logic` and is stored as Markdown in `server.pages.help.mcp` (canonical storage is the `yaml.d/pages.yml` area file, key `server.pages.help.mcp`, edited there by the operator and applied on config reload; the admin panel also exposes it in Pages → Help, and both write the same `server.pages.help.mcp` value in `yaml.d/pages.yml`). It MUST use the project's real tool names and real data — example prompts a user can paste into an assistant, per-tool tips and limits, and documentation of any MCP resources or prompts the project exposes. It never repeats or contradicts the base sections, and generic placeholder text is forbidden (same rule as `/server/help`).
+**Project expansion (required content):** the project appends its own section, `#project`, after the base sections. The text comes from IDEA.md `## Business logic` and is stored as Markdown in `server.pages.help.mcp` (canonical storage is the `yaml.d/pages.yml` area file, key `server.pages.help.mcp`, edited there by the operator and applied on config reload; the admin panel also exposes it in Pages → Help as its own "MCP project section" field, separate from the general Help `content` field (`server.pages.help.content`, served by `/api/{api_version}/server/help`), and the MCP help API `/api/{api_version}/server/help/mcp` serves the base sections plus this `project` section; the file and the admin field both write the same `server.pages.help.mcp` value in `yaml.d/pages.yml`). It MUST use the project's real tool names and real data — example prompts a user can paste into an assistant, per-tool tips and limits, and documentation of any MCP resources or prompts the project exposes. It never repeats or contradicts the base sections, and generic placeholder text is forbidden (same rule as `/server/help`).
 
 **JSON body (`GET /api/{api_version}/server/help/mcp`, envelope `{ "ok": true, "data": ... }`; field names are fixed):**
 ```json
@@ -31438,6 +31472,7 @@ When the admin panel is enabled (PART 28) all pages are editable at `/server/{ad
 | `/api/{api_version}/server/contact` | GET | Contact form description (JSON, no auth): `fields` (list of `{name, type, required, max_length, required_when, max_length_when}`, see "Length limits"), `captcha` (`{provider: "simple", captcha_id, question}` for `simple`; `{provider, site_key, fallback}` for `recaptcha` and `hcaptcha`, where `fallback` is the same `{provider: "simple", captcha_id, question}` object; a new challenge on every call), `security_url`, `abuse_email`. Nothing else about recipients |
 | `/api/{api_version}/server/contact` | POST | Submit the report form in two calls (the first returns the `review` and a `review_token` and delivers nothing; the second repeats every field with `review_token` and `confirmed: true` and delivers): the fields above (including `type` and the fields that type requires), the `form_token` from the `GET`, no `website`, plus ONE captcha proof (`captcha_response`, or `captcha_id` + `captcha_answer`; see "No-JavaScript fallback and the simple challenge") |
 | `/api/{api_version}/server/auth/check` | GET | Token check (machine-only, no page; `Authorization: Bearer` required): `200` with `{kind}` when the token is valid (`kind` is `operator`, `owner` or, where the project has accounts, `user`), `401` otherwise. Side-effect free, rate-limited like other auth endpoints, never echoes the token |
+| `/api/{api_version}/server/reports/{name}` | POST | Browser report intake (machine-only, no page, no auth): `{name}` is `csp`, `nel` or `default`; accepts `application/csp-report` and `application/reports+json`, answers `204 No Content`, rate-limited per IP (PART 11, "Reporting API") |
 | `/api/{api_version}/server/help` | GET | Help page (JSON, no auth): `title`, `content` (Markdown source of `server.pages.help.content` in the resolved request language, falling back as above), `format` (always `markdown`) and `pages` (the registered help pages, each `{title, path}`, in hub order) |
 | `/api/{api_version}/server/help/mcp` | GET | MCP help (JSON, no auth; the same content as the help page): `enabled`, `url`, `aliases`, `auth`, `tools` and `project` — field names are fixed, see "/server/help/mcp" |
 | `/api/{api_version}/server/terms` | GET | Terms of service (JSON, no auth): `title`, `content` (the source of `server.branding.content.terms` for the request's language, or the built-in terms in Markdown when there is no entry) and `format` (`markdown`, `html` or `text`) |
@@ -32332,6 +32367,7 @@ Every project MUST include these scheduled tasks:
 | `cve_update` | Daily at 05:00 | Download/update CVE (NVD) and Trivy vulnerability databases — trivy has no separate scheduled task despite its own directory/config; this task owns it too | Yes |
 | `update_check` | Daily at 06:00 | Check release channel for a newer version — notify-only unless `update.auto_install: true` (default false); honors `update.defer_days` | Yes |
 | `token_cleanup` | Every 15 minutes | Remove expired API tokens and sessions, and used or expired simple-captcha challenges | No |
+| `ip_block_cleanup` | Every minute | Lift IP blocks whose duration has expired ("IP Block Management") | No |
 | `log_rotation` | Daily at 00:00 | Rotate and compress old logs | No |
 | `backup_daily` | Daily at 02:00 | Full backup + daily incremental (2 files per run and 3 on disk; the first run has no previous full, so it creates only the full backup, "Incremental Backup Contract") | Yes |
 | `backup_hourly` | Hourly | Hourly incremental (disabled by default) | Yes |
@@ -36322,7 +36358,7 @@ frontend_routes=(
 
 for route in "${frontend_routes[@]}"; do
     # Test HTML response
-    curl -q -LSsf -H "Accept: text/html" "${BASE_URL}${route}" | grep -q "<!DOCTYPE html" || fail "HTML failed for $route"
+    curl -q -LSsf -H "Accept: text/html" "${BASE_URL}${route}" | grep "<!DOCTYPE html" >/dev/null || fail "HTML failed for $route"
     # Test plain text response
     curl -q -LSsf -H "Accept: text/plain" "${BASE_URL}${route}" | head -1 || fail "Plain text failed for $route"
 done
@@ -36903,9 +36939,9 @@ docker run --rm \
     #
     # Example for jokes frontend (smart detection, no .txt - test with text for simplicity):
     #   JOKE=\$(curl -q -LSsf http://localhost:64580/jokes/random)  # CLI auto-detects text
-    #   if echo "\$JOKE" | grep -q "Why"; then echo '✓ Frontend text works'; else fail 'Frontend text'; fi
+    #   if echo "\$JOKE" | grep "Why" >/dev/null; then echo '✓ Frontend text works'; else fail 'Frontend text'; fi
     #   # Optional: verify HTML is served to browsers
-    #   curl -q -LSsfI -H 'Accept: text/html' http://localhost:64580/jokes/random | grep -q 'text/html' || fail 'Frontend HTML'
+    #   curl -q -LSsfI -H 'Accept: text/html' http://localhost:64580/jokes/random | grep 'text/html' >/dev/null || fail 'Frontend HTML'
     #
     # Example for open data CRUD (full test suite):
     #   # API - no auth required
@@ -36920,7 +36956,7 @@ docker run --rm \
 
     echo '=== Open API Smoke Test ==='
     # No token needed for the public endpoints; MCP, metrics and token routes are checked separately (a missing token answers 401)
-    curl -q -LSsf -H 'Accept: application/json' http://localhost:64580/server/healthz | grep -q '"status"' \
+    curl -q -LSsf -H 'Accept: application/json' http://localhost:64580/server/healthz | grep '"status"' >/dev/null \
         && echo '✓ Health endpoint works' \
         || fail 'Health endpoint'
 
@@ -36928,7 +36964,7 @@ docker run --rm \
     # Test that binaries show ACTUAL name in --help/--version (not hardcoded)
     cp /app/${PROJECT_NAME} /app/renamed-server
     chmod +x /app/renamed-server
-    if /app/renamed-server --help 2>&1 | grep -q 'renamed-server'; then
+    if /app/renamed-server --help 2>&1 | grep 'renamed-server' >/dev/null; then
         echo '✓ Server binary rename works (--help shows actual name)'
     else
         fail 'Server --help does not show renamed binary name'
@@ -36942,7 +36978,7 @@ docker run --rm \
         # Test binary rename
         cp /app/${PROJECT_NAME}-cli /app/renamed-cli
         chmod +x /app/renamed-cli
-        if /app/renamed-cli --help 2>&1 | grep -q 'renamed-cli'; then
+        if /app/renamed-cli --help 2>&1 | grep 'renamed-cli' >/dev/null; then
             echo '✓ CLI binary rename works'
         else
             fail 'CLI --help does not show renamed binary name'
@@ -37088,8 +37124,8 @@ if [ "$INIT_MODE" = "systemd" ]; then
     svc_pid()     { systemctl show -p MainPID --value "$INTERNAL_NAME"; }
 else
     UNIT_FILE="/etc/init.d/${INTERNAL_NAME}"
-    svc_active()  { rc-service "$INTERNAL_NAME" status 2>&1 | grep -q started; }
-    svc_enabled() { rc-update show default | grep -qw "$INTERNAL_NAME"; }
+    svc_active()  { rc-service "$INTERNAL_NAME" status 2>&1 | grep started >/dev/null; }
+    svc_enabled() { rc-update show default | grep -w "$INTERNAL_NAME" >/dev/null; }
     svc_pid()     { cat "/var/run/${INTERNAL_ORG}/${INTERNAL_NAME}/${INTERNAL_NAME}.pid"; }
 fi
 svc_stopped() { ! svc_active; }
@@ -37450,7 +37486,7 @@ Bootstrapping Tor and I2P needs outbound network access from the container. When
 
 **Purpose:** Clean-OS testing in real VMs: a pristine guest with its own kernel and a real boot, once per init system (systemd on Debian, OpenRC on Alpine), on whichever hypervisor the host has (Incus `--vm`, libvirt or VirtualBox; see "VM Hypervisors"). It is OPTIONAL: a project adds it only when it really needs a clean system, such as installing onto a pristine OS, a cold power cycle, kernel-dependent behavior, or the "running in a VM" branch. Everything a container can show stays in `tests/docker.sh` (basic) and `tests/incus.sh` (the whole app). It is standalone and developer-initiated like `tests/e2e.sh`: `tests/run_tests.sh` never starts it, and CI never requires it.
 
-**virt.sh MUST:** build with `make build`; run the SAME guest-side steps as `tests/incus.sh` (init identity, `--service --install`, restart, stop and start, the reboot, Tor and I2P), so a VM run is a superset; then add the VM-only checks below. It follows "Incus Discipline", "Incus Virtual Machines" and "VM Hypervisors" exactly: `{project_name}-XXXXXXXX` names, `trap cleanup EXIT INT TERM` before the first create, resource caps, one VM at a time, and a ceiling on every wait. A host without a usable hypervisor is an error (`69` and the reason on stderr), never a skip.
+**virt.sh MUST:** build the host-platform debug binary the way `tests/incus.sh` does (a direct build in the toolchain container, never `make`); run the SAME guest-side steps as `tests/incus.sh` (init identity, `--service --install`, restart, stop and start, the reboot, Tor and I2P), so a VM run is a superset; then add the VM-only checks below. It follows "Incus Discipline", "Incus Virtual Machines" and "VM Hypervisors" exactly: `{project_name}-XXXXXXXX` names, `trap cleanup EXIT INT TERM` before the first create, resource caps, one VM at a time, and a ceiling on every wait. A host without a usable hypervisor is an error (`69` and the reason on stderr), never a skip.
 
 ```bash
 #!/usr/bin/env bash
@@ -45781,9 +45817,9 @@ impl TorService {
 | Child exits before port file | `try_wait` | Fail immediately with the exit status (bad torrc, port in use, `DataDirectory` locked) |
 | `515 Authentication failed` | Step 3 reply | Cookie unreadable or stale: kill child, delete `control_auth_cookie`, restart once; second failure = WARN |
 | `DataDirectory` lock held | Child exits at once | Another Tor uses this dir: kill only the PID in `{data_dir}/tor/tor.pid` if it is a `tor` process we started, then restart once |
-| Bootstrap timeout | Step 4 timeout | Kill child, WARN `Tor bootstrap timeout, hidden service unavailable`; no immediate retry: a bootstrap timeout is not a restart trigger, so Tor stays `unavailable` until the next trigger in "Restart rules" (a crash exit or a `server.tor.*` change) or a server restart |
+| Bootstrap timeout | Step 4 timeout | Kill child, WARN `Tor bootstrap timeout, hidden service unavailable`; no immediate retry: a bootstrap timeout is not a restart trigger, so Tor stays `unavailable` until the next restart trigger (an unexpected Tor exit, a lost control connection or a `server.tor.*` change) or a server restart |
 | `hostname` missing after bootstrap | Step 5 timeout | Kill child, WARN; check `HiddenServiceDir` mode `0700` and ownership |
-| Control connection drops at runtime | Read error | WARN `Tor control connection lost, restarting` (existing Restart rules) |
+| Control connection drops at runtime | Read error | WARN `Tor control connection lost, restarting` (restart trigger: the supervisor restarts Tor after 5 s, 15 s and 45 s, at most 3 consecutive attempts; after the third failure Tor stays `unavailable` until the next trigger) |
 
 **Shutdown:** send `SIGNAL SHUTDOWN` on the control connection, then wait for the process to exit up to 10 s; on timeout kill it. A bare `kill()` is never the first step. `--__OwningControllerProcess` is the backstop if the server dies without running shutdown.
 
@@ -47104,7 +47140,7 @@ HYBRID has no application-level Normal User account type (identity is the OS per
 /server/{admin_path}/security/          # Security settings
 /server/{admin_path}/security/auth      # Authentication config (sessions, MFA)
 /server/{admin_path}/security/tokens    # API token management
-/server/{admin_path}/security/firewall  # Firewall rules
+/server/{admin_path}/security/firewall  # Firewall overview (rules); IP blocks, allow-list and locked accounts are its own pages: security/blocked-ips, security/allowlist, security/locked-accounts
 /server/{admin_path}/system-users       # System Users (read-only view of system_users)
 ```
 
@@ -47526,9 +47562,8 @@ pub fn register_admin_routes(cfg: &Config) -> axum::Router<Arc<AppState>> {
 |---------|-------------|
 | Login page | The shared `/server/auth/login`; an unauthenticated request to `/server/{admin_path}` redirects there |
 | Login form | Admin token (`server.token`) entry, centered card |
-| Session | Cookie-based (30 days default, configurable) |
+| Session | Cookie-based (30 days, absolute, plus the idle timeout) |
 | CSRF | Protection on all forms |
-| Remember Me | Option available (extends to 90 days) |
 | Logout | Always visible in header |
 | MFA | TOTP support (optional, configurable) |
 
@@ -47641,7 +47676,7 @@ On first run, a one-time setup token is generated and displayed in console. Admi
 | 3 | User enters setup token |
 | 4 | Redirect to `/server/{admin_path}/setup` (setup wizard) |
 
-**Setup authorization.** Every setup request, from the page and from the API, carries the first-run `X-Setup-Token` header (never a cookie) and the token is checked on EACH call (`verify`, account creation and the later steps); there is no separate setup session, and "setup session" in the step text means this token-authorized sequence.
+**Setup authorization.** Every API setup request carries the first-run `X-Setup-Token` header (never a cookie); the page's plain HTML forms, which cannot set a header, carry the same token in a hidden `setup_token` field that the web route passes to the same check (never a cookie, never the query string); the token is checked on EACH call (`verify`, account creation and the later steps); there is no separate setup session, and "setup session" in the step text means this token-authorized sequence.
 
 **The setup page works without JavaScript and calls ONLY the routes listed for it.** Each step is a plain server-rendered, CSRF-protected form that posts to a web route which calls the same service functions, token check, setup session and validation as the API step route of the same name, in the same order; JavaScript only enhances it. When it runs, its JavaScript verifies the token with `POST /api/{api_version}/server/{admin_path}/setup/verify` and uses no other path: a `404` on a route such as `/server/admin/verify-token` means the page and the router disagree on the route or on `{admin_path}`. A test loads the setup page and asserts that every request target it makes exists in the router.
 
@@ -47880,8 +47915,6 @@ On first run, a one-time setup token is generated and displayed in console. Admi
 │         │  Admin Token:     │           │
 │         │  [______________] │           │
 │         │                   │           │
-│         │  [ ] Remember me  │           │
-│         │                   │           │
 │         │    [  Login  ]    │           │
 │         │                   │           │
 │         └───────────────────┘           │
@@ -47978,7 +48011,7 @@ On first run, a one-time setup token is generated and displayed in console. Admi
 | `/server/{admin_path}/network/blocklists` | Blocklists | IP/domain blocklists |
 | `/server/{admin_path}/system-users` | System Users | Read-only view of `system_users` (username, uid, token status, last_used_at, rotated_at) |
 | `/server/{admin_path}/backup` | Backup | Create/restore backups |
-| `/server/{admin_path}/maintenance` | Maintenance | Maintenance mode |
+| `/server/{admin_path}/maintenance` | Maintenance | Read-only status and fix guidance of the maintenance state (PART 5): maintenance is entered automatically after a critical failure and left by self-healing or the CLI, never by a toggle on this page; the self-healing pacing is edited under the Maintenance settings |
 | `/server/{admin_path}/updates` | Updates | Check/apply updates |
 | `/server/{admin_path}/info` | Server Info | Version, environment, deps |
 | `/server/{admin_path}/pages/help` | Help | Edit help page content (matches the `{admin_path}/pages/help` API route below and the `/server/{admin_path}/pages` grouping used by About/Privacy/Contact/Terms) |
@@ -48190,9 +48223,9 @@ On first run, a one-time setup token is generated and displayed in console. Admi
 
 | Setting | Control | Default | Restart | Description |
 |---------|---------|---------|---------|-------------|
-| `backup.enabled` | Toggle | On | No | Enable scheduled backups (backup_daily) |
-| `backup.hourly_enabled` | Toggle | Off | No | Enable hourly incremental (backup_hourly) |
-| `backup.schedule` | Text | `0 2 * * *` | No | Daily backup cron schedule |
+| `backup.enabled` | Toggle | On | No | Enable scheduled backups (stored as `server.scheduler.tasks.backup_daily.enabled`) |
+| `backup.hourly_enabled` | Toggle | Off | No | Enable hourly incremental (stored as `server.scheduler.tasks.backup_hourly.enabled`) |
+| `backup.schedule` | Text | `0 2 * * *` | No | Daily backup cron schedule (stored as `server.scheduler.tasks.backup_daily.schedule`; there is no `server.backup.schedule` key) |
 | `backup.retention.max_backups` | Number | `1` | No | Daily full backups to keep (≥1) |
 | `backup.retention.keep_weekly` | Number | `0` | No | Weekly backups (Sunday) - 0 = disabled |
 | `backup.retention.keep_monthly` | Number | `0` | No | Monthly backups (1st) - 0 = disabled |
@@ -48517,7 +48550,7 @@ pub async fn blocklist_middleware(
 
 **API Response Examples:**
 
-Response for `GET /api/{api_version}/server/{admin_path}/network/blocklists`:
+Response `data` (inside the standard `{"ok": true, "data": ...}` envelope) for `GET /api/{api_version}/server/{admin_path}/network/blocklists`:
 
 ```json
 {
@@ -48551,7 +48584,7 @@ Response for `GET /api/{api_version}/server/{admin_path}/network/blocklists`:
 }
 ```
 
-Response for `GET /api/{api_version}/server/{admin_path}/network/blocklists/check/1.2.3.4`:
+Response `data` (inside the standard `{"ok": true, "data": ...}` envelope) for `GET /api/{api_version}/server/{admin_path}/network/blocklists/check/1.2.3.4`:
 
 ```json
 {
@@ -48880,7 +48913,7 @@ The admin panel MUST include a scheduler section with:
 |----------|--------|-------------|
 | `/api/{api_version}/server/{admin_path}/ssl` | GET | Get SSL settings |
 | `/api/{api_version}/server/{admin_path}/ssl` | PATCH | Update SSL settings |
-| `/api/{api_version}/server/{admin_path}/ssl/renew` | POST | Force certificate renewal |
+| `/api/{api_version}/server/{admin_path}/ssl/renew` | POST | Force renewal of an app-managed certificate (`{config_dir}/ssl/letsencrypt/{fqdn}/`); a system-managed (`/etc/letsencrypt`) or user-managed local certificate is not renewed by the app and answers `409 CONFLICT` naming the source |
 
 ### Admin - Tor (`/api/{api_version}/server/{admin_path}/network/tor/`)
 
